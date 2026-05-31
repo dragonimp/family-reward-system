@@ -1,0 +1,13 @@
+{
+  "name": "family-reward-system",
+  "version": "1.0.0",
+  "description": "家庭奖励管理系统 - 孩子积分奖励系统",
+  "techStack": ["ASP.NET Core 10", "React 18", "TypeScript", "Tailwind CSS", "PostgreSQL"],
+  "author": "Hermes Agent",
+  "config": {
+    "apiPort": 5102,
+    "webPort": 3000,
+    "deployPort": 5103,
+    "deployDomain": "happylife.impx.net"
+  }
+}

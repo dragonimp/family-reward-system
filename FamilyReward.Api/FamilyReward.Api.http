@@ -1,0 +1,6 @@
+@FamilyReward.Api_HostAddress = http://localhost:5043
+
+GET {{FamilyReward.Api_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###

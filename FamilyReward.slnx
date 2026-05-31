@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="FamilyReward.Api/FamilyReward.Api.csproj" />
+  <Project Path="FamilyReward.Tests/FamilyReward.Tests.csproj" />
+</Solution>
