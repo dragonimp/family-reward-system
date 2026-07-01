@@ -65,6 +65,60 @@ export interface ApiResponse<T> {
   data: T;
 }
 
+export interface VoiceConfig {
+  enabled: boolean;
+  recognitionLanguage: string;
+  transcriptionProvider: string;
+}
+
+export interface AgentConfig {
+  enabled: boolean;
+  endpoint: string;
+  apiKey: string;
+  model: string;
+  timeout_seconds: number;
+  systemPrompt: string;
+}
+
+export interface SystemConfig {
+  voice: VoiceConfig;
+  agent: AgentConfig;
+}
+
+export interface AgentInvokeRequest {
+  prompt: string;
+  payload?: Record<string, unknown>;
+  apiKey?: string;
+}
+
+export interface AgentInvokeResponse {
+  ok: boolean;
+  status?: number;
+  response?: unknown;
+  error?: string;
+}
+
+export interface RewardCommand {
+  childId?: number | null;
+  childName?: string | null;
+  type: 'score' | 'cash' | 'item';
+  amount: number;
+  category?: string;
+  description?: string;
+  confidence?: number;
+}
+
+export interface RewardParseRequest {
+  text: string;
+}
+
+export interface RewardParseResponse {
+  ok: boolean;
+  command?: RewardCommand;
+  raw?: string;
+  error?: string;
+}
+
 // 分页请求参数
 export interface PaginationParams {
   page: number;

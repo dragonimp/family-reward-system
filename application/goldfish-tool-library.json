@@ -1,0 +1,106 @@
+{
+  "platform": "goldfish",
+  "type": "mcp_tool_library",
+  "name": "family-reward-mcp-tools",
+  "title": "家庭积分系统 MCP 工具库",
+  "description": "接入家庭积分系统后端的统一 MCP 服务：支持孩子管理、积分增减与积分查询，供智能体工具调用。",
+  "services": [
+    {
+      "name": "family-reward-mcp",
+      "title": "家庭积分系统 MCP 服务（统一工具）",
+      "description": "提供 add_child、adjust_score、query_score、query_children 四类业务动作。",
+      "baseUrl": "https://happylife.ai.impx.net",
+      "mcpEndpoint": "/api/mcp",
+      "httpEndpoint": "https://happylife.ai.impx.net/api/mcp",
+      "protocol": ["initialize", "initialized", "notifications/initialized", "ping", "tools/list", "tools/call"],
+      "serviceType": "MCP",
+      "tool": {
+        "name": "family_reward_tool",
+        "description": "家庭积分系统统一工具（用于智能体函数调用）",
+        "inputSchema": {
+          "type": "object",
+          "required": ["action"],
+          "properties": {
+            "action": {
+              "type": "string",
+              "enum": [
+                "add_child",
+                "adjust_score",
+                "query_score",
+                "query_children"
+              ]
+            },
+            "child_id": {
+              "type": "integer",
+              "description": "目标孩子ID（优先）"
+            },
+            "childId": {
+              "type": "integer",
+              "description": "目标孩子ID（兼容别名）"
+            },
+            "child_name": {
+              "type": "string",
+              "description": "目标孩子姓名"
+            },
+            "name": {
+              "type": "string",
+              "description": "新建孩子姓名（add_child）"
+            },
+            "note": {
+              "type": "string",
+              "description": "新建孩子备注"
+            },
+            "score": {
+              "type": "number",
+              "description": "初始积分（add_child）"
+            },
+            "cash": {
+              "type": "number",
+              "description": "初始现金（add_child）"
+            },
+            "items": {
+              "type": "integer",
+              "description": "初始物品数量（add_child）"
+            },
+            "delta": {
+              "type": "number",
+              "description": "积分变化量（adjust_score）"
+            },
+            "amount": {
+              "type": "number",
+              "description": "积分变化量（adjust_score，delta 别名）"
+            },
+            "direction": {
+              "type": "string",
+              "enum": [
+                "+",
+                "-"
+              ],
+              "description": "可选：积分方向，默认按 delta 正负号"
+            },
+            "date": {
+              "type": "string",
+              "description": "交易日期，格式 YYYY-MM-DD"
+            },
+            "category": {
+              "type": "string",
+              "description": "分类（adjust_score）"
+            },
+            "description": {
+              "type": "string",
+              "description": "交易描述（adjust_score）"
+            },
+            "include_transactions": {
+              "type": "boolean",
+              "description": "query_score 是否返回最近交易"
+            },
+            "limit": {
+              "type": "integer",
+              "description": "query_score 返回交易条数（默认20）"
+            }
+          }
+        }
+      }
+    }
+  ]
+}

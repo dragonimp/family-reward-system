@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "dgSpecHash": "dpQ9BFQlGFE=",
+  "dgSpecHash": "gFGjFCfnn1w=",
   "success": true,
   "projectFilePath": "/Users/wengzhishan/Projects/family-reward-system/FamilyReward.Api/FamilyReward.Api.csproj",
   "expectedPackageFiles": [
@@ -24,6 +24,7 @@
     "/Users/wengzhishan/.nuget/packages/microsoft.extensions.dependencymodel/10.0.8/microsoft.extensions.dependencymodel.10.0.8.nupkg.sha512",
     "/Users/wengzhishan/.nuget/packages/microsoft.openapi/2.0.0/microsoft.openapi.2.0.0.nupkg.sha512",
     "/Users/wengzhishan/.nuget/packages/mono.texttemplating/2.2.1/mono.texttemplating.2.2.1.nupkg.sha512",
+    "/Users/wengzhishan/.nuget/packages/npgsql/10.0.3/npgsql.10.0.3.nupkg.sha512",
     "/Users/wengzhishan/.nuget/packages/sqlitepclraw.bundle_e_sqlite3/2.1.11/sqlitepclraw.bundle_e_sqlite3.2.1.11.nupkg.sha512",
     "/Users/wengzhishan/.nuget/packages/sqlitepclraw.core/2.1.11/sqlitepclraw.core.2.1.11.nupkg.sha512",
     "/Users/wengzhishan/.nuget/packages/sqlitepclraw.lib.e_sqlite3/2.1.11/sqlitepclraw.lib.e_sqlite3.2.1.11.nupkg.sha512",

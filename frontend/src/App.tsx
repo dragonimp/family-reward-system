@@ -5,6 +5,7 @@ import RewardPage from './pages/Reward';
 import TransactionsPage from './pages/Transactions';
 import RulesPage from './pages/Rules';
 import StatsPage from './pages/Stats';
+import SettingsPage from './pages/Settings';
 import Layout from './components/Layout';
 import './styles/global.css';
 
@@ -20,6 +21,7 @@ export default function App() {
           <Route path="/transactions" element={<TransactionsPage />} />
           <Route path="/rules" element={<RulesPage />} />
           <Route path="/stats" element={<StatsPage />} />
+          <Route path="/settings" element={<SettingsPage />} />
         </Routes>
       </Layout>
     </BrowserRouter>

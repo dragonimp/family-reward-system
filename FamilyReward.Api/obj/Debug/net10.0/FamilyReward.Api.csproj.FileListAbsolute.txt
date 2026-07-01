@@ -129,3 +129,6 @@
 /Users/wengzhishan/Projects/family-reward-system/FamilyReward.Api/obj/Debug/net10.0/FamilyReward.Api.pdb
 /Users/wengzhishan/Projects/family-reward-system/FamilyReward.Api/obj/Debug/net10.0/FamilyReward.Api.genruntimeconfig.cache
 /Users/wengzhishan/Projects/family-reward-system/FamilyReward.Api/obj/Debug/net10.0/ref/FamilyReward.Api.dll
+/Users/wengzhishan/Projects/family-reward-system/FamilyReward.Api/obj/Debug/net10.0/FamilyReward.Api.sourcelink.json
+/Users/wengzhishan/Projects/family-reward-system/FamilyReward.Api/bin/Debug/net10.0/Npgsql.dll
+/Users/wengzhishan/Projects/family-reward-system/FamilyReward.Api/bin/Debug/net10.0/system_config.json

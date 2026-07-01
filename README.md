@@ -1,35 +1,24 @@
-# 家庭奖励管理系统
-
-## 项目简介
-记录和激励孩子们的良好行为，通过积分和现金奖励系统培养孩子的习惯养成。
+# family-reward-system
+家庭奖励管理系统 — 管理孩子积分现金物品奖励
 
 ## 技术栈
-- **后端**: Python (HTTP Server, 零依赖)
-- **前端**: React + TypeScript + Vite
-- **数据库**: SQLite (开发) / PostgreSQL (生产)
+- 后端：ASP.NET Core 10 Minimal API
+- 数据库：PostgreSQL
+- 前端：React 18 + TypeScript + Tailwind CSS
 
-## 运行方式
-```bash
-cd server && python3 app.py
-```
+## 本地运行
+1. 确认 PostgreSQL 已启动，并存在 `family_rewards` 数据库。
+2. 启动后端：
+   ```bash
+   dotnet run --project FamilyReward.Api/FamilyReward.Api.csproj
+   ```
+3. 启动前端：
+   ```bash
+   cd frontend
+   npm run dev
+   ```
 
-## 访问地址
-- 本地: http://localhost:5102
-- 域名: happylife.impx.net
-
-## 功能模块
-- 📊 仪表盘 - 总览所有孩子积分、排行榜
-- 👨‍👩‍👧‍👦 孩子管理 - 管理孩子信息和账户
-- 🎯 积分操作 - 添加/扣除积分、现金、物品
-- 📋 交易记录 - 查看所有历史交易
-- 📜 规则管理 - 积分规则和红线规则
-- 📈 统计报表 - 详细统计数据
-
-## 初始数据
-| 孩子 | 积分 | 现金 |
-|------|------|------|
-| 彦谦 | 108 | ¥230 |
-| 玥玥 | 123 | ¥30 |
-| 嘟嘟 | 100 | ¥0 |
-| 薇薇 | 100 | ¥0 |
-| 小宇 | 100 | ¥0 |
+默认地址：
+- 前端：`http://localhost:3000`
+- 后端：`http://localhost:5102`
+- 健康检查：`http://localhost:5102/health`

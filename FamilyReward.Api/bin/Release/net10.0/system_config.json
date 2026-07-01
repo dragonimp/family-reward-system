@@ -1,0 +1,15 @@
+{
+  "voice": {
+    "enabled": false,
+    "recognitionLanguage": "zh-CN",
+    "transcriptionProvider": "browser"
+  },
+  "agent": {
+    "enabled": false,
+    "endpoint": "",
+    "apiKey": "",
+    "model": "gpt-4o-mini",
+    "timeout_seconds": 20,
+    "systemPrompt": "\u4F60\u662F\u5BB6\u5EAD\u79EF\u5206\u7CFB\u7EDF\u667A\u80FD\u52A9\u624B\uFF0C\u8F93\u51FA\u7B80\u77ED\u53EF\u6267\u884C\u5EFA\u8BAE\u3002"
+  }
+}

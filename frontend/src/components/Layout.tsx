@@ -8,6 +8,7 @@ const navItems = [
   { path: '/transactions', label: '交易记录', icon: '📝' },
   { path: '/rules', label: '规则管理', icon: '📋' },
   { path: '/stats', label: '统计报表', icon: '📈' },
+  { path: '/settings', label: '系统设置', icon: '⚙️' },
 ];
 
 interface LayoutProps {
@@ -44,7 +45,7 @@ export default function Layout({ children }: LayoutProps) {
               ))}
             </nav>
             {/* 平板端横向滚动导航 */}
-            <nav className="hidden lg:hidden flex-1 mx-3 overflow-x-auto scrollbar-hide">
+            <nav className="hidden sm:flex flex-1 mx-3 overflow-x-auto scrollbar-hide">
               <div className="flex items-center gap-1 min-w-max">
                 {navItems.map((item) => (
                   <Link
@@ -72,7 +73,7 @@ export default function Layout({ children }: LayoutProps) {
           </div>
         </div>
         {/* 移动端下拉菜单 */}
-        {mobileOpen && (
+          {mobileOpen && (
           <div className="lg:hidden border-t border-gray-200 bg-white">
             <div className="flex flex-col gap-1 p-2">
               {navItems.map((item) => (
@@ -100,9 +101,9 @@ export default function Layout({ children }: LayoutProps) {
         </div>
       </main>
       {/* 移动端底部导航 */}
-      <nav className="lg:hidden bg-white border-t border-gray-200 flex-shrink-0">
-        <div className="flex items-center justify-around py-1">
-          {navItems.slice(0, 5).map((item) => (
+          <nav className="lg:hidden bg-white border-t border-gray-200 flex-shrink-0">
+            <div className="flex items-center justify-around py-1">
+              {navItems.slice(0, 6).map((item) => (
             <Link
               key={item.path}
               to={item.path}

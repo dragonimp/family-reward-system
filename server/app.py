@@ -1,6 +1,12 @@
 #!/usr/bin/env python3
 """家庭奖励管理系统 - 后端服务器 (PostgreSQL持久化版)"""
-import json, os, datetime as dt, threading
+import json
+import os
+import datetime as dt
+import threading
+import urllib.request
+import urllib.error
+import getpass
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from urllib.parse import urlparse, parse_qs
 import psycopg2
@@ -9,12 +15,38 @@ import psycopg2.extras
 # ─── 数据库连接配置 ────────────────────────────────────────────────────────
 
 DB_CONFIG = {
-    'host': 'localhost',
-    'port': 5432,
-    'database': 'family_rewards',
-    'user': 'postgres',
-    'password': os.environ.get('PG_PASSWORD', ''),
+    'host': os.environ.get('PGHOST', 'localhost'),
+    'port': int(os.environ.get('PGPORT', '5432')),
+    'database': os.environ.get('PGDATABASE', 'family_rewards'),
+    'user': os.environ.get('PGUSER', getpass.getuser()),
+    'password': os.environ.get('PGPASSWORD', os.environ.get('PG_PASSWORD', '')),
 }
+
+CONFIG_FILE = os.path.join(os.path.dirname(__file__), "system_config.json")
+DEFAULT_SYSTEM_CONFIG = {
+    "voice": {
+        "enabled": False,
+        "recognitionLanguage": "zh-CN",
+        "transcriptionProvider": "browser",
+    },
+    "agent": {
+        "enabled": False,
+        "endpoint": "",
+        "apiKey": "",
+        "model": "gpt-4o-mini",
+        "timeout_seconds": 20,
+        "systemPrompt": "你是家庭积分系统智能助手，输出简短可执行建议。",
+    },
+}
+
+INITIAL_CHILDREN = [
+    # 名称, 当前积分, 当前现金, 物品数量, 物品详情, 累计积分获得, 累计积分消耗, 累计现金获得, 累计现金支出
+    ("彦谦", 108, 230.00, 2, "2个铲子", 108, 0, 300.00, 70.00),
+    ("玥玥", 123, 30.00, 1, "水培栽培", 144, 21, 50.00, 20.00),
+    ("嘟嘟", 100, 0.00, 0, "", 100, 0, 0.00, 0.00),
+    ("薇薇", 100, 0.00, 0, "", 100, 0, 0.00, 0.00),
+    ("小宇", 100, 0.00, 0, "", 100, 0, 0.00, 0.00),
+]
 
 def get_db_connection():
     """获取数据库连接"""
@@ -23,7 +55,7 @@ def get_db_connection():
 # ─── 数据库操作函数 ─────────────────────────────────────────────────────────
 
 def init_db():
-    """初始化数据库表结构"""
+    """初始化数据库表结构和基础种子数据"""
     conn = get_db_connection()
     try:
         cur = conn.cursor()
@@ -88,7 +120,7 @@ def init_db():
         ]
         for table_sql in tables:
             cur.execute(table_sql)
-        
+
         # 创建索引
         indexes = [
             "CREATE INDEX IF NOT EXISTS idx_tx_child ON transactions(child_id)",
@@ -97,7 +129,73 @@ def init_db():
         ]
         for idx_sql in indexes:
             cur.execute(idx_sql)
-        
+
+        # 1) 初始化孩子 + 账户：不存在则补齐
+        for name, points, cash_cny, items_count, items_detail, \
+            points_earned, points_spent, cash_earned, cash_spent in INITIAL_CHILDREN:
+            cur.execute("""
+                INSERT INTO children (name, status, note, created_at, updated_at)
+                VALUES (%s, 'active', '', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                ON CONFLICT (name) DO NOTHING
+            """, (name,))
+
+            cur.execute("""
+                INSERT INTO accounts (
+                    child_id, points, cash_cny, items_count, items_detail,
+                    points_earned, points_spent, cash_earned, cash_spent,
+                    created_at, updated_at
+                )
+                SELECT c.id, %s, %s, %s, %s, %s, %s, %s, %s,
+                       CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+                FROM children c
+                WHERE c.name = %s
+                ON CONFLICT (child_id) DO NOTHING
+            """, (points, cash_cny, items_count, items_detail,
+                  points_earned, points_spent, cash_earned, cash_spent, name))
+
+        # 2) 若 rules 和 redlines 为空，初始化规则配置（避免首次启动无规则可用）
+        cur.execute("SELECT COUNT(*) FROM rules")
+        if cur.fetchone()[0] == 0:
+            defaults = [
+                ("按时/及时完成作业", "学习", 5, 0, "规定时间内完成"),
+                ("主动完成作业", "学习", 3, 0, "不用催促"),
+                ("作业优秀/全对", "学习", 2, 0, "额外奖励"),
+                ("主动刷牙", "规矩", 2, 0, "早晚各一次"),
+                ("好好吃饭", "规矩", 2, 0, "不挑食、按时吃"),
+                ("自己收拾玩具", "规矩", 2, 0, "玩完归位"),
+                ("按时睡觉", "规矩", 2, 0, "不拖延"),
+                ("主动看书", "学习", 3, 0, "自己拿起书看"),
+                ("帮忙做家务", "帮忙", 3, 0, "倒垃圾、擦桌子等"),
+                ("分享玩具", "规矩", 2, 0, "不抢不争"),
+                ("说谢谢/对不起", "规矩", 1, 0, "礼貌用语"),
+                ("帮助他人", "帮忙", 3, 0, "帮助弟弟妹妹或他人"),
+                ("遵守红线", "规矩", 5, 0, "连续一段时间遵守红线规则"),
+                ("耐心等待", "规矩", 5, 0, "排队、等待时不急躁"),
+            ]
+            cur.executemany("""
+                INSERT INTO rules (name, category, points, cash_cny, description)
+                VALUES (%s, %s, %s, %s, %s)
+            """, defaults)
+
+        cur.execute("SELECT COUNT(*) FROM redlines")
+        if cur.fetchone()[0] == 0:
+            redline_defaults = [
+                (1, "不大喊大叫", "彦谦", "无论什么原因都不允许大喊大叫、乱发脾气", 10),
+                (2, "不跟紧大人", "", "外出时必须紧跟父母，不得独自跑开、躲藏", 15),
+                (3, "不碰危险物品", "", "不碰剪刀、刀具、火源、药品、电源插座", 20),
+                (4, "不私自下水", "", "靠近水边必须有大人陪同，不得独自下水", 20),
+                (5, "不跟陌生人走", "", "无论什么理由，不得跟随陌生人离开", 20),
+                (6, "不打人/不骂人", "", "不得伤害他人身体或语言侮辱", 15),
+                (7, "不撒谎", "", "做错事必须承认，不得隐瞒欺骗", 10),
+                (8, "不破坏公物", "", "不得故意损坏公共设施或他人物品", 15),
+                (9, "不爬高危险处", "", "不攀爬栏杆、假山、树木、高楼窗户", 20),
+                (10, "不乱吃东西", "", "不吃陌生人给的食物，不乱吃不明物品", 15),
+            ]
+            cur.executemany("""
+                INSERT INTO redlines (order_num, rule, proposer, description, penalty_points)
+                VALUES (%s, %s, %s, %s, %s)
+            """, redline_defaults)
+
         conn.commit()
         print("✅ 数据库表初始化完成")
     except Exception as e:
@@ -105,6 +203,121 @@ def init_db():
         conn.rollback()
     finally:
         conn.close()
+
+
+def _load_system_config():
+    """读取系统配置（语音 + 智能体）。缺失则创建默认配置。"""
+    config = json.loads(json.dumps(DEFAULT_SYSTEM_CONFIG))
+
+    try:
+        with open(CONFIG_FILE, "r", encoding="utf-8") as f:
+            raw = json.load(f)
+    except FileNotFoundError:
+        with open(CONFIG_FILE, "w", encoding="utf-8") as f:
+            json.dump(config, f, ensure_ascii=False, indent=2)
+        return config
+    except Exception:
+        return config
+
+    if not isinstance(raw, dict):
+        return config
+
+    if isinstance(raw.get("voice"), dict):
+        config["voice"].update({k: v for k, v in raw["voice"].items() if k in config["voice"]})
+    if isinstance(raw.get("agent"), dict):
+        config["agent"].update({k: v for k, v in raw["agent"].items() if k in config["agent"]})
+    return config
+
+
+def _save_system_config(payload: dict):
+    """保存系统配置，保留未知字段以减少误删风险。"""
+    current = _load_system_config()
+    merged = {
+        "voice": {**current.get("voice", {}), **(payload.get("voice") or {})},
+        "agent": {**current.get("agent", {}), **(payload.get("agent") or {})},
+    }
+    with open(CONFIG_FILE, "w", encoding="utf-8") as f:
+        json.dump(merged, f, ensure_ascii=False, indent=2)
+    return merged
+
+
+def _is_truthy(value):
+    return str(value).lower() in {"1", "true", "yes", "y", "on"}
+
+
+def _call_agent_service(body):
+    """调用外部智能体服务（透传），返回统一格式响应。"""
+    config = _load_system_config().get("agent", {})
+    if not config.get("enabled"):
+        return {"error": "智能体服务未开启"}, 400
+
+    endpoint = (config.get("endpoint") or "").strip()
+    if not endpoint:
+        return {"error": "未配置智能体服务地址"}, 400
+
+    prompt = (body.get("prompt") or body.get("input") or "").strip()
+    if not prompt and not isinstance(body.get("payload"), dict):
+        return {"error": "缺少 prompt 参数"}, 400
+
+    payload = body.get("payload")
+    if not isinstance(payload, dict):
+        payload = {
+            "model": config.get("model", "gpt-4o-mini"),
+            "messages": [
+                {"role": "system", "content": config.get("systemPrompt", "")},
+                {"role": "user", "content": prompt},
+            ],
+        }
+    else:
+        # 保持显式配置优先
+        payload = json.loads(json.dumps(payload))
+
+    if "model" not in payload:
+        payload["model"] = config.get("model", "gpt-4o-mini")
+    if "messages" not in payload and prompt:
+        payload["messages"] = [
+            {"role": "system", "content": config.get("systemPrompt", "")},
+            {"role": "user", "content": prompt},
+        ]
+    elif "prompt" in payload:
+        payload["prompt"] = prompt or payload.get("prompt")
+
+    headers = {"Content-Type": "application/json"}
+    api_key = body.get("apiKey") or config.get("apiKey")
+    if api_key:
+        headers["Authorization"] = api_key if str(api_key).startswith("Bearer ") else f"Bearer {api_key}"
+
+    request_payload = json.dumps(payload, ensure_ascii=False).encode("utf-8")
+    request = urllib.request.Request(
+        endpoint,
+        data=request_payload,
+        headers=headers,
+        method="POST",
+    )
+    timeout = int(config.get("timeout_seconds", 20) or 20)
+    try:
+        with urllib.request.urlopen(request, timeout=timeout) as response:
+            raw = response.read()
+            text = raw.decode("utf-8", errors="ignore")
+            try:
+                parsed = json.loads(text)
+            except Exception:
+                parsed = text
+            return {
+                "ok": True,
+                "status": response.status,
+                "response": parsed,
+            }, 200
+    except urllib.error.HTTPError as exc:
+        error_text = exc.read().decode("utf-8", errors="ignore")
+        return {
+            "ok": False,
+            "status": exc.code,
+            "error": error_text or exc.reason,
+        }, 502
+    except urllib.error.URLError as exc:
+        return {"ok": False, "error": f"智能体服务网络异常: {exc}"}, 502
+
 
 def get_all_children():
     """获取所有孩子"""
@@ -312,7 +525,7 @@ class APIHandler(BaseHTTPRequestHandler):
             return self._send_json({"status": "ok", "version": "2.0.0", "db": "postgresql"})
 
         # SPA fallback
-        if path == "" or path == "/" or path == "/dashboard" or path.startswith("/children") or path.startswith("/rules") or path.startswith("/transactions") or path.startswith("/reward") or path.startswith("/stats"):
+        if path == "" or path == "/" or path == "/dashboard" or path.startswith("/children") or path.startswith("/rules") or path.startswith("/transactions") or path.startswith("/reward") or path.startswith("/stats") or path.startswith("/settings"):
             self._send_file("frontend/static/index.html", "text/html")
             return
 
@@ -367,6 +580,9 @@ class APIHandler(BaseHTTPRequestHandler):
         elif path == "/api/rules":
             data = get_rules()
             self._send_json(data)
+
+        elif path == "/api/system/config":
+            self._send_json(_load_system_config())
 
         # API: stats
         elif path == "/api/stats/dashboard":
@@ -535,6 +751,10 @@ class APIHandler(BaseHTTPRequestHandler):
                 self._send_json(rule, 201)
             finally:
                 conn.close()
+        elif path == "/api/agent/invoke":
+            body = self._read_body()
+            result, status = _call_agent_service(body)
+            self._send_json(result, status)
 
         else:
             self._send_json({"error": "not found"}, 404)
@@ -593,6 +813,28 @@ class APIHandler(BaseHTTPRequestHandler):
                 self._send_json(dict(rl))
             finally:
                 conn.close()
+        elif path == "/api/system/config":
+            payload = self._read_body()
+            if not isinstance(payload, dict):
+                self._send_json({"error": "请求体必须是 JSON 对象"}, 400)
+                return
+            payload = {
+                "voice": {
+                    "enabled": bool(_is_truthy(payload.get("voice", {}).get("enabled", _load_system_config()["voice"]["enabled"]))),
+                    "recognitionLanguage": str(payload.get("voice", {}).get("recognitionLanguage", _load_system_config()["voice"]["recognitionLanguage"])),
+                    "transcriptionProvider": str(payload.get("voice", {}).get("transcriptionProvider", _load_system_config()["voice"]["transcriptionProvider"])),
+                },
+                "agent": {
+                    "enabled": bool(_is_truthy(payload.get("agent", {}).get("enabled", _load_system_config()["agent"]["enabled"]))),
+                    "endpoint": str(payload.get("agent", {}).get("endpoint", _load_system_config()["agent"]["endpoint"])),
+                    "apiKey": str(payload.get("agent", {}).get("apiKey", _load_system_config()["agent"]["apiKey"])),
+                    "model": str(payload.get("agent", {}).get("model", _load_system_config()["agent"]["model"])),
+                    "timeout_seconds": int(payload.get("agent", {}).get("timeout_seconds", _load_system_config()["agent"]["timeout_seconds"])),
+                    "systemPrompt": str(payload.get("agent", {}).get("systemPrompt", _load_system_config()["agent"]["systemPrompt"])),
+                },
+            }
+            saved = _save_system_config(payload)
+            self._send_json(saved)
 
         else:
             self._send_json({"error": "not found"}, 404)

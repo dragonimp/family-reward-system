@@ -1,5 +1,6 @@
 import http from './api';
 import type { Child } from '../types';
+import type { AgentInvokeRequest, AgentInvokeResponse, RewardParseRequest, RewardParseResponse, SystemConfig } from '../types';
 
 export const getChildren = () => http.get('/api/children');
 export const getChild = (id: number) => http.get(`/api/children/${id}`);
@@ -19,3 +20,8 @@ export const deleteRule = (id: number) => http.delete(`/api/rules/${id}`);
 export const getChildStats = () => http.get('/api/stats/dashboard');
 export const getLeaderboard = () => http.get('/api/stats/leaderboard');
 export const getCategoryStats = () => http.get('/api/stats/categories');
+
+export const getSystemConfig = () => http.get<unknown, SystemConfig>('/api/system/config');
+export const updateSystemConfig = (data: SystemConfig) => http.put<unknown, SystemConfig>('/api/system/config', data);
+export const invokeAgent = (data: AgentInvokeRequest) => http.post<unknown, AgentInvokeResponse>('/api/agent/invoke', data);
+export const parseRewardVoice = (data: RewardParseRequest) => http.post<unknown, RewardParseResponse>('/api/agent/parse-reward', data);
