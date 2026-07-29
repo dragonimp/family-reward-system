@@ -1,0 +1,9 @@
+{
+  "id": 0,
+  "toolKey": "family-reward-mcp",
+  "name": "家庭积分系统 MCP 服务（按工具拆分）",
+  "toolType": "mcp",
+  "description": "家庭积分系统 MCP：提供孩子、积分、记录、规则、家庭组等独立工具（family_reward_*）。",
+  "configJson": "{\"url\":\"https://happylife.ai.impx.net/api/mcp\",\"token\":\"\"}",
+  "status": "Active"
+}

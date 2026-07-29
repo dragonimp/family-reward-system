@@ -132,3 +132,13 @@
 /Users/wengzhishan/Projects/family-reward-system/FamilyReward.Api/obj/Debug/net10.0/FamilyReward.Api.sourcelink.json
 /Users/wengzhishan/Projects/family-reward-system/FamilyReward.Api/bin/Debug/net10.0/Npgsql.dll
 /Users/wengzhishan/Projects/family-reward-system/FamilyReward.Api/bin/Debug/net10.0/system_config.json
+/Users/wengzhishan/Projects/family-reward-system/FamilyReward.Api/bin/Debug/net10.0/Microsoft.AspNetCore.Authentication.JwtBearer.dll
+/Users/wengzhishan/Projects/family-reward-system/FamilyReward.Api/bin/Debug/net10.0/Microsoft.IdentityModel.Abstractions.dll
+/Users/wengzhishan/Projects/family-reward-system/FamilyReward.Api/bin/Debug/net10.0/Microsoft.IdentityModel.JsonWebTokens.dll
+/Users/wengzhishan/Projects/family-reward-system/FamilyReward.Api/bin/Debug/net10.0/Microsoft.IdentityModel.Logging.dll
+/Users/wengzhishan/Projects/family-reward-system/FamilyReward.Api/bin/Debug/net10.0/Microsoft.IdentityModel.Protocols.dll
+/Users/wengzhishan/Projects/family-reward-system/FamilyReward.Api/bin/Debug/net10.0/Microsoft.IdentityModel.Protocols.OpenIdConnect.dll
+/Users/wengzhishan/Projects/family-reward-system/FamilyReward.Api/bin/Debug/net10.0/Microsoft.IdentityModel.Tokens.dll
+/Users/wengzhishan/Projects/family-reward-system/FamilyReward.Api/bin/Debug/net10.0/System.IdentityModel.Tokens.Jwt.dll
+/Users/wengzhishan/Projects/family-reward-system/FamilyReward.Api/bin/Debug/net10.0/AgentIdentity.Sdk.dll
+/Users/wengzhishan/Projects/family-reward-system/FamilyReward.Api/bin/Debug/net10.0/AgentIdentity.Sdk.pdb

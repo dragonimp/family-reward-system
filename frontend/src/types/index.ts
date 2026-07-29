@@ -1,11 +1,25 @@
 // 用户/孩子类型定义
 export interface Child {
   id: number;
+  familyGroupId?: number;
+  family_group_id?: number;
+  familyGroupName?: string;
+  family_group_name?: string;
   name: string;
   score?: number;
   cash?: number;
   items?: number;
   avatar?: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface FamilyGroup {
+  id: number;
+  name: string;
+  description?: string;
+  createdBy?: string;
+  role?: string;
   createdAt?: string;
   updatedAt?: string;
 }
@@ -63,6 +77,26 @@ export interface ApiResponse<T> {
   code: number;
   message: string;
   data: T;
+}
+
+export interface AuthUser {
+  id?: string;
+  userId?: string;
+  username: string;
+  displayName?: string;
+  role?: string;
+  iconEmoji?: string;
+  applicationKey?: string;
+}
+
+export interface AuthContextType {
+  user: AuthUser | null;
+  userId: string | null;
+  ready: boolean;
+  login: (returnUrl?: string) => void;
+  logout: () => void;
+  refresh: () => Promise<AuthUser | null>;
+  isAuthenticated: boolean;
 }
 
 export interface VoiceConfig {

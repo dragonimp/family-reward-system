@@ -1,10 +1,11 @@
 {
   "version": 2,
-  "dgSpecHash": "gFGjFCfnn1w=",
+  "dgSpecHash": "gPALvrs84Fw=",
   "success": true,
   "projectFilePath": "/Users/wengzhishan/Projects/family-reward-system/FamilyReward.Api/FamilyReward.Api.csproj",
   "expectedPackageFiles": [
     "/Users/wengzhishan/.nuget/packages/humanizer.core/2.14.1/humanizer.core.2.14.1.nupkg.sha512",
+    "/Users/wengzhishan/.nuget/packages/microsoft.aspnetcore.authentication.jwtbearer/10.0.7/microsoft.aspnetcore.authentication.jwtbearer.10.0.7.nupkg.sha512",
     "/Users/wengzhishan/.nuget/packages/microsoft.aspnetcore.openapi/10.0.7/microsoft.aspnetcore.openapi.10.0.7.nupkg.sha512",
     "/Users/wengzhishan/.nuget/packages/microsoft.bcl.asyncinterfaces/6.0.0/microsoft.bcl.asyncinterfaces.6.0.0.nupkg.sha512",
     "/Users/wengzhishan/.nuget/packages/microsoft.codeanalysis.analyzers/3.3.3/microsoft.codeanalysis.analyzers.3.3.3.nupkg.sha512",
@@ -22,6 +23,12 @@
     "/Users/wengzhishan/.nuget/packages/microsoft.entityframeworkcore.sqlite.core/10.0.8/microsoft.entityframeworkcore.sqlite.core.10.0.8.nupkg.sha512",
     "/Users/wengzhishan/.nuget/packages/microsoft.entityframeworkcore.tools/10.0.8/microsoft.entityframeworkcore.tools.10.0.8.nupkg.sha512",
     "/Users/wengzhishan/.nuget/packages/microsoft.extensions.dependencymodel/10.0.8/microsoft.extensions.dependencymodel.10.0.8.nupkg.sha512",
+    "/Users/wengzhishan/.nuget/packages/microsoft.identitymodel.abstractions/8.14.0/microsoft.identitymodel.abstractions.8.14.0.nupkg.sha512",
+    "/Users/wengzhishan/.nuget/packages/microsoft.identitymodel.jsonwebtokens/8.14.0/microsoft.identitymodel.jsonwebtokens.8.14.0.nupkg.sha512",
+    "/Users/wengzhishan/.nuget/packages/microsoft.identitymodel.logging/8.14.0/microsoft.identitymodel.logging.8.14.0.nupkg.sha512",
+    "/Users/wengzhishan/.nuget/packages/microsoft.identitymodel.protocols/8.0.1/microsoft.identitymodel.protocols.8.0.1.nupkg.sha512",
+    "/Users/wengzhishan/.nuget/packages/microsoft.identitymodel.protocols.openidconnect/8.0.1/microsoft.identitymodel.protocols.openidconnect.8.0.1.nupkg.sha512",
+    "/Users/wengzhishan/.nuget/packages/microsoft.identitymodel.tokens/8.14.0/microsoft.identitymodel.tokens.8.14.0.nupkg.sha512",
     "/Users/wengzhishan/.nuget/packages/microsoft.openapi/2.0.0/microsoft.openapi.2.0.0.nupkg.sha512",
     "/Users/wengzhishan/.nuget/packages/mono.texttemplating/2.2.1/mono.texttemplating.2.2.1.nupkg.sha512",
     "/Users/wengzhishan/.nuget/packages/npgsql/10.0.3/npgsql.10.0.3.nupkg.sha512",
@@ -35,7 +42,8 @@
     "/Users/wengzhishan/.nuget/packages/system.composition.convention/6.0.0/system.composition.convention.6.0.0.nupkg.sha512",
     "/Users/wengzhishan/.nuget/packages/system.composition.hosting/6.0.0/system.composition.hosting.6.0.0.nupkg.sha512",
     "/Users/wengzhishan/.nuget/packages/system.composition.runtime/6.0.0/system.composition.runtime.6.0.0.nupkg.sha512",
-    "/Users/wengzhishan/.nuget/packages/system.composition.typedparts/6.0.0/system.composition.typedparts.6.0.0.nupkg.sha512"
+    "/Users/wengzhishan/.nuget/packages/system.composition.typedparts/6.0.0/system.composition.typedparts.6.0.0.nupkg.sha512",
+    "/Users/wengzhishan/.nuget/packages/system.identitymodel.tokens.jwt/8.14.0/system.identitymodel.tokens.jwt.8.14.0.nupkg.sha512"
   ],
   "logs": []
 }

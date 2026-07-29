@@ -10,6 +10,10 @@ export default defineConfig({
         target: 'http://localhost:5102',
         changeOrigin: true,
       },
+      '/auth': {
+        target: 'http://localhost:5102',
+        changeOrigin: true,
+      },
     },
   },
 })

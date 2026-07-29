@@ -2,7 +2,6 @@ import { Card } from '../components/Card';
 import type { Transaction, Child } from '../types';
 import { useState, useEffect, useCallback } from 'react';
 import { getTransactions, getChildren } from '../services';
-import { CHILDREN_DATA } from '../constants/children';
 
 type TransactionType = 'score' | 'cash' | 'item';
 
@@ -50,19 +49,15 @@ export default function Transactions() {
         getChildren(),
       ]);
 
-      const txData = (txRes as any).data;
+      const txData = (txRes as any).data ?? txRes;
       setTransactions(txData?.items || []);
       setTotal(txData?.total || 0);
-      setChildren((childRes as any).data || []);
+      setChildren(Array.isArray(childRes) ? childRes : (childRes as any).data || []);
     } catch (error) {
       console.error('加载失败:', error);
-      setTransactions([
-        { id: 1, childId: 1, childName: '彦谦', type: 'score', category: '学习', amount: 10, description: '数学考试满分', createdAt: new Date().toISOString() },
-        { id: 2, childId: 2, childName: '玥玥', type: 'cash', category: '奖励', amount: 5, description: '整理房间', createdAt: new Date().toISOString() },
-        { id: 3, childId: 1, childName: '彦谦', type: 'score', category: '纪律', amount: -5, description: '上课讲话', createdAt: new Date().toISOString() },
-      ]);
-      setTotal(3);
-      setChildren(CHILDREN_DATA as Child[]);
+      setTransactions([]);
+      setTotal(0);
+      setChildren([]);
     } finally {
       setLoading(false);
     }

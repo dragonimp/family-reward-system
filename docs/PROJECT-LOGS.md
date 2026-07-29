@@ -21,3 +21,9 @@
 - 前端由 nginx 托管静态资源，后端由 `family-reward-api.service` 运行 ASP.NET Core API。
 - 已为 `happylife.ai.impx.net` 签发并安装正确 HTTPS 证书。
 - 验证通过：首页、`/health`、`/api/children`、`/api/rules`。
+
+## [2026-07-13 23:05] 统一登录审计与本地开发修复
+- 确认生产登录态只由 `/auth/me` 建立，不信任浏览器持久化用户数据。
+- 补充 Vite `/auth` 代理，避免本地开发时认证路径被 SPA fallback 吞掉并形成重载循环。
+- 新增 2 个回归测试；前端测试/构建和后端 Release 构建通过。
+- 生产陈旧 Cookie 与完整 OAuth 登录/退出验证通过；生产代码未变更，未重复部署。

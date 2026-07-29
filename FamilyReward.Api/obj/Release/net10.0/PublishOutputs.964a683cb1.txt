@@ -5,6 +5,7 @@
 /tmp/family-reward-publish/api/FamilyReward.Api.dll
 /tmp/family-reward-publish/api/FamilyReward.Api.runtimeconfig.json
 /tmp/family-reward-publish/api/FamilyReward.Api.pdb
+/tmp/family-reward-publish/api/Microsoft.AspNetCore.Authentication.JwtBearer.dll
 /tmp/family-reward-publish/api/Microsoft.AspNetCore.OpenApi.dll
 /tmp/family-reward-publish/api/Microsoft.Data.Sqlite.dll
 /tmp/family-reward-publish/api/Microsoft.EntityFrameworkCore.dll
@@ -12,11 +13,18 @@
 /tmp/family-reward-publish/api/Microsoft.EntityFrameworkCore.Relational.dll
 /tmp/family-reward-publish/api/Microsoft.EntityFrameworkCore.Sqlite.dll
 /tmp/family-reward-publish/api/Microsoft.Extensions.DependencyModel.dll
+/tmp/family-reward-publish/api/Microsoft.IdentityModel.Abstractions.dll
+/tmp/family-reward-publish/api/Microsoft.IdentityModel.JsonWebTokens.dll
+/tmp/family-reward-publish/api/Microsoft.IdentityModel.Logging.dll
+/tmp/family-reward-publish/api/Microsoft.IdentityModel.Protocols.dll
+/tmp/family-reward-publish/api/Microsoft.IdentityModel.Protocols.OpenIdConnect.dll
+/tmp/family-reward-publish/api/Microsoft.IdentityModel.Tokens.dll
 /tmp/family-reward-publish/api/Microsoft.OpenApi.dll
 /tmp/family-reward-publish/api/Npgsql.dll
 /tmp/family-reward-publish/api/SQLitePCLRaw.batteries_v2.dll
 /tmp/family-reward-publish/api/SQLitePCLRaw.core.dll
 /tmp/family-reward-publish/api/SQLitePCLRaw.provider.e_sqlite3.dll
+/tmp/family-reward-publish/api/System.IdentityModel.Tokens.Jwt.dll
 /tmp/family-reward-publish/api/runtimes/browser-wasm/nativeassets/net9.0/e_sqlite3.a
 /tmp/family-reward-publish/api/runtimes/linux-arm/native/libe_sqlite3.so
 /tmp/family-reward-publish/api/runtimes/linux-arm64/native/libe_sqlite3.so
@@ -40,4 +48,6 @@
 /tmp/family-reward-publish/api/runtimes/win-arm64/native/e_sqlite3.dll
 /tmp/family-reward-publish/api/runtimes/win-x64/native/e_sqlite3.dll
 /tmp/family-reward-publish/api/runtimes/win-x86/native/e_sqlite3.dll
+/tmp/family-reward-publish/api/AgentIdentity.Sdk.dll
+/tmp/family-reward-publish/api/AgentIdentity.Sdk.pdb
 /tmp/family-reward-publish/api/FamilyReward.Api.deps.json

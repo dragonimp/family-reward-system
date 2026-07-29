@@ -1,8 +1,13 @@
 import http from './api';
 import type { Child } from '../types';
+import type { FamilyGroup } from '../types';
 import type { AgentInvokeRequest, AgentInvokeResponse, RewardParseRequest, RewardParseResponse, SystemConfig } from '../types';
 
-export const getChildren = () => http.get('/api/children');
+export const getFamilyGroups = (params?: { userId?: string }) => http.get<unknown, FamilyGroup[]>('/api/family-groups', { params });
+export const createFamilyGroup = (data: Partial<FamilyGroup> & { userId?: string }) => http.post<unknown, FamilyGroup>('/api/family-groups', data);
+export const linkFamilyGroupUser = (id: number, data: { userId: string; role?: string }) => http.put(`/api/family-groups/${id}/users`, data);
+
+export const getChildren = (params?: { familyGroupId?: number; userId?: string }) => http.get('/api/children', { params });
 export const getChild = (id: number) => http.get(`/api/children/${id}`);
 export const createChild = (data: Partial<Child>) => http.post('/api/children', data);
 export const updateChild = (id: number, data: Partial<Child>) => http.put(`/api/children/${id}`, data);

@@ -16,4 +16,8 @@
     <PackageReference Include="Npgsql" Version="10.0.3" />
   </ItemGroup>
 
+  <ItemGroup>
+    <ProjectReference Include="../../AgentIdentity/src/AgentIdentity.Sdk/AgentIdentity.Sdk.csproj" />
+  </ItemGroup>
+
 </Project>

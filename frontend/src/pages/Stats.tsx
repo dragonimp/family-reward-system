@@ -1,8 +1,7 @@
 import { Card } from '../components/Card';
-import type { ChildStats, Child, TrendData } from '../types';
+import type { Child } from '../types';
 import { useState, useEffect, useCallback } from 'react';
-import { getChildStats, getChild as getChildApi, getCategoryStats } from '../services';
-import { CHILDREN_DATA } from '../constants/children';
+import { getChildStats, getCategoryStats } from '../services';
 
 // Simple SVG donut chart component
 function DonutChart({ data }: { data: Array<{ name: string; value: number; color: string }> }) {
@@ -87,7 +86,6 @@ const categoryColors: Record<string, string> = {
 };
 
 export default function Stats() {
-  const [childStats, setChildStats] = useState<ChildStats[]>([]);
   const [children, setChildren] = useState<Child[]>([]);
   const [categoryData, setCategoryData] = useState<Array<{ category: string; total: number }>>([]);
   const [loading, setLoading] = useState(true);
@@ -95,37 +93,19 @@ export default function Stats() {
   const loadData = useCallback(async () => {
     try {
       setLoading(true);
-      const [statsRes, childrenRes, catRes] = await Promise.all([
+      const [statsRes, catRes] = await Promise.all([
         getChildStats(),
-        getChildStats().then(() => {}),
         getCategoryStats(),
       ]);
 
-      setChildStats((statsRes as any).data || []);
-      setCategoryData((catRes as any).data || []);
-
-      try {
-        const allChildren = await (await fetch('/api/children')).json();
-        setChildren((allChildren as any).data || []);
-      } catch {
-        setChildren(CHILDREN_DATA as Child[]);
-      }
+      const statsPayload = (statsRes as any).data ?? statsRes;
+      const catPayload = (catRes as any).data ?? catRes;
+      setChildren(Array.isArray(statsPayload?.children) ? statsPayload.children : []);
+      setCategoryData(Array.isArray(catPayload) ? catPayload : []);
     } catch (error) {
       console.error('加载失败:', error);
-      setChildStats([
-        { childId: 1, childName: '彦谦', totalScore: 108, totalCash: 230, totalItems: 2, scoreCount: 25, cashCount: 10, itemCount: 5, avgDailyScore: 5 },
-        { childId: 2, childName: '玥玥', totalScore: 123, totalCash: 30, totalItems: 1, scoreCount: 20, cashCount: 8, itemCount: 3, avgDailyScore: 4 },
-        { childId: 3, childName: '嘟嘟', totalScore: 100, totalCash: 0, totalItems: 0, scoreCount: 15, cashCount: 5, itemCount: 2, avgDailyScore: 3 },
-        { childId: 4, childName: '薇薇', totalScore: 100, totalCash: 0, totalItems: 0, scoreCount: 15, cashCount: 5, itemCount: 2, avgDailyScore: 3 },
-        { childId: 5, childName: '小宇', totalScore: 100, totalCash: 0, totalItems: 0, scoreCount: 15, cashCount: 5, itemCount: 2, avgDailyScore: 3 },
-      ]);
-      setCategoryData([
-        { category: '学习', total: 280 },
-        { category: '生活', total: 150 },
-        { category: '纪律', total: -80 },
-        { category: '奖励', total: 90 },
-      ]);
-      setChildren(CHILDREN_DATA as Child[]);
+      setChildren([]);
+      setCategoryData([]);
     } finally {
       setLoading(false);
     }
@@ -147,7 +127,7 @@ export default function Stats() {
   }
 
   // 排行榜
-  const sortedStats = [...childStats].sort((a, b) => b.totalScore - a.totalScore);
+  const sortedChildren = [...children].sort((a, b) => (b.score ?? 0) - (a.score ?? 0));
   const medals = ['🥇', '🥈', '🥉'];
 
   // 分类颜色
@@ -160,7 +140,7 @@ export default function Stats() {
   // 月度对比图表
   const monthData = children.map((child, i) => ({
     label: child.name,
-    value: childStats.find((s) => s.childId === child.id)?.totalScore ?? (child.score ?? 0),
+    value: child.score ?? 0,
     color: ['#4A90D9', '#7ED321', '#F5A623', '#E74C3C', '#9B59B6'][i % 5],
   }));
 
@@ -177,42 +157,27 @@ export default function Stats() {
           <span>🏆</span> 积分排行榜
         </h3>
         <div className="space-y-3">
-          {sortedStats.length === 0 && children.length > 0
-            ? children.map((child, idx) => {
-                const stats = childStats.find((s) => s.childId === child.id);
-                const score = stats?.totalScore ?? child.score;
-                return (
-                  <div key={child.id} className="flex items-center gap-4 p-3 rounded-xl bg-gray-50/50">
-                    <span className="text-2xl w-10 text-center">{idx < 3 ? medals[idx] : <span className="text-gray-400 font-bold">{idx + 1}</span>}</span>
-                    <div className="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold"
-                      style={{ backgroundColor: ['#4A90D9', '#7ED321', '#F5A623', '#E74C3C', '#9B59B6'][idx % 5] }}>
-                      {child.name[0]}
-                    </div>
-                    <div className="flex-1">
-                      <p className="font-medium">{child.name}</p>
-                      <p className="text-xs text-gray-500">积分: {score} | 现金: ¥{(stats?.totalCash ?? ((child.score ?? 0) / 5)).toFixed(0)} | 物品: {stats?.totalItems ?? 0}</p>
-                    </div>
-                  </div>
-                );
-              })
-            : sortedStats.map((stat, idx) => (
-                <div key={stat.childId} className="flex items-center gap-4 p-3 rounded-xl bg-gray-50/50">
+          {sortedChildren.length === 0 ? (
+            <div className="h-24 flex items-center justify-center text-gray-400">暂无数据</div>
+          ) : (
+            sortedChildren.map((child, idx) => (
+                <div key={child.id} className="flex items-center gap-4 p-3 rounded-xl bg-gray-50/50">
                   <span className="text-2xl w-10 text-center">{idx < 3 ? medals[idx] : <span className="text-gray-400 font-bold">{idx + 1}</span>}</span>
                   <div className="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold"
                     style={{ backgroundColor: ['#4A90D9', '#7ED321', '#F5A623', '#E74C3C', '#9B59B6'][idx % 5] }}>
-                    {stat.childName[0]}
+                    {child.name[0]}
                   </div>
                   <div className="flex-1">
-                    <p className="font-medium">{stat.childName}</p>
+                    <p className="font-medium">{child.name}</p>
                     <div className="flex gap-3 text-xs text-gray-500 mt-1">
-                      <span>⭐ {stat.totalScore}</span>
-                      <span>💰 ¥{stat.totalCash}</span>
-                      <span>🎁 {stat.totalItems}</span>
+                      <span>⭐ {child.score ?? 0}</span>
+                      <span>💰 ¥{child.cash ?? 0}</span>
+                      <span>🎁 {child.items ?? 0}</span>
                     </div>
                   </div>
                 </div>
               ))
-          }
+          )}
         </div>
       </Card>
 
@@ -220,7 +185,7 @@ export default function Stats() {
         {/* 每个孩子累计统计 */}
         <Card className="p-5">
           <h3 className="text-sm font-semibold text-gray-700 mb-4">📊 累计统计</h3>
-          {sortedStats.length === 0 && children.length === 0 ? (
+          {sortedChildren.length === 0 ? (
             <div className="h-48 flex items-center justify-center text-gray-400">暂无数据</div>
           ) : (
             <div className="overflow-x-auto">
@@ -235,20 +200,12 @@ export default function Stats() {
                   </tr>
                 </thead>
                 <tbody>
-                  {sortedStats.length > 0 ? sortedStats.map((s, i) => (
-                    <tr key={s.childId} className={`border-b border-gray-100 ${i % 2 === 0 ? '' : 'bg-gray-50/30'}`}>
-                      <td className="py-3 px-3 font-medium">{s.childName}</td>
-                      <td className="py-3 px-3 text-right text-[#4A90D9] font-medium">{s.totalScore}</td>
-                      <td className="py-3 px-3 text-right text-green-600">¥{s.totalCash}</td>
-                      <td className="py-3 px-3 text-right text-orange-600">{s.totalItems}</td>
-                      <td className="py-3 px-3 text-right">{s.avgDailyScore}</td>
-                    </tr>
-                  )) : children.map((c, i) => (
+                  {sortedChildren.map((c, i) => (
                     <tr key={c.id} className={`border-b border-gray-100 ${i % 2 === 0 ? '' : 'bg-gray-50/30'}`}>
                       <td className="py-3 px-3 font-medium">{c.name}</td>
-                      <td className="py-3 px-3 text-right text-[#4A90D9] font-medium">{c.score}</td>
+                      <td className="py-3 px-3 text-right text-[#4A90D9] font-medium">{c.score ?? 0}</td>
                       <td className="py-3 px-3 text-right text-green-600">¥{(c.cash ?? 0).toFixed(0)}</td>
-                      <td className="py-3 px-3 text-right text-orange-600">-</td>
+                      <td className="py-3 px-3 text-right text-orange-600">{c.items ?? 0}</td>
                       <td className="py-3 px-3 text-right">-</td>
                     </tr>
                   ))}
@@ -281,36 +238,7 @@ export default function Stats() {
         {/* 交易次数统计 */}
         <Card className="p-5">
           <h3 className="text-sm font-semibold text-gray-700 mb-4">📈 交易次数统计</h3>
-          {sortedStats.length === 0 ? (
-            <div className="h-48 flex items-center justify-center text-gray-400">暂无数据</div>
-          ) : (
-            <div className="space-y-4">
-              {sortedStats.map((s, i) => (
-                <div key={s.childId}>
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="text-sm font-medium">{s.childName}</span>
-                    <span className="text-xs text-gray-500">总 {s.scoreCount + s.cashCount + s.itemCount} 次</span>
-                  </div>
-                  <div className="flex h-3 rounded-full overflow-hidden bg-gray-100">
-                    {s.scoreCount > 0 && (
-                      <div className="bg-[#4A90D9] transition-all" style={{ width: `${(s.scoreCount / (s.scoreCount + s.cashCount + s.itemCount)) * 100}%` }} />
-                    )}
-                    {s.cashCount > 0 && (
-                      <div className="bg-green-500 transition-all" style={{ width: `${(s.cashCount / (s.scoreCount + s.cashCount + s.itemCount)) * 100}%` }} />
-                    )}
-                    {s.itemCount > 0 && (
-                      <div className="bg-orange-400 transition-all" style={{ width: `${(s.itemCount / (s.scoreCount + s.cashCount + s.itemCount)) * 100}%` }} />
-                    )}
-                  </div>
-                  <div className="flex gap-3 mt-1 text-xs text-gray-500">
-                    <span>⭐ {s.scoreCount}</span>
-                    <span>💰 {s.cashCount}</span>
-                    <span>🎁 {s.itemCount}</span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
+          <div className="h-48 flex items-center justify-center text-gray-400">暂无交易次数数据</div>
         </Card>
       </div>
     </div>

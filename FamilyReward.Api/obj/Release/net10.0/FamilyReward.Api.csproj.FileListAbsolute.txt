@@ -132,3 +132,13 @@
 /Users/wengzhishan/Projects/family-reward-system/FamilyReward.Api/obj/Release/net10.0/FamilyReward.Api.pdb
 /Users/wengzhishan/Projects/family-reward-system/FamilyReward.Api/obj/Release/net10.0/FamilyReward.Api.genruntimeconfig.cache
 /Users/wengzhishan/Projects/family-reward-system/FamilyReward.Api/obj/Release/net10.0/ref/FamilyReward.Api.dll
+/Users/wengzhishan/Projects/family-reward-system/FamilyReward.Api/bin/Release/net10.0/Microsoft.AspNetCore.Authentication.JwtBearer.dll
+/Users/wengzhishan/Projects/family-reward-system/FamilyReward.Api/bin/Release/net10.0/Microsoft.IdentityModel.Abstractions.dll
+/Users/wengzhishan/Projects/family-reward-system/FamilyReward.Api/bin/Release/net10.0/Microsoft.IdentityModel.JsonWebTokens.dll
+/Users/wengzhishan/Projects/family-reward-system/FamilyReward.Api/bin/Release/net10.0/Microsoft.IdentityModel.Logging.dll
+/Users/wengzhishan/Projects/family-reward-system/FamilyReward.Api/bin/Release/net10.0/Microsoft.IdentityModel.Protocols.dll
+/Users/wengzhishan/Projects/family-reward-system/FamilyReward.Api/bin/Release/net10.0/Microsoft.IdentityModel.Protocols.OpenIdConnect.dll
+/Users/wengzhishan/Projects/family-reward-system/FamilyReward.Api/bin/Release/net10.0/Microsoft.IdentityModel.Tokens.dll
+/Users/wengzhishan/Projects/family-reward-system/FamilyReward.Api/bin/Release/net10.0/System.IdentityModel.Tokens.Jwt.dll
+/Users/wengzhishan/Projects/family-reward-system/FamilyReward.Api/bin/Release/net10.0/AgentIdentity.Sdk.dll
+/Users/wengzhishan/Projects/family-reward-system/FamilyReward.Api/bin/Release/net10.0/AgentIdentity.Sdk.pdb

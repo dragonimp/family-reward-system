@@ -1,5 +1,7 @@
 import { Link, useLocation } from 'react-router-dom';
 import { useState, type ReactNode } from 'react';
+import { useAuth } from '../contexts/AuthContext';
+import UserMenu from './UserMenu';
 
 const navItems = [
   { path: '/dashboard', label: '仪表盘', icon: '📊' },
@@ -8,7 +10,6 @@ const navItems = [
   { path: '/transactions', label: '交易记录', icon: '📝' },
   { path: '/rules', label: '规则管理', icon: '📋' },
   { path: '/stats', label: '统计报表', icon: '📈' },
-  { path: '/settings', label: '系统设置', icon: '⚙️' },
 ];
 
 interface LayoutProps {
@@ -17,7 +18,13 @@ interface LayoutProps {
 
 export default function Layout({ children }: LayoutProps) {
   const location = useLocation();
+  const { logout, user, userId } = useAuth();
   const [mobileOpen, setMobileOpen] = useState(false);
+
+  const handleLogout = () => {
+    setMobileOpen(false);
+    logout();
+  };
 
   return (
     <div className="h-screen flex flex-col bg-[#F7F9FC] overflow-hidden">
@@ -45,7 +52,7 @@ export default function Layout({ children }: LayoutProps) {
               ))}
             </nav>
             {/* 平板端横向滚动导航 */}
-            <nav className="hidden sm:flex flex-1 mx-3 overflow-x-auto scrollbar-hide">
+            <nav className="hidden sm:flex lg:hidden flex-1 mx-3 overflow-x-auto scrollbar-hide">
               <div className="flex items-center gap-1 min-w-max">
                 {navItems.map((item) => (
                   <Link
@@ -62,6 +69,7 @@ export default function Layout({ children }: LayoutProps) {
                 ))}
               </div>
             </nav>
+            <UserMenu user={user} userId={userId} onLogout={handleLogout} />
             {/* 移动端汉堡菜单 */}
             <button
               className="lg:hidden p-2 rounded-lg hover:bg-gray-100 text-xl"

@@ -3,7 +3,6 @@ import type { Child, Transaction } from '../types';
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getChildren, getTransactions } from '../services';
-import { CHILDREN_DATA } from '../constants/children';
 
 interface ChildCardProps {
   child: Child;
@@ -144,9 +143,9 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string>('');
 
-  const loadData = useCallback(async () => {
+  const loadData = useCallback(async (silent = false) => {
     try {
-      setLoading(true);
+      if (!silent) setLoading(true);
       setError('');
       
       const [childrenRes, transactionsRes] = await Promise.all([
@@ -159,20 +158,20 @@ export default function Dashboard() {
         setChildren(ch as Child[]);
       }
       
-      // 交易数据 - 后端返回 {data: {items: [...], total: N}}
-      // axios 拦截器返回 response.data，所以 txRes 已经是 {data: {items, total}}
-      if (transactionsRes?.data?.items) {
-        const mapped = transactionsRes.data.items.map((t: any) => ({
+      // 交易数据 - 兼容后端 {data: {items}} 和直接 {items} 两种形状
+      const txData = transactionsRes?.data ?? transactionsRes;
+      if (txData?.items) {
+        const mapped = txData.items.map((t: any) => ({
           ...t,
-          child_name: ({ 1: '彦谦', 2: '玥玥', 3: '嘟嘟', 4: '薇薇', 5: '小宇' } as Record<number, string>)[t.child_id] || `孩子${t.child_id}`,
+          child_name: t.child_name || t.childName || '',
         }));
         setTransactions(mapped);
       }
     } catch (err) {
       console.error('加载数据失败:', err);
-      setError('连接服务器失败，使用演示数据');
-      // 演示数据 - 使用全局共享常量
-      setChildren(CHILDREN_DATA);
+      setError('连接服务器失败，暂时无法加载真实数据');
+      setChildren([]);
+      setTransactions([]);
     } finally {
       setLoading(false);
     }
@@ -180,6 +179,20 @@ export default function Dashboard() {
 
   useEffect(() => {
     loadData();
+  }, [loadData]);
+
+  useEffect(() => {
+    const interval = window.setInterval(() => {
+      loadData(true);
+    }, 10000);
+    const handleVisibilityChange = () => {
+      if (!document.hidden) loadData(true);
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => {
+      window.clearInterval(interval);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
   }, [loadData]);
 
   const totalPoints = children.reduce((sum, c) => sum + (c.score || 0), 0);
@@ -206,7 +219,7 @@ export default function Dashboard() {
           <p className="text-sm text-gray-500 mt-1">记录每个孩子的成长瞬间</p>
         </div>
         <button
-          onClick={loadData}
+          onClick={() => loadData()}
           className="px-4 py-2 bg-[#4A90D9] text-white rounded-lg text-sm font-medium hover:bg-[#3a7bc8] transition-colors shadow-sm"
         >
           🔄 刷新

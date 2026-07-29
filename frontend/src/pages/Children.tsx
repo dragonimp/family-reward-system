@@ -4,7 +4,8 @@ import type { Child, Transaction } from '../types';
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getChildren, createChild, updateChild, deleteChild, getTransactions, createTransaction } from '../services';
-import { CHILDREN_DATA } from '../constants/children';
+import { useAuth } from '../contexts/AuthContext';
+import { useFamilyGroup } from '../contexts/FamilyGroupContext';
 
 interface ChildForm {
   name: string;
@@ -15,6 +16,8 @@ interface ChildForm {
 
 export default function Children() {
   const navigate = useNavigate();
+  const { userId } = useAuth();
+  const { selectedGroupId, selectedGroup, loading: familyGroupsLoading, error: familyGroupsError } = useFamilyGroup();
   const [children, setChildren] = useState<Child[]>([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
@@ -29,21 +32,41 @@ export default function Children() {
     setTimeout(() => setToast({ show: false, message: '', type: 'success' }), 3000);
   };
 
-  const loadChildren = useCallback(async () => {
+  const loadChildren = useCallback(async (silent = false) => {
+    if (!selectedGroupId) {
+      setChildren([]);
+      setLoading(false);
+      return;
+    }
     try {
-      setLoading(true);
-      const res = await getChildren();
+      if (!silent) setLoading(true);
+      const res = await getChildren({ familyGroupId: selectedGroupId, userId: userId || undefined });
       setChildren(Array.isArray(res) ? res : res?.data || []);
     } catch (error) {
       console.error('加载失败:', error);
-      setChildren(CHILDREN_DATA as Child[]);
+      setChildren([]);
+      showToast('孩子列表加载失败', 'error');
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [selectedGroupId, userId]);
 
   useEffect(() => {
     loadChildren();
+  }, [loadChildren]);
+
+  useEffect(() => {
+    const interval = window.setInterval(() => {
+      loadChildren(true);
+    }, 10000);
+    const handleVisibilityChange = () => {
+      if (!document.hidden) loadChildren(true);
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => {
+      window.clearInterval(interval);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
   }, [loadChildren]);
 
   const openCreateModal = () => {
@@ -65,10 +88,10 @@ export default function Children() {
     }
     try {
       if (editingChild) {
-        await updateChild(editingChild.id, { ...formData, id: editingChild.id, createdAt: editingChild.createdAt, updatedAt: new Date().toISOString() });
+        await updateChild(editingChild.id, { ...formData, familyGroupId: selectedGroupId ?? undefined, id: editingChild.id, createdAt: editingChild.createdAt, updatedAt: new Date().toISOString() });
         showToast('更新成功');
       } else {
-        await createChild({ ...formData, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() } as any);
+        await createChild({ ...formData, familyGroupId: selectedGroupId ?? undefined, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() } as any);
         showToast('创建成功');
       }
       setShowModal(false);
@@ -98,7 +121,7 @@ export default function Children() {
     }
   };
 
-  if (loading) {
+  if (loading || familyGroupsLoading) {
     return (
       <div className="flex items-center justify-center py-20">
         <div className="text-center">
@@ -120,7 +143,13 @@ export default function Children() {
       )}
 
       <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-bold text-gray-900">孩子管理</h2>
+        <div>
+          <h2 className="text-2xl font-bold text-gray-900">孩子管理</h2>
+          <p className="text-sm text-gray-500 mt-1">
+            当前家庭组：{selectedGroup?.name || '未选择'}
+            {familyGroupsError ? `，${familyGroupsError}` : ''}
+          </p>
+        </div>
         <button onClick={openCreateModal} className="btn-primary flex items-center gap-2">
           <span>➕</span> 新增孩子
         </button>
@@ -222,7 +251,7 @@ export default function Children() {
               <input
                 type="number"
                 value={formData.score}
-                onChange={(e) => setFormData({ ...formData, score: parseInt(e.target.value) || 0 })}
+                onChange={(e) => setFormData({ ...formData, score: parseFloat(e.target.value) || 0 })}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4A90D9] focus:border-transparent"
               />
             </div>

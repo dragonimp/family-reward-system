@@ -4,7 +4,6 @@ import type { Child, Rule, Transaction } from '../types';
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getChildren, getRules, createTransaction, parseRewardVoice } from '../services';
-import { CHILDREN_DATA } from '../constants/children';
 
 type TransactionType = 'score' | 'cash' | 'item';
 
@@ -32,9 +31,9 @@ export default function Reward() {
     setTimeout(() => setToast({ show: false, message: '', type: 'success' }), 3000);
   };
 
-  const loadData = useCallback(async () => {
+  const loadData = useCallback(async (silent = false) => {
     try {
-      setLoading(true);
+      if (!silent) setLoading(true);
       const [childrenRes, rulesRes] = await Promise.all([getChildren(), getRules()]);
       const childList = Array.isArray(childrenRes) ? childrenRes : (childrenRes as any)?.data || [];
       const rulePayload = (rulesRes as any)?.data || rulesRes;
@@ -55,12 +54,9 @@ export default function Reward() {
       setRules([...baseRules, ...redlineRules]);
     } catch (error) {
       console.error('加载失败:', error);
-      setChildren(CHILDREN_DATA as Child[]);
-      setRules([
-        { id: 1, name: '考试满分', description: '任何科目考试满分', category: '学习', type: 'positive', isRedLine: false, score: 10, enabled: true } as Rule,
-        { id: 2, name: '整理房间', description: '主动整理自己的房间', category: '生活', type: 'positive', isRedLine: false, score: 5, enabled: true } as Rule,
-        { id: 3, name: '迟到', description: '上学迟到', category: '纪律', type: 'negative', isRedLine: false, score: -5, enabled: true } as Rule,
-      ] as Rule[]);
+      setChildren([]);
+      setRules([]);
+      showToast('数据加载失败，暂时无法操作', 'error');
     } finally {
       setLoading(false);
     }
@@ -68,6 +64,20 @@ export default function Reward() {
 
   useEffect(() => {
     loadData();
+  }, [loadData]);
+
+  useEffect(() => {
+    const interval = window.setInterval(() => {
+      loadData(true);
+    }, 10000);
+    const handleVisibilityChange = () => {
+      if (!document.hidden) loadData(true);
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => {
+      window.clearInterval(interval);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
   }, [loadData]);
 
   const handleRuleSelect = (ruleId: number) => {
@@ -264,7 +274,7 @@ export default function Reward() {
           <div>
             <h3 className="text-sm font-semibold text-gray-700">语音记录积分</h3>
             <p className="text-xs text-gray-500 mt-1">
-              例如：给玥玥加5分，因为主动刷牙；彦谦扣10分，大喊大叫。
+              例如：给某个孩子加5分，因为主动完成任务；或扣10分，因为违反约定。
             </p>
             {voiceText && <p className="text-sm text-[#4A90D9] mt-2">浏览器识别：{voiceText}</p>}
             {voiceParsing && <p className="text-xs text-gray-500 mt-1">正在调用智能体纠错孩子姓名和积分...</p>}

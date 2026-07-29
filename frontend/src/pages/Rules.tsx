@@ -59,12 +59,8 @@ export default function Rules() {
       setRules(merged);
     } catch (error) {
       console.error('加载失败:', error);
-      setRules([
-        { id: 1, name: '考试满分', description: '任何科目考试满分', category: '学习', type: 'positive', isRedLine: false, score: 10, enabled: true, createdAt: '', updatedAt: '' },
-        { id: 2, name: '整理房间', description: '主动整理自己的房间', category: '生活', type: 'positive', isRedLine: false, score: 5, enabled: true, createdAt: '', updatedAt: '' },
-        { id: 3, name: '上学迟到', description: '没有按时到校', category: '纪律', type: 'negative', isRedLine: false, score: -5, enabled: true, createdAt: '', updatedAt: '' },
-        { id: 4, name: '打骂他人', description: '暴力行为', category: '红线', type: 'negative', isRedLine: true, score: -50, enabled: true, createdAt: '', updatedAt: '' },
-      ] as Rule[]);
+      setRules([]);
+      showToast('规则加载失败', 'error');
     } finally {
       setLoading(false);
     }
@@ -291,7 +287,7 @@ export default function Rules() {
         <div className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">规则名称 *</label>
-            <input type="text" value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} placeholder="如：考试满分" className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4A90D9]" />
+            <input type="text" value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} placeholder="如：按时完成约定任务" className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4A90D9]" />
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">描述</label>

@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("FamilyReward.Api")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+1fc1582f081c4858fa78d633a4a8bac9c0949fca")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+178018b3fe3c86d003d1adfae2dc0730bff438d9")]
 [assembly: System.Reflection.AssemblyProductAttribute("FamilyReward.Api")]
 [assembly: System.Reflection.AssemblyTitleAttribute("FamilyReward.Api")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]
