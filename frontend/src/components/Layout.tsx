@@ -5,12 +5,19 @@ import UserMenu from './UserMenu';
 
 const navItems = [
   { path: '/dashboard', label: '仪表盘', icon: '📊' },
-  { path: '/children', label: '孩子管理', icon: '👶' },
   { path: '/reward', label: '积分操作', icon: '⭐' },
   { path: '/transactions', label: '交易记录', icon: '📝' },
-  { path: '/rules', label: '规则管理', icon: '📋' },
   { path: '/stats', label: '统计报表', icon: '📈' },
 ];
+
+const manageItems = [
+  { path: '/family-groups', label: '家庭组管理', icon: '🏠' },
+  { path: '/children', label: '孩子管理', icon: '👶' },
+  { path: '/rules', label: '规则管理', icon: '📋' },
+  { path: '/settings', label: '系统设置', icon: '⚙️' },
+];
+
+const mobileNavItems = [...navItems, ...manageItems];
 
 interface LayoutProps {
   children: ReactNode;
@@ -20,6 +27,7 @@ export default function Layout({ children }: LayoutProps) {
   const location = useLocation();
   const { logout, user, userId } = useAuth();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [manageOpen, setManageOpen] = useState(false);
 
   const handleLogout = () => {
     setMobileOpen(false);
@@ -50,6 +58,36 @@ export default function Layout({ children }: LayoutProps) {
                   <span>{item.label}</span>
                 </Link>
               ))}
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={() => setManageOpen((open) => !open)}
+                  className={`flex items-center gap-1 px-3 py-2 rounded-lg text-sm font-medium transition-colors whitespace-nowrap
+                    ${manageItems.some((item) => location.pathname === item.path)
+                      ? 'bg-[#4A90D9]/10 text-[#4A90D9]'
+                      : 'text-gray-600 hover:bg-gray-100'}`}
+                >
+                  <span className="text-base">🧭</span>
+                  <span>管理</span>
+                </button>
+                {manageOpen && (
+                  <div className="absolute right-0 mt-2 w-40 rounded-lg border border-gray-200 bg-white p-1 shadow-lg">
+                    {manageItems.map((item) => (
+                      <Link
+                        key={item.path}
+                        to={item.path}
+                        onClick={() => setManageOpen(false)}
+                        className={`flex items-center gap-2 rounded-md px-3 py-2 text-sm ${
+                          location.pathname === item.path ? 'bg-[#4A90D9]/10 text-[#4A90D9]' : 'text-gray-600 hover:bg-gray-50'
+                        }`}
+                      >
+                        <span>{item.icon}</span>
+                        <span>{item.label}</span>
+                      </Link>
+                    ))}
+                  </div>
+                )}
+              </div>
             </nav>
             {/* 平板端横向滚动导航 */}
             <nav className="hidden sm:flex lg:hidden flex-1 mx-3 overflow-x-auto scrollbar-hide">
@@ -67,6 +105,16 @@ export default function Layout({ children }: LayoutProps) {
                     <span>{item.label}</span>
                   </Link>
                 ))}
+                <Link
+                  to="/family-groups"
+                  className={`flex items-center gap-1 px-2 sm:px-3 py-2 rounded-lg text-xs sm:text-sm font-medium transition-colors whitespace-nowrap
+                    ${manageItems.some((item) => location.pathname === item.path)
+                      ? 'bg-[#4A90D9]/10 text-[#4A90D9]'
+                      : 'text-gray-600 hover:bg-gray-100'}`}
+                >
+                  <span className="text-sm sm:text-base">🧭</span>
+                  <span>管理</span>
+                </Link>
               </div>
             </nav>
             <UserMenu user={user} userId={userId} onLogout={handleLogout} />
@@ -84,7 +132,7 @@ export default function Layout({ children }: LayoutProps) {
           {mobileOpen && (
           <div className="lg:hidden border-t border-gray-200 bg-white">
             <div className="flex flex-col gap-1 p-2">
-              {navItems.map((item) => (
+              {mobileNavItems.map((item) => (
                 <Link
                   key={item.path}
                   to={item.path}
@@ -111,7 +159,7 @@ export default function Layout({ children }: LayoutProps) {
       {/* 移动端底部导航 */}
           <nav className="lg:hidden bg-white border-t border-gray-200 flex-shrink-0">
             <div className="flex items-center justify-around py-1">
-              {navItems.slice(0, 6).map((item) => (
+              {mobileNavItems.slice(0, 6).map((item) => (
             <Link
               key={item.path}
               to={item.path}

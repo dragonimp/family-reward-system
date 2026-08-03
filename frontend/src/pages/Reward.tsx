@@ -4,11 +4,13 @@ import type { Child, Rule, Transaction } from '../types';
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getChildren, getRules, createTransaction, parseRewardVoice } from '../services';
+import { useFamilyGroup } from '../contexts/FamilyGroupContext';
 
 type TransactionType = 'score' | 'cash' | 'item';
 
 export default function Reward() {
   const navigate = useNavigate();
+  const { selectedGroupId } = useFamilyGroup();
   const [children, setChildren] = useState<Child[]>([]);
   const [rules, setRules] = useState<Rule[]>([]);
   const [loading, setLoading] = useState(true);
@@ -34,7 +36,10 @@ export default function Reward() {
   const loadData = useCallback(async (silent = false) => {
     try {
       if (!silent) setLoading(true);
-      const [childrenRes, rulesRes] = await Promise.all([getChildren(), getRules()]);
+      const [childrenRes, rulesRes] = await Promise.all([
+        getChildren({ familyGroupId: selectedGroupId ?? undefined }),
+        getRules(),
+      ]);
       const childList = Array.isArray(childrenRes) ? childrenRes : (childrenRes as any)?.data || [];
       const rulePayload = (rulesRes as any)?.data || rulesRes;
       const baseRules = Array.isArray(rulePayload) ? rulePayload : rulePayload?.rules || [];
@@ -60,11 +65,18 @@ export default function Reward() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [selectedGroupId]);
 
   useEffect(() => {
     loadData();
   }, [loadData]);
+
+  useEffect(() => {
+    setSelectedChild(null);
+    setSelectedRule(null);
+    setShowConfirm(false);
+    setTransactionPreview(null);
+  }, [selectedGroupId]);
 
   useEffect(() => {
     const interval = window.setInterval(() => {
@@ -91,7 +103,7 @@ export default function Reward() {
   const applyVoiceCommand = async (text: string) => {
     try {
       setVoiceParsing(true);
-      const result = await parseRewardVoice({ text });
+      const result = await parseRewardVoice({ text, familyGroupId: selectedGroupId ?? undefined });
       if (!result.ok || !result.command) {
         showToast(result.error || '智能体解析失败', 'error');
         return;
@@ -204,6 +216,7 @@ export default function Reward() {
 
     const txData: any = {
       child_id: child.id,
+      family_group_id: selectedGroupId ?? undefined,
       child_name: child.name,
       category: category || '其他',
       description: description || (rule?.name || '自定义操作'),

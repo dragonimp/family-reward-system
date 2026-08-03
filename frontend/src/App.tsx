@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import Dashboard from './pages/Dashboard';
 import ChildrenPage from './pages/Children';
+import FamilyGroupsPage from './pages/FamilyGroups';
 import RewardPage from './pages/Reward';
 import TransactionsPage from './pages/Transactions';
 import RulesPage from './pages/Rules';
@@ -26,6 +27,7 @@ export default function App() {
                     <Routes>
                       <Route path="/" element={<Navigate to="/dashboard" replace />} />
                       <Route path="/dashboard" element={<Dashboard />} />
+                      <Route path="/family-groups" element={<FamilyGroupsPage />} />
                       <Route path="/children" element={<ChildrenPage />} />
                       <Route path="/reward" element={<RewardPage />} />
                       <Route path="/transactions" element={<TransactionsPage />} />

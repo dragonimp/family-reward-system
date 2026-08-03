@@ -5,6 +5,8 @@ export interface Child {
   family_group_id?: number;
   familyGroupName?: string;
   family_group_name?: string;
+  profileKey?: string;
+  profile_key?: string;
   name: string;
   score?: number;
   cash?: number;
@@ -22,6 +24,13 @@ export interface FamilyGroup {
   role?: string;
   createdAt?: string;
   updatedAt?: string;
+}
+
+export interface FamilyGroupInvite {
+  familyGroupId: number;
+  familyGroupName: string;
+  inviteUrl: string;
+  qrImageUrl: string;
 }
 
 // 交易记录类型
@@ -144,6 +153,7 @@ export interface RewardCommand {
 
 export interface RewardParseRequest {
   text: string;
+  familyGroupId?: number;
 }
 
 export interface RewardParseResponse {

@@ -2,6 +2,7 @@ import { Card } from '../components/Card';
 import type { Transaction, Child } from '../types';
 import { useState, useEffect, useCallback } from 'react';
 import { getTransactions, getChildren } from '../services';
+import { useFamilyGroup } from '../contexts/FamilyGroupContext';
 
 type TransactionType = 'score' | 'cash' | 'item';
 
@@ -18,6 +19,7 @@ const typeColors: Record<string, string> = {
 };
 
 export default function Transactions() {
+  const { selectedGroupId } = useFamilyGroup();
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [children, setChildren] = useState<Child[]>([]);
   const [loading, setLoading] = useState(true);
@@ -36,7 +38,7 @@ export default function Transactions() {
   const loadData = useCallback(async () => {
     try {
       setLoading(true);
-      const params: any = { page, pageSize };
+      const params: any = { page, pageSize, familyGroupId: selectedGroupId ?? undefined };
       if (filterChild) params.childId = parseInt(filterChild);
       if (filterType) params.type = filterType;
       if (filterCategory) params.category = filterCategory;
@@ -46,7 +48,7 @@ export default function Transactions() {
 
       const [txRes, childRes] = await Promise.all([
         getTransactions(params),
-        getChildren(),
+        getChildren({ familyGroupId: selectedGroupId ?? undefined }),
       ]);
 
       const txData = (txRes as any).data ?? txRes;
@@ -61,11 +63,16 @@ export default function Transactions() {
     } finally {
       setLoading(false);
     }
-  }, [page, pageSize, filterChild, filterType, filterCategory, filterStartDate, filterEndDate, filterSearch]);
+  }, [page, pageSize, filterChild, filterType, filterCategory, filterStartDate, filterEndDate, filterSearch, selectedGroupId]);
 
   useEffect(() => {
     loadData();
   }, [loadData]);
+
+  useEffect(() => {
+    setPage(1);
+    setFilterChild('');
+  }, [selectedGroupId]);
 
   const categories = Array.from(new Set(transactions.map((t) => t.category)));
   const totalPages = Math.ceil(total / pageSize);

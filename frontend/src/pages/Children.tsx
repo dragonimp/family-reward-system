@@ -91,7 +91,13 @@ export default function Children() {
         await updateChild(editingChild.id, { ...formData, familyGroupId: selectedGroupId ?? undefined, id: editingChild.id, createdAt: editingChild.createdAt, updatedAt: new Date().toISOString() });
         showToast('更新成功');
       } else {
-        await createChild({ ...formData, familyGroupId: selectedGroupId ?? undefined, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() } as any);
+        await createChild({
+          ...formData,
+          familyGroupId: selectedGroupId ?? undefined,
+          userId: userId || undefined,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        } as any);
         showToast('创建成功');
       }
       setShowModal(false);
@@ -110,7 +116,7 @@ export default function Children() {
   const handleDelete = async () => {
     if (childToDelete) {
       try {
-        await deleteChild(childToDelete);
+        await deleteChild(childToDelete, { familyGroupId: selectedGroupId ?? undefined });
         showToast('删除成功');
         setShowDeleteConfirm(false);
         loadChildren();

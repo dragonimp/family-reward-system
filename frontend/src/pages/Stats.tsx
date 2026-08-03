@@ -2,6 +2,7 @@ import { Card } from '../components/Card';
 import type { Child } from '../types';
 import { useState, useEffect, useCallback } from 'react';
 import { getChildStats, getCategoryStats } from '../services';
+import { useFamilyGroup } from '../contexts/FamilyGroupContext';
 
 // Simple SVG donut chart component
 function DonutChart({ data }: { data: Array<{ name: string; value: number; color: string }> }) {
@@ -86,6 +87,7 @@ const categoryColors: Record<string, string> = {
 };
 
 export default function Stats() {
+  const { selectedGroupId } = useFamilyGroup();
   const [children, setChildren] = useState<Child[]>([]);
   const [categoryData, setCategoryData] = useState<Array<{ category: string; total: number }>>([]);
   const [loading, setLoading] = useState(true);
@@ -94,8 +96,8 @@ export default function Stats() {
     try {
       setLoading(true);
       const [statsRes, catRes] = await Promise.all([
-        getChildStats(),
-        getCategoryStats(),
+        getChildStats({ familyGroupId: selectedGroupId ?? undefined }),
+        getCategoryStats({ familyGroupId: selectedGroupId ?? undefined }),
       ]);
 
       const statsPayload = (statsRes as any).data ?? statsRes;
@@ -109,7 +111,7 @@ export default function Stats() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [selectedGroupId]);
 
   useEffect(() => {
     loadData();

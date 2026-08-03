@@ -2,6 +2,7 @@ import { Card } from '../components/Card';
 import type { Child, Transaction } from '../types';
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useFamilyGroup } from '../contexts/FamilyGroupContext';
 import { getChildren, getTransactions } from '../services';
 
 interface ChildCardProps {
@@ -138,6 +139,7 @@ function TransactionItem({ tx, childColors }: { tx: any; childColors: any[] }) {
 
 export default function Dashboard() {
   const navigate = useNavigate();
+  const { selectedGroupId } = useFamilyGroup();
   const [children, setChildren] = useState<Child[]>([]);
   const [transactions, setTransactions] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -149,8 +151,8 @@ export default function Dashboard() {
       setError('');
       
       const [childrenRes, transactionsRes] = await Promise.all([
-        getChildren(),
-        getTransactions({ page: 1, pageSize: 20 }),
+        getChildren({ familyGroupId: selectedGroupId ?? undefined }),
+        getTransactions({ page: 1, pageSize: 20, familyGroupId: selectedGroupId ?? undefined }),
       ]);
 
       const ch = Array.isArray(childrenRes) ? childrenRes : childrenRes?.data;
@@ -175,7 +177,7 @@ export default function Dashboard() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [selectedGroupId]);
 
   useEffect(() => {
     loadData();

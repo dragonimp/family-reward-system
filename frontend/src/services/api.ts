@@ -29,7 +29,7 @@ http.interceptors.response.use(
   },
   (error) => {
     const message =
-      error.response?.data?.message || error.message || '网络请求失败';
+      error.response?.data?.error || error.response?.data?.message || error.message || '网络请求失败';
     console.error('API Error:', message);
     return Promise.reject(new Error(message));
   }

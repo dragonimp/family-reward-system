@@ -121,6 +121,50 @@ app.MapPost("/api/family-groups", async (JsonObject body, HttpRequest request) =
     return Results.Created($"/api/family-groups/{GetInt(created.Group!, "id")}", created.Group);
 });
 
+app.MapGet("/api/family-groups/{id:int}/invite", async (int id, HttpRequest request) =>
+{
+    var userId = GetRequestUserId(request);
+    var groups = await GetFamilyGroups(connectionString, userId);
+    var group = groups.FirstOrDefault(item => GetInt(item, "id") == id);
+    if (group is null)
+    {
+        return Results.NotFound(new { error = "家庭组不存在" });
+    }
+
+    var origin = $"{request.Scheme}://{request.Host}";
+    var inviteUrl = $"{origin}/family-groups?joinFamilyGroupId={id}";
+    return Results.Json(new
+    {
+        familyGroupId = id,
+        familyGroupName = Convert.ToString(group["name"], CultureInfo.InvariantCulture) ?? "",
+        inviteUrl,
+        qrImageUrl = $"https://api.qrserver.com/v1/create-qr-code/?size=180x180&data={Uri.EscapeDataString(inviteUrl)}"
+    });
+});
+
+app.MapPost("/api/family-groups/join", async (JsonObject body, HttpRequest request) =>
+{
+    var familyGroupId = body.Int("family_group_id") ?? body.Int("familyGroupId");
+    if (familyGroupId is null)
+    {
+        return Results.BadRequest(new { error = "缺少 familyGroupId" });
+    }
+
+    var userId = body.String("user_id");
+    if (string.IsNullOrWhiteSpace(userId))
+    {
+        userId = body.String("userId");
+    }
+    if (string.IsNullOrWhiteSpace(userId))
+    {
+        userId = GetRequestUserId(request);
+    }
+
+    var role = body.String("role", "member");
+    var linked = await UpsertFamilyGroupUser(connectionString, familyGroupId.Value, userId, role);
+    return linked ? Results.Json(new { ok = true }) : Results.NotFound(new { error = "家庭组不存在" });
+});
+
 app.MapPut("/api/family-groups/{id:int}/users", async (int id, JsonObject body) =>
 {
     var userId = body.String("user_id");
@@ -151,8 +195,211 @@ app.MapGet("/api/children/{id:int}", async (int id, HttpRequest request) =>
     return child is null ? Results.NotFound(new { error = "不存在" }) : Results.Json(child);
 });
 
+app.MapGet("/api/watch/score", async (HttpRequest request) =>
+{
+    var familyGroupId = await ResolveFamilyGroupId(connectionString, request);
+    var children = await GetChildren(connectionString, familyGroupId);
+    var familyGroupName = children
+        .Select(c => Convert.ToString(c["familyGroupName"], CultureInfo.InvariantCulture) ?? "")
+        .FirstOrDefault(name => !string.IsNullOrWhiteSpace(name)) ?? "";
+    return Results.Json(new
+    {
+        familyGroupId,
+        familyGroupName,
+        updatedAt = DateTimeOffset.UtcNow.ToString("O", CultureInfo.InvariantCulture),
+        children = children.Select(c => new
+        {
+            id = GetInt(c, "id"),
+            name = Convert.ToString(c["name"], CultureInfo.InvariantCulture) ?? "",
+            points = GetDecimal(c, "score"),
+            cash = GetDecimal(c, "cash"),
+            items = GetInt(c, "items")
+        })
+    });
+});
+
+app.MapGet("/api/watch/rules", async () =>
+{
+    var rulesPayload = await GetRules(connectionString);
+    var rules = ((List<Dictionary<string, object?>>)rulesPayload["rules"])
+        .Where(rule => GetDecimal(rule, "points") > 0)
+        .Select(rule => new
+        {
+            id = GetInt(rule, "id"),
+            name = Convert.ToString(rule["name"], CultureInfo.InvariantCulture) ?? "",
+            category = Convert.ToString(rule["category"], CultureInfo.InvariantCulture) ?? "",
+            points = GetDecimal(rule, "points"),
+            description = Convert.ToString(rule["description"], CultureInfo.InvariantCulture) ?? ""
+        });
+    return Results.Json(new { rules });
+});
+
+app.MapGet("/api/watch/requests", async (HttpRequest request) =>
+{
+    var familyGroupId = await ResolveFamilyGroupId(connectionString, request);
+    var childId = request.Query.Int("childId") ?? request.Query.Int("child_id");
+    var limit = Math.Clamp(request.Query.Int("limit") ?? 20, 1, 50);
+    return Results.Json(new
+    {
+        familyGroupId,
+        requests = await GetWatchRewardRequests(connectionString, familyGroupId, childId, limit)
+    });
+});
+
+app.MapPost("/api/watch/requests", async (JsonObject body, HttpRequest request) =>
+{
+    var familyGroupId = await ResolveFamilyGroupId(connectionString, request, body);
+    var result = await CreateWatchRewardRequest(connectionString, body, familyGroupId, GetRequestUserId(request));
+    return result.ContainsKey("error")
+        ? Results.BadRequest(result)
+        : Results.Created($"/api/watch/requests/{GetInt(result, "id")}", result);
+});
+
+app.MapPost("/api/watch/requests/{id:int}/approve", async (int id, JsonObject body, HttpRequest request) =>
+{
+    var familyGroupId = await ResolveFamilyGroupId(connectionString, request, body);
+    var result = await ApproveWatchRewardRequest(connectionString, id, familyGroupId, body.String("reviewNote"));
+    return result.ContainsKey("error") ? Results.BadRequest(result) : Results.Json(result);
+});
+
+app.MapGet("/watch", async (HttpRequest request) =>
+{
+    var familyGroupId = await ResolveFamilyGroupId(connectionString, request);
+    var children = await GetChildren(connectionString, familyGroupId);
+    var rulesPayload = await GetRules(connectionString);
+    var positiveRules = ((List<Dictionary<string, object?>>)rulesPayload["rules"])
+        .Where(rule => GetDecimal(rule, "points") > 0)
+        .Take(8)
+        .ToList();
+    var recentRequests = await GetWatchRewardRequests(connectionString, familyGroupId, null, 6);
+    var updatedAt = DateTime.Now.ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture);
+    var childOptions = string.Join("", children.Select((c, index) => $"""
+        <option value="{GetInt(c, "id")}"{(index == 0 ? " selected" : "")}>{Html(Convert.ToString(c["name"], CultureInfo.InvariantCulture) ?? "")}</option>
+        """));
+    var childCards = string.Join("", children.Select(c => $"""
+        <article class="child-card" data-child-id="{GetInt(c, "id")}">
+          <div>
+            <div class="name">{Html(Convert.ToString(c["name"], CultureInfo.InvariantCulture) ?? "")}</div>
+            <div class="sub">{Html(Convert.ToString(c["familyGroupName"], CultureInfo.InvariantCulture) ?? "")}</div>
+          </div>
+          <div class="score">{FormatPoints(GetDecimal(c, "score"))}</div>
+        </article>
+        """));
+    if (string.IsNullOrWhiteSpace(childCards))
+    {
+        childCards = """<div class="empty">暂无孩子积分</div>""";
+    }
+
+    var ruleButtons = string.Join("", positiveRules.Select(rule => $"""
+        <button type="button" class="rule-btn" data-rule-id="{GetInt(rule, "id")}" data-points="{FormatPoints(GetDecimal(rule, "points"))}" data-title="{Html(Convert.ToString(rule["name"], CultureInfo.InvariantCulture) ?? "")}">
+          <span>{Html(Convert.ToString(rule["name"], CultureInfo.InvariantCulture) ?? "")}</span>
+          <b>+{FormatPoints(GetDecimal(rule, "points"))}</b>
+        </button>
+        """));
+    if (string.IsNullOrWhiteSpace(ruleButtons))
+    {
+        ruleButtons = """<div class="empty compact">暂无可申请规则</div>""";
+    }
+
+    var requestRows = string.Join("", recentRequests.Select(item => $"""
+        <li>
+          <span>{Html(Convert.ToString(item["childName"], CultureInfo.InvariantCulture) ?? "")} · {Html(Convert.ToString(item["title"], CultureInfo.InvariantCulture) ?? "")}</span>
+          <b>{Html(WatchRequestStatusText(Convert.ToString(item["status"], CultureInfo.InvariantCulture) ?? ""))}</b>
+        </li>
+        """));
+    if (string.IsNullOrWhiteSpace(requestRows))
+    {
+        requestRows = """<li class="empty-row">暂无申请</li>""";
+    }
+
+    var html = """
+        <!doctype html>
+        <html lang="zh-CN">
+        <head>
+          <meta charset="utf-8">
+          <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+          <title>手表积分</title>
+          <style>
+            *{box-sizing:border-box}body{margin:0;background:#eef5ef;color:#17231b;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}.wrap{max-width:360px;margin:0 auto;padding:9px}header{display:flex;align-items:end;justify-content:space-between;gap:8px;margin:0 0 8px}h1{margin:0;font-size:21px;line-height:1.1}.time{margin:0;color:#5a6b61;font-size:11px}.stack{display:grid;gap:8px}.child-card{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:9px 10px;background:#fff;border:1px solid #d6e1d9;border-radius:8px}.name{font-size:17px;font-weight:800;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.sub{margin-top:2px;font-size:11px;color:#637269;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.score{font-size:27px;font-weight:900;color:#0c7a3a;white-space:nowrap}.score:after{content:"分";margin-left:2px;font-size:12px;color:#5a6b61}.panel{padding:9px;background:#fff;border:1px solid #d6e1d9;border-radius:8px}h2{margin:0 0 7px;font-size:15px}.rules{display:grid;grid-template-columns:1fr 1fr;gap:6px}.rule-btn{display:flex;align-items:center;justify-content:space-between;gap:5px;min-height:38px;padding:7px;border:1px solid #cfdcd3;border-radius:7px;background:#f8fbf9;color:#17231b;font-size:12px;text-align:left}.rule-btn span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.rule-btn b{color:#0c7a3a}label{display:block;margin:7px 0 3px;font-size:12px;color:#44544a}select,input,textarea{width:100%;border:1px solid #cbd8cf;border-radius:7px;background:#fff;padding:8px;font-size:15px;color:#17231b}textarea{min-height:52px;resize:vertical}.submit{width:100%;margin-top:8px;border:0;border-radius:8px;background:#16643a;color:#fff;padding:10px;font-size:16px;font-weight:800}.msg{min-height:17px;margin:6px 0 0;font-size:12px;color:#16643a}.requests{list-style:none;margin:0;padding:0;display:grid;gap:5px}.requests li{display:flex;justify-content:space-between;gap:8px;border-top:1px solid #edf2ee;padding-top:5px;font-size:12px}.requests b{white-space:nowrap;color:#5f5221}.empty,.empty-row{color:#64746a;text-align:center;font-size:13px}.compact{padding:7px}.hint{margin:7px 0 0;color:#64746a;text-align:center;font-size:11px}@media(max-width:230px){.wrap{padding:7px}h1{font-size:18px}.score{font-size:22px}.rules{grid-template-columns:1fr}.panel{padding:8px}select,input,textarea{font-size:14px;padding:7px}}
+          </style>
+        </head>
+        <body>
+          <main class="wrap">
+            <header>
+              <h1>手表积分</h1>
+              <p class="time">__UPDATED_AT__</p>
+            </header>
+            <section class="stack">__CHILD_CARDS__</section>
+            <section class="panel">
+              <h2>申请领取</h2>
+              <form id="request-form">
+                <input type="hidden" name="family_group_id" value="__FAMILY_GROUP_ID__">
+                <input type="hidden" name="rule_id" id="rule-id">
+                <label for="child-id">孩子</label>
+                <select id="child-id" name="child_id">__CHILD_OPTIONS__</select>
+                <label>常用奖励</label>
+                <div class="rules">__RULE_BUTTONS__</div>
+                <label for="title">申请事项</label>
+                <input id="title" name="title" maxlength="80" placeholder="比如 好好吃饭">
+                <label for="points">积分</label>
+                <input id="points" name="points" inputmode="decimal" placeholder="比如 5">
+                <label for="note">说明</label>
+                <textarea id="note" name="note" maxlength="200" placeholder="可以写一句说明"></textarea>
+                <button class="submit" type="submit">提交申请</button>
+                <p id="msg" class="msg"></p>
+              </form>
+            </section>
+            <section class="panel">
+              <h2>最近申请</h2>
+              <ul class="requests" id="requests">__REQUEST_ROWS__</ul>
+            </section>
+            <p class="hint">适配小天才、华为、小米等手表浏览器小屏访问</p>
+          </main>
+          <script>
+            const form = document.getElementById('request-form');
+            const msg = document.getElementById('msg');
+            document.querySelectorAll('.rule-btn').forEach((button) => {
+              button.addEventListener('click', () => {
+                document.getElementById('rule-id').value = button.dataset.ruleId || '';
+                document.getElementById('title').value = button.dataset.title || '';
+                document.getElementById('points').value = button.dataset.points || '';
+              });
+            });
+            form.addEventListener('submit', async (event) => {
+              event.preventDefault();
+              msg.textContent = '正在提交...';
+              const data = Object.fromEntries(new FormData(form).entries());
+              try {
+                const response = await fetch('/api/watch/requests', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify(data)
+                });
+                const payload = await response.json();
+                if (!response.ok) throw new Error(payload.error || '提交失败');
+                msg.textContent = '已提交，等待家长确认';
+                form.reset();
+                document.getElementById('rule-id').value = '';
+              } catch (error) {
+                msg.textContent = error.message || '提交失败';
+              }
+            });
+          </script>
+        </body>
+        </html>
+        """
+        .Replace("__UPDATED_AT__", Html(updatedAt), StringComparison.Ordinal)
+        .Replace("__FAMILY_GROUP_ID__", familyGroupId.ToString(CultureInfo.InvariantCulture), StringComparison.Ordinal)
+        .Replace("__CHILD_CARDS__", childCards, StringComparison.Ordinal)
+        .Replace("__CHILD_OPTIONS__", childOptions, StringComparison.Ordinal)
+        .Replace("__RULE_BUTTONS__", ruleButtons, StringComparison.Ordinal)
+        .Replace("__REQUEST_ROWS__", requestRows, StringComparison.Ordinal);
+    return Results.Content(html, "text/html; charset=utf-8");
+});
+
 app.MapPost("/api/children", async (JsonObject body, HttpRequest request) =>
 {
+    body["user_id"] = GetRequestUserId(request);
     var familyGroupId = await ResolveFamilyGroupId(connectionString, request, body);
     var created = await CreateChildCore(connectionString, body, familyGroupId);
     if (!created.Success)
@@ -171,7 +418,7 @@ app.MapPut("/api/children/{id:int}", async (int id, JsonObject body, HttpRequest
         UPDATE children
         SET name = @name, note = @note, status = @status, updated_at = CURRENT_TIMESTAMP
         WHERE id = @id AND family_group_id = @family_group_id
-        RETURNING id, name, status, note, created_at, updated_at
+        RETURNING id, name, status, note, profile_key, created_at, updated_at
         """, conn, tx);
     cmd.Parameters.AddWithValue("id", id);
     cmd.Parameters.AddWithValue("family_group_id", familyGroupId);
@@ -187,9 +434,11 @@ app.MapPut("/api/children/{id:int}", async (int id, JsonObject body, HttpRequest
     await reader.CloseAsync();
 
     await using var accountCmd = new NpgsqlCommand("""
-        INSERT INTO accounts (child_id, points, cash_cny, items_count)
-        VALUES (@child_id, COALESCE(@points, 0), COALESCE(@cash_cny, 0), COALESCE(@items_count, 0))
-        ON CONFLICT (child_id) DO UPDATE SET
+        INSERT INTO accounts (child_id, profile_key, points, cash_cny, items_count)
+        SELECT @child_id, profile_key, COALESCE(@points, 0), COALESCE(@cash_cny, 0), COALESCE(@items_count, 0)
+        FROM children
+        WHERE id = @child_id
+        ON CONFLICT (profile_key) DO UPDATE SET
             points = COALESCE(@points, accounts.points),
             cash_cny = COALESCE(@cash_cny, accounts.cash_cny),
             items_count = COALESCE(@items_count, accounts.items_count),
@@ -209,12 +458,8 @@ app.MapPut("/api/children/{id:int}", async (int id, JsonObject body, HttpRequest
 app.MapDelete("/api/children/{id:int}", async (int id, HttpRequest request) =>
 {
     var familyGroupId = await ResolveFamilyGroupId(connectionString, request);
-    await using var conn = await OpenConnection(connectionString);
-    await using var cmd = new NpgsqlCommand("DELETE FROM children WHERE id = @id AND family_group_id = @family_group_id", conn);
-    cmd.Parameters.AddWithValue("id", id);
-    cmd.Parameters.AddWithValue("family_group_id", familyGroupId);
-    await cmd.ExecuteNonQueryAsync();
-    return Results.Json(new { status = "ok" });
+    var result = await DeleteChildMembership(connectionString, id, familyGroupId);
+    return result.ContainsKey("error") ? Results.NotFound(result) : Results.Json(result);
 });
 
 app.MapGet("/api/transactions", async (HttpRequest request) =>
@@ -282,18 +527,20 @@ app.MapGet("/api/transactions", async (HttpRequest request) =>
     return Results.Json(new { data = new { items, total, page, page_size = pageSize } });
 });
 
-app.MapPost("/api/transactions", async (JsonObject body) =>
+app.MapPost("/api/transactions", async (JsonObject body, HttpRequest request) =>
 {
-    var result = await CreateTransaction(connectionString, body);
+    var familyGroupId = await ResolveFamilyGroupId(connectionString, request, body);
+    var result = await CreateTransaction(connectionString, body, familyGroupId);
     return result.ContainsKey("error") ? Results.BadRequest(result) : Results.Json(result);
 });
 
-app.MapPost("/api/transactions/batch", async (JsonArray body) =>
+app.MapPost("/api/transactions/batch", async (JsonArray body, HttpRequest request) =>
 {
     var results = new List<object>();
     foreach (var node in body.OfType<JsonObject>())
     {
-        var result = await CreateTransaction(connectionString, node);
+        var familyGroupId = await ResolveFamilyGroupId(connectionString, request, node);
+        var result = await CreateTransaction(connectionString, node, familyGroupId);
         results.Add(new
         {
             child_id = node.Int("child_id") ?? node.Int("childId"),
@@ -305,13 +552,11 @@ app.MapPost("/api/transactions/batch", async (JsonArray body) =>
     return Results.Json(new { results });
 });
 
-app.MapDelete("/api/transactions/{id:int}", async (int id) =>
+app.MapDelete("/api/transactions/{id:int}", async (int id, HttpRequest request) =>
 {
-    await using var conn = await OpenConnection(connectionString);
-    await using var cmd = new NpgsqlCommand("DELETE FROM transactions WHERE id = @id", conn);
-    cmd.Parameters.AddWithValue("id", id);
-    await cmd.ExecuteNonQueryAsync();
-    return Results.Json(new { status = "ok" });
+    var familyGroupId = await ResolveFamilyGroupId(connectionString, request);
+    var result = await DeleteTransaction(connectionString, id, familyGroupId);
+    return result.ContainsKey("error") ? Results.NotFound(result) : Results.Json(result);
 });
 
 app.MapGet("/api/rules", async () => Results.Json(await GetRules(connectionString)));
@@ -1511,7 +1756,7 @@ static async Task<object> McpUpdateChild(string connectionString, JsonObject arg
                 status = COALESCE(@status, status),
                 updated_at = CURRENT_TIMESTAMP
             WHERE id = @id
-            RETURNING id, name, status, note, created_at, updated_at
+            RETURNING id, name, status, note, profile_key, created_at, updated_at
             """, conn, tx))
         {
             cmd.Parameters.AddWithValue("id", childId);
@@ -1529,9 +1774,11 @@ static async Task<object> McpUpdateChild(string connectionString, JsonObject arg
         }
 
         await using (var accountCmd = new NpgsqlCommand("""
-            INSERT INTO accounts (child_id, points, cash_cny, items_count)
-            VALUES (@child_id, COALESCE(@points, 0), COALESCE(@cash_cny, 0), COALESCE(@items_count, 0))
-            ON CONFLICT (child_id) DO UPDATE SET
+            INSERT INTO accounts (child_id, profile_key, points, cash_cny, items_count)
+            SELECT @child_id, profile_key, COALESCE(@points, 0), COALESCE(@cash_cny, 0), COALESCE(@items_count, 0)
+            FROM children
+            WHERE id = @child_id
+            ON CONFLICT (profile_key) DO UPDATE SET
                 points = COALESCE(@points, points),
                 cash_cny = COALESCE(@cash_cny, cash_cny),
                 items_count = COALESCE(@items_count, items_count),
@@ -1565,13 +1812,11 @@ static async Task<object> McpDeleteChild(string connectionString, JsonObject arg
         return new { ok = false, error = "未找到目标孩子" };
     }
 
-    await using var conn = await OpenConnection(connectionString);
-    await using var cmd = new NpgsqlCommand("DELETE FROM children WHERE id = @id", conn);
-    cmd.Parameters.AddWithValue("id", GetInt(target, "id"));
-    var affected = await cmd.ExecuteNonQueryAsync();
-    return affected > 0
+    var familyGroupId = GetInt(target, "family_group_id");
+    var result = await DeleteChildMembership(connectionString, GetInt(target, "id"), familyGroupId);
+    return !result.ContainsKey("error")
         ? new { ok = true, action = "delete_child", child = target }
-        : new { ok = false, error = "孩子不存在" };
+        : new { ok = false, error = result["error"] };
 }
 
 static async Task<object> McpQueryScore(string connectionString, JsonObject arguments)
@@ -2006,13 +2251,13 @@ static async Task<Dictionary<string, object?>> UpdateTransaction(string connecti
     }
 }
 
-static async Task<Dictionary<string, object?>> DeleteTransaction(string connectionString, int id)
+static async Task<Dictionary<string, object?>> DeleteTransaction(string connectionString, int id, int? familyGroupId = null)
 {
     await using var conn = await OpenConnection(connectionString);
     await using var tx = await conn.BeginTransactionAsync();
     try
     {
-        var existing = await ReadTransactionForUpdate(conn, tx, id);
+        var existing = await ReadTransactionForUpdate(conn, tx, id, familyGroupId);
         if (existing is null)
         {
             await tx.RollbackAsync();
@@ -2033,34 +2278,49 @@ static async Task<Dictionary<string, object?>> DeleteTransaction(string connecti
     }
 }
 
-static async Task<Dictionary<string, object?>?> ReadTransactionForUpdate(NpgsqlConnection conn, NpgsqlTransaction tx, int id)
+static async Task<Dictionary<string, object?>?> ReadTransactionForUpdate(NpgsqlConnection conn, NpgsqlTransaction tx, int id, int? familyGroupId = null)
 {
     await using var cmd = new NpgsqlCommand("""
         SELECT t.*, c.name AS child_name
         FROM transactions t
         LEFT JOIN children c ON c.id = t.child_id
         WHERE t.id = @id
+          AND (@family_group_id IS NULL OR c.family_group_id = @family_group_id)
         FOR UPDATE OF t
         """, conn, tx);
     cmd.Parameters.AddWithValue("id", id);
+    cmd.Parameters.Add(new NpgsqlParameter("family_group_id", NpgsqlDbType.Integer)
+    {
+        Value = familyGroupId is null ? DBNull.Value : familyGroupId.Value
+    });
     await using var reader = await cmd.ExecuteReaderAsync();
     return await reader.ReadAsync() ? ReadTransaction(reader) : null;
 }
 
 static async Task ReverseTransactionAccountEffect(NpgsqlConnection conn, NpgsqlTransaction tx, IReadOnlyDictionary<string, object?> transaction)
 {
-    var reverseDirection = string.Equals(Convert.ToString(transaction["direction"], CultureInfo.InvariantCulture), "-", StringComparison.Ordinal)
-        ? "+"
-        : "-";
-    await UpdateAccount(
-        conn,
-        tx,
-        GetInt(transaction, "child_id"),
-        Convert.ToString(transaction["rawType"], CultureInfo.InvariantCulture) ?? "points",
-        reverseDirection,
-        GetDecimal(transaction, "points"),
-        GetDecimal(transaction, "cash_cny"),
-        Convert.ToString(transaction["items"], CultureInfo.InvariantCulture) ?? "");
+    var type = Convert.ToString(transaction["rawType"], CultureInfo.InvariantCulture) ?? "points";
+    var wasCredit = string.Equals(Convert.ToString(transaction["direction"], CultureInfo.InvariantCulture), "+", StringComparison.Ordinal);
+    var sql = (type, wasCredit) switch
+    {
+        ("points", true) => "UPDATE accounts SET points = points - @points, points_earned = GREATEST(points_earned - @points, 0), updated_at = CURRENT_TIMESTAMP WHERE profile_key = (SELECT profile_key FROM children WHERE id = @child_id)",
+        ("points", false) => "UPDATE accounts SET points = points + @points, points_spent = GREATEST(points_spent - @points, 0), updated_at = CURRENT_TIMESTAMP WHERE profile_key = (SELECT profile_key FROM children WHERE id = @child_id)",
+        ("cash", true) => "UPDATE accounts SET cash_cny = cash_cny - @cash, cash_earned = GREATEST(cash_earned - @cash, 0), updated_at = CURRENT_TIMESTAMP WHERE profile_key = (SELECT profile_key FROM children WHERE id = @child_id)",
+        ("cash", false) => "UPDATE accounts SET cash_cny = cash_cny + @cash, cash_spent = GREATEST(cash_spent - @cash, 0), updated_at = CURRENT_TIMESTAMP WHERE profile_key = (SELECT profile_key FROM children WHERE id = @child_id)",
+        ("items", true) => "UPDATE accounts SET items_count = GREATEST(items_count - 1, 0), updated_at = CURRENT_TIMESTAMP WHERE profile_key = (SELECT profile_key FROM children WHERE id = @child_id)",
+        ("items", false) => "UPDATE accounts SET items_count = items_count + 1, updated_at = CURRENT_TIMESTAMP WHERE profile_key = (SELECT profile_key FROM children WHERE id = @child_id)",
+        _ => ""
+    };
+    if (string.IsNullOrWhiteSpace(sql))
+    {
+        return;
+    }
+
+    await using var cmd = new NpgsqlCommand(sql, conn, tx);
+    cmd.Parameters.AddWithValue("child_id", GetInt(transaction, "child_id"));
+    cmd.Parameters.AddWithValue("points", Math.Abs(GetDecimal(transaction, "points")));
+    cmd.Parameters.AddWithValue("cash", Math.Abs(GetDecimal(transaction, "cash_cny")));
+    await cmd.ExecuteNonQueryAsync();
 }
 
 static Dictionary<string, object?>? ResolveChildByReference(List<Dictionary<string, object?>> children, JsonObject arguments)
@@ -2118,17 +2378,32 @@ static async Task<(bool Success, Dictionary<string, object?>? Child, string? Err
     {
         return (false, null, "孩子姓名不能为空");
     }
+    var userId = body.String("user_id");
+    if (string.IsNullOrWhiteSpace(userId))
+    {
+        userId = body.String("userId", DefaultUserId);
+    }
+    var profileKey = body.String("profile_key");
+    if (string.IsNullOrWhiteSpace(profileKey))
+    {
+        profileKey = body.String("profileKey");
+    }
+    if (string.IsNullOrWhiteSpace(profileKey))
+    {
+        profileKey = MakeChildProfileKey(userId, name);
+    }
 
     await using var conn = await OpenConnection(connectionString);
     await using var tx = await conn.BeginTransactionAsync();
     try
     {
         await using var cmd = new NpgsqlCommand("""
-            INSERT INTO children (family_group_id, name, status, note)
-            VALUES (@family_group_id, @name, @status, @note)
-            RETURNING id, name, status, note, created_at, updated_at
+            INSERT INTO children (family_group_id, profile_key, name, status, note)
+            VALUES (@family_group_id, @profile_key, @name, @status, @note)
+            RETURNING id, name, status, note, profile_key, created_at, updated_at
             """, conn, tx);
         cmd.Parameters.AddWithValue("family_group_id", familyGroupId is null ? DBNull.Value : familyGroupId.Value);
+        cmd.Parameters.AddWithValue("profile_key", profileKey);
         cmd.Parameters.AddWithValue("name", name);
         cmd.Parameters.AddWithValue("status", body.String("status", "active"));
         cmd.Parameters.AddWithValue("note", body.String("note"));
@@ -2138,10 +2413,12 @@ static async Task<(bool Success, Dictionary<string, object?>? Child, string? Err
         await reader.CloseAsync();
 
         await using var accountCmd = new NpgsqlCommand("""
-            INSERT INTO accounts (child_id, points, cash_cny, items_count)
-            VALUES (@child_id, @points, @cash_cny, @items_count)
+            INSERT INTO accounts (child_id, profile_key, points, cash_cny, items_count)
+            VALUES (@child_id, @profile_key, @points, @cash_cny, @items_count)
+            ON CONFLICT (profile_key) DO UPDATE SET updated_at = CURRENT_TIMESTAMP
             """, conn, tx);
         accountCmd.Parameters.AddWithValue("child_id", GetInt(child, "id"));
+        accountCmd.Parameters.AddWithValue("profile_key", profileKey);
         accountCmd.Parameters.AddWithValue("points", body.Decimal("score") ?? body.Decimal("points") ?? 0);
         accountCmd.Parameters.AddWithValue("cash_cny", body.Decimal("cash") ?? body.Decimal("cash_cny") ?? 0);
         accountCmd.Parameters.AddWithValue("items_count", body.Int("items") ?? 0);
@@ -2245,6 +2522,7 @@ static async Task InitDatabase(string connectionString)
         )
         """,
         "ALTER TABLE children ADD COLUMN IF NOT EXISTS family_group_id INTEGER",
+        "ALTER TABLE children ADD COLUMN IF NOT EXISTS profile_key VARCHAR(160)",
         """
         DO $$
         BEGIN
@@ -2274,9 +2552,19 @@ static async Task InitDatabase(string connectionString)
             UNIQUE(child_id)
         )
         """,
+        "ALTER TABLE accounts ADD COLUMN IF NOT EXISTS profile_key VARCHAR(160)",
         "ALTER TABLE accounts ALTER COLUMN points TYPE NUMERIC(10,2) USING points::numeric",
         "ALTER TABLE accounts ALTER COLUMN points_earned TYPE NUMERIC(10,2) USING points_earned::numeric",
         "ALTER TABLE accounts ALTER COLUMN points_spent TYPE NUMERIC(10,2) USING points_spent::numeric",
+        "UPDATE children SET profile_key = CONCAT('child-', id) WHERE profile_key IS NULL OR profile_key = ''",
+        """
+        UPDATE accounts a
+        SET profile_key = c.profile_key
+        FROM children c
+        WHERE a.child_id = c.id AND (a.profile_key IS NULL OR a.profile_key = '')
+        """,
+        "DROP INDEX IF EXISTS ux_accounts_profile_key",
+        "CREATE UNIQUE INDEX IF NOT EXISTS ux_accounts_profile_key ON accounts(profile_key)",
         """
         CREATE TABLE IF NOT EXISTS transactions (
             id SERIAL PRIMARY KEY,
@@ -2306,6 +2594,25 @@ static async Task InitDatabase(string connectionString)
         )
         """,
         """
+        CREATE TABLE IF NOT EXISTS watch_reward_requests (
+            id SERIAL PRIMARY KEY,
+            family_group_id INTEGER NOT NULL REFERENCES family_groups(id) ON DELETE CASCADE,
+            child_id INTEGER NOT NULL REFERENCES children(id) ON DELETE CASCADE,
+            rule_id INTEGER REFERENCES rules(id) ON DELETE SET NULL,
+            title VARCHAR(120) NOT NULL,
+            category VARCHAR(50),
+            points NUMERIC(10,2) NOT NULL DEFAULT 0,
+            note TEXT,
+            status VARCHAR(20) NOT NULL DEFAULT 'pending',
+            requested_by VARCHAR(100),
+            requested_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            reviewed_at TIMESTAMP NULL,
+            completed_at TIMESTAMP NULL,
+            review_note TEXT,
+            transaction_id INTEGER REFERENCES transactions(id) ON DELETE SET NULL
+        )
+        """,
+        """
         CREATE TABLE IF NOT EXISTS redlines (
             id SERIAL PRIMARY KEY,
             order_num INTEGER,
@@ -2320,7 +2627,9 @@ static async Task InitDatabase(string connectionString)
         "CREATE INDEX IF NOT EXISTS idx_tx_date ON transactions(date)",
         "CREATE INDEX IF NOT EXISTS idx_tx_type ON transactions(type)",
         "CREATE INDEX IF NOT EXISTS idx_children_family_group ON children(family_group_id)",
-        "CREATE INDEX IF NOT EXISTS idx_family_group_users_user ON family_group_users(user_id)"
+        "CREATE INDEX IF NOT EXISTS idx_family_group_users_user ON family_group_users(user_id)",
+        "CREATE INDEX IF NOT EXISTS idx_watch_reward_requests_family_child ON watch_reward_requests(family_group_id, child_id, requested_at DESC)",
+        "CREATE INDEX IF NOT EXISTS idx_watch_reward_requests_status ON watch_reward_requests(status)"
     };
 
     foreach (var sql in statements)
@@ -2594,13 +2903,13 @@ static async Task<List<Dictionary<string, object?>>> GetChildren(string connecti
     await using var conn = await OpenConnection(connectionString);
     await using var cmd = new NpgsqlCommand("""
         SELECT c.id, c.family_group_id, fg.name AS family_group_name,
-               c.name, c.status, c.note, c.created_at, c.updated_at,
+               c.profile_key, c.name, c.status, c.note, c.created_at, c.updated_at,
                COALESCE(a.points, 0) AS score,
                COALESCE(a.cash_cny, 0) AS cash,
                COALESCE(a.items_count, 0) AS items
         FROM children c
         LEFT JOIN family_groups fg ON fg.id = c.family_group_id
-        LEFT JOIN accounts a ON a.child_id = c.id
+        LEFT JOIN accounts a ON a.profile_key = c.profile_key
         WHERE c.status = 'active' AND (@family_group_id IS NULL OR c.family_group_id = @family_group_id)
         ORDER BY c.id
         """, conn);
@@ -2619,6 +2928,8 @@ static async Task<List<Dictionary<string, object?>>> GetChildren(string connecti
             ["family_group_id"] = reader.Int("family_group_id"),
             ["familyGroupName"] = reader.String("family_group_name"),
             ["family_group_name"] = reader.String("family_group_name"),
+            ["profileKey"] = reader.String("profile_key"),
+            ["profile_key"] = reader.String("profile_key"),
             ["name"] = reader.String("name"),
             ["status"] = reader.String("status"),
             ["note"] = reader.String("note"),
@@ -2692,7 +3003,7 @@ static async Task<List<Dictionary<string, object?>>> GetRecentTransactions(strin
     return rows;
 }
 
-static async Task<Dictionary<string, object?>> CreateTransaction(string connectionString, JsonObject body)
+static async Task<Dictionary<string, object?>> CreateTransaction(string connectionString, JsonObject body, int? familyGroupId = null)
 {
     await using var conn = await OpenConnection(connectionString);
     await using var tx = await conn.BeginTransactionAsync();
@@ -2704,6 +3015,18 @@ static async Task<Dictionary<string, object?>> CreateTransaction(string connecti
         var points = body.Decimal("points") ?? body.Decimal("amount") ?? 0;
         var cash = body.Decimal("cash_cny") ?? (type == "cash" ? body.Decimal("amount") : null) ?? 0;
         var itemText = body.String("items");
+
+        if (familyGroupId is not null)
+        {
+            await using var childCmd = new NpgsqlCommand("SELECT COUNT(*) FROM children WHERE id = @child_id AND family_group_id = @family_group_id", conn, tx);
+            childCmd.Parameters.AddWithValue("child_id", childId);
+            childCmd.Parameters.AddWithValue("family_group_id", familyGroupId.Value);
+            if (Convert.ToInt32(await childCmd.ExecuteScalarAsync(), CultureInfo.InvariantCulture) == 0)
+            {
+                await tx.RollbackAsync();
+                return new Dictionary<string, object?> { ["error"] = "孩子不属于当前家庭组" };
+            }
+        }
 
         await using var cmd = new NpgsqlCommand("""
             INSERT INTO transactions (date, child_id, type, direction, category, description, points, cash_cny, items, notes)
@@ -2738,20 +3061,275 @@ static async Task<Dictionary<string, object?>> CreateTransaction(string connecti
     }
 }
 
+static async Task<Dictionary<string, object?>> DeleteChildMembership(string connectionString, int id, int familyGroupId)
+{
+    await using var conn = await OpenConnection(connectionString);
+    await using var tx = await conn.BeginTransactionAsync();
+    try
+    {
+        string profileKey;
+        await using (var lookup = new NpgsqlCommand("""
+            SELECT profile_key
+            FROM children
+            WHERE id = @id AND family_group_id = @family_group_id
+            FOR UPDATE
+            """, conn, tx))
+        {
+            lookup.Parameters.AddWithValue("id", id);
+            lookup.Parameters.AddWithValue("family_group_id", familyGroupId);
+            var value = await lookup.ExecuteScalarAsync();
+            if (value is null || value is DBNull)
+            {
+                await tx.RollbackAsync();
+                return new Dictionary<string, object?> { ["error"] = "孩子不存在" };
+            }
+            profileKey = Convert.ToString(value, CultureInfo.InvariantCulture) ?? "";
+        }
+
+        await using (var replacement = new NpgsqlCommand("""
+            SELECT id
+            FROM children
+            WHERE profile_key = @profile_key AND id <> @id
+            ORDER BY id
+            LIMIT 1
+            """, conn, tx))
+        {
+            replacement.Parameters.AddWithValue("profile_key", profileKey);
+            replacement.Parameters.AddWithValue("id", id);
+            var replacementId = await replacement.ExecuteScalarAsync();
+            if (replacementId is not null && replacementId is not DBNull)
+            {
+                await using var reassign = new NpgsqlCommand("""
+                    UPDATE accounts
+                    SET child_id = @replacement_id
+                    WHERE child_id = @id AND profile_key = @profile_key
+                    """, conn, tx);
+                reassign.Parameters.AddWithValue("replacement_id", Convert.ToInt32(replacementId, CultureInfo.InvariantCulture));
+                reassign.Parameters.AddWithValue("id", id);
+                reassign.Parameters.AddWithValue("profile_key", profileKey);
+                await reassign.ExecuteNonQueryAsync();
+            }
+        }
+
+        await using (var cmd = new NpgsqlCommand("DELETE FROM children WHERE id = @id AND family_group_id = @family_group_id", conn, tx))
+        {
+            cmd.Parameters.AddWithValue("id", id);
+            cmd.Parameters.AddWithValue("family_group_id", familyGroupId);
+            await cmd.ExecuteNonQueryAsync();
+        }
+
+        await tx.CommitAsync();
+        return new Dictionary<string, object?> { ["status"] = "ok" };
+    }
+    catch (Exception ex)
+    {
+        await tx.RollbackAsync();
+        return new Dictionary<string, object?> { ["error"] = ex.Message };
+    }
+}
+
+static async Task<List<Dictionary<string, object?>>> GetWatchRewardRequests(string connectionString, int familyGroupId, int? childId, int limit)
+{
+    await using var conn = await OpenConnection(connectionString);
+    await using var cmd = new NpgsqlCommand("""
+        SELECT wrr.*, c.name AS child_name, r.name AS rule_name
+        FROM watch_reward_requests wrr
+        LEFT JOIN children c ON c.id = wrr.child_id
+        LEFT JOIN rules r ON r.id = wrr.rule_id
+        WHERE wrr.family_group_id = @family_group_id
+          AND (@child_id IS NULL OR wrr.child_id = @child_id)
+        ORDER BY wrr.requested_at DESC, wrr.id DESC
+        LIMIT @limit
+        """, conn);
+    cmd.Parameters.AddWithValue("family_group_id", familyGroupId);
+    cmd.Parameters.Add(new NpgsqlParameter("child_id", NpgsqlDbType.Integer)
+    {
+        Value = childId is null ? DBNull.Value : childId.Value
+    });
+    cmd.Parameters.AddWithValue("limit", limit);
+
+    var rows = new List<Dictionary<string, object?>>();
+    await using var reader = await cmd.ExecuteReaderAsync();
+    while (await reader.ReadAsync())
+    {
+        rows.Add(ReadWatchRewardRequest(reader));
+    }
+    return rows;
+}
+
+static async Task<Dictionary<string, object?>> CreateWatchRewardRequest(string connectionString, JsonObject body, int familyGroupId, string requestedBy)
+{
+    var childId = body.Int("child_id") ?? body.Int("childId") ?? 0;
+    if (childId <= 0)
+    {
+        return new Dictionary<string, object?> { ["error"] = "请选择孩子" };
+    }
+
+    await using var conn = await OpenConnection(connectionString);
+    if (!await ChildBelongsToFamily(conn, childId, familyGroupId))
+    {
+        return new Dictionary<string, object?> { ["error"] = "孩子不属于当前家庭组" };
+    }
+
+    var ruleId = body.Int("rule_id") ?? body.Int("ruleId");
+    string ruleName = "";
+    string ruleCategory = "";
+    decimal? rulePoints = null;
+    if (ruleId is not null)
+    {
+        await using var ruleCmd = new NpgsqlCommand("SELECT name, category, points FROM rules WHERE id = @id", conn);
+        ruleCmd.Parameters.AddWithValue("id", ruleId.Value);
+        await using var ruleReader = await ruleCmd.ExecuteReaderAsync();
+        if (!await ruleReader.ReadAsync())
+        {
+            return new Dictionary<string, object?> { ["error"] = "奖励规则不存在" };
+        }
+
+        ruleName = ruleReader.String("name");
+        ruleCategory = ruleReader.String("category");
+        rulePoints = ruleReader.Decimal("points");
+    }
+
+    var title = body.String("title").Trim();
+    if (string.IsNullOrWhiteSpace(title))
+    {
+        title = ruleName;
+    }
+    if (string.IsNullOrWhiteSpace(title))
+    {
+        return new Dictionary<string, object?> { ["error"] = "请填写申请事项" };
+    }
+
+    var points = body.Decimal("points") ?? body.Decimal("score") ?? rulePoints ?? 0;
+    if (points <= 0)
+    {
+        return new Dictionary<string, object?> { ["error"] = "申请积分必须大于 0" };
+    }
+
+    var category = body.String("category");
+    if (string.IsNullOrWhiteSpace(category))
+    {
+        category = string.IsNullOrWhiteSpace(ruleCategory) ? "手表申请" : ruleCategory;
+    }
+
+    await using var cmd = new NpgsqlCommand("""
+        INSERT INTO watch_reward_requests
+            (family_group_id, child_id, rule_id, title, category, points, note, status, requested_by)
+        VALUES
+            (@family_group_id, @child_id, @rule_id, @title, @category, @points, @note, 'pending', @requested_by)
+        RETURNING id
+        """, conn);
+    cmd.Parameters.AddWithValue("family_group_id", familyGroupId);
+    cmd.Parameters.AddWithValue("child_id", childId);
+    cmd.Parameters.Add(new NpgsqlParameter("rule_id", NpgsqlDbType.Integer)
+    {
+        Value = ruleId is null ? DBNull.Value : ruleId.Value
+    });
+    cmd.Parameters.AddWithValue("title", title);
+    cmd.Parameters.AddWithValue("category", category);
+    cmd.Parameters.AddWithValue("points", points);
+    cmd.Parameters.AddWithValue("note", body.String("note"));
+    cmd.Parameters.AddWithValue("requested_by", requestedBy);
+
+    var id = Convert.ToInt32(await cmd.ExecuteScalarAsync(), CultureInfo.InvariantCulture);
+    return (await GetWatchRewardRequests(connectionString, familyGroupId, childId, 10))
+        .First(row => GetInt(row, "id") == id);
+}
+
+static async Task<Dictionary<string, object?>> ApproveWatchRewardRequest(string connectionString, int id, int familyGroupId, string reviewNote)
+{
+    Dictionary<string, object?> request;
+    await using (var conn = await OpenConnection(connectionString))
+    await using (var cmd = new NpgsqlCommand("""
+        SELECT wrr.*, c.name AS child_name, r.name AS rule_name
+        FROM watch_reward_requests wrr
+        LEFT JOIN children c ON c.id = wrr.child_id
+        LEFT JOIN rules r ON r.id = wrr.rule_id
+        WHERE wrr.id = @id AND wrr.family_group_id = @family_group_id
+        """, conn))
+    {
+        cmd.Parameters.AddWithValue("id", id);
+        cmd.Parameters.AddWithValue("family_group_id", familyGroupId);
+        await using var reader = await cmd.ExecuteReaderAsync();
+        if (!await reader.ReadAsync())
+        {
+            return new Dictionary<string, object?> { ["error"] = "申请不存在" };
+        }
+
+        request = ReadWatchRewardRequest(reader);
+    }
+
+    if (!string.Equals(Convert.ToString(request["status"], CultureInfo.InvariantCulture), "pending", StringComparison.Ordinal))
+    {
+        return new Dictionary<string, object?> { ["error"] = "申请已处理" };
+    }
+
+    var transactionResult = await CreateTransaction(connectionString, new JsonObject
+    {
+        ["child_id"] = GetInt(request, "childId"),
+        ["type"] = "points",
+        ["direction"] = "+",
+        ["points"] = GetDecimal(request, "points"),
+        ["category"] = Convert.ToString(request["category"], CultureInfo.InvariantCulture) ?? "手表申请",
+        ["description"] = Convert.ToString(request["title"], CultureInfo.InvariantCulture) ?? "手表积分申请",
+        ["notes"] = $"手表端申请 #{id}"
+    }, familyGroupId);
+
+    if (transactionResult.TryGetValue("error", out var error))
+    {
+        return new Dictionary<string, object?> { ["error"] = error };
+    }
+
+    var transaction = (Dictionary<string, object?>)transactionResult["transaction"]!;
+    await using (var conn = await OpenConnection(connectionString))
+    await using (var cmd = new NpgsqlCommand("""
+        UPDATE watch_reward_requests
+        SET status = 'approved',
+            reviewed_at = CURRENT_TIMESTAMP,
+            completed_at = CURRENT_TIMESTAMP,
+            review_note = @review_note,
+            transaction_id = @transaction_id
+        WHERE id = @id AND family_group_id = @family_group_id
+        """, conn))
+    {
+        cmd.Parameters.AddWithValue("id", id);
+        cmd.Parameters.AddWithValue("family_group_id", familyGroupId);
+        cmd.Parameters.AddWithValue("review_note", reviewNote);
+        cmd.Parameters.AddWithValue("transaction_id", GetInt(transaction, "id"));
+        await cmd.ExecuteNonQueryAsync();
+    }
+
+    return new Dictionary<string, object?>
+    {
+        ["status"] = "approved",
+        ["transaction"] = transaction,
+        ["request"] = (await GetWatchRewardRequests(connectionString, familyGroupId, GetInt(request, "childId"), 10))
+            .First(row => GetInt(row, "id") == id)
+    };
+}
+
+static async Task<bool> ChildBelongsToFamily(NpgsqlConnection conn, int childId, int familyGroupId)
+{
+    await using var cmd = new NpgsqlCommand("SELECT COUNT(*) FROM children WHERE id = @child_id AND family_group_id = @family_group_id", conn);
+    cmd.Parameters.AddWithValue("child_id", childId);
+    cmd.Parameters.AddWithValue("family_group_id", familyGroupId);
+    return Convert.ToInt32(await cmd.ExecuteScalarAsync(), CultureInfo.InvariantCulture) > 0;
+}
+
 static async Task UpdateAccount(NpgsqlConnection conn, NpgsqlTransaction tx, int childId, string type, string direction, decimal points, decimal cash, string items)
 {
     var sign = direction == "-" ? -1 : 1;
     var sql = type switch
     {
         "points" => sign > 0
-            ? "UPDATE accounts SET points = points + @points, points_earned = points_earned + @points, updated_at = CURRENT_TIMESTAMP WHERE child_id = @child_id"
-            : "UPDATE accounts SET points = points - @points, points_spent = points_spent + @points, updated_at = CURRENT_TIMESTAMP WHERE child_id = @child_id",
+            ? "UPDATE accounts SET points = points + @points, points_earned = points_earned + @points, updated_at = CURRENT_TIMESTAMP WHERE profile_key = (SELECT profile_key FROM children WHERE id = @child_id)"
+            : "UPDATE accounts SET points = points - @points, points_spent = points_spent + @points, updated_at = CURRENT_TIMESTAMP WHERE profile_key = (SELECT profile_key FROM children WHERE id = @child_id)",
         "cash" => sign > 0
-            ? "UPDATE accounts SET cash_cny = cash_cny + @cash, cash_earned = cash_earned + @cash, updated_at = CURRENT_TIMESTAMP WHERE child_id = @child_id"
-            : "UPDATE accounts SET cash_cny = cash_cny - @cash, cash_spent = cash_spent + @cash, updated_at = CURRENT_TIMESTAMP WHERE child_id = @child_id",
+            ? "UPDATE accounts SET cash_cny = cash_cny + @cash, cash_earned = cash_earned + @cash, updated_at = CURRENT_TIMESTAMP WHERE profile_key = (SELECT profile_key FROM children WHERE id = @child_id)"
+            : "UPDATE accounts SET cash_cny = cash_cny - @cash, cash_spent = cash_spent + @cash, updated_at = CURRENT_TIMESTAMP WHERE profile_key = (SELECT profile_key FROM children WHERE id = @child_id)",
         "items" => sign > 0
-            ? "UPDATE accounts SET items_count = items_count + 1, items_detail = CONCAT_WS(', ', NULLIF(items_detail, ''), @items), updated_at = CURRENT_TIMESTAMP WHERE child_id = @child_id"
-            : "UPDATE accounts SET items_count = GREATEST(items_count - 1, 0), updated_at = CURRENT_TIMESTAMP WHERE child_id = @child_id",
+            ? "UPDATE accounts SET items_count = items_count + 1, items_detail = CONCAT_WS(', ', NULLIF(items_detail, ''), @items), updated_at = CURRENT_TIMESTAMP WHERE profile_key = (SELECT profile_key FROM children WHERE id = @child_id)"
+            : "UPDATE accounts SET items_count = GREATEST(items_count - 1, 0), updated_at = CURRENT_TIMESTAMP WHERE profile_key = (SELECT profile_key FROM children WHERE id = @child_id)",
         _ => ""
     };
     if (string.IsNullOrWhiteSpace(sql))
@@ -2773,6 +3351,8 @@ static Dictionary<string, object?> ReadChild(IDataRecord reader) => new()
     ["name"] = reader.String("name"),
     ["status"] = reader.String("status"),
     ["note"] = reader.String("note"),
+    ["profileKey"] = reader.HasColumn("profile_key") ? reader.String("profile_key") : "",
+    ["profile_key"] = reader.HasColumn("profile_key") ? reader.String("profile_key") : "",
     ["createdAt"] = reader.DateTime("created_at").ToString("O"),
     ["updatedAt"] = reader.DateTime("updated_at").ToString("O")
 };
@@ -2796,6 +3376,39 @@ static Dictionary<string, object?> ReadRule(IDataRecord reader)
         ["updatedAt"] = reader.HasColumn("updated_at") ? reader.DateTime("updated_at").ToString("O") : reader.DateTime("created_at").ToString("O")
     };
 }
+
+static Dictionary<string, object?> ReadWatchRewardRequest(IDataRecord reader) => new()
+{
+    ["id"] = reader.Int("id"),
+    ["familyGroupId"] = reader.Int("family_group_id"),
+    ["family_group_id"] = reader.Int("family_group_id"),
+    ["childId"] = reader.Int("child_id"),
+    ["child_id"] = reader.Int("child_id"),
+    ["childName"] = reader.HasColumn("child_name") ? reader.String("child_name") : "",
+    ["child_name"] = reader.HasColumn("child_name") ? reader.String("child_name") : "",
+    ["ruleId"] = NullableInt(reader, "rule_id"),
+    ["rule_id"] = NullableInt(reader, "rule_id"),
+    ["ruleName"] = reader.HasColumn("rule_name") ? reader.String("rule_name") : "",
+    ["rule_name"] = reader.HasColumn("rule_name") ? reader.String("rule_name") : "",
+    ["title"] = reader.String("title"),
+    ["category"] = reader.String("category"),
+    ["points"] = reader.Decimal("points"),
+    ["note"] = reader.String("note"),
+    ["status"] = reader.String("status"),
+    ["statusText"] = WatchRequestStatusText(reader.String("status")),
+    ["requestedBy"] = reader.String("requested_by"),
+    ["requested_by"] = reader.String("requested_by"),
+    ["requestedAt"] = reader.DateTime("requested_at").ToString("O"),
+    ["requested_at"] = reader.DateTime("requested_at").ToString("O"),
+    ["reviewedAt"] = NullableDateTimeString(reader, "reviewed_at"),
+    ["reviewed_at"] = NullableDateTimeString(reader, "reviewed_at"),
+    ["completedAt"] = NullableDateTimeString(reader, "completed_at"),
+    ["completed_at"] = NullableDateTimeString(reader, "completed_at"),
+    ["reviewNote"] = reader.String("review_note"),
+    ["review_note"] = reader.String("review_note"),
+    ["transactionId"] = NullableInt(reader, "transaction_id"),
+    ["transaction_id"] = NullableInt(reader, "transaction_id")
+};
 
 static Dictionary<string, object?> ReadTransaction(IDataRecord reader)
 {
@@ -2878,6 +3491,50 @@ static int GetInt(IReadOnlyDictionary<string, object?> row, string key) =>
 
 static decimal GetDecimal(IReadOnlyDictionary<string, object?> row, string key) =>
     Convert.ToDecimal(row[key], CultureInfo.InvariantCulture);
+
+static string FormatPoints(decimal points) =>
+    points == decimal.Truncate(points)
+        ? points.ToString("0", CultureInfo.InvariantCulture)
+        : points.ToString("0.##", CultureInfo.InvariantCulture);
+
+static string Html(string value) => System.Net.WebUtility.HtmlEncode(value);
+
+static int? NullableInt(IDataRecord reader, string name)
+{
+    if (!reader.HasColumn(name))
+    {
+        return null;
+    }
+
+    var value = reader[name];
+    return value is DBNull ? null : Convert.ToInt32(value, CultureInfo.InvariantCulture);
+}
+
+static string? NullableDateTimeString(IDataRecord reader, string name)
+{
+    if (!reader.HasColumn(name))
+    {
+        return null;
+    }
+
+    var value = reader[name];
+    return value is DBNull ? null : Convert.ToDateTime(value, CultureInfo.InvariantCulture).ToString("O");
+}
+
+static string WatchRequestStatusText(string status) => status switch
+{
+    "pending" => "待确认",
+    "approved" => "已领取",
+    "rejected" => "已退回",
+    _ => "处理中"
+};
+
+static string MakeChildProfileKey(string userId, string name)
+{
+    var owner = string.IsNullOrWhiteSpace(userId) ? DefaultUserId : userId.Trim();
+    var normalizedName = name.Trim().ToLowerInvariant();
+    return $"{owner}:{normalizedName}";
+}
 
 static string ExtractAgentText(JsonNode? providerJson, string fallback)
 {
