@@ -1,6 +1,6 @@
 import axios from 'axios';
 import type { ApiResponse } from '../types';
-import { readCurrentUser } from '../auth';
+import { readCurrentAppProfile, readCurrentUser } from '../auth';
 
 const API_BASE = import.meta.env.DEV ? 'http://localhost:5102' : '';
 
@@ -18,6 +18,13 @@ http.interceptors.request.use((config) => {
   const userId = user?.userId || user?.id;
   if (userId) {
     config.headers['X-User-Id'] = userId;
+  }
+  const appProfile = readCurrentAppProfile();
+  if (appProfile?.appUserId) {
+    config.headers['X-App-User-Id'] = appProfile.appUserId;
+  }
+  if (appProfile?.role) {
+    config.headers['X-App-User-Role'] = appProfile.role;
   }
   return config;
 });

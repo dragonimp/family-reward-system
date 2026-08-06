@@ -1,9 +1,14 @@
-import type { AuthUser } from './types';
+import type { AppUserProfile, AuthUser } from './types';
 
 let cachedUser: AuthUser | null = null;
+let cachedAppProfile: AppUserProfile | null = null;
 
 export function readCurrentUser(): AuthUser | null {
   return cachedUser;
+}
+
+export function readCurrentAppProfile(): AppUserProfile | null {
+  return cachedAppProfile;
 }
 
 export async function refreshCurrentUser(): Promise<AuthUser | null> {
@@ -15,6 +20,39 @@ export async function refreshCurrentUser(): Promise<AuthUser | null> {
 
   cachedUser = await response.json();
   return cachedUser;
+}
+
+export async function refreshAppUserProfile(): Promise<AppUserProfile | null> {
+  const response = await fetch('/api/user/profile?channel=pc', { credentials: 'include' });
+  if (!response.ok) {
+    cachedAppProfile = null;
+    return null;
+  }
+
+  cachedAppProfile = await response.json();
+  if (!cachedAppProfile) {
+    throw new Error('身份保存失败');
+  }
+  return cachedAppProfile;
+}
+
+export async function saveAppUserRole(role: 'parent' | 'child'): Promise<AppUserProfile> {
+  const response = await fetch('/api/user/profile', {
+    method: 'POST',
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ channel: 'pc', role }),
+  });
+  if (!response.ok) {
+    const payload = await response.json().catch(() => ({}));
+    throw new Error(payload.error || '身份保存失败');
+  }
+
+  cachedAppProfile = await response.json();
+  if (!cachedAppProfile) {
+    throw new Error('身份保存失败');
+  }
+  return cachedAppProfile;
 }
 
 function getCurrentReturnUrl() {
@@ -43,5 +81,6 @@ export function redirectToAuthLogout() {
 
 export function clearAuthCookies() {
   cachedUser = null;
+  cachedAppProfile = null;
   window.localStorage.removeItem('agentidentity.user');
 }

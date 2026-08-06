@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Card, StatCard } from '../components/Card';
-import { createFamilyGroup, getFamilyGroupInvite, joinFamilyGroup } from '../services';
+import { createFamilyGroup, getChildren, getFamilyGroupInvite, joinFamilyGroup } from '../services';
 import { useAuth } from '../contexts/AuthContext';
 import { useFamilyGroup } from '../contexts/FamilyGroupContext';
-import type { FamilyGroupInvite } from '../types';
+import type { Child, FamilyGroupInvite } from '../types';
 
 export default function FamilyGroups() {
   const { userId } = useAuth();
@@ -21,6 +21,8 @@ export default function FamilyGroups() {
   const [newName, setNewName] = useState('');
   const [newDescription, setNewDescription] = useState('');
   const [joinGroupId, setJoinGroupId] = useState(searchParams.get('joinFamilyGroupId') || '');
+  const [joinChildId, setJoinChildId] = useState('');
+  const [children, setChildren] = useState<Child[]>([]);
   const [invite, setInvite] = useState<FamilyGroupInvite | null>(null);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
@@ -53,6 +55,26 @@ export default function FamilyGroups() {
       cancelled = true;
     };
   }, [selectedGroupId]);
+
+  useEffect(() => {
+    if (!selectedGroupId) {
+      setChildren([]);
+      return;
+    }
+
+    let cancelled = false;
+    getChildren({ familyGroupId: selectedGroupId, userId: userId || undefined })
+      .then((payload) => {
+        if (!cancelled) setChildren(Array.isArray(payload) ? payload : (payload as any)?.data || []);
+      })
+      .catch(() => {
+        if (!cancelled) setChildren([]);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedGroupId, userId]);
 
   const handleCreate = async () => {
     const trimmed = newName.trim();
@@ -91,11 +113,16 @@ export default function FamilyGroups() {
     try {
       setBusy(true);
       setMessage('');
-      await joinFamilyGroup({ familyGroupId: id, userId: userId || undefined, role: 'member' });
+      await joinFamilyGroup({
+        familyGroupId: id,
+        userId: userId || undefined,
+        role: 'member',
+        childId: joinChildId ? Number.parseInt(joinChildId, 10) : undefined,
+      });
       await refreshGroups();
       selectGroup(id);
       setSearchParams({});
-      setMessage('已加入家庭组');
+      setMessage(joinChildId ? '已将孩子绑定到家庭组' : '已加入家庭组');
     } catch (err) {
       setMessage(err instanceof Error ? err.message : '加入家庭组失败');
     } finally {
@@ -210,6 +237,18 @@ export default function FamilyGroups() {
                 placeholder="输入家庭组 ID"
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4A90D9]"
               />
+              <select
+                value={joinChildId}
+                onChange={(event) => setJoinChildId(event.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4A90D9]"
+              >
+                <option value="">仅加入家长账号</option>
+                {children.map((child) => (
+                  <option key={child.id} value={child.id}>
+                    绑定孩子：{child.name}
+                  </option>
+                ))}
+              </select>
               <button disabled={busy} onClick={handleJoin} className="btn-primary w-full">
                 加入家庭组
               </button>

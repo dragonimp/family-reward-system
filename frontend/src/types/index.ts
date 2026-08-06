@@ -98,13 +98,28 @@ export interface AuthUser {
   applicationKey?: string;
 }
 
+export interface AppUserProfile {
+  unifiedUserId?: string;
+  username?: string;
+  channel?: 'pc' | 'watch' | string;
+  role?: 'parent' | 'child' | string;
+  appUserId?: string;
+  childProfileKey?: string | null;
+  childId?: number | null;
+  needsRole?: boolean;
+}
+
 export interface AuthContextType {
   user: AuthUser | null;
   userId: string | null;
+  appProfile: AppUserProfile | null;
+  profileReady: boolean;
   ready: boolean;
   login: (returnUrl?: string) => void;
   logout: () => void;
   refresh: () => Promise<AuthUser | null>;
+  refreshAppProfile: () => Promise<AppUserProfile | null>;
+  selectAppRole: (role: 'parent' | 'child') => Promise<AppUserProfile>;
   isAuthenticated: boolean;
 }
 

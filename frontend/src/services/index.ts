@@ -6,7 +6,7 @@ import type { AgentInvokeRequest, AgentInvokeResponse, RewardParseRequest, Rewar
 export const getFamilyGroups = (params?: { userId?: string }) => http.get<unknown, FamilyGroup[]>('/api/family-groups', { params });
 export const createFamilyGroup = (data: Partial<FamilyGroup> & { userId?: string }) => http.post<unknown, FamilyGroup>('/api/family-groups', data);
 export const getFamilyGroupInvite = (id: number) => http.get<unknown, FamilyGroupInvite>(`/api/family-groups/${id}/invite`);
-export const joinFamilyGroup = (data: { familyGroupId: number; userId?: string; role?: string }) => http.post('/api/family-groups/join', data);
+export const joinFamilyGroup = (data: { familyGroupId: number; userId?: string; role?: string; childId?: number }) => http.post('/api/family-groups/join', data);
 export const linkFamilyGroupUser = (id: number, data: { userId: string; role?: string }) => http.put(`/api/family-groups/${id}/users`, data);
 
 export const getChildren = (params?: { familyGroupId?: number; userId?: string }) => http.get('/api/children', { params });
