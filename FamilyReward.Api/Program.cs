@@ -95,6 +95,17 @@ app.MapGet("/health", () => Results.Json(new
     db = "postgresql"
 }));
 
+app.MapGet("/watch/manifest.json", (HttpRequest request) => Results.Json(BuildWatchWebManifest(request)));
+app.MapGet("/api/watch/app-info", (HttpRequest request) => Results.Json(BuildWatchAppInfo(request)));
+app.MapGet("/watch/icon.svg", () => Results.Content("""
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+      <rect width="512" height="512" rx="96" fill="#16643a"/>
+      <circle cx="256" cy="256" r="162" fill="#eef5ef"/>
+      <path d="M174 270l50 50 116-134" fill="none" stroke="#16643a" stroke-width="42" stroke-linecap="round" stroke-linejoin="round"/>
+      <path d="M184 58h144l24 72H160l24-72zm-24 324h192l-24 72H184l-24-72z" fill="#8fd19e"/>
+    </svg>
+    """, "image/svg+xml; charset=utf-8"));
+
 app.MapGet("/api/user/profile", async (HttpRequest request) =>
 {
     if (!HasUnifiedIdentity(request))
@@ -382,6 +393,10 @@ app.MapGet("/watch", async (HttpRequest request) =>
         <head>
           <meta charset="utf-8">
           <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+          <meta name="theme-color" content="#16643a">
+          <meta name="mobile-web-app-capable" content="yes">
+          <link rel="manifest" href="/watch/manifest.json">
+          <link rel="icon" href="/watch/icon.svg" type="image/svg+xml">
           <title>手表积分</title>
           <style>
             *{box-sizing:border-box}body{margin:0;background:#eef5ef;color:#17231b;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}.wrap{max-width:360px;margin:0 auto;padding:9px}header{display:flex;align-items:end;justify-content:space-between;gap:8px;margin:0 0 8px}h1{margin:0;font-size:21px;line-height:1.1}.time{margin:0;color:#5a6b61;font-size:11px}.stack{display:grid;gap:8px}.child-card{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:9px 10px;background:#fff;border:1px solid #d6e1d9;border-radius:8px}.name{font-size:17px;font-weight:800;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.sub{margin-top:2px;font-size:11px;color:#637269;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.score{font-size:27px;font-weight:900;color:#0c7a3a;white-space:nowrap}.score:after{content:"分";margin-left:2px;font-size:12px;color:#5a6b61}.panel{padding:9px;background:#fff;border:1px solid #d6e1d9;border-radius:8px}h2{margin:0 0 7px;font-size:15px}.rules{display:grid;grid-template-columns:1fr 1fr;gap:6px}.rule-btn{display:flex;align-items:center;justify-content:space-between;gap:5px;min-height:38px;padding:7px;border:1px solid #cfdcd3;border-radius:7px;background:#f8fbf9;color:#17231b;font-size:12px;text-align:left}.rule-btn span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.rule-btn b{color:#0c7a3a}label{display:block;margin:7px 0 3px;font-size:12px;color:#44544a}select,input,textarea{width:100%;border:1px solid #cbd8cf;border-radius:7px;background:#fff;padding:8px;font-size:15px;color:#17231b}textarea{min-height:52px;resize:vertical}.submit{width:100%;margin-top:8px;border:0;border-radius:8px;background:#16643a;color:#fff;padding:10px;font-size:16px;font-weight:800}.msg{min-height:17px;margin:6px 0 0;font-size:12px;color:#16643a}.requests{list-style:none;margin:0;padding:0;display:grid;gap:5px}.requests li{display:flex;justify-content:space-between;gap:8px;border-top:1px solid #edf2ee;padding-top:5px;font-size:12px}.requests b{white-space:nowrap;color:#5f5221}.empty,.empty-row{color:#64746a;text-align:center;font-size:13px}.compact{padding:7px}.hint{margin:7px 0 0;color:#64746a;text-align:center;font-size:11px}@media(max-width:230px){.wrap{padding:7px}h1{font-size:18px}.score{font-size:22px}.rules{grid-template-columns:1fr}.panel{padding:8px}select,input,textarea{font-size:14px;padding:7px}}
@@ -1042,6 +1057,81 @@ app.MapPost("/api/mcp", async (JsonObject body) =>
 });
 
 app.Run();
+
+static JsonObject BuildWatchWebManifest(HttpRequest request)
+{
+    var baseUrl = GetPublicBaseUrl(request);
+    return new JsonObject
+    {
+        ["id"] = "/watch",
+        ["name"] = "HappyLife 手表积分",
+        ["short_name"] = "手表积分",
+        ["description"] = "给孩子在手表端查询积分和提交积分申请的 HappyLife 手表应用。",
+        ["lang"] = "zh-CN",
+        ["start_url"] = $"{baseUrl}/watch?source=watch-app",
+        ["scope"] = $"{baseUrl}/watch",
+        ["display"] = "standalone",
+        ["orientation"] = "portrait",
+        ["theme_color"] = "#16643a",
+        ["background_color"] = "#eef5ef",
+        ["categories"] = new JsonArray { "kids", "education", "lifestyle" },
+        ["icons"] = new JsonArray
+        {
+            new JsonObject
+            {
+                ["src"] = $"{baseUrl}/watch/icon.svg",
+                ["sizes"] = "any",
+                ["type"] = "image/svg+xml",
+                ["purpose"] = "any maskable"
+            }
+        }
+    };
+}
+
+static JsonObject BuildWatchAppInfo(HttpRequest request)
+{
+    var baseUrl = GetPublicBaseUrl(request);
+    return new JsonObject
+    {
+        ["appName"] = "HappyLife 手表积分",
+        ["packageId"] = "net.impx.happylife.watch",
+        ["versionName"] = "1.0.0",
+        ["versionCode"] = 100,
+        ["entryUrl"] = $"{baseUrl}/watch?source=watch-app",
+        ["manifestUrl"] = $"{baseUrl}/watch/manifest.json",
+        ["apiBaseUrl"] = baseUrl,
+        ["supportedPlatforms"] = new JsonArray { "xiaotiancai", "xiaomi", "huawei" },
+        ["supportedScreens"] = new JsonArray { "192x192", "240x240", "280x280", "320x320", "360x360" },
+        ["watchFeatures"] = new JsonArray { "积分查询", "积分申请", "最近申请状态", "统一登录孩子身份" },
+        ["requiredPermissions"] = new JsonArray { "INTERNET", "ACCESS_NETWORK_STATE" },
+        ["privacy"] = new JsonObject
+        {
+            ["collectsPreciseLocation"] = false,
+            ["collectsContacts"] = false,
+            ["collectsMicrophone"] = false,
+            ["collectsCamera"] = false,
+            ["childAccountOnly"] = true
+        },
+        ["releaseReadiness"] = new JsonObject
+        {
+            ["webEntry"] = "ready",
+            ["androidWrapper"] = "ready_for_sdk_build",
+            ["storeListingAssets"] = "prepared",
+            ["blockedBy"] = "平台开发者账号、签名证书、真机截图和平台后台提交"
+        }
+    };
+}
+
+static string GetPublicBaseUrl(HttpRequest request)
+{
+    var scheme = request.Headers.TryGetValue("X-Forwarded-Proto", out var forwardedProto) && !string.IsNullOrWhiteSpace(forwardedProto.ToString())
+        ? forwardedProto.ToString().Split(',')[0].Trim()
+        : request.Scheme;
+    var host = request.Headers.TryGetValue("X-Forwarded-Host", out var forwardedHost) && !string.IsNullOrWhiteSpace(forwardedHost.ToString())
+        ? forwardedHost.ToString().Split(',')[0].Trim()
+        : request.Host.Value;
+    return $"{scheme}://{host}".TrimEnd('/');
+}
 
 static object BuildMcpServiceDescriptor()
 {

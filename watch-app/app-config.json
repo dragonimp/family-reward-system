@@ -1,0 +1,17 @@
+{
+  "appName": "HappyLife 手表积分",
+  "packageId": "net.impx.happylife.watch",
+  "versionName": "1.0.0",
+  "versionCode": 100,
+  "apiBaseUrl": "https://happylife.ai.impx.net",
+  "startUrl": "https://happylife.ai.impx.net/watch?source=watch-app",
+  "manifestUrl": "https://happylife.ai.impx.net/watch/manifest.json",
+  "android": {
+    "minSdk": 23,
+    "targetSdk": 35,
+    "compileSdk": 35
+  },
+  "platforms": ["xiaotiancai", "xiaomi", "huawei"],
+  "screens": ["192x192", "240x240", "280x280", "320x320", "360x360"],
+  "permissions": ["android.permission.INTERNET", "android.permission.ACCESS_NETWORK_STATE"]
+}
