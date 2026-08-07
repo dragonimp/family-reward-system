@@ -1,9 +1,19 @@
 import { Card, StatCard } from '../components/Card';
 import { Modal } from '../components/Modal';
-import type { Child, Transaction } from '../types';
+import type { Child, Transaction, WatchDeviceBinding } from '../types';
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { getChildren, createChild, updateChild, deleteChild, getTransactions, createTransaction } from '../services';
+import {
+  getChildren,
+  createChild,
+  updateChild,
+  deleteChild,
+  getTransactions,
+  createTransaction,
+  generateChildAuthCode,
+  getChildWatchDevices,
+  revokeChildWatchDevice,
+} from '../services';
 import { useAuth } from '../contexts/AuthContext';
 import { useFamilyGroup } from '../contexts/FamilyGroupContext';
 
@@ -25,6 +35,10 @@ export default function Children() {
   const [formData, setFormData] = useState<ChildForm>({ name: '', score: 0, cash: 0, items: 0 });
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [childToDelete, setChildToDelete] = useState<number | null>(null);
+  const [deviceChild, setDeviceChild] = useState<Child | null>(null);
+  const [authCode, setAuthCode] = useState<{ code: string; expiresAt: string } | null>(null);
+  const [devices, setDevices] = useState<WatchDeviceBinding[]>([]);
+  const [deviceLoading, setDeviceLoading] = useState(false);
   const [toast, setToast] = useState<{ show: boolean; message: string; type: 'success' | 'error' }>({ show: false, message: '', type: 'success' });
 
   const showToast = (message: string, type: 'success' | 'error' = 'success') => {
@@ -127,6 +141,56 @@ export default function Children() {
     }
   };
 
+  const openDeviceModal = async (child: Child) => {
+    setDeviceChild(child);
+    setAuthCode(null);
+    setDevices([]);
+    setDeviceLoading(true);
+    try {
+      const result = await getChildWatchDevices(child.id, { familyGroupId: selectedGroupId ?? undefined });
+      setDevices(result.devices || []);
+    } catch (error) {
+      console.error('设备加载失败:', error);
+      showToast('设备列表加载失败', 'error');
+    } finally {
+      setDeviceLoading(false);
+    }
+  };
+
+  const handleGenerateAuthCode = async () => {
+    if (!deviceChild) return;
+    setDeviceLoading(true);
+    try {
+      const result = await generateChildAuthCode(deviceChild.id, {
+        familyGroupId: selectedGroupId ?? undefined,
+        expiresInMinutes: 24 * 60,
+      });
+      setAuthCode({ code: result.code, expiresAt: result.expiresAt });
+      showToast('认证码已生成');
+    } catch (error) {
+      console.error('认证码生成失败:', error);
+      showToast('认证码生成失败', 'error');
+    } finally {
+      setDeviceLoading(false);
+    }
+  };
+
+  const handleRevokeDevice = async (deviceId: number) => {
+    if (!deviceChild) return;
+    setDeviceLoading(true);
+    try {
+      await revokeChildWatchDevice(deviceChild.id, deviceId, { familyGroupId: selectedGroupId ?? undefined });
+      const result = await getChildWatchDevices(deviceChild.id, { familyGroupId: selectedGroupId ?? undefined });
+      setDevices(result.devices || []);
+      showToast('设备已解绑');
+    } catch (error) {
+      console.error('设备解绑失败:', error);
+      showToast('设备解绑失败', 'error');
+    } finally {
+      setDeviceLoading(false);
+    }
+  };
+
   if (loading || familyGroupsLoading) {
     return (
       <div className="flex items-center justify-center py-20">
@@ -205,6 +269,9 @@ export default function Children() {
                     <div className="flex items-center justify-center gap-2">
                       <button onClick={() => openEditModal(child)} className="text-[#4A90D9] hover:text-[#3A7BC8] text-sm font-medium">
                         编辑
+                      </button>
+                      <button onClick={() => openDeviceModal(child)} className="text-[#16A085] hover:text-[#0E7D67] text-sm font-medium">
+                        手表
                       </button>
                       <button onClick={() => confirmDelete(child.id)} className="text-[#E74C3C] hover:text-red-700 text-sm font-medium">
                         删除
@@ -300,6 +367,62 @@ export default function Children() {
         }
       >
         <p className="text-gray-600">确定要删除这个孩子吗？此操作不可撤销。</p>
+      </Modal>
+
+      <Modal
+        isOpen={!!deviceChild}
+        onClose={() => setDeviceChild(null)}
+        title={deviceChild ? `${deviceChild.name}的手表绑定` : '手表绑定'}
+        footer={
+          <>
+            <button onClick={() => setDeviceChild(null)} className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg">
+              关闭
+            </button>
+            <button onClick={handleGenerateAuthCode} disabled={deviceLoading} className="btn-primary">
+              生成认证码
+            </button>
+          </>
+        }
+      >
+        <div className="space-y-4">
+          {authCode && (
+            <div className="rounded-lg border border-green-200 bg-green-50 p-4 text-center">
+              <div className="text-sm text-green-700">儿童认证码</div>
+              <div className="mt-2 text-3xl font-black tracking-[0.25em] text-green-900">{authCode.code}</div>
+              <div className="mt-2 text-xs text-green-700">
+                有效期至 {new Date(authCode.expiresAt).toLocaleString('zh-CN', { hour12: false })}，使用后立即失效
+              </div>
+            </div>
+          )}
+
+          <div>
+            <div className="mb-2 text-sm font-medium text-gray-700">已绑定设备</div>
+            {deviceLoading ? (
+              <div className="py-6 text-center text-gray-400">加载中...</div>
+            ) : devices.length === 0 ? (
+              <div className="rounded-lg border border-gray-200 py-6 text-center text-sm text-gray-400">暂无绑定设备</div>
+            ) : (
+              <div className="space-y-2">
+                {devices.map((device) => (
+                  <div key={device.id} className="flex items-center justify-between gap-3 rounded-lg border border-gray-200 p-3">
+                    <div className="min-w-0">
+                      <div className="truncate text-sm font-medium text-gray-900">{device.deviceName || '手表设备'}</div>
+                      <div className="mt-1 text-xs text-gray-500">
+                        最近使用 {new Date(device.lastSeenAt).toLocaleString('zh-CN', { hour12: false })}
+                        {device.revokedAt ? ' · 已解绑' : ''}
+                      </div>
+                    </div>
+                    {!device.revokedAt && (
+                      <button onClick={() => handleRevokeDevice(device.id)} className="shrink-0 text-sm font-medium text-[#E74C3C] hover:text-red-700">
+                        解绑
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
       </Modal>
     </div>
   );

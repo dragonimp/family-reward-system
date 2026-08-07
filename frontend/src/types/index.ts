@@ -16,6 +16,33 @@ export interface Child {
   updatedAt?: string;
 }
 
+export interface ChildAuthCode {
+  code: string;
+  expiresAt: string;
+  expiresInMinutes: number;
+  child: Child;
+}
+
+export interface WatchDeviceBinding {
+  id: number;
+  childId: number;
+  familyGroupId: number;
+  childProfileKey: string;
+  parentAppUserId: string;
+  deviceName: string;
+  platform: string;
+  userAgent: string;
+  boundAt: string;
+  lastSeenAt: string;
+  revokedAt?: string | null;
+  active: boolean;
+}
+
+export interface ChildWatchDevices {
+  child: Child;
+  devices: WatchDeviceBinding[];
+}
+
 export interface FamilyGroup {
   id: number;
   name: string;

@@ -7,8 +7,16 @@
 - 入口：`https://happylife.ai.impx.net/watch?source=watch-app`
 - 清单：`https://happylife.ai.impx.net/watch/manifest.json`
 - 应用包名：`net.impx.happylife.watch`
-- 手表端身份：统一登录后默认为孩子
+- 手表端身份：输入家长生成的儿童认证码完成设备绑定
 - 权限范围：仅网络访问和网络状态检测
+
+## 设备绑定流程
+
+1. 家长在 Web 端完成注册/登录。
+2. 家长在孩子管理中创建儿童账号，并为孩子生成一次性认证码。
+3. 手表 App 打开 `/watch`，输入认证码完成绑定。
+4. 绑定成功后手表端保存 `deviceToken`，后续仅允许查询积分、提交积分申请和查看申请状态。
+5. 家长可在 Web 端查看设备列表并解绑设备。
 
 ## 目录
 

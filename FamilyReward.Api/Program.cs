@@ -5,6 +5,7 @@ using System.Globalization;
 using System.Text.Encodings.Web;
 using System.Net.Http.Headers;
 using System.Security.Claims;
+using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
@@ -258,17 +259,18 @@ app.MapGet("/api/children/{id:int}", async (int id, HttpRequest request) =>
 
 app.MapGet("/api/watch/score", async (HttpRequest request) =>
 {
-    if (!HasUnifiedIdentity(request)) return Results.Json(new { error = "请先登录", code = "login_required" }, statusCode: StatusCodes.Status401Unauthorized);
-    var profile = await GetOrCreateAppUserProfile(connectionString, request, "watch", "child", autoCreate: true);
-    var familyGroupId = await ResolveFamilyGroupIdForProfile(connectionString, request, null, profile);
-    var children = await GetChildren(connectionString, familyGroupId, profile.Role == "child" ? profile.ChildProfileKey : null);
+    var binding = await RequireWatchDeviceBinding(connectionString, request);
+    if (binding.Error is not null) return binding.Error;
+    var device = binding.Binding!;
+    var children = await GetChildren(connectionString, device.FamilyGroupId, device.ChildProfileKey);
     var familyGroupName = children
         .Select(c => Convert.ToString(c["familyGroupName"], CultureInfo.InvariantCulture) ?? "")
         .FirstOrDefault(name => !string.IsNullOrWhiteSpace(name)) ?? "";
     return Results.Json(new
     {
-        familyGroupId,
+        familyGroupId = device.FamilyGroupId,
         familyGroupName,
+        deviceId = device.Id,
         updatedAt = DateTimeOffset.UtcNow.ToString("O", CultureInfo.InvariantCulture),
         children = children.Select(c => new
         {
@@ -283,7 +285,8 @@ app.MapGet("/api/watch/score", async (HttpRequest request) =>
 
 app.MapGet("/api/watch/rules", async (HttpRequest request) =>
 {
-    if (!HasUnifiedIdentity(request)) return Results.Json(new { error = "请先登录", code = "login_required" }, statusCode: StatusCodes.Status401Unauthorized);
+    var binding = await RequireWatchDeviceBinding(connectionString, request, touch: false);
+    if (binding.Error is not null) return binding.Error;
     var rulesPayload = await GetRules(connectionString);
     var rules = ((List<Dictionary<string, object?>>)rulesPayload["rules"])
         .Where(rule => GetDecimal(rule, "points") > 0)
@@ -300,27 +303,43 @@ app.MapGet("/api/watch/rules", async (HttpRequest request) =>
 
 app.MapGet("/api/watch/requests", async (HttpRequest request) =>
 {
-    if (!HasUnifiedIdentity(request)) return Results.Json(new { error = "请先登录", code = "login_required" }, statusCode: StatusCodes.Status401Unauthorized);
-    var profile = await GetOrCreateAppUserProfile(connectionString, request, "watch", "child", autoCreate: true);
-    var familyGroupId = await ResolveFamilyGroupIdForProfile(connectionString, request, null, profile);
+    var binding = await RequireWatchDeviceBinding(connectionString, request);
+    if (binding.Error is not null) return binding.Error;
+    var device = binding.Binding!;
     var childId = request.Query.Int("childId") ?? request.Query.Int("child_id");
     var limit = Math.Clamp(request.Query.Int("limit") ?? 20, 1, 50);
     return Results.Json(new
     {
-        familyGroupId,
-        requests = await GetWatchRewardRequests(connectionString, familyGroupId, childId, limit, profile.Role == "child" ? profile.ChildProfileKey : null)
+        familyGroupId = device.FamilyGroupId,
+        requests = await GetWatchRewardRequests(connectionString, device.FamilyGroupId, childId, limit, device.ChildProfileKey)
     });
 });
 
 app.MapPost("/api/watch/requests", async (JsonObject body, HttpRequest request) =>
 {
-    if (!HasUnifiedIdentity(request)) return Results.Json(new { error = "请先登录", code = "login_required" }, statusCode: StatusCodes.Status401Unauthorized);
-    var profile = await GetOrCreateAppUserProfile(connectionString, request, "watch", "child", autoCreate: true, body);
-    var familyGroupId = await ResolveFamilyGroupIdForProfile(connectionString, request, body, profile);
-    var result = await CreateWatchRewardRequest(connectionString, body, familyGroupId, profile.AppUserId, profile.Role == "child" ? profile.ChildProfileKey : null);
+    var binding = await RequireWatchDeviceBinding(connectionString, request);
+    if (binding.Error is not null) return binding.Error;
+    var device = binding.Binding!;
+    body["child_id"] = device.ChildId;
+    body["family_group_id"] = device.FamilyGroupId;
+    var result = await CreateWatchRewardRequest(connectionString, body, device.FamilyGroupId, $"watch-device:{device.Id}", device.ChildProfileKey);
     return result.ContainsKey("error")
         ? Results.BadRequest(result)
         : Results.Created($"/api/watch/requests/{GetInt(result, "id")}", result);
+});
+
+app.MapPost("/api/watch/device-bind", async (JsonObject body, HttpRequest request) =>
+{
+    var result = await BindWatchDevice(connectionString, body, request);
+    return result.ContainsKey("error") ? Results.BadRequest(result) : Results.Json(result);
+});
+
+app.MapPost("/api/watch/device-unbind", async (HttpRequest request) =>
+{
+    var binding = await RequireWatchDeviceBinding(connectionString, request, touch: false);
+    if (binding.Error is not null) return binding.Error;
+    await RevokeWatchDeviceByToken(connectionString, binding.Binding!.TokenHash);
+    return Results.Json(new { status = "ok" });
 });
 
 app.MapPost("/api/watch/requests/{id:int}/approve", async (int id, JsonObject body, HttpRequest request) =>
@@ -332,61 +351,8 @@ app.MapPost("/api/watch/requests/{id:int}/approve", async (int id, JsonObject bo
     return result.ContainsKey("error") ? Results.BadRequest(result) : Results.Json(result);
 });
 
-app.MapGet("/watch", async (HttpRequest request) =>
+app.MapGet("/watch", () =>
 {
-    if (!HasUnifiedIdentity(request))
-    {
-        return Results.Redirect(BuildLoginUrl(request));
-    }
-    var profile = await GetOrCreateAppUserProfile(connectionString, request, "watch", "child", autoCreate: true);
-    var familyGroupId = await ResolveFamilyGroupIdForProfile(connectionString, request, null, profile);
-    var children = await GetChildren(connectionString, familyGroupId, profile.Role == "child" ? profile.ChildProfileKey : null);
-    var rulesPayload = await GetRules(connectionString);
-    var positiveRules = ((List<Dictionary<string, object?>>)rulesPayload["rules"])
-        .Where(rule => GetDecimal(rule, "points") > 0)
-        .Take(8)
-        .ToList();
-    var recentRequests = await GetWatchRewardRequests(connectionString, familyGroupId, null, 6, profile.Role == "child" ? profile.ChildProfileKey : null);
-    var updatedAt = DateTime.Now.ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture);
-    var childOptions = string.Join("", children.Select((c, index) => $"""
-        <option value="{GetInt(c, "id")}"{(index == 0 ? " selected" : "")}>{Html(Convert.ToString(c["name"], CultureInfo.InvariantCulture) ?? "")}</option>
-        """));
-    var childCards = string.Join("", children.Select(c => $"""
-        <article class="child-card" data-child-id="{GetInt(c, "id")}">
-          <div>
-            <div class="name">{Html(Convert.ToString(c["name"], CultureInfo.InvariantCulture) ?? "")}</div>
-            <div class="sub">{Html(Convert.ToString(c["familyGroupName"], CultureInfo.InvariantCulture) ?? "")}</div>
-          </div>
-          <div class="score">{FormatPoints(GetDecimal(c, "score"))}</div>
-        </article>
-        """));
-    if (string.IsNullOrWhiteSpace(childCards))
-    {
-        childCards = """<div class="empty">暂无孩子积分</div>""";
-    }
-
-    var ruleButtons = string.Join("", positiveRules.Select(rule => $"""
-        <button type="button" class="rule-btn" data-rule-id="{GetInt(rule, "id")}" data-points="{FormatPoints(GetDecimal(rule, "points"))}" data-title="{Html(Convert.ToString(rule["name"], CultureInfo.InvariantCulture) ?? "")}">
-          <span>{Html(Convert.ToString(rule["name"], CultureInfo.InvariantCulture) ?? "")}</span>
-          <b>+{FormatPoints(GetDecimal(rule, "points"))}</b>
-        </button>
-        """));
-    if (string.IsNullOrWhiteSpace(ruleButtons))
-    {
-        ruleButtons = """<div class="empty compact">暂无可申请规则</div>""";
-    }
-
-    var requestRows = string.Join("", recentRequests.Select(item => $"""
-        <li>
-          <span>{Html(Convert.ToString(item["childName"], CultureInfo.InvariantCulture) ?? "")} · {Html(Convert.ToString(item["title"], CultureInfo.InvariantCulture) ?? "")}</span>
-          <b>{Html(WatchRequestStatusText(Convert.ToString(item["status"], CultureInfo.InvariantCulture) ?? ""))}</b>
-        </li>
-        """));
-    if (string.IsNullOrWhiteSpace(requestRows))
-    {
-        requestRows = """<li class="empty-row">暂无申请</li>""";
-    }
-
     var html = """
         <!doctype html>
         <html lang="zh-CN">
@@ -399,25 +365,31 @@ app.MapGet("/watch", async (HttpRequest request) =>
           <link rel="icon" href="/watch/icon.svg" type="image/svg+xml">
           <title>手表积分</title>
           <style>
-            *{box-sizing:border-box}body{margin:0;background:#eef5ef;color:#17231b;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}.wrap{max-width:360px;margin:0 auto;padding:9px}header{display:flex;align-items:end;justify-content:space-between;gap:8px;margin:0 0 8px}h1{margin:0;font-size:21px;line-height:1.1}.time{margin:0;color:#5a6b61;font-size:11px}.stack{display:grid;gap:8px}.child-card{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:9px 10px;background:#fff;border:1px solid #d6e1d9;border-radius:8px}.name{font-size:17px;font-weight:800;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.sub{margin-top:2px;font-size:11px;color:#637269;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.score{font-size:27px;font-weight:900;color:#0c7a3a;white-space:nowrap}.score:after{content:"分";margin-left:2px;font-size:12px;color:#5a6b61}.panel{padding:9px;background:#fff;border:1px solid #d6e1d9;border-radius:8px}h2{margin:0 0 7px;font-size:15px}.rules{display:grid;grid-template-columns:1fr 1fr;gap:6px}.rule-btn{display:flex;align-items:center;justify-content:space-between;gap:5px;min-height:38px;padding:7px;border:1px solid #cfdcd3;border-radius:7px;background:#f8fbf9;color:#17231b;font-size:12px;text-align:left}.rule-btn span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.rule-btn b{color:#0c7a3a}label{display:block;margin:7px 0 3px;font-size:12px;color:#44544a}select,input,textarea{width:100%;border:1px solid #cbd8cf;border-radius:7px;background:#fff;padding:8px;font-size:15px;color:#17231b}textarea{min-height:52px;resize:vertical}.submit{width:100%;margin-top:8px;border:0;border-radius:8px;background:#16643a;color:#fff;padding:10px;font-size:16px;font-weight:800}.msg{min-height:17px;margin:6px 0 0;font-size:12px;color:#16643a}.requests{list-style:none;margin:0;padding:0;display:grid;gap:5px}.requests li{display:flex;justify-content:space-between;gap:8px;border-top:1px solid #edf2ee;padding-top:5px;font-size:12px}.requests b{white-space:nowrap;color:#5f5221}.empty,.empty-row{color:#64746a;text-align:center;font-size:13px}.compact{padding:7px}.hint{margin:7px 0 0;color:#64746a;text-align:center;font-size:11px}@media(max-width:230px){.wrap{padding:7px}h1{font-size:18px}.score{font-size:22px}.rules{grid-template-columns:1fr}.panel{padding:8px}select,input,textarea{font-size:14px;padding:7px}}
+            *{box-sizing:border-box}body{margin:0;background:#eef5ef;color:#17231b;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}.wrap{max-width:360px;margin:0 auto;padding:9px}header{display:flex;align-items:end;justify-content:space-between;gap:8px;margin:0 0 8px}h1{margin:0;font-size:21px;line-height:1.1}.time{margin:0;color:#5a6b61;font-size:11px}.stack{display:grid;gap:8px}.child-card{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:9px 10px;background:#fff;border:1px solid #d6e1d9;border-radius:8px}.name{font-size:17px;font-weight:800;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.sub{margin-top:2px;font-size:11px;color:#637269;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.score{font-size:27px;font-weight:900;color:#0c7a3a;white-space:nowrap}.score:after{content:"分";margin-left:2px;font-size:12px;color:#5a6b61}.panel{padding:9px;background:#fff;border:1px solid #d6e1d9;border-radius:8px}h2{margin:0 0 7px;font-size:15px}.rules{display:grid;grid-template-columns:1fr 1fr;gap:6px}.rule-btn{display:flex;align-items:center;justify-content:space-between;gap:5px;min-height:38px;padding:7px;border:1px solid #cfdcd3;border-radius:7px;background:#f8fbf9;color:#17231b;font-size:12px;text-align:left}.rule-btn span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.rule-btn b{color:#0c7a3a}label{display:block;margin:7px 0 3px;font-size:12px;color:#44544a}input,textarea{width:100%;border:1px solid #cbd8cf;border-radius:7px;background:#fff;padding:8px;font-size:15px;color:#17231b}textarea{min-height:52px;resize:vertical}.submit,.ghost{width:100%;margin-top:8px;border:0;border-radius:8px;padding:10px;font-size:16px;font-weight:800}.submit{background:#16643a;color:#fff}.ghost{background:#e7f0ea;color:#17462c}.msg{min-height:17px;margin:6px 0 0;font-size:12px;color:#16643a}.requests{list-style:none;margin:0;padding:0;display:grid;gap:5px}.requests li{display:flex;justify-content:space-between;gap:8px;border-top:1px solid #edf2ee;padding-top:5px;font-size:12px}.requests b{white-space:nowrap;color:#5f5221}.empty,.empty-row{color:#64746a;text-align:center;font-size:13px}.compact{padding:7px}.hint{margin:7px 0 0;color:#64746a;text-align:center;font-size:11px}.hidden{display:none}.code{text-align:center;letter-spacing:3px;font-size:22px;font-weight:900;text-transform:uppercase}@media(max-width:230px){.wrap{padding:7px}h1{font-size:18px}.score{font-size:22px}.rules{grid-template-columns:1fr}.panel{padding:8px}input,textarea{font-size:14px;padding:7px}}
           </style>
         </head>
         <body>
           <main class="wrap">
             <header>
               <h1>手表积分</h1>
-              <p class="time">__UPDATED_AT__</p>
+              <p class="time" id="updated-at"></p>
             </header>
-            <section class="stack">__CHILD_CARDS__</section>
-            <section class="panel">
+            <section class="panel" id="bind-panel">
+              <h2>设备绑定</h2>
+              <form id="bind-form">
+                <label for="auth-code">儿童认证码</label>
+                <input id="auth-code" name="code" class="code" maxlength="12" autocomplete="one-time-code" placeholder="输入认证码">
+                <button class="submit" type="submit">绑定手表</button>
+                <p id="bind-msg" class="msg"></p>
+              </form>
+            </section>
+            <section class="stack hidden" id="children"></section>
+            <section class="panel hidden" id="request-panel">
               <h2>申请领取</h2>
               <form id="request-form">
-                <input type="hidden" name="family_group_id" value="__FAMILY_GROUP_ID__">
                 <input type="hidden" name="rule_id" id="rule-id">
-                <label for="child-id">孩子</label>
-                <select id="child-id" name="child_id">__CHILD_OPTIONS__</select>
                 <label>常用奖励</label>
-                <div class="rules">__RULE_BUTTONS__</div>
+                <div class="rules" id="rules"></div>
                 <label for="title">申请事项</label>
                 <input id="title" name="title" maxlength="80" placeholder="比如 好好吃饭">
                 <label for="points">积分</label>
@@ -428,21 +400,84 @@ app.MapGet("/watch", async (HttpRequest request) =>
                 <p id="msg" class="msg"></p>
               </form>
             </section>
-            <section class="panel">
+            <section class="panel hidden" id="requests-panel">
               <h2>最近申请</h2>
-              <ul class="requests" id="requests">__REQUEST_ROWS__</ul>
+              <ul class="requests" id="requests"></ul>
             </section>
+            <button class="ghost hidden" id="unbind" type="button">解除绑定</button>
             <p class="hint">适配小天才、华为、小米等手表浏览器小屏访问</p>
           </main>
           <script>
             const form = document.getElementById('request-form');
             const msg = document.getElementById('msg');
-            document.querySelectorAll('.rule-btn').forEach((button) => {
-              button.addEventListener('click', () => {
-                document.getElementById('rule-id').value = button.dataset.ruleId || '';
-                document.getElementById('title').value = button.dataset.title || '';
-                document.getElementById('points').value = button.dataset.points || '';
-              });
+            const bindForm = document.getElementById('bind-form');
+            const bindMsg = document.getElementById('bind-msg');
+            const tokenKey = 'happylife_watch_device_token';
+            const token = () => localStorage.getItem(tokenKey) || '';
+            const authHeaders = () => ({ 'X-Watch-Device-Token': token() });
+            const escapeText = (value) => String(value || '').replace(/[&<>"']/g, (ch) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
+            const showBound = (bound) => {
+              document.getElementById('bind-panel').classList.toggle('hidden', bound);
+              document.getElementById('children').classList.toggle('hidden', !bound);
+              document.getElementById('request-panel').classList.toggle('hidden', !bound);
+              document.getElementById('requests-panel').classList.toggle('hidden', !bound);
+              document.getElementById('unbind').classList.toggle('hidden', !bound);
+            };
+            const fetchJson = async (url, options = {}) => {
+              const response = await fetch(url, options);
+              const payload = await response.json().catch(() => ({}));
+              if (!response.ok) throw new Error(payload.error || '请求失败');
+              return payload;
+            };
+            const load = async () => {
+              if (!token()) { showBound(false); return; }
+              try {
+                const [score, rulesPayload, requestsPayload] = await Promise.all([
+                  fetchJson('/api/watch/score', { headers: authHeaders() }),
+                  fetchJson('/api/watch/rules', { headers: authHeaders() }),
+                  fetchJson('/api/watch/requests?limit=6', { headers: authHeaders() })
+                ]);
+                showBound(true);
+                document.getElementById('updated-at').textContent = new Date(score.updatedAt).toLocaleString('zh-CN', { hour12: false });
+                document.getElementById('children').innerHTML = (score.children || []).map((child) => `
+                  <article class="child-card">
+                    <div><div class="name">${escapeText(child.name)}</div><div class="sub">${escapeText(score.familyGroupName)}</div></div>
+                    <div class="score">${escapeText(child.points)}</div>
+                  </article>`).join('') || '<div class="empty">暂无孩子积分</div>';
+                document.getElementById('rules').innerHTML = (rulesPayload.rules || []).slice(0, 8).map((rule) => `
+                  <button type="button" class="rule-btn" data-rule-id="${rule.id}" data-points="${rule.points}" data-title="${escapeText(rule.name)}">
+                    <span>${escapeText(rule.name)}</span><b>+${escapeText(rule.points)}</b>
+                  </button>`).join('') || '<div class="empty compact">暂无可申请规则</div>';
+                document.querySelectorAll('.rule-btn').forEach((button) => {
+                  button.addEventListener('click', () => {
+                    document.getElementById('rule-id').value = button.dataset.ruleId || '';
+                    document.getElementById('title').value = button.dataset.title || '';
+                    document.getElementById('points').value = button.dataset.points || '';
+                  });
+                });
+                document.getElementById('requests').innerHTML = (requestsPayload.requests || []).map((item) => `
+                  <li><span>${escapeText(item.childName)} · ${escapeText(item.title)}</span><b>${escapeText(item.statusText)}</b></li>`).join('') || '<li class="empty-row">暂无申请</li>';
+              } catch (error) {
+                localStorage.removeItem(tokenKey);
+                showBound(false);
+                bindMsg.textContent = error.message || '请重新绑定';
+              }
+            };
+            bindForm.addEventListener('submit', async (event) => {
+              event.preventDefault();
+              bindMsg.textContent = '正在绑定...';
+              try {
+                const payload = await fetchJson('/api/watch/device-bind', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ code: document.getElementById('auth-code').value, deviceName: navigator.userAgent })
+                });
+                localStorage.setItem(tokenKey, payload.deviceToken);
+                bindMsg.textContent = '';
+                await load();
+              } catch (error) {
+                bindMsg.textContent = error.message || '绑定失败';
+              }
             });
             form.addEventListener('submit', async (event) => {
               event.preventDefault();
@@ -451,7 +486,7 @@ app.MapGet("/watch", async (HttpRequest request) =>
               try {
                 const response = await fetch('/api/watch/requests', {
                   method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
+                  headers: { 'Content-Type': 'application/json', ...authHeaders() },
                   body: JSON.stringify(data)
                 });
                 const payload = await response.json();
@@ -463,16 +498,16 @@ app.MapGet("/watch", async (HttpRequest request) =>
                 msg.textContent = error.message || '提交失败';
               }
             });
+            document.getElementById('unbind').addEventListener('click', async () => {
+              try { await fetch('/api/watch/device-unbind', { method: 'POST', headers: authHeaders() }); } catch {}
+              localStorage.removeItem(tokenKey);
+              location.reload();
+            });
+            load();
           </script>
         </body>
         </html>
-        """
-        .Replace("__UPDATED_AT__", Html(updatedAt), StringComparison.Ordinal)
-        .Replace("__FAMILY_GROUP_ID__", familyGroupId.ToString(CultureInfo.InvariantCulture), StringComparison.Ordinal)
-        .Replace("__CHILD_CARDS__", childCards, StringComparison.Ordinal)
-        .Replace("__CHILD_OPTIONS__", childOptions, StringComparison.Ordinal)
-        .Replace("__RULE_BUTTONS__", ruleButtons, StringComparison.Ordinal)
-        .Replace("__REQUEST_ROWS__", requestRows, StringComparison.Ordinal);
+        """;
     return Results.Content(html, "text/html; charset=utf-8");
 });
 
@@ -545,6 +580,34 @@ app.MapDelete("/api/children/{id:int}", async (int id, HttpRequest request) =>
     if (access.Error is not null) return access.Error;
     var familyGroupId = await ResolveFamilyGroupId(connectionString, request);
     var result = await DeleteChildMembership(connectionString, id, familyGroupId);
+    return result.ContainsKey("error") ? Results.NotFound(result) : Results.Json(result);
+});
+
+app.MapPost("/api/children/{id:int}/auth-code", async (int id, JsonObject body, HttpRequest request) =>
+{
+    var access = await RequireParentProfile(connectionString, request);
+    if (access.Error is not null) return access.Error;
+    var familyGroupId = await ResolveFamilyGroupId(connectionString, request, body);
+    var minutes = Math.Clamp(body.Int("expiresInMinutes") ?? 24 * 60, 10, 24 * 60);
+    var result = await CreateChildAuthCode(connectionString, id, familyGroupId, access.Profile!.AppUserId, minutes);
+    return result.ContainsKey("error") ? Results.BadRequest(result) : Results.Json(result);
+});
+
+app.MapGet("/api/children/{id:int}/devices", async (int id, HttpRequest request) =>
+{
+    var access = await RequireParentProfile(connectionString, request);
+    if (access.Error is not null) return access.Error;
+    var familyGroupId = await ResolveFamilyGroupId(connectionString, request);
+    var result = await GetChildWatchDevices(connectionString, id, familyGroupId, access.Profile!.AppUserId);
+    return result.ContainsKey("error") ? Results.NotFound(result) : Results.Json(result);
+});
+
+app.MapDelete("/api/children/{id:int}/devices/{deviceId:int}", async (int id, int deviceId, HttpRequest request) =>
+{
+    var access = await RequireParentProfile(connectionString, request);
+    if (access.Error is not null) return access.Error;
+    var familyGroupId = await ResolveFamilyGroupId(connectionString, request);
+    var result = await RevokeChildWatchDevice(connectionString, id, deviceId, familyGroupId, access.Profile!.AppUserId);
     return result.ContainsKey("error") ? Results.NotFound(result) : Results.Json(result);
 });
 
@@ -1102,7 +1165,7 @@ static JsonObject BuildWatchAppInfo(HttpRequest request)
         ["apiBaseUrl"] = baseUrl,
         ["supportedPlatforms"] = new JsonArray { "xiaotiancai", "xiaomi", "huawei" },
         ["supportedScreens"] = new JsonArray { "192x192", "240x240", "280x280", "320x320", "360x360" },
-        ["watchFeatures"] = new JsonArray { "积分查询", "积分申请", "最近申请状态", "统一登录孩子身份" },
+        ["watchFeatures"] = new JsonArray { "积分查询", "积分申请", "最近申请状态", "儿童认证码设备绑定" },
         ["requiredPermissions"] = new JsonArray { "INTERNET", "ACCESS_NETWORK_STATE" },
         ["privacy"] = new JsonObject
         {
@@ -2753,6 +2816,35 @@ static async Task InitDatabase(string connectionString)
         )
         """,
         """
+        CREATE TABLE IF NOT EXISTS child_auth_codes (
+            id SERIAL PRIMARY KEY,
+            child_id INTEGER NOT NULL,
+            family_group_id INTEGER NOT NULL,
+            child_profile_key VARCHAR(180) NOT NULL,
+            parent_app_user_id VARCHAR(180) NOT NULL,
+            code_hash VARCHAR(128) NOT NULL UNIQUE,
+            expires_at TIMESTAMP NOT NULL,
+            used_at TIMESTAMP NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+        """,
+        """
+        CREATE TABLE IF NOT EXISTS watch_device_bindings (
+            id SERIAL PRIMARY KEY,
+            child_id INTEGER NOT NULL,
+            family_group_id INTEGER NOT NULL,
+            child_profile_key VARCHAR(180) NOT NULL,
+            parent_app_user_id VARCHAR(180) NOT NULL,
+            device_token_hash VARCHAR(128) NOT NULL UNIQUE,
+            device_name VARCHAR(240) NOT NULL DEFAULT '',
+            platform VARCHAR(80) NOT NULL DEFAULT '',
+            user_agent TEXT NOT NULL DEFAULT '',
+            bound_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            last_seen_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            revoked_at TIMESTAMP NULL
+        )
+        """,
+        """
         CREATE TABLE IF NOT EXISTS children (
             id SERIAL PRIMARY KEY,
             family_group_id INTEGER REFERENCES family_groups(id) ON DELETE RESTRICT,
@@ -2874,6 +2966,9 @@ static async Task InitDatabase(string connectionString)
         "CREATE INDEX IF NOT EXISTS idx_app_user_profiles_unified ON app_user_profiles(unified_user_id)",
         "CREATE INDEX IF NOT EXISTS idx_child_user_bindings_parent ON child_user_bindings(parent_app_user_id)",
         "CREATE INDEX IF NOT EXISTS idx_child_user_bindings_child ON child_user_bindings(child_profile_key)",
+        "CREATE INDEX IF NOT EXISTS idx_child_auth_codes_child ON child_auth_codes(child_id, expires_at DESC)",
+        "CREATE INDEX IF NOT EXISTS idx_watch_device_bindings_child ON watch_device_bindings(child_id, revoked_at)",
+        "CREATE INDEX IF NOT EXISTS idx_watch_device_bindings_parent ON watch_device_bindings(parent_app_user_id)",
         "CREATE INDEX IF NOT EXISTS idx_watch_reward_requests_family_child ON watch_reward_requests(family_group_id, child_id, requested_at DESC)",
         "CREATE INDEX IF NOT EXISTS idx_watch_reward_requests_status ON watch_reward_requests(status)"
     };
@@ -3396,48 +3491,6 @@ static async Task<int> ResolveFamilyGroupId(string connectionString, HttpRequest
     return await EnsureFamilyGroup(conn, DefaultFamilyGroupName, userId);
 }
 
-static async Task<int> ResolveFamilyGroupIdForProfile(string connectionString, HttpRequest request, JsonObject? body, AppUserProfile profile)
-{
-    var requestedId = body?.Int("family_group_id") ?? body?.Int("familyGroupId") ?? request.Query.Int("familyGroupId") ?? request.Query.Int("family_group_id");
-    await using var conn = await OpenConnection(connectionString);
-
-    if (string.Equals(profile.Role, "child", StringComparison.Ordinal) && !string.IsNullOrWhiteSpace(profile.ChildProfileKey))
-    {
-        if (requestedId is not null)
-        {
-            await using var checkCmd = new NpgsqlCommand("""
-                SELECT COUNT(*)
-                FROM children
-                WHERE family_group_id = @family_group_id AND profile_key = @profile_key AND status = 'active'
-                """, conn);
-            checkCmd.Parameters.AddWithValue("family_group_id", requestedId.Value);
-            checkCmd.Parameters.AddWithValue("profile_key", profile.ChildProfileKey);
-            if (Convert.ToInt32(await checkCmd.ExecuteScalarAsync(), CultureInfo.InvariantCulture) > 0)
-            {
-                return requestedId.Value;
-            }
-        }
-
-        await using var cmd = new NpgsqlCommand("""
-            SELECT family_group_id
-            FROM children
-            WHERE profile_key = @profile_key AND status = 'active'
-            ORDER BY id
-            LIMIT 1
-            """, conn);
-        cmd.Parameters.AddWithValue("profile_key", profile.ChildProfileKey);
-        var result = await cmd.ExecuteScalarAsync();
-        if (result is not null && result is not DBNull)
-        {
-            return Convert.ToInt32(result, CultureInfo.InvariantCulture);
-        }
-
-        return await EnsureFamilyGroup(conn, $"{profile.Username}的家庭", MakeParentAppUserId(profile.Username));
-    }
-
-    return await ResolveFamilyGroupId(connectionString, request, body);
-}
-
 static string GetRequestUserId(HttpRequest request)
 {
     var userId = request.Headers.TryGetValue("X-App-User-Id", out var appUserId) ? appUserId.ToString() : "";
@@ -3518,12 +3571,6 @@ static string? FirstClaim(HttpRequest request, params string[] types)
 static bool IsWatchRequest(HttpRequest request) =>
     request.Path.StartsWithSegments("/watch", StringComparison.OrdinalIgnoreCase)
     || request.Path.StartsWithSegments("/api/watch", StringComparison.OrdinalIgnoreCase);
-
-static string BuildLoginUrl(HttpRequest request)
-{
-    var returnUrl = $"{request.Scheme}://{request.Host}{request.Path}{request.QueryString}";
-    return $"/auth/login?returnUrl={Uri.EscapeDataString(returnUrl)}";
-}
 
 static string NormalizeIdentityChannel(string? value, string fallback)
 {
@@ -3830,6 +3877,314 @@ static async Task<Dictionary<string, object?>> DeleteChildMembership(string conn
     }
 }
 
+static async Task<Dictionary<string, object?>> CreateChildAuthCode(string connectionString, int childId, int familyGroupId, string parentAppUserId, int expiresInMinutes)
+{
+    await using var conn = await OpenConnection(connectionString);
+    await using var tx = await conn.BeginTransactionAsync();
+    try
+    {
+        var child = await GetChildForFamily(conn, tx, childId, familyGroupId);
+        if (child is null)
+        {
+            await tx.RollbackAsync();
+            return new Dictionary<string, object?> { ["error"] = "孩子不属于当前家庭组" };
+        }
+
+        await using (var expireCmd = new NpgsqlCommand("""
+            UPDATE child_auth_codes
+            SET used_at = CURRENT_TIMESTAMP
+            WHERE child_id = @child_id
+              AND family_group_id = @family_group_id
+              AND used_at IS NULL
+              AND expires_at > CURRENT_TIMESTAMP
+            """, conn, tx))
+        {
+            expireCmd.Parameters.AddWithValue("child_id", childId);
+            expireCmd.Parameters.AddWithValue("family_group_id", familyGroupId);
+            await expireCmd.ExecuteNonQueryAsync();
+        }
+
+        var code = GenerateAuthCode();
+        var codeHash = HashSecret(code);
+        var expiresAt = DateTime.UtcNow.AddMinutes(expiresInMinutes);
+        await using (var cmd = new NpgsqlCommand("""
+            INSERT INTO child_auth_codes (child_id, family_group_id, child_profile_key, parent_app_user_id, code_hash, expires_at)
+            VALUES (@child_id, @family_group_id, @child_profile_key, @parent_app_user_id, @code_hash, @expires_at)
+            """, conn, tx))
+        {
+            cmd.Parameters.AddWithValue("child_id", childId);
+            cmd.Parameters.AddWithValue("family_group_id", familyGroupId);
+            cmd.Parameters.AddWithValue("child_profile_key", Convert.ToString(child["profileKey"], CultureInfo.InvariantCulture) ?? "");
+            cmd.Parameters.AddWithValue("parent_app_user_id", parentAppUserId);
+            cmd.Parameters.AddWithValue("code_hash", codeHash);
+            cmd.Parameters.AddWithValue("expires_at", expiresAt);
+            await cmd.ExecuteNonQueryAsync();
+        }
+
+        await tx.CommitAsync();
+        return new Dictionary<string, object?>
+        {
+            ["code"] = code,
+            ["expiresAt"] = expiresAt.ToString("O", CultureInfo.InvariantCulture),
+            ["expiresInMinutes"] = expiresInMinutes,
+            ["child"] = child
+        };
+    }
+    catch (Exception ex)
+    {
+        await tx.RollbackAsync();
+        return new Dictionary<string, object?> { ["error"] = ex.Message };
+    }
+}
+
+static async Task<Dictionary<string, object?>> GetChildWatchDevices(string connectionString, int childId, int familyGroupId, string parentAppUserId)
+{
+    await using var conn = await OpenConnection(connectionString);
+    var child = await GetChildForFamily(conn, null, childId, familyGroupId);
+    if (child is null)
+    {
+        return new Dictionary<string, object?> { ["error"] = "孩子不属于当前家庭组" };
+    }
+
+    var devices = new List<Dictionary<string, object?>>();
+    await using var cmd = new NpgsqlCommand("""
+        SELECT id, child_id, family_group_id, child_profile_key, parent_app_user_id, device_name, platform, user_agent, bound_at, last_seen_at, revoked_at
+        FROM watch_device_bindings
+        WHERE child_id = @child_id
+          AND family_group_id = @family_group_id
+          AND parent_app_user_id = @parent_app_user_id
+        ORDER BY revoked_at NULLS FIRST, last_seen_at DESC, id DESC
+        """, conn);
+    cmd.Parameters.AddWithValue("child_id", childId);
+    cmd.Parameters.AddWithValue("family_group_id", familyGroupId);
+    cmd.Parameters.AddWithValue("parent_app_user_id", parentAppUserId);
+    await using var reader = await cmd.ExecuteReaderAsync();
+    while (await reader.ReadAsync())
+    {
+        devices.Add(ReadWatchDevice(reader));
+    }
+
+    return new Dictionary<string, object?> { ["child"] = child, ["devices"] = devices };
+}
+
+static async Task<Dictionary<string, object?>> RevokeChildWatchDevice(string connectionString, int childId, int deviceId, int familyGroupId, string parentAppUserId)
+{
+    await using var conn = await OpenConnection(connectionString);
+    await using var cmd = new NpgsqlCommand("""
+        UPDATE watch_device_bindings
+        SET revoked_at = CURRENT_TIMESTAMP
+        WHERE id = @id
+          AND child_id = @child_id
+          AND family_group_id = @family_group_id
+          AND parent_app_user_id = @parent_app_user_id
+          AND revoked_at IS NULL
+        """, conn);
+    cmd.Parameters.AddWithValue("id", deviceId);
+    cmd.Parameters.AddWithValue("child_id", childId);
+    cmd.Parameters.AddWithValue("family_group_id", familyGroupId);
+    cmd.Parameters.AddWithValue("parent_app_user_id", parentAppUserId);
+    var affected = await cmd.ExecuteNonQueryAsync();
+    return affected == 0
+        ? new Dictionary<string, object?> { ["error"] = "设备不存在或已解绑" }
+        : new Dictionary<string, object?> { ["status"] = "ok" };
+}
+
+static async Task<Dictionary<string, object?>> BindWatchDevice(string connectionString, JsonObject body, HttpRequest request)
+{
+    var code = NormalizeAuthCode(body.String("code"));
+    if (string.IsNullOrWhiteSpace(code))
+    {
+        return new Dictionary<string, object?> { ["error"] = "请输入儿童认证码" };
+    }
+
+    await using var conn = await OpenConnection(connectionString);
+    await using var tx = await conn.BeginTransactionAsync();
+    try
+    {
+        Dictionary<string, object?>? codeRow = null;
+        await using (var lookup = new NpgsqlCommand("""
+            SELECT cac.id, cac.child_id, cac.family_group_id, cac.child_profile_key, cac.parent_app_user_id, cac.expires_at,
+                   c.name AS child_name, fg.name AS family_group_name
+            FROM child_auth_codes cac
+            JOIN children c ON c.id = cac.child_id AND c.family_group_id = cac.family_group_id AND c.status = 'active'
+            LEFT JOIN family_groups fg ON fg.id = cac.family_group_id
+            WHERE cac.code_hash = @code_hash
+              AND cac.used_at IS NULL
+              AND cac.expires_at > CURRENT_TIMESTAMP
+            FOR UPDATE OF cac
+            """, conn, tx))
+        {
+            lookup.Parameters.AddWithValue("code_hash", HashSecret(code));
+            await using var reader = await lookup.ExecuteReaderAsync();
+            if (await reader.ReadAsync())
+            {
+                codeRow = new Dictionary<string, object?>
+                {
+                    ["id"] = reader.Int("id"),
+                    ["childId"] = reader.Int("child_id"),
+                    ["familyGroupId"] = reader.Int("family_group_id"),
+                    ["childProfileKey"] = reader.String("child_profile_key"),
+                    ["parentAppUserId"] = reader.String("parent_app_user_id"),
+                    ["childName"] = reader.String("child_name"),
+                    ["familyGroupName"] = reader.String("family_group_name")
+                };
+            }
+        }
+
+        if (codeRow is null)
+        {
+            await tx.RollbackAsync();
+            return new Dictionary<string, object?> { ["error"] = "认证码无效或已过期" };
+        }
+
+        var token = GenerateDeviceToken();
+        var tokenHash = HashSecret(token);
+        var deviceName = Truncate(body.String("deviceName", request.Headers.UserAgent.ToString()), 240);
+        var platform = Truncate(body.String("platform"), 80);
+        var userAgent = request.Headers.UserAgent.ToString();
+        int deviceId;
+        await using (var insert = new NpgsqlCommand("""
+            INSERT INTO watch_device_bindings
+                (child_id, family_group_id, child_profile_key, parent_app_user_id, device_token_hash, device_name, platform, user_agent)
+            VALUES
+                (@child_id, @family_group_id, @child_profile_key, @parent_app_user_id, @device_token_hash, @device_name, @platform, @user_agent)
+            RETURNING id
+            """, conn, tx))
+        {
+            insert.Parameters.AddWithValue("child_id", Convert.ToInt32(codeRow["childId"], CultureInfo.InvariantCulture));
+            insert.Parameters.AddWithValue("family_group_id", Convert.ToInt32(codeRow["familyGroupId"], CultureInfo.InvariantCulture));
+            insert.Parameters.AddWithValue("child_profile_key", Convert.ToString(codeRow["childProfileKey"], CultureInfo.InvariantCulture) ?? "");
+            insert.Parameters.AddWithValue("parent_app_user_id", Convert.ToString(codeRow["parentAppUserId"], CultureInfo.InvariantCulture) ?? "");
+            insert.Parameters.AddWithValue("device_token_hash", tokenHash);
+            insert.Parameters.AddWithValue("device_name", deviceName);
+            insert.Parameters.AddWithValue("platform", platform);
+            insert.Parameters.AddWithValue("user_agent", userAgent);
+            deviceId = Convert.ToInt32(await insert.ExecuteScalarAsync(), CultureInfo.InvariantCulture);
+        }
+
+        await using (var useCode = new NpgsqlCommand("UPDATE child_auth_codes SET used_at = CURRENT_TIMESTAMP WHERE id = @id", conn, tx))
+        {
+            useCode.Parameters.AddWithValue("id", Convert.ToInt32(codeRow["id"], CultureInfo.InvariantCulture));
+            await useCode.ExecuteNonQueryAsync();
+        }
+
+        await tx.CommitAsync();
+        return new Dictionary<string, object?>
+        {
+            ["deviceToken"] = token,
+            ["deviceId"] = deviceId,
+            ["child"] = new Dictionary<string, object?>
+            {
+                ["id"] = codeRow["childId"],
+                ["name"] = codeRow["childName"],
+                ["profileKey"] = codeRow["childProfileKey"]
+            },
+            ["familyGroupId"] = codeRow["familyGroupId"],
+            ["familyGroupName"] = codeRow["familyGroupName"]
+        };
+    }
+    catch (Exception ex)
+    {
+        await tx.RollbackAsync();
+        return new Dictionary<string, object?> { ["error"] = ex.Message };
+    }
+}
+
+static async Task<(WatchDeviceBinding? Binding, IResult? Error)> RequireWatchDeviceBinding(string connectionString, HttpRequest request, bool touch = true)
+{
+    var token = GetWatchDeviceToken(request);
+    if (string.IsNullOrWhiteSpace(token))
+    {
+        return (null, Results.Json(new { error = "请先输入儿童认证码绑定手表", code = "watch_device_required" }, statusCode: StatusCodes.Status401Unauthorized));
+    }
+
+    var tokenHash = HashSecret(token);
+    await using var conn = await OpenConnection(connectionString);
+    await using var cmd = new NpgsqlCommand("""
+        SELECT wdb.id, wdb.child_id, wdb.family_group_id, wdb.child_profile_key, wdb.parent_app_user_id,
+               wdb.device_token_hash, wdb.device_name, wdb.platform
+        FROM watch_device_bindings wdb
+        JOIN children c ON c.id = wdb.child_id AND c.family_group_id = wdb.family_group_id AND c.status = 'active'
+        WHERE wdb.device_token_hash = @token_hash
+          AND wdb.revoked_at IS NULL
+        """, conn);
+    cmd.Parameters.AddWithValue("token_hash", tokenHash);
+    await using var reader = await cmd.ExecuteReaderAsync();
+    if (!await reader.ReadAsync())
+    {
+        return (null, Results.Json(new { error = "手表绑定已失效，请重新输入认证码", code = "watch_device_invalid" }, statusCode: StatusCodes.Status401Unauthorized));
+    }
+
+    var binding = new WatchDeviceBinding(
+        reader.Int("id"),
+        reader.Int("child_id"),
+        reader.Int("family_group_id"),
+        reader.String("child_profile_key"),
+        reader.String("parent_app_user_id"),
+        reader.String("device_token_hash"),
+        reader.String("device_name"),
+        reader.String("platform"));
+    await reader.CloseAsync();
+
+    if (touch)
+    {
+        await using var touchCmd = new NpgsqlCommand("UPDATE watch_device_bindings SET last_seen_at = CURRENT_TIMESTAMP WHERE id = @id", conn);
+        touchCmd.Parameters.AddWithValue("id", binding.Id);
+        await touchCmd.ExecuteNonQueryAsync();
+    }
+
+    return (binding, null);
+}
+
+static async Task RevokeWatchDeviceByToken(string connectionString, string tokenHash)
+{
+    await using var conn = await OpenConnection(connectionString);
+    await using var cmd = new NpgsqlCommand("UPDATE watch_device_bindings SET revoked_at = CURRENT_TIMESTAMP WHERE device_token_hash = @token_hash AND revoked_at IS NULL", conn);
+    cmd.Parameters.AddWithValue("token_hash", tokenHash);
+    await cmd.ExecuteNonQueryAsync();
+}
+
+static async Task<Dictionary<string, object?>?> GetChildForFamily(NpgsqlConnection conn, NpgsqlTransaction? tx, int childId, int familyGroupId)
+{
+    await using var cmd = new NpgsqlCommand("""
+        SELECT c.id, c.family_group_id, fg.name AS family_group_name,
+               c.profile_key, c.name, c.status, c.note, c.created_at, c.updated_at,
+               COALESCE(a.points, 0) AS score,
+               COALESCE(a.cash_cny, 0) AS cash,
+               COALESCE(a.items_count, 0) AS items
+        FROM children c
+        LEFT JOIN family_groups fg ON fg.id = c.family_group_id
+        LEFT JOIN accounts a ON a.profile_key = c.profile_key
+        WHERE c.id = @child_id AND c.family_group_id = @family_group_id AND c.status = 'active'
+        """, conn, tx);
+    cmd.Parameters.AddWithValue("child_id", childId);
+    cmd.Parameters.AddWithValue("family_group_id", familyGroupId);
+    await using var reader = await cmd.ExecuteReaderAsync();
+    if (!await reader.ReadAsync())
+    {
+        return null;
+    }
+
+    return new Dictionary<string, object?>
+    {
+        ["id"] = reader.Int("id"),
+        ["familyGroupId"] = reader.Int("family_group_id"),
+        ["family_group_id"] = reader.Int("family_group_id"),
+        ["familyGroupName"] = reader.String("family_group_name"),
+        ["family_group_name"] = reader.String("family_group_name"),
+        ["profileKey"] = reader.String("profile_key"),
+        ["profile_key"] = reader.String("profile_key"),
+        ["name"] = reader.String("name"),
+        ["status"] = reader.String("status"),
+        ["note"] = reader.String("note"),
+        ["createdAt"] = reader.DateTime("created_at").ToString("O"),
+        ["updatedAt"] = reader.DateTime("updated_at").ToString("O"),
+        ["score"] = reader.Decimal("score"),
+        ["cash"] = reader.Decimal("cash"),
+        ["items"] = reader.Int("items")
+    };
+}
+
 static async Task<List<Dictionary<string, object?>>> GetWatchRewardRequests(string connectionString, int familyGroupId, int? childId, int limit, string? childProfileKey = null)
 {
     await using var conn = await OpenConnection(connectionString);
@@ -4128,6 +4483,22 @@ static Dictionary<string, object?> ReadWatchRewardRequest(IDataRecord reader) =>
     ["transaction_id"] = NullableInt(reader, "transaction_id")
 };
 
+static Dictionary<string, object?> ReadWatchDevice(IDataRecord reader) => new()
+{
+    ["id"] = reader.Int("id"),
+    ["childId"] = reader.Int("child_id"),
+    ["familyGroupId"] = reader.Int("family_group_id"),
+    ["childProfileKey"] = reader.String("child_profile_key"),
+    ["parentAppUserId"] = reader.String("parent_app_user_id"),
+    ["deviceName"] = reader.String("device_name"),
+    ["platform"] = reader.String("platform"),
+    ["userAgent"] = reader.String("user_agent"),
+    ["boundAt"] = reader.DateTime("bound_at").ToString("O"),
+    ["lastSeenAt"] = reader.DateTime("last_seen_at").ToString("O"),
+    ["revokedAt"] = NullableDateTimeString(reader, "revoked_at"),
+    ["active"] = NullableDateTimeString(reader, "revoked_at") is null
+};
+
 static Dictionary<string, object?> ReadTransaction(IDataRecord reader)
 {
     var type = reader.String("type");
@@ -4210,12 +4581,59 @@ static int GetInt(IReadOnlyDictionary<string, object?> row, string key) =>
 static decimal GetDecimal(IReadOnlyDictionary<string, object?> row, string key) =>
     Convert.ToDecimal(row[key], CultureInfo.InvariantCulture);
 
-static string FormatPoints(decimal points) =>
-    points == decimal.Truncate(points)
-        ? points.ToString("0", CultureInfo.InvariantCulture)
-        : points.ToString("0.##", CultureInfo.InvariantCulture);
+static string NormalizeAuthCode(string value) =>
+    new(value.Trim().Where(char.IsLetterOrDigit).Select(char.ToUpperInvariant).ToArray());
 
-static string Html(string value) => System.Net.WebUtility.HtmlEncode(value);
+static string GenerateAuthCode()
+{
+    const string alphabet = "23456789ABCDEFGHJKLMNPQRSTUVWXYZ";
+    Span<char> chars = stackalloc char[6];
+    for (var i = 0; i < chars.Length; i++)
+    {
+        chars[i] = alphabet[RandomNumberGenerator.GetInt32(alphabet.Length)];
+    }
+    return new string(chars);
+}
+
+static string GenerateDeviceToken()
+{
+    Span<byte> bytes = stackalloc byte[32];
+    RandomNumberGenerator.Fill(bytes);
+    return Convert.ToBase64String(bytes)
+        .TrimEnd('=')
+        .Replace('+', '-')
+        .Replace('/', '_');
+}
+
+static string HashSecret(string value)
+{
+    var bytes = SHA256.HashData(Encoding.UTF8.GetBytes(value));
+    return Convert.ToHexString(bytes).ToLowerInvariant();
+}
+
+static string GetWatchDeviceToken(HttpRequest request)
+{
+    if (request.Headers.TryGetValue("X-Watch-Device-Token", out var headerToken) && !string.IsNullOrWhiteSpace(headerToken.ToString()))
+    {
+        return headerToken.ToString().Trim();
+    }
+    if (request.Headers.TryGetValue("Authorization", out var authHeader))
+    {
+        var value = authHeader.ToString();
+        const string bearer = "Bearer ";
+        if (value.StartsWith(bearer, StringComparison.OrdinalIgnoreCase))
+        {
+            return value[bearer.Length..].Trim();
+        }
+    }
+    return request.Query.String("deviceToken").Trim();
+}
+
+static string Truncate(string value, int maxLength)
+{
+    value = value.Trim();
+    return value.Length <= maxLength ? value : value[..maxLength];
+}
 
 static int? NullableInt(IDataRecord reader, string name)
 {
@@ -4518,3 +4936,13 @@ public sealed record AppUserProfile(
     string? ChildProfileKey,
     int? ChildId,
     bool NeedsRole);
+
+public sealed record WatchDeviceBinding(
+    int Id,
+    int ChildId,
+    int FamilyGroupId,
+    string ChildProfileKey,
+    string ParentAppUserId,
+    string TokenHash,
+    string DeviceName,
+    string Platform);
