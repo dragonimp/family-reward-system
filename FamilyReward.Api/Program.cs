@@ -365,47 +365,74 @@ app.MapGet("/watch", () =>
           <link rel="icon" href="/watch/icon.svg" type="image/svg+xml">
           <title>手表积分</title>
           <style>
-            *{box-sizing:border-box}body{margin:0;background:#eef5ef;color:#17231b;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}.wrap{max-width:360px;margin:0 auto;padding:9px}header{display:flex;align-items:end;justify-content:space-between;gap:8px;margin:0 0 8px}h1{margin:0;font-size:21px;line-height:1.1}.time{margin:0;color:#5a6b61;font-size:11px}.stack{display:grid;gap:8px}.child-card{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:9px 10px;background:#fff;border:1px solid #d6e1d9;border-radius:8px}.name{font-size:17px;font-weight:800;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.sub{margin-top:2px;font-size:11px;color:#637269;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.score{font-size:27px;font-weight:900;color:#0c7a3a;white-space:nowrap}.score:after{content:"分";margin-left:2px;font-size:12px;color:#5a6b61}.panel{padding:9px;background:#fff;border:1px solid #d6e1d9;border-radius:8px}h2{margin:0 0 7px;font-size:15px}.rules{display:grid;grid-template-columns:1fr 1fr;gap:6px}.rule-btn{display:flex;align-items:center;justify-content:space-between;gap:5px;min-height:38px;padding:7px;border:1px solid #cfdcd3;border-radius:7px;background:#f8fbf9;color:#17231b;font-size:12px;text-align:left}.rule-btn span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.rule-btn b{color:#0c7a3a}label{display:block;margin:7px 0 3px;font-size:12px;color:#44544a}input,textarea{width:100%;border:1px solid #cbd8cf;border-radius:7px;background:#fff;padding:8px;font-size:15px;color:#17231b}textarea{min-height:52px;resize:vertical}.submit,.ghost{width:100%;margin-top:8px;border:0;border-radius:8px;padding:10px;font-size:16px;font-weight:800}.submit{background:#16643a;color:#fff}.ghost{background:#e7f0ea;color:#17462c}.msg{min-height:17px;margin:6px 0 0;font-size:12px;color:#16643a}.requests{list-style:none;margin:0;padding:0;display:grid;gap:5px}.requests li{display:flex;justify-content:space-between;gap:8px;border-top:1px solid #edf2ee;padding-top:5px;font-size:12px}.requests b{white-space:nowrap;color:#5f5221}.empty,.empty-row{color:#64746a;text-align:center;font-size:13px}.compact{padding:7px}.hint{margin:7px 0 0;color:#64746a;text-align:center;font-size:11px}.hidden{display:none}.code{text-align:center;letter-spacing:3px;font-size:22px;font-weight:900;text-transform:uppercase}@media(max-width:230px){.wrap{padding:7px}h1{font-size:18px}.score{font-size:22px}.rules{grid-template-columns:1fr}.panel{padding:8px}input,textarea{font-size:14px;padding:7px}}
+            *{box-sizing:border-box}body{min-height:100vh;margin:0;overflow-x:hidden;background:#dce8e2;color:#102019;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}.wrap{width:min(100vw,390px);margin:0 auto;padding:10px 9px}.watch-shell{position:relative;margin:0 auto;width:min(calc(100vw - 52px),346px);max-width:346px}.watch-face{position:relative;aspect-ratio:1/1;overflow:hidden;border-radius:50%;border:10px solid #17231b;background:#f9fbf7;box-shadow:0 12px 30px rgba(16,32,25,.2),inset 0 0 0 1px #cad7ce}.watch-face:before{content:"";position:absolute;inset:14px;border:1px solid #d8e2dc;border-radius:50%;pointer-events:none}.screen{position:absolute;inset:24px;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center}.topline{position:absolute;top:23px;left:58px;right:58px;display:flex;align-items:center;justify-content:center;gap:4px;color:#65736b;font-size:11px;white-space:nowrap}.brand{font-size:12px;font-weight:900;color:#245138;letter-spacing:0}.home-child{max-width:170px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:24px;font-weight:900}.home-group{max-width:178px;margin-top:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#637269;font-size:12px}.score-ring{display:grid;place-items:center;width:126px;height:126px;margin:10px 0 6px;border-radius:50%;border:7px solid #1f7a48;background:#fff}.score{max-width:100px;color:#0c6f3b;font-size:43px;font-weight:900;line-height:.95;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.unit{margin-top:4px;color:#5c6b62;font-size:12px;font-weight:800}.metric-row{display:grid;grid-template-columns:1fr 1fr;gap:6px;width:170px}.metric{min-width:0;border:1px solid #d7e1da;border-radius:8px;padding:5px 6px;background:#eef5f0}.metric b{display:block;color:#24352b;font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.metric span{display:block;margin-top:1px;color:#65736b;font-size:10px}.menu-dock{position:absolute;right:-3px;top:50%;z-index:3;display:grid;gap:6px;transform:translateY(-50%)}.menu-btn{display:grid;place-items:center;width:42px;height:42px;border:2px solid #17231b;border-radius:50%;background:#fff;color:#17231b;font-size:11px;font-weight:900;box-shadow:0 4px 10px rgba(16,32,25,.16)}.menu-btn.active{background:#1f7a48;color:#fff}.panel{display:none;width:205px;max-height:222px;overflow:auto;text-align:left}.panel.active{display:block}.panel[data-panel=home],#bind-panel .panel{text-align:center}.panel h1,.panel h2{margin:0 0 8px;text-align:center;font-size:18px;line-height:1.1}.bind-title{font-size:20px;font-weight:900}.bind-sub{margin:5px 0 10px;color:#65736b;font-size:12px}.rules{display:grid;gap:6px}.rule-btn{display:flex;align-items:center;justify-content:space-between;gap:6px;width:100%;min-height:34px;border:1px solid #d3ded7;border-radius:8px;background:#fff;color:#17231b;padding:6px 8px;font-size:12px;text-align:left}.rule-btn span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.rule-btn b{color:#0c6f3b;white-space:nowrap}label{display:block;margin:7px 0 3px;color:#44544a;font-size:11px;font-weight:700}input,textarea{width:100%;border:1px solid #cbd8cf;border-radius:8px;background:#fff;color:#17231b;padding:7px;font-size:14px}textarea{min-height:44px;resize:vertical}.submit,.ghost{width:100%;margin-top:8px;border:0;border-radius:8px;padding:9px;font-size:14px;font-weight:900}.submit{background:#1f7a48;color:#fff}.ghost{background:#e7efe9;color:#17462c}.msg{min-height:16px;margin:6px 0 0;text-align:center;color:#16643a;font-size:11px}.requests{list-style:none;margin:0;padding:0;display:grid;gap:5px}.requests li{display:grid;grid-template-columns:1fr auto;gap:6px;border-top:1px solid #e3ebe6;padding-top:5px;color:#25362c;font-size:11px}.requests span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.requests b{color:#71601b;white-space:nowrap}.empty,.empty-row{color:#64746a;text-align:center;font-size:12px}.code{text-align:center;letter-spacing:3px;font-size:22px;font-weight:900;text-transform:uppercase}.hidden{display:none!important}@media(max-width:260px){.wrap{padding:6px}.watch-face{border-width:8px}.screen{inset:20px}.topline{top:20px;left:48px;right:48px;font-size:10px}.home-child{font-size:20px}.score-ring{width:105px;height:105px}.score{font-size:35px}.metric-row{width:148px}.panel{width:176px;max-height:192px}.panel h1,.panel h2{font-size:16px}.menu-btn{width:35px;height:35px;font-size:10px}.rules{gap:4px}input,textarea{font-size:13px;padding:6px}}
           </style>
         </head>
         <body>
           <main class="wrap">
-            <header>
-              <h1>手表积分</h1>
-              <p class="time" id="updated-at"></p>
-            </header>
-            <section class="panel" id="bind-panel">
-              <h2>设备绑定</h2>
-              <form id="bind-form">
-                <label for="auth-code">儿童认证码</label>
-                <input id="auth-code" name="code" class="code" maxlength="12" autocomplete="one-time-code" placeholder="输入认证码">
-                <button class="submit" type="submit">绑定手表</button>
-                <p id="bind-msg" class="msg"></p>
-              </form>
-            </section>
-            <section class="stack hidden" id="children"></section>
-            <section class="panel hidden" id="request-panel">
-              <h2>申请领取</h2>
-              <form id="request-form">
-                <input type="hidden" name="rule_id" id="rule-id">
-                <label>常用奖励</label>
-                <div class="rules" id="rules"></div>
-                <label for="title">申请事项</label>
-                <input id="title" name="title" maxlength="80" placeholder="比如 好好吃饭">
-                <label for="points">积分</label>
-                <input id="points" name="points" inputmode="decimal" placeholder="比如 5">
-                <label for="note">说明</label>
-                <textarea id="note" name="note" maxlength="200" placeholder="可以写一句说明"></textarea>
-                <button class="submit" type="submit">提交申请</button>
-                <p id="msg" class="msg"></p>
-              </form>
-            </section>
-            <section class="panel hidden" id="requests-panel">
-              <h2>最近申请</h2>
-              <ul class="requests" id="requests"></ul>
-            </section>
-            <button class="ghost hidden" id="unbind" type="button">解除绑定</button>
-            <p class="hint">适配小天才、华为、小米等手表浏览器小屏访问</p>
+            <div class="watch-shell">
+              <div class="watch-face">
+                <div class="topline"><span class="brand">HappyLife</span><span id="updated-at"></span></div>
+                <section class="screen" id="bind-panel">
+                  <div class="panel active">
+                    <div class="bind-title">设备绑定</div>
+                    <p class="bind-sub">儿童认证码登录</p>
+                    <form id="bind-form">
+                      <label for="auth-code">认证码</label>
+                      <input id="auth-code" name="code" class="code" maxlength="12" autocomplete="one-time-code" placeholder="输入">
+                      <button class="submit" type="submit">绑定</button>
+                      <p id="bind-msg" class="msg"></p>
+                    </form>
+                  </div>
+                </section>
+                <section class="screen hidden" id="app-panel">
+                  <div class="panel active" data-panel="home">
+                    <div class="home-child" id="child-name">--</div>
+                    <div class="home-group" id="group-name">--</div>
+                    <div class="score-ring">
+                      <div><div class="score" id="score">0</div><div class="unit">积分</div></div>
+                    </div>
+                    <div class="metric-row">
+                      <div class="metric"><b id="cash">0</b><span>现金</span></div>
+                      <div class="metric"><b id="items">0</b><span>物品</span></div>
+                    </div>
+                  </div>
+                  <div class="panel" data-panel="request">
+                    <h2>申请奖励</h2>
+                    <form id="request-form">
+                      <input type="hidden" name="rule_id" id="rule-id">
+                      <div class="rules" id="rules"></div>
+                      <label for="title">申请事项</label>
+                      <input id="title" name="title" maxlength="80" placeholder="比如 好好吃饭">
+                      <label for="points">积分</label>
+                      <input id="points" name="points" inputmode="decimal" placeholder="比如 5">
+                      <label for="note">说明</label>
+                      <textarea id="note" name="note" maxlength="200" placeholder="可以写一句说明"></textarea>
+                      <button class="submit" type="submit">提交</button>
+                      <p id="msg" class="msg"></p>
+                    </form>
+                  </div>
+                  <div class="panel" data-panel="requests">
+                    <h2>最近申请</h2>
+                    <ul class="requests" id="requests"></ul>
+                  </div>
+                  <div class="panel" data-panel="device">
+                    <h2>设备</h2>
+                    <div class="requests">
+                      <li><span>绑定状态</span><b>已绑定</b></li>
+                      <li><span>设备</span><b id="device-id">--</b></li>
+                    </div>
+                    <button class="ghost" id="unbind" type="button">解除绑定</button>
+                  </div>
+                </section>
+              </div>
+              <nav class="menu-dock hidden" id="menu" aria-label="功能菜单">
+                <button class="menu-btn active" type="button" data-view="home">积分</button>
+                <button class="menu-btn" type="button" data-view="request">申请</button>
+                <button class="menu-btn" type="button" data-view="requests">记录</button>
+                <button class="menu-btn" type="button" data-view="device">设备</button>
+              </nav>
+            </div>
           </main>
           <script>
             const form = document.getElementById('request-form');
@@ -418,10 +445,12 @@ app.MapGet("/watch", () =>
             const escapeText = (value) => String(value || '').replace(/[&<>"']/g, (ch) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
             const showBound = (bound) => {
               document.getElementById('bind-panel').classList.toggle('hidden', bound);
-              document.getElementById('children').classList.toggle('hidden', !bound);
-              document.getElementById('request-panel').classList.toggle('hidden', !bound);
-              document.getElementById('requests-panel').classList.toggle('hidden', !bound);
-              document.getElementById('unbind').classList.toggle('hidden', !bound);
+              document.getElementById('app-panel').classList.toggle('hidden', !bound);
+              document.getElementById('menu').classList.toggle('hidden', !bound);
+            };
+            const setView = (view) => {
+              document.querySelectorAll('[data-panel]').forEach((panel) => panel.classList.toggle('active', panel.dataset.panel === view));
+              document.querySelectorAll('.menu-btn').forEach((button) => button.classList.toggle('active', button.dataset.view === view));
             };
             const fetchJson = async (url, options = {}) => {
               const response = await fetch(url, options);
@@ -438,16 +467,18 @@ app.MapGet("/watch", () =>
                   fetchJson('/api/watch/requests?limit=6', { headers: authHeaders() })
                 ]);
                 showBound(true);
-                document.getElementById('updated-at').textContent = new Date(score.updatedAt).toLocaleString('zh-CN', { hour12: false });
-                document.getElementById('children').innerHTML = (score.children || []).map((child) => `
-                  <article class="child-card">
-                    <div><div class="name">${escapeText(child.name)}</div><div class="sub">${escapeText(score.familyGroupName)}</div></div>
-                    <div class="score">${escapeText(child.points)}</div>
-                  </article>`).join('') || '<div class="empty">暂无孩子积分</div>';
+                const child = (score.children || [])[0] || {};
+                document.getElementById('updated-at').textContent = new Date(score.updatedAt).toLocaleTimeString('zh-CN', { hour12: false, hour: '2-digit', minute: '2-digit' });
+                document.getElementById('child-name').textContent = child.name || '暂无孩子';
+                document.getElementById('group-name').textContent = score.familyGroupName || '家庭积分';
+                document.getElementById('score').textContent = child.points ?? 0;
+                document.getElementById('cash').textContent = child.cash ?? 0;
+                document.getElementById('items').textContent = child.items ?? 0;
+                document.getElementById('device-id').textContent = '#' + escapeText(score.deviceId);
                 document.getElementById('rules').innerHTML = (rulesPayload.rules || []).slice(0, 8).map((rule) => `
                   <button type="button" class="rule-btn" data-rule-id="${rule.id}" data-points="${rule.points}" data-title="${escapeText(rule.name)}">
                     <span>${escapeText(rule.name)}</span><b>+${escapeText(rule.points)}</b>
-                  </button>`).join('') || '<div class="empty compact">暂无可申请规则</div>';
+                  </button>`).join('') || '<div class="empty">暂无可申请规则</div>';
                 document.querySelectorAll('.rule-btn').forEach((button) => {
                   button.addEventListener('click', () => {
                     document.getElementById('rule-id').value = button.dataset.ruleId || '';
@@ -494,6 +525,8 @@ app.MapGet("/watch", () =>
                 msg.textContent = '已提交，等待家长确认';
                 form.reset();
                 document.getElementById('rule-id').value = '';
+                await load();
+                setView('requests');
               } catch (error) {
                 msg.textContent = error.message || '提交失败';
               }
@@ -502,6 +535,9 @@ app.MapGet("/watch", () =>
               try { await fetch('/api/watch/device-unbind', { method: 'POST', headers: authHeaders() }); } catch {}
               localStorage.removeItem(tokenKey);
               location.reload();
+            });
+            document.querySelectorAll('.menu-btn').forEach((button) => {
+              button.addEventListener('click', () => setView(button.dataset.view || 'home'));
             });
             load();
           </script>
