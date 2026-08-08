@@ -23,6 +23,7 @@
 - `android/`：Android WebView 手表壳工程，可用于小米、华为以及 Android 系手表渠道打包。
 - `platforms/`：三家平台的上架适配配置和审核说明。
 - `store-listing/`：中文上架文案、权限说明、截图清单。
+- `RELEASE-CHECKLIST.md`：平台账号、签名、真机截图、合规资料和完成证据边界。
 - `scripts/verify-watch-app.mjs`：不依赖 Android SDK 的发布配置校验。
 
 ## 本地校验
@@ -47,4 +48,4 @@ dotnet build FamilyReward.slnx
 ./gradlew :app:assembleRelease
 ```
 
-本机当前没有 Gradle wrapper 和 Android SDK，因此仓库内以工程文件与配置校验作为可验证交付。
+工程会从上述四个环境变量读取 release 签名配置；缺少任一项时 release 构建会直接报错，避免误交未签名产物。仓库不提交 Gradle wrapper 二进制、真实证书或密码，发布环境需提供受控 Gradle/JDK/Android SDK 工具链。

@@ -18,7 +18,8 @@ const requiredFiles = [
   "platforms/xiaotiancai.json",
   "platforms/xiaomi.json",
   "platforms/huawei.json",
-  "store-listing/listing.zh-CN.md"
+  "store-listing/listing.zh-CN.md",
+  "RELEASE-CHECKLIST.md"
 ];
 const requiredRepoFiles = [
   "frontend/public/watch/manifest.json",
@@ -41,6 +42,8 @@ const buildGradle = read("android/app/build.gradle.kts");
 const manifest = read("android/app/src/main/AndroidManifest.xml");
 const mainActivity = read("android/app/src/main/java/net/impx/happylife/watch/MainActivity.java");
 const webManifest = JSON.parse(readRepo("frontend/public/watch/manifest.json"));
+const apiSource = readRepo("FamilyReward.Api/Program.cs");
+const releaseChecklist = read("RELEASE-CHECKLIST.md");
 
 if (!buildGradle.includes(`applicationId = "${config.packageId}"`)) {
   errors.push("applicationId does not match app-config.json");
@@ -62,8 +65,27 @@ for (const permission of config.permissions) {
 if (!mainActivity.includes("HappyLifeWatch/")) {
   errors.push("MainActivity missing HappyLifeWatch user agent marker");
 }
+for (const signingVariable of [
+  "HAPPYLIFE_WATCH_KEYSTORE",
+  "HAPPYLIFE_WATCH_KEY_ALIAS",
+  "HAPPYLIFE_WATCH_KEYSTORE_PASSWORD",
+  "HAPPYLIFE_WATCH_KEY_PASSWORD"
+]) {
+  if (!buildGradle.includes(signingVariable)) {
+    errors.push(`release signing missing environment variable: ${signingVariable}`);
+  }
+}
 if (webManifest.start_url !== config.startUrl) {
   errors.push("frontend public watch manifest start_url mismatch");
+}
+if (!apiSource.includes('app.MapGet("/watch/manifest.json"') ||
+    !apiSource.includes('app.MapGet("/api/watch/app-info"')) {
+  errors.push("API source missing online watch manifest or app-info route");
+}
+for (const feature of ["积分查询", "积分申请", "儿童认证码设备绑定"]) {
+  if (!apiSource.includes(feature)) {
+    errors.push(`API app-info missing watch feature: ${feature}`);
+  }
 }
 
 for (const platform of config.platforms) {
@@ -73,6 +95,18 @@ for (const platform of config.platforms) {
   }
   if (!platformConfig.entryUrl.includes("source=watch-app")) {
     errors.push(`${platform}.json entryUrl missing watch-app source`);
+  }
+  if (platformConfig.targetAudience !== "child") {
+    errors.push(`${platform}.json targetAudience must be child`);
+  }
+  if (!Array.isArray(platformConfig.submitBlockers) || platformConfig.submitBlockers.length < 3) {
+    errors.push(`${platform}.json submitBlockers is incomplete`);
+  }
+}
+
+for (const boundary of ["平台账号与准入", "签名与构建", "真机验收与截图边界", "平台后台资料"]) {
+  if (!releaseChecklist.includes(boundary)) {
+    errors.push(`release checklist missing section: ${boundary}`);
   }
 }
 
