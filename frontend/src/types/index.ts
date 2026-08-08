@@ -43,6 +43,13 @@ export interface ChildWatchDevices {
   devices: WatchDeviceBinding[];
 }
 
+export interface WatchDeviceUnbindCode {
+  code: string;
+  deviceId: number;
+  expiresAt: string;
+  expiresInMinutes: number;
+}
+
 export interface FamilyGroup {
   id: number;
   name: string;
@@ -56,8 +63,16 @@ export interface FamilyGroup {
 export interface FamilyGroupInvite {
   familyGroupId: number;
   familyGroupName: string;
+  inviteCode: string;
   inviteUrl: string;
   qrImageUrl: string;
+}
+
+export interface JoinFamilyGroupResult {
+  ok: boolean;
+  familyGroupId: number;
+  familyGroupName: string;
+  linkedChildCount: number;
 }
 
 // 交易记录类型

@@ -44,6 +44,11 @@ const mainActivity = read("android/app/src/main/java/net/impx/happylife/watch/Ma
 const webManifest = JSON.parse(readRepo("frontend/public/watch/manifest.json"));
 const apiSource = readRepo("FamilyReward.Api/Program.cs");
 const releaseChecklist = read("RELEASE-CHECKLIST.md");
+const formatPoints = (value) => Number(value).toLocaleString("zh-CN", {
+  useGrouping: false,
+  minimumFractionDigits: 0,
+  maximumFractionDigits: 1
+});
 
 if (!buildGradle.includes(`applicationId = "${config.packageId}"`)) {
   errors.push("applicationId does not match app-config.json");
@@ -64,6 +69,33 @@ for (const permission of config.permissions) {
 }
 if (!mainActivity.includes("HappyLifeWatch/")) {
   errors.push("MainActivity missing HappyLifeWatch user agent marker");
+}
+if (apiSource.includes('id="group-name"') || apiSource.includes("getElementById('group-name')")) {
+  errors.push("watch score page must not display the family group");
+}
+if (!apiSource.includes("const formatPoints = (value)") ||
+    !apiSource.includes("maximumFractionDigits: 1") ||
+    !apiSource.includes("font-variant-numeric:tabular-nums") ||
+    !apiSource.includes("document.getElementById('score').textContent = formatPoints(child.points)")) {
+  errors.push("watch score page does not support a four-digit score with one decimal place");
+}
+if (formatPoints(9999.9) !== "9999.9") {
+  errors.push("watch score formatter failed the 9999.9 regression case");
+}
+for (const unbindRequirement of [
+  'app.MapPost("/api/watch/device-unbind", async (JsonObject body, HttpRequest request)',
+  'app.MapPost("/api/children/{id:int}/devices/{deviceId:int}/unbind-code"',
+  "CREATE TABLE IF NOT EXISTS watch_device_unbind_codes",
+  "UnbindWatchDeviceWithCode",
+  'id="unbind-code"',
+  "解绑认证码无效或已过期"
+]) {
+  if (!apiSource.includes(unbindRequirement)) {
+    errors.push(`watch unbind authorization missing: ${unbindRequirement}`);
+  }
+}
+if (apiSource.includes("RevokeWatchDeviceByToken")) {
+  errors.push("watch must not unbind using the device token alone");
 }
 for (const signingVariable of [
   "HAPPYLIFE_WATCH_KEYSTORE",

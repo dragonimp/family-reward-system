@@ -1,13 +1,14 @@
 import http from './api';
 import type { Child } from '../types';
-import type { FamilyGroup, FamilyGroupInvite } from '../types';
-import type { ChildAuthCode, ChildWatchDevices } from '../types';
+import type { FamilyGroup, FamilyGroupInvite, JoinFamilyGroupResult } from '../types';
+import type { ChildAuthCode, ChildWatchDevices, WatchDeviceUnbindCode } from '../types';
 import type { AgentInvokeRequest, AgentInvokeResponse, RewardParseRequest, RewardParseResponse, SystemConfig } from '../types';
 
 export const getFamilyGroups = (params?: { userId?: string }) => http.get<unknown, FamilyGroup[]>('/api/family-groups', { params });
 export const createFamilyGroup = (data: Partial<FamilyGroup> & { userId?: string }) => http.post<unknown, FamilyGroup>('/api/family-groups', data);
 export const getFamilyGroupInvite = (id: number) => http.get<unknown, FamilyGroupInvite>(`/api/family-groups/${id}/invite`);
-export const joinFamilyGroup = (data: { familyGroupId: number; userId?: string; role?: string; childId?: number }) => http.post('/api/family-groups/join', data);
+export const joinFamilyGroup = (data: { inviteCode: string }) =>
+  http.post<unknown, JoinFamilyGroupResult>('/api/family-groups/join', data);
 export const linkFamilyGroupUser = (id: number, data: { userId: string; role?: string }) => http.put(`/api/family-groups/${id}/users`, data);
 
 export const getChildren = (params?: { familyGroupId?: number; userId?: string }) => http.get('/api/children', { params });
@@ -21,6 +22,11 @@ export const getChildWatchDevices = (id: number, params?: { familyGroupId?: numb
   http.get<unknown, ChildWatchDevices>(`/api/children/${id}/devices`, { params });
 export const revokeChildWatchDevice = (childId: number, deviceId: number, params?: { familyGroupId?: number }) =>
   http.delete(`/api/children/${childId}/devices/${deviceId}`, { params });
+export const generateWatchDeviceUnbindCode = (
+  childId: number,
+  deviceId: number,
+  data?: { familyGroupId?: number; expiresInMinutes?: number },
+) => http.post<unknown, WatchDeviceUnbindCode>(`/api/children/${childId}/devices/${deviceId}/unbind-code`, data || {});
 
 export const getTransactions = (params: any) => http.get('/api/transactions', { params });
 export const createTransaction = (data: any) => http.post('/api/transactions', data);

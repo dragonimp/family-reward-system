@@ -8,8 +8,8 @@ DEFAULT_LIBRARY_JSON="$SCRIPT_DIR/../application/mcp/family-reward-mcp-tool-libr
 
 FAMILY_POINTS_MCP_TOKEN="${FAMILY_POINTS_MCP_TOKEN:-}"
 FAMILY_POINTS_MCP_TOOL_KEY="${FAMILY_POINTS_MCP_TOOL_KEY:-family-reward-mcp}"
-FAMILY_POINTS_MCP_NAME="${FAMILY_POINTS_MCP_NAME:-家庭积分系统 MCP 服务（按工具拆分）}"
-FAMILY_POINTS_MCP_DESC="${FAMILY_POINTS_MCP_DESC:-家庭积分系统 MCP：提供孩子、积分、记录、规则、家庭组等独立工具（family_reward_*）。}"
+FAMILY_POINTS_MCP_NAME="${FAMILY_POINTS_MCP_NAME:-家加分 MCP 服务（按工具拆分）}"
+FAMILY_POINTS_MCP_DESC="${FAMILY_POINTS_MCP_DESC:-家加分 MCP：提供孩子、积分、记录、规则、家庭组等独立工具（family_reward_*）。}"
 
 FAMILY_POINTS_MCP_URL="${FAMILY_POINTS_MCP_URL:-}"
 FAMILY_POINTS_MCP_SERVERS="${FAMILY_POINTS_MCP_SERVERS:-}"
@@ -54,7 +54,7 @@ if [ -z "$FAMILY_POINTS_MCP_SERVERS" ] && [ -z "$FAMILY_POINTS_MCP_URL" ]; then
   bash scripts/install-family-rewards-mcp-tool.sh
 
 示例（服务拆分后手工多服务）：
-  export FAMILY_POINTS_MCP_SERVERS=$'https://happylife.ai.impx.net/api/mcp|family-reward-mcp|家庭积分系统 MCP 服务（按工具拆分）|家庭积分系统 MCP：提供孩子、积分、记录、规则、家庭组等独立工具（family_reward_*）。|'
+  export FAMILY_POINTS_MCP_SERVERS=$'https://happylife.ai.impx.net/api/mcp|family-reward-mcp|家加分 MCP 服务（按工具拆分）|家加分 MCP：提供孩子、积分、记录、规则、家庭组等独立工具（family_reward_*）。|'
   bash scripts/install-family-rewards-mcp-tool.sh
 EOF
   exit 1
@@ -125,7 +125,7 @@ while IFS= read -r line; do
   token="${token:-$FAMILY_POINTS_MCP_TOKEN}"
 
   write_tool_json "$GOLDFISH_HOME/tools/$key" "$name" "$key" "$desc" "$url" "$token"
-  echo "家庭积分 MCP 工具已写入: $GOLDFISH_HOME/tools/$key/tool.json"
+  echo "家加分 MCP 工具已写入: $GOLDFISH_HOME/tools/$key/tool.json"
 
   if command -v jq >/dev/null 2>&1; then
     jq -cn --arg key "$key" --arg name "$name" '{Id: 0, ToolKey: $key, Name: $name, ToolType: "mcp", McpToolIds: []}' >> "$TOOL_ID_ENTRIES_FILE"
@@ -163,7 +163,7 @@ if [ ! -f "$TOOL_ID_FILE" ]; then
     done
     printf ']\n'
   } > "$TOOL_ID_FILE"
-  echo "已创建 ${TOOL_ID_FILE}，并自动包含家庭积分 MCP 工具引用。"
+  echo "已创建 ${TOOL_ID_FILE}，并自动包含家加分 MCP 工具引用。"
 elif [ "${#pending_tool_keys[@]}" -gt 0 ]; then
   if command -v jq >/dev/null 2>&1 && [ -s "$TOOL_ID_ENTRIES_FILE" ]; then
     tmp_file="$(mktemp)"
@@ -180,7 +180,7 @@ elif [ "${#pending_tool_keys[@]}" -gt 0 ]; then
         )
     ' "$TOOL_ID_FILE" "$TOOL_ID_ENTRIES_FILE" > "$tmp_file"
     mv "$tmp_file" "$TOOL_ID_FILE"
-    echo "已更新 ${TOOL_ID_FILE}，并包含家庭积分 MCP 工具引用。"
+    echo "已更新 ${TOOL_ID_FILE}，并包含家加分 MCP 工具引用。"
   else
     echo "${TOOL_ID_FILE} 已存在，未执行覆盖。请手动追加以下条目："
     for key in "${pending_tool_keys[@]}"; do

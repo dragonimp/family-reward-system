@@ -2,8 +2,8 @@
   "services": [
     {
       "name": "family-reward-mcp",
-      "title": "家庭积分系统 MCP 服务（能力拆分）",
-      "description": "家庭积分系统 MCP：查询孩子列表时优先使用 family_reward_list_children；单孩查询未命中时必须再查完整孩子清单并比较用户输入；查询孩子积分清单使用 family_reward_query_score。",
+      "title": "家加分 MCP 服务（能力拆分）",
+      "description": "家加分 MCP：查询孩子列表时优先使用 family_reward_list_children；单孩查询未命中时必须再查完整孩子清单并比较用户输入；查询孩子积分清单使用 family_reward_query_score。",
       "baseUrl": "https://happylife.ai.impx.net",
       "mcpEndpoint": "/api/mcp",
       "httpEndpoint": "https://happylife.ai.impx.net/api/mcp",

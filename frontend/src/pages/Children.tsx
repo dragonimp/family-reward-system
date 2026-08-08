@@ -13,6 +13,7 @@ import {
   generateChildAuthCode,
   getChildWatchDevices,
   revokeChildWatchDevice,
+  generateWatchDeviceUnbindCode,
 } from '../services';
 import { useAuth } from '../contexts/AuthContext';
 import { useFamilyGroup } from '../contexts/FamilyGroupContext';
@@ -38,6 +39,7 @@ export default function Children() {
   const [deviceChild, setDeviceChild] = useState<Child | null>(null);
   const [authCode, setAuthCode] = useState<{ code: string; expiresAt: string } | null>(null);
   const [devices, setDevices] = useState<WatchDeviceBinding[]>([]);
+  const [unbindCode, setUnbindCode] = useState<{ code: string; deviceId: number; expiresAt: string } | null>(null);
   const [deviceLoading, setDeviceLoading] = useState(false);
   const [toast, setToast] = useState<{ show: boolean; message: string; type: 'success' | 'error' }>({ show: false, message: '', type: 'success' });
 
@@ -144,6 +146,7 @@ export default function Children() {
   const openDeviceModal = async (child: Child) => {
     setDeviceChild(child);
     setAuthCode(null);
+    setUnbindCode(null);
     setDevices([]);
     setDeviceLoading(true);
     try {
@@ -186,6 +189,24 @@ export default function Children() {
     } catch (error) {
       console.error('设备解绑失败:', error);
       showToast('设备解绑失败', 'error');
+    } finally {
+      setDeviceLoading(false);
+    }
+  };
+
+  const handleGenerateUnbindCode = async (deviceId: number) => {
+    if (!deviceChild) return;
+    setDeviceLoading(true);
+    try {
+      const result = await generateWatchDeviceUnbindCode(deviceChild.id, deviceId, {
+        familyGroupId: selectedGroupId ?? undefined,
+        expiresInMinutes: 10,
+      });
+      setUnbindCode({ code: result.code, deviceId: result.deviceId, expiresAt: result.expiresAt });
+      showToast('解绑认证码已生成');
+    } catch (error) {
+      console.error('解绑认证码生成失败:', error);
+      showToast('解绑认证码生成失败', 'error');
     } finally {
       setDeviceLoading(false);
     }
@@ -395,6 +416,16 @@ export default function Children() {
             </div>
           )}
 
+          {unbindCode && (
+            <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-center">
+              <div className="text-sm text-amber-700">设备 #{unbindCode.deviceId} 解绑认证码</div>
+              <div className="mt-2 text-3xl font-black tracking-[0.25em] text-amber-900">{unbindCode.code}</div>
+              <div className="mt-2 text-xs text-amber-700">
+                请在对应手表端输入；有效期至 {new Date(unbindCode.expiresAt).toLocaleString('zh-CN', { hour12: false })}，使用后立即失效
+              </div>
+            </div>
+          )}
+
           <div>
             <div className="mb-2 text-sm font-medium text-gray-700">已绑定设备</div>
             {deviceLoading ? (
@@ -413,9 +444,14 @@ export default function Children() {
                       </div>
                     </div>
                     {!device.revokedAt && (
-                      <button onClick={() => handleRevokeDevice(device.id)} className="shrink-0 text-sm font-medium text-[#E74C3C] hover:text-red-700">
-                        解绑
-                      </button>
+                      <div className="flex shrink-0 flex-col items-end gap-1">
+                        <button onClick={() => handleGenerateUnbindCode(device.id)} className="text-sm font-medium text-amber-700 hover:text-amber-900">
+                          生成解绑码
+                        </button>
+                        <button onClick={() => handleRevokeDevice(device.id)} className="text-xs font-medium text-[#E74C3C] hover:text-red-700">
+                          家长直接解绑
+                        </button>
+                      </div>
                     )}
                   </div>
                 ))}

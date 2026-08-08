@@ -32,7 +32,7 @@ export default function Identity() {
       <div className="mx-auto max-w-3xl">
         <div className="mb-6">
           <h1 className="text-2xl font-bold text-gray-900">选择身份</h1>
-          <p className="mt-2 text-sm text-gray-500">{displayName}，请选择这次使用 HappyLife 的身份。</p>
+          <p className="mt-2 text-sm text-gray-500">{displayName}，请选择这次使用家加分的身份。</p>
         </div>
 
         {error && (

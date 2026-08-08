@@ -1,6 +1,6 @@
-## 家庭积分 MCP 工具配置（Goldfish）
+## 家加分 MCP 工具配置（Goldfish）
 
-用于把家庭积分系统 MCP 工具接入 Goldfish 的本地 `.goldfish` 配置。
+用于把家加分 MCP 工具接入 Goldfish 的本地 `.goldfish` 配置。
 
 ### 1) 配置参数
 
@@ -8,7 +8,7 @@
 - `FAMILY_POINTS_MCP_URL`（可选）：MCP 服务 URL，例如 `https://happylife.ai.impx.net/api/mcp`。
 - `FAMILY_POINTS_MCP_TOKEN`（可选）：MCP 访问令牌。
 - `FAMILY_POINTS_MCP_TOOL_KEY`（可选）：默认 `family-reward-mcp`。
-- `FAMILY_POINTS_MCP_NAME`（可选）：默认 `家庭积分系统 MCP 服务（按工具拆分）`。
+- `FAMILY_POINTS_MCP_NAME`（可选）：默认 `家加分 MCP 服务（按工具拆分）`。
 - `FAMILY_POINTS_MCP_DESC`（可选）：工具描述，默认包含孩子、积分、记录、规则、家庭组等独立工具。
 - `FAMILY_POINTS_MCP_SERVERS`（可选）：服务拆分后使用。每行一条，格式：
   `url|toolKey|name|description|token`
@@ -30,7 +30,7 @@ bash scripts/install-family-rewards-mcp-tool.sh
 
 ```bash
 # 手工多服务（当你不想走库文件时）
-export FAMILY_POINTS_MCP_SERVERS=$'https://happylife.ai.impx.net/api/mcp|family-reward-mcp|家庭积分系统 MCP 服务（按工具拆分）|家庭积分系统 MCP：提供孩子、积分、记录、规则、家庭组等独立工具（family_reward_*）。|'
+export FAMILY_POINTS_MCP_SERVERS=$'https://happylife.ai.impx.net/api/mcp|family-reward-mcp|家加分 MCP 服务（按工具拆分）|家加分 MCP：提供孩子、积分、记录、规则、家庭组等独立工具（family_reward_*）。|'
 bash scripts/install-family-rewards-mcp-tool.sh
 ```
 

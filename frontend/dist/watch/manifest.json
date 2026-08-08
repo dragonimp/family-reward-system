@@ -1,8 +1,8 @@
 {
   "id": "/watch",
-  "name": "HappyLife 手表积分",
+  "name": "家加分手表积分",
   "short_name": "手表积分",
-  "description": "给孩子在手表端查询积分和提交积分申请的 HappyLife 手表应用。",
+  "description": "给孩子在手表端查询积分和提交积分申请的家加分手表应用。",
   "lang": "zh-CN",
   "start_url": "https://happylife.ai.impx.net/watch?source=watch-app",
   "scope": "https://happylife.ai.impx.net/watch",

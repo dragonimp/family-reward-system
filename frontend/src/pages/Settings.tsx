@@ -16,7 +16,7 @@ const defaultConfig: SystemConfig = {
     apiKey: '',
     model: 'gpt-4o-mini',
     timeout_seconds: 20,
-    systemPrompt: '你是家庭积分系统智能助手，输出简短可执行建议。',
+    systemPrompt: '你是家加分智能助手，输出简短可执行建议。',
   },
 };
 

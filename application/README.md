@@ -1,11 +1,11 @@
-# Goldfish 工具库接入（家庭积分系统）
+# Goldfish 工具库接入（家加分）
 
 本目录用于放置可直接导入 Goldfish 的智能体工具库配置。
 
 ## MCP 服务信息
 
 - 服务名称：`family-reward-mcp`
-- 服务说明：`家庭积分系统 MCP 服务（按工具拆分）`
+- 服务说明：`家加分 MCP 服务（按工具拆分）`
 - MCP 接口地址：`https://happylife.ai.impx.net/api/mcp`
 - 支持方法：`initialize`、`initialized`、`notifications/initialized`、`ping`、`tools/list`、`tools/call`
 - 独立工具名（可直接用于 `tools/call`）：

@@ -1,9 +1,9 @@
 {
-  "name": "家庭奖励管理系统",
+  "name": "家加分",
   "version": "1.0.0",
   "buildDate": "2026-05-29T16:30:07.664498+08:00",
   "buildNumber": 1,
-  "description": "家庭奖励管理系统 v1.0.0",
+  "description": "家加分 v1.0.0",
   "techStack": [
     "Python",
     "FastAPI/HTTP",

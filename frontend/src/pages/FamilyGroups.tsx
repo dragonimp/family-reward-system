@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Card, StatCard } from '../components/Card';
-import { createFamilyGroup, getChildren, getFamilyGroupInvite, joinFamilyGroup } from '../services';
+import { createFamilyGroup, getFamilyGroupInvite, joinFamilyGroup } from '../services';
 import { useAuth } from '../contexts/AuthContext';
 import { useFamilyGroup } from '../contexts/FamilyGroupContext';
-import type { Child, FamilyGroupInvite } from '../types';
+import type { FamilyGroupInvite } from '../types';
 
 export default function FamilyGroups() {
   const { userId } = useAuth();
@@ -20,9 +20,7 @@ export default function FamilyGroups() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [newName, setNewName] = useState('');
   const [newDescription, setNewDescription] = useState('');
-  const [joinGroupId, setJoinGroupId] = useState(searchParams.get('joinFamilyGroupId') || '');
-  const [joinChildId, setJoinChildId] = useState('');
-  const [children, setChildren] = useState<Child[]>([]);
+  const [joinInviteCode, setJoinInviteCode] = useState(searchParams.get('inviteCode') || '');
   const [invite, setInvite] = useState<FamilyGroupInvite | null>(null);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
@@ -56,26 +54,6 @@ export default function FamilyGroups() {
     };
   }, [selectedGroupId]);
 
-  useEffect(() => {
-    if (!selectedGroupId) {
-      setChildren([]);
-      return;
-    }
-
-    let cancelled = false;
-    getChildren({ familyGroupId: selectedGroupId, userId: userId || undefined })
-      .then((payload) => {
-        if (!cancelled) setChildren(Array.isArray(payload) ? payload : (payload as any)?.data || []);
-      })
-      .catch(() => {
-        if (!cancelled) setChildren([]);
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [selectedGroupId, userId]);
-
   const handleCreate = async () => {
     const trimmed = newName.trim();
     if (!trimmed) {
@@ -104,25 +82,21 @@ export default function FamilyGroups() {
   };
 
   const handleJoin = async () => {
-    const id = Number.parseInt(joinGroupId, 10);
-    if (!Number.isFinite(id) || id <= 0) {
-      setMessage('请输入有效的家庭组 ID');
+    const inviteCode = joinInviteCode.replace(/\D/g, '');
+    if (inviteCode.length !== 8) {
+      setMessage('请输入 8 位数字邀请码');
       return;
     }
 
     try {
       setBusy(true);
       setMessage('');
-      await joinFamilyGroup({
-        familyGroupId: id,
-        userId: userId || undefined,
-        role: 'member',
-        childId: joinChildId ? Number.parseInt(joinChildId, 10) : undefined,
-      });
+      const joined = await joinFamilyGroup({ inviteCode });
       await refreshGroups();
-      selectGroup(id);
+      selectGroup(joined.familyGroupId);
       setSearchParams({});
-      setMessage(joinChildId ? '已将孩子绑定到家庭组' : '已加入家庭组');
+      setJoinInviteCode('');
+      setMessage(`已加入「${joined.familyGroupName}」，同步名下孩子 ${joined.linkedChildCount} 名`);
     } catch (err) {
       setMessage(err instanceof Error ? err.message : '加入家庭组失败');
     } finally {
@@ -131,12 +105,12 @@ export default function FamilyGroups() {
   };
 
   const handleCopyInvite = async () => {
-    if (!invite?.inviteUrl) return;
+    if (!invite?.inviteCode) return;
     try {
-      await navigator.clipboard.writeText(invite.inviteUrl);
-      setMessage('邀请链接已复制');
+      await navigator.clipboard.writeText(invite.inviteCode);
+      setMessage('邀请码已复制');
     } catch {
-      setMessage(invite.inviteUrl);
+      setMessage(`邀请码：${invite.inviteCode}`);
     }
   };
 
@@ -231,24 +205,14 @@ export default function FamilyGroups() {
             <h3 className="text-lg font-semibold text-gray-900 mb-4">加入家庭组</h3>
             <div className="space-y-3">
               <input
-                value={joinGroupId}
-                onChange={(event) => setJoinGroupId(event.target.value)}
+                value={joinInviteCode}
+                onChange={(event) => setJoinInviteCode(event.target.value.replace(/\D/g, '').slice(0, 8))}
                 inputMode="numeric"
-                placeholder="输入家庭组 ID"
+                maxLength={8}
+                placeholder="输入 8 位数字邀请码"
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4A90D9]"
               />
-              <select
-                value={joinChildId}
-                onChange={(event) => setJoinChildId(event.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4A90D9]"
-              >
-                <option value="">仅加入家长账号</option>
-                {children.map((child) => (
-                  <option key={child.id} value={child.id}>
-                    绑定孩子：{child.name}
-                  </option>
-                ))}
-              </select>
+              <p className="text-xs text-gray-500">加入后会自动把你名下的全部孩子同步到该家庭组。</p>
               <button disabled={busy} onClick={handleJoin} className="btn-primary w-full">
                 加入家庭组
               </button>
@@ -257,10 +221,11 @@ export default function FamilyGroups() {
 
           <Card className="p-5">
             <h3 className="text-lg font-semibold text-gray-900 mb-4">邀请</h3>
-            {invite ? (
+            {selectedGroup && (selectedGroup.role === 'owner' || selectedGroup.createdBy === userId) && invite ? (
               <div className="space-y-3">
-                <div className="rounded-lg border border-gray-200 bg-gray-50 p-3 break-all text-sm text-gray-700">
-                  {invite.inviteUrl}
+                <div className="rounded-lg border border-blue-200 bg-blue-50 p-4 text-center">
+                  <p className="text-xs text-blue-600 mb-1">8 位家庭邀请码</p>
+                  <p className="text-3xl font-bold tracking-[0.28em] text-blue-800">{invite.inviteCode}</p>
                 </div>
                 <div className="flex justify-center rounded-lg border border-gray-200 bg-white p-3">
                   <img src={invite.qrImageUrl} alt="邀请二维码" className="h-40 w-40" />
@@ -269,11 +234,14 @@ export default function FamilyGroups() {
                   onClick={handleCopyInvite}
                   className="w-full rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
                 >
-                  复制邀请链接
+                  复制邀请码
                 </button>
+                <p className="break-all text-xs text-gray-400">邀请链接：{invite.inviteUrl}</p>
               </div>
             ) : (
-              <div className="text-sm text-gray-400">请选择一个家庭组</div>
+              <div className="text-sm text-gray-400">
+                {selectedGroup ? '只有家庭组管理员可以生成邀请码' : '请选择一个家庭组'}
+              </div>
             )}
           </Card>
         </div>

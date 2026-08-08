@@ -1,5 +1,5 @@
-# family-reward-system
-家庭奖励管理系统 — 管理孩子积分现金物品奖励
+# 家加分
+家加分 — 管理孩子积分、现金和物品奖励
 
 ## 技术栈
 - 后端：ASP.NET Core 10 Minimal API

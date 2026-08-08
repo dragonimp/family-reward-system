@@ -171,19 +171,21 @@ app.MapGet("/api/family-groups/{id:int}/invite", async (int id, HttpRequest requ
 {
     var access = await RequireParentProfile(connectionString, request);
     if (access.Error is not null) return access.Error;
-    var groups = await GetFamilyGroups(connectionString, access.Profile!.AppUserId);
-    var group = groups.FirstOrDefault(item => GetInt(item, "id") == id);
-    if (group is null)
+    var invite = await GetOrCreateFamilyGroupInvite(connectionString, id, access.Profile!.AppUserId);
+    if (!invite.Success)
     {
-        return Results.NotFound(new { error = "家庭组不存在" });
+        return invite.Forbidden
+            ? Results.Json(new { error = invite.Error }, statusCode: StatusCodes.Status403Forbidden)
+            : Results.NotFound(new { error = invite.Error });
     }
 
     var origin = $"{request.Scheme}://{request.Host}";
-    var inviteUrl = $"{origin}/family-groups?joinFamilyGroupId={id}";
+    var inviteUrl = $"{origin}/family-groups?inviteCode={invite.InviteCode}";
     return Results.Json(new
     {
         familyGroupId = id,
-        familyGroupName = Convert.ToString(group["name"], CultureInfo.InvariantCulture) ?? "",
+        familyGroupName = invite.FamilyGroupName,
+        inviteCode = invite.InviteCode,
         inviteUrl,
         qrImageUrl = $"https://api.qrserver.com/v1/create-qr-code/?size=180x180&data={Uri.EscapeDataString(inviteUrl)}"
     });
@@ -193,32 +195,27 @@ app.MapPost("/api/family-groups/join", async (JsonObject body, HttpRequest reque
 {
     var access = await RequireParentProfile(connectionString, request);
     if (access.Error is not null) return access.Error;
-    var familyGroupId = body.Int("family_group_id") ?? body.Int("familyGroupId");
-    if (familyGroupId is null)
+    var inviteCode = body.String("invite_code");
+    if (string.IsNullOrWhiteSpace(inviteCode))
     {
-        return Results.BadRequest(new { error = "缺少 familyGroupId" });
+        inviteCode = body.String("inviteCode");
+    }
+    inviteCode = NormalizeFamilyGroupInviteCode(inviteCode);
+    if (inviteCode.Length != 8 || inviteCode.Any(ch => !char.IsAsciiDigit(ch)))
+    {
+        return Results.BadRequest(new { error = "请输入 8 位数字邀请码" });
     }
 
-    var userId = body.String("user_id");
-    if (string.IsNullOrWhiteSpace(userId))
-    {
-        userId = body.String("userId");
-    }
-    if (string.IsNullOrWhiteSpace(userId))
-    {
-        userId = access.Profile!.AppUserId;
-    }
-
-    var childId = body.Int("child_id") ?? body.Int("childId");
-    if (childId is not null)
-    {
-        var childLinked = await LinkChildToFamilyGroup(connectionString, childId.Value, familyGroupId.Value, access.Profile!.AppUserId);
-        return childLinked.ContainsKey("error") ? Results.BadRequest(childLinked) : Results.Json(childLinked);
-    }
-
-    var role = body.String("role", "member");
-    var linked = await UpsertFamilyGroupUser(connectionString, familyGroupId.Value, userId, role);
-    return linked ? Results.Json(new { ok = true }) : Results.NotFound(new { error = "家庭组不存在" });
+    var joined = await JoinFamilyGroupByInviteCode(connectionString, inviteCode, access.Profile!.AppUserId);
+    return joined.Success
+        ? Results.Json(new
+        {
+            ok = true,
+            familyGroupId = joined.FamilyGroupId,
+            familyGroupName = joined.FamilyGroupName,
+            linkedChildCount = joined.LinkedChildCount
+        })
+        : Results.NotFound(new { error = joined.Error });
 });
 
 app.MapPut("/api/family-groups/{id:int}/users", async (int id, JsonObject body, HttpRequest request) =>
@@ -334,12 +331,12 @@ app.MapPost("/api/watch/device-bind", async (JsonObject body, HttpRequest reques
     return result.ContainsKey("error") ? Results.BadRequest(result) : Results.Json(result);
 });
 
-app.MapPost("/api/watch/device-unbind", async (HttpRequest request) =>
+app.MapPost("/api/watch/device-unbind", async (JsonObject body, HttpRequest request) =>
 {
     var binding = await RequireWatchDeviceBinding(connectionString, request, touch: false);
     if (binding.Error is not null) return binding.Error;
-    await RevokeWatchDeviceByToken(connectionString, binding.Binding!.TokenHash);
-    return Results.Json(new { status = "ok" });
+    var result = await UnbindWatchDeviceWithCode(connectionString, binding.Binding!, body.String("code"));
+    return result.ContainsKey("error") ? Results.BadRequest(result) : Results.Json(result);
 });
 
 app.MapPost("/api/watch/requests/{id:int}/approve", async (int id, JsonObject body, HttpRequest request) =>
@@ -365,14 +362,14 @@ app.MapGet("/watch", () =>
           <link rel="icon" href="/watch/icon.svg" type="image/svg+xml">
           <title>手表积分</title>
           <style>
-            *{box-sizing:border-box}body{min-height:100vh;margin:0;overflow-x:hidden;background:#dce8e2;color:#102019;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}.wrap{width:min(100vw,390px);margin:0 auto;padding:10px 9px}.watch-shell{position:relative;margin:0 auto;width:min(calc(100vw - 52px),346px);max-width:346px}.watch-face{position:relative;aspect-ratio:1/1;overflow:hidden;border-radius:50%;border:10px solid #17231b;background:#f9fbf7;box-shadow:0 12px 30px rgba(16,32,25,.2),inset 0 0 0 1px #cad7ce}.watch-face:before{content:"";position:absolute;inset:14px;border:1px solid #d8e2dc;border-radius:50%;pointer-events:none}.screen{position:absolute;inset:24px;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center}.topline{position:absolute;top:23px;left:58px;right:58px;display:flex;align-items:center;justify-content:center;gap:4px;color:#65736b;font-size:11px;white-space:nowrap}.brand{font-size:12px;font-weight:900;color:#245138;letter-spacing:0}.home-child{max-width:170px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:24px;font-weight:900}.home-group{max-width:178px;margin-top:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#637269;font-size:12px}.score-ring{display:grid;place-items:center;width:126px;height:126px;margin:10px 0 6px;border-radius:50%;border:7px solid #1f7a48;background:#fff}.score{max-width:100px;color:#0c6f3b;font-size:43px;font-weight:900;line-height:.95;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.unit{margin-top:4px;color:#5c6b62;font-size:12px;font-weight:800}.metric-row{display:grid;grid-template-columns:1fr 1fr;gap:6px;width:170px}.metric{min-width:0;border:1px solid #d7e1da;border-radius:8px;padding:5px 6px;background:#eef5f0}.metric b{display:block;color:#24352b;font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.metric span{display:block;margin-top:1px;color:#65736b;font-size:10px}.menu-dock{position:absolute;right:-3px;top:50%;z-index:3;display:grid;gap:6px;transform:translateY(-50%)}.menu-btn{display:grid;place-items:center;width:42px;height:42px;border:2px solid #17231b;border-radius:50%;background:#fff;color:#17231b;font-size:11px;font-weight:900;box-shadow:0 4px 10px rgba(16,32,25,.16)}.menu-btn.active{background:#1f7a48;color:#fff}.panel{display:none;width:205px;max-height:222px;overflow:auto;text-align:left}.panel.active{display:block}.panel[data-panel=home],#bind-panel .panel{text-align:center}.panel h1,.panel h2{margin:0 0 8px;text-align:center;font-size:18px;line-height:1.1}.bind-title{font-size:20px;font-weight:900}.bind-sub{margin:5px 0 10px;color:#65736b;font-size:12px}.rules{display:grid;gap:6px}.rule-btn{display:flex;align-items:center;justify-content:space-between;gap:6px;width:100%;min-height:34px;border:1px solid #d3ded7;border-radius:8px;background:#fff;color:#17231b;padding:6px 8px;font-size:12px;text-align:left}.rule-btn span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.rule-btn b{color:#0c6f3b;white-space:nowrap}label{display:block;margin:7px 0 3px;color:#44544a;font-size:11px;font-weight:700}input,textarea{width:100%;border:1px solid #cbd8cf;border-radius:8px;background:#fff;color:#17231b;padding:7px;font-size:14px}textarea{min-height:44px;resize:vertical}.submit,.ghost{width:100%;margin-top:8px;border:0;border-radius:8px;padding:9px;font-size:14px;font-weight:900}.submit{background:#1f7a48;color:#fff}.ghost{background:#e7efe9;color:#17462c}.msg{min-height:16px;margin:6px 0 0;text-align:center;color:#16643a;font-size:11px}.requests{list-style:none;margin:0;padding:0;display:grid;gap:5px}.requests li{display:grid;grid-template-columns:1fr auto;gap:6px;border-top:1px solid #e3ebe6;padding-top:5px;color:#25362c;font-size:11px}.requests span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.requests b{color:#71601b;white-space:nowrap}.empty,.empty-row{color:#64746a;text-align:center;font-size:12px}.code{text-align:center;letter-spacing:3px;font-size:22px;font-weight:900;text-transform:uppercase}.hidden{display:none!important}@media(max-width:260px){.wrap{padding:6px}.watch-face{border-width:8px}.screen{inset:20px}.topline{top:20px;left:48px;right:48px;font-size:10px}.home-child{font-size:20px}.score-ring{width:105px;height:105px}.score{font-size:35px}.metric-row{width:148px}.panel{width:176px;max-height:192px}.panel h1,.panel h2{font-size:16px}.menu-btn{width:35px;height:35px;font-size:10px}.rules{gap:4px}input,textarea{font-size:13px;padding:6px}}
+            *{box-sizing:border-box}body{min-height:100vh;margin:0;overflow-x:hidden;background:#dce8e2;color:#102019;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}.wrap{width:min(100vw,390px);margin:0 auto;padding:10px 9px}.watch-shell{position:relative;margin:0 auto;width:min(calc(100vw - 52px),346px);max-width:346px}.watch-face{position:relative;aspect-ratio:1/1;overflow:hidden;border-radius:50%;border:10px solid #17231b;background:#f9fbf7;box-shadow:0 12px 30px rgba(16,32,25,.2),inset 0 0 0 1px #cad7ce}.watch-face:before{content:"";position:absolute;inset:14px;border:1px solid #d8e2dc;border-radius:50%;pointer-events:none}.screen{position:absolute;inset:24px;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center}.topline{position:absolute;top:23px;left:58px;right:58px;display:flex;align-items:center;justify-content:center;gap:4px;color:#65736b;font-size:11px;white-space:nowrap}.brand{font-size:12px;font-weight:900;color:#245138;letter-spacing:0}.home-child{max-width:170px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:24px;font-weight:900}.score-ring{display:grid;place-items:center;width:150px;height:150px;margin:10px 0 6px;border-radius:50%;border:7px solid #1f7a48;background:#fff}.score{width:100%;padding:0 4px;color:#0c6f3b;font-size:clamp(28px,10vw,38px);font-variant-numeric:tabular-nums;font-weight:900;letter-spacing:-1.5px;line-height:.95;white-space:nowrap}.unit{margin-top:5px;color:#5c6b62;font-size:12px;font-weight:800}.metric-row{display:grid;grid-template-columns:1fr 1fr;gap:6px;width:170px}.metric{min-width:0;border:1px solid #d7e1da;border-radius:8px;padding:5px 6px;background:#eef5f0}.metric b{display:block;color:#24352b;font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.metric span{display:block;margin-top:1px;color:#65736b;font-size:10px}.menu-dock{position:absolute;right:-3px;top:50%;z-index:3;display:grid;gap:6px;transform:translateY(-50%)}.menu-btn{display:grid;place-items:center;width:42px;height:42px;border:2px solid #17231b;border-radius:50%;background:#fff;color:#17231b;font-size:11px;font-weight:900;box-shadow:0 4px 10px rgba(16,32,25,.16)}.menu-btn.active{background:#1f7a48;color:#fff}.panel{display:none;width:205px;max-height:222px;overflow:auto;text-align:left}.panel.active{display:block}.panel[data-panel=home],#bind-panel .panel{text-align:center}.panel h1,.panel h2{margin:0 0 8px;text-align:center;font-size:18px;line-height:1.1}.bind-title{font-size:20px;font-weight:900}.bind-sub{margin:5px 0 10px;color:#65736b;font-size:12px}.rules{display:grid;gap:6px}.rule-btn{display:flex;align-items:center;justify-content:space-between;gap:6px;width:100%;min-height:34px;border:1px solid #d3ded7;border-radius:8px;background:#fff;color:#17231b;padding:6px 8px;font-size:12px;text-align:left}.rule-btn span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.rule-btn b{color:#0c6f3b;white-space:nowrap}label{display:block;margin:7px 0 3px;color:#44544a;font-size:11px;font-weight:700}input,textarea{width:100%;border:1px solid #cbd8cf;border-radius:8px;background:#fff;color:#17231b;padding:7px;font-size:14px}textarea{min-height:44px;resize:vertical}.submit,.ghost{width:100%;margin-top:8px;border:0;border-radius:8px;padding:9px;font-size:14px;font-weight:900}.submit{background:#1f7a48;color:#fff}.ghost{background:#e7efe9;color:#17462c}.msg{min-height:16px;margin:6px 0 0;text-align:center;color:#16643a;font-size:11px}.requests{list-style:none;margin:0;padding:0;display:grid;gap:5px}.requests li{display:grid;grid-template-columns:1fr auto;gap:6px;border-top:1px solid #e3ebe6;padding-top:5px;color:#25362c;font-size:11px}.requests span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.requests b{color:#71601b;white-space:nowrap}.empty,.empty-row{color:#64746a;text-align:center;font-size:12px}.code{text-align:center;letter-spacing:3px;font-size:22px;font-weight:900;text-transform:uppercase}.hidden{display:none!important}@media(max-width:260px){.wrap{padding:6px}.watch-face{border-width:8px}.screen{inset:20px}.topline{top:20px;left:48px;right:48px;font-size:10px}.home-child{font-size:20px}.score-ring{width:112px;height:112px}.score{font-size:28px;padding:0 2px}.metric-row{width:148px}.panel{width:176px;max-height:192px}.panel h1,.panel h2{font-size:16px}.menu-btn{width:35px;height:35px;font-size:10px}.rules{gap:4px}input,textarea{font-size:13px;padding:6px}}
           </style>
         </head>
         <body>
           <main class="wrap">
             <div class="watch-shell">
               <div class="watch-face">
-                <div class="topline"><span class="brand">HappyLife</span><span id="updated-at"></span></div>
+                <div class="topline"><span class="brand">家加分</span><span id="updated-at"></span></div>
                 <section class="screen" id="bind-panel">
                   <div class="panel active">
                     <div class="bind-title">设备绑定</div>
@@ -388,7 +385,6 @@ app.MapGet("/watch", () =>
                 <section class="screen hidden" id="app-panel">
                   <div class="panel active" data-panel="home">
                     <div class="home-child" id="child-name">--</div>
-                    <div class="home-group" id="group-name">--</div>
                     <div class="score-ring">
                       <div><div class="score" id="score">0</div><div class="unit">积分</div></div>
                     </div>
@@ -422,7 +418,10 @@ app.MapGet("/watch", () =>
                       <li><span>绑定状态</span><b>已绑定</b></li>
                       <li><span>设备</span><b id="device-id">--</b></li>
                     </div>
+                    <label for="unbind-code">家长端解绑认证码</label>
+                    <input id="unbind-code" class="code" maxlength="12" autocomplete="one-time-code" placeholder="输入">
                     <button class="ghost" id="unbind" type="button">解除绑定</button>
+                    <p id="unbind-msg" class="msg"></p>
                   </div>
                 </section>
               </div>
@@ -443,6 +442,12 @@ app.MapGet("/watch", () =>
             const token = () => localStorage.getItem(tokenKey) || '';
             const authHeaders = () => ({ 'X-Watch-Device-Token': token() });
             const escapeText = (value) => String(value || '').replace(/[&<>"']/g, (ch) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
+            const formatPoints = (value) => {
+              const points = Number(value);
+              return Number.isFinite(points)
+                ? points.toLocaleString('zh-CN', { useGrouping: false, minimumFractionDigits: 0, maximumFractionDigits: 1 })
+                : '0';
+            };
             const showBound = (bound) => {
               document.getElementById('bind-panel').classList.toggle('hidden', bound);
               document.getElementById('app-panel').classList.toggle('hidden', !bound);
@@ -470,8 +475,7 @@ app.MapGet("/watch", () =>
                 const child = (score.children || [])[0] || {};
                 document.getElementById('updated-at').textContent = new Date(score.updatedAt).toLocaleTimeString('zh-CN', { hour12: false, hour: '2-digit', minute: '2-digit' });
                 document.getElementById('child-name').textContent = child.name || '暂无孩子';
-                document.getElementById('group-name').textContent = score.familyGroupName || '家庭积分';
-                document.getElementById('score').textContent = child.points ?? 0;
+                document.getElementById('score').textContent = formatPoints(child.points);
                 document.getElementById('cash').textContent = child.cash ?? 0;
                 document.getElementById('items').textContent = child.items ?? 0;
                 document.getElementById('device-id').textContent = '#' + escapeText(score.deviceId);
@@ -532,9 +536,19 @@ app.MapGet("/watch", () =>
               }
             });
             document.getElementById('unbind').addEventListener('click', async () => {
-              try { await fetch('/api/watch/device-unbind', { method: 'POST', headers: authHeaders() }); } catch {}
-              localStorage.removeItem(tokenKey);
-              location.reload();
+              const unbindMsg = document.getElementById('unbind-msg');
+              unbindMsg.textContent = '正在验证...';
+              try {
+                await fetchJson('/api/watch/device-unbind', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json', ...authHeaders() },
+                  body: JSON.stringify({ code: document.getElementById('unbind-code').value })
+                });
+                localStorage.removeItem(tokenKey);
+                location.reload();
+              } catch (error) {
+                unbindMsg.textContent = error.message || '解绑失败';
+              }
             });
             document.querySelectorAll('.menu-btn').forEach((button) => {
               button.addEventListener('click', () => setView(button.dataset.view || 'home'));
@@ -570,23 +584,50 @@ app.MapPut("/api/children/{id:int}", async (int id, JsonObject body, HttpRequest
     await using var conn = await OpenConnection(connectionString);
     await using var tx = await conn.BeginTransactionAsync();
     await using var cmd = new NpgsqlCommand("""
-        UPDATE children
-        SET name = @name, note = @note, status = @status, updated_at = CURRENT_TIMESTAMP
-        WHERE id = @id AND family_group_id = @family_group_id
-        RETURNING id, name, status, note, profile_key, created_at, updated_at
+        SELECT c.profile_key
+        FROM children c
+        JOIN child_user_bindings cub ON cub.child_profile_key = c.profile_key
+        WHERE c.id = @id
+          AND c.family_group_id = @family_group_id
+          AND cub.parent_app_user_id = @parent_app_user_id
+        LIMIT 1
         """, conn, tx);
     cmd.Parameters.AddWithValue("id", id);
     cmd.Parameters.AddWithValue("family_group_id", familyGroupId);
-    cmd.Parameters.AddWithValue("name", body.String("name"));
-    cmd.Parameters.AddWithValue("note", body.String("note"));
-    cmd.Parameters.AddWithValue("status", body.String("status", "active"));
-    await using var reader = await cmd.ExecuteReaderAsync();
-    if (!await reader.ReadAsync())
+    cmd.Parameters.AddWithValue("parent_app_user_id", access.Profile!.AppUserId);
+    var profileKeyValue = await cmd.ExecuteScalarAsync();
+    if (profileKeyValue is null || profileKeyValue is DBNull)
     {
         await tx.RollbackAsync();
-        return Results.NotFound(new { error = "不存在" });
+        return Results.Json(new { error = "孩子不存在，或只有孩子的所属账号可以修改全局信息" }, statusCode: StatusCodes.Status403Forbidden);
     }
-    await reader.CloseAsync();
+    var profileKey = Convert.ToString(profileKeyValue, CultureInfo.InvariantCulture) ?? "";
+
+    await using (var profileCmd = new NpgsqlCommand("""
+        UPDATE child_profiles
+        SET name = @name, note = @note, status = @status, updated_at = CURRENT_TIMESTAMP
+        WHERE profile_key = @profile_key
+        """, conn, tx))
+    {
+        profileCmd.Parameters.AddWithValue("profile_key", profileKey);
+        profileCmd.Parameters.AddWithValue("name", body.String("name"));
+        profileCmd.Parameters.AddWithValue("note", body.String("note"));
+        profileCmd.Parameters.AddWithValue("status", body.String("status", "active"));
+        await profileCmd.ExecuteNonQueryAsync();
+    }
+
+    await using (var membershipCmd = new NpgsqlCommand("""
+        UPDATE children
+        SET name = @name, note = @note, status = @status, updated_at = CURRENT_TIMESTAMP
+        WHERE profile_key = @profile_key
+        """, conn, tx))
+    {
+        membershipCmd.Parameters.AddWithValue("profile_key", profileKey);
+        membershipCmd.Parameters.AddWithValue("name", body.String("name"));
+        membershipCmd.Parameters.AddWithValue("note", body.String("note"));
+        membershipCmd.Parameters.AddWithValue("status", body.String("status", "active"));
+        await membershipCmd.ExecuteNonQueryAsync();
+    }
 
     await using var accountCmd = new NpgsqlCommand("""
         INSERT INTO accounts (child_id, profile_key, points, cash_cny, items_count)
@@ -644,6 +685,16 @@ app.MapDelete("/api/children/{id:int}/devices/{deviceId:int}", async (int id, in
     if (access.Error is not null) return access.Error;
     var familyGroupId = await ResolveFamilyGroupId(connectionString, request);
     var result = await RevokeChildWatchDevice(connectionString, id, deviceId, familyGroupId, access.Profile!.AppUserId);
+    return result.ContainsKey("error") ? Results.NotFound(result) : Results.Json(result);
+});
+
+app.MapPost("/api/children/{id:int}/devices/{deviceId:int}/unbind-code", async (int id, int deviceId, JsonObject body, HttpRequest request) =>
+{
+    var access = await RequireParentProfile(connectionString, request);
+    if (access.Error is not null) return access.Error;
+    var familyGroupId = await ResolveFamilyGroupId(connectionString, request, body);
+    var minutes = Math.Clamp(body.Int("expiresInMinutes") ?? 10, 5, 30);
+    var result = await CreateWatchDeviceUnbindCode(connectionString, id, deviceId, familyGroupId, access.Profile!.AppUserId, minutes);
     return result.ContainsKey("error") ? Results.NotFound(result) : Results.Json(result);
 });
 
@@ -910,7 +961,7 @@ app.MapPost("/api/agent/parse-reward", async (JsonObject body, IHttpClientFactor
     var children = await GetChildren(connectionString, familyGroupId);
     var rules = await GetRules(connectionString);
     var prompt = $$$"""
-        你是家庭积分系统的语音纠错和结构化解析智能体。
+        你是家加分的语音纠错和结构化解析智能体。
         用户语音识别文本可能把孩子名字、规则名称识别错。请根据候选孩子和规则语义，选择最可能的孩子和操作。
 
         候选孩子 JSON:
@@ -1163,9 +1214,9 @@ static JsonObject BuildWatchWebManifest(HttpRequest request)
     return new JsonObject
     {
         ["id"] = "/watch",
-        ["name"] = "HappyLife 手表积分",
+        ["name"] = "家加分手表积分",
         ["short_name"] = "手表积分",
-        ["description"] = "给孩子在手表端查询积分和提交积分申请的 HappyLife 手表应用。",
+        ["description"] = "给孩子在手表端查询积分和提交积分申请的家加分手表应用。",
         ["lang"] = "zh-CN",
         ["start_url"] = $"{baseUrl}/watch?source=watch-app",
         ["scope"] = $"{baseUrl}/watch",
@@ -1192,7 +1243,7 @@ static JsonObject BuildWatchAppInfo(HttpRequest request)
     var baseUrl = GetPublicBaseUrl(request);
     return new JsonObject
     {
-        ["appName"] = "HappyLife 手表积分",
+        ["appName"] = "家加分手表积分",
         ["packageId"] = "net.impx.happylife.watch",
         ["versionName"] = "1.0.0",
         ["versionCode"] = 100,
@@ -1201,7 +1252,7 @@ static JsonObject BuildWatchAppInfo(HttpRequest request)
         ["apiBaseUrl"] = baseUrl,
         ["supportedPlatforms"] = new JsonArray { "xiaotiancai", "xiaomi", "huawei" },
         ["supportedScreens"] = new JsonArray { "192x192", "240x240", "280x280", "320x320", "360x360" },
-        ["watchFeatures"] = new JsonArray { "积分查询", "积分申请", "最近申请状态", "儿童认证码设备绑定" },
+        ["watchFeatures"] = new JsonArray { "积分查询", "积分申请", "最近申请状态", "儿童认证码设备绑定", "家长解绑认证码校验" },
         ["requiredPermissions"] = new JsonArray { "INTERNET", "ACCESS_NETWORK_STATE" },
         ["privacy"] = new JsonObject
         {
@@ -1240,7 +1291,7 @@ static object BuildMcpServiceDescriptor()
         {
             name = FamilyRewardMcpServiceName,
             version = "3.0.0",
-            title = "家庭积分系统 MCP 服务（能力拆分）",
+            title = "家加分 MCP 服务（能力拆分）",
             description = "按能力提供独立工具：新增孩子、修改孩子、积分增减、积分查询、积分明细写入与查询。"
         },
         endpoint = "/api/mcp",
@@ -2693,9 +2744,24 @@ static async Task<(bool Success, Dictionary<string, object?>? Child, string? Err
     await using var tx = await conn.BeginTransactionAsync();
     try
     {
+        await using (var profileCmd = new NpgsqlCommand("""
+            INSERT INTO child_profiles (profile_key, name, status, note)
+            VALUES (@profile_key, @name, @status, @note)
+            ON CONFLICT (profile_key) DO NOTHING
+            """, conn, tx))
+        {
+            profileCmd.Parameters.AddWithValue("profile_key", profileKey);
+            profileCmd.Parameters.AddWithValue("name", name);
+            profileCmd.Parameters.AddWithValue("status", body.String("status", "active"));
+            profileCmd.Parameters.AddWithValue("note", body.String("note"));
+            await profileCmd.ExecuteNonQueryAsync();
+        }
+
         await using var cmd = new NpgsqlCommand("""
             INSERT INTO children (family_group_id, profile_key, name, status, note)
-            VALUES (@family_group_id, @profile_key, @name, @status, @note)
+            SELECT @family_group_id, cp.profile_key, cp.name, cp.status, cp.note
+            FROM child_profiles cp
+            WHERE cp.profile_key = @profile_key
             RETURNING id, name, status, note, profile_key, created_at, updated_at
             """, conn, tx);
         cmd.Parameters.AddWithValue("family_group_id", familyGroupId is null ? DBNull.Value : familyGroupId.Value);
@@ -2707,6 +2773,22 @@ static async Task<(bool Success, Dictionary<string, object?>? Child, string? Err
         await reader.ReadAsync();
         var child = ReadChild(reader);
         await reader.CloseAsync();
+
+        await using (var membershipsCmd = new NpgsqlCommand("""
+            INSERT INTO children (family_group_id, profile_key, name, status, note)
+            SELECT fg.id, cp.profile_key, cp.name, cp.status, cp.note
+            FROM family_groups fg
+            JOIN child_profiles cp ON cp.profile_key = @profile_key
+            LEFT JOIN family_group_users fgu
+              ON fgu.family_group_id = fg.id AND fgu.user_id = @user_id
+            WHERE fg.created_by = @user_id OR fgu.user_id = @user_id
+            ON CONFLICT (family_group_id, profile_key) WHERE profile_key IS NOT NULL DO NOTHING
+            """, conn, tx))
+        {
+            membershipsCmd.Parameters.AddWithValue("profile_key", profileKey);
+            membershipsCmd.Parameters.AddWithValue("user_id", userId);
+            await membershipsCmd.ExecuteNonQueryAsync();
+        }
 
         await using var accountCmd = new NpgsqlCommand("""
             INSERT INTO accounts (child_id, profile_key, points, cash_cny, items_count)
@@ -2826,6 +2908,17 @@ static async Task InitDatabase(string connectionString)
         )
         """,
         """
+        CREATE TABLE IF NOT EXISTS family_group_invites (
+            id SERIAL PRIMARY KEY,
+            family_group_id INTEGER NOT NULL UNIQUE REFERENCES family_groups(id) ON DELETE CASCADE,
+            invite_code VARCHAR(8) NOT NULL UNIQUE,
+            created_by VARCHAR(180) NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            revoked_at TIMESTAMP NULL
+        )
+        """,
+        """
         CREATE TABLE IF NOT EXISTS app_user_profiles (
             id SERIAL PRIMARY KEY,
             unified_user_id VARCHAR(160) NOT NULL,
@@ -2849,6 +2942,16 @@ static async Task InitDatabase(string connectionString)
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             UNIQUE(parent_app_user_id, child_profile_key)
+        )
+        """,
+        """
+        CREATE TABLE IF NOT EXISTS child_profiles (
+            profile_key VARCHAR(180) PRIMARY KEY,
+            name VARCHAR(50) NOT NULL,
+            status VARCHAR(20) NOT NULL DEFAULT 'active',
+            note TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
         """,
         """
@@ -2881,6 +2984,19 @@ static async Task InitDatabase(string connectionString)
         )
         """,
         """
+        CREATE TABLE IF NOT EXISTS watch_device_unbind_codes (
+            id SERIAL PRIMARY KEY,
+            device_binding_id INTEGER NOT NULL REFERENCES watch_device_bindings(id) ON DELETE CASCADE,
+            child_id INTEGER NOT NULL,
+            family_group_id INTEGER NOT NULL,
+            parent_app_user_id VARCHAR(180) NOT NULL,
+            code_hash VARCHAR(128) NOT NULL UNIQUE,
+            expires_at TIMESTAMP NOT NULL,
+            used_at TIMESTAMP NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+        """,
+        """
         CREATE TABLE IF NOT EXISTS children (
             id SERIAL PRIMARY KEY,
             family_group_id INTEGER REFERENCES family_groups(id) ON DELETE RESTRICT,
@@ -2905,7 +3021,9 @@ static async Task InitDatabase(string connectionString)
         END $$;
         """,
         "ALTER TABLE children DROP CONSTRAINT IF EXISTS children_name_key",
-        "CREATE UNIQUE INDEX IF NOT EXISTS ux_children_family_group_name ON children(family_group_id, name)",
+        "ALTER TABLE children DROP CONSTRAINT IF EXISTS children_family_group_id_name_key",
+        "DROP INDEX IF EXISTS ux_children_family_group_name",
+        "CREATE UNIQUE INDEX IF NOT EXISTS ux_children_family_group_profile ON children(family_group_id, profile_key) WHERE profile_key IS NOT NULL",
         """
         CREATE TABLE IF NOT EXISTS accounts (
             id SERIAL PRIMARY KEY,
@@ -2928,6 +3046,27 @@ static async Task InitDatabase(string connectionString)
         "ALTER TABLE accounts ALTER COLUMN points_earned TYPE NUMERIC(10,2) USING points_earned::numeric",
         "ALTER TABLE accounts ALTER COLUMN points_spent TYPE NUMERIC(10,2) USING points_spent::numeric",
         "UPDATE children SET profile_key = CONCAT('child-', id) WHERE profile_key IS NULL OR profile_key = ''",
+        """
+        INSERT INTO child_profiles (profile_key, name, status, note, created_at, updated_at)
+        SELECT DISTINCT ON (profile_key)
+               profile_key, name, status, note, created_at, updated_at
+        FROM children
+        WHERE profile_key IS NOT NULL AND profile_key <> ''
+        ORDER BY profile_key, updated_at DESC, id DESC
+        ON CONFLICT (profile_key) DO NOTHING
+        """,
+        """
+        UPDATE children c
+        SET name = cp.name,
+            status = cp.status,
+            note = cp.note,
+            updated_at = GREATEST(c.updated_at, cp.updated_at)
+        FROM child_profiles cp
+        WHERE cp.profile_key = c.profile_key
+          AND (c.name IS DISTINCT FROM cp.name
+            OR c.status IS DISTINCT FROM cp.status
+            OR c.note IS DISTINCT FROM cp.note)
+        """,
         """
         UPDATE accounts a
         SET profile_key = c.profile_key
@@ -2999,12 +3138,27 @@ static async Task InitDatabase(string connectionString)
         "CREATE INDEX IF NOT EXISTS idx_tx_type ON transactions(type)",
         "CREATE INDEX IF NOT EXISTS idx_children_family_group ON children(family_group_id)",
         "CREATE INDEX IF NOT EXISTS idx_family_group_users_user ON family_group_users(user_id)",
+        "CREATE INDEX IF NOT EXISTS idx_family_group_invites_code ON family_group_invites(invite_code) WHERE revoked_at IS NULL",
         "CREATE INDEX IF NOT EXISTS idx_app_user_profiles_unified ON app_user_profiles(unified_user_id)",
         "CREATE INDEX IF NOT EXISTS idx_child_user_bindings_parent ON child_user_bindings(parent_app_user_id)",
         "CREATE INDEX IF NOT EXISTS idx_child_user_bindings_child ON child_user_bindings(child_profile_key)",
         "CREATE INDEX IF NOT EXISTS idx_child_auth_codes_child ON child_auth_codes(child_id, expires_at DESC)",
         "CREATE INDEX IF NOT EXISTS idx_watch_device_bindings_child ON watch_device_bindings(child_id, revoked_at)",
         "CREATE INDEX IF NOT EXISTS idx_watch_device_bindings_parent ON watch_device_bindings(parent_app_user_id)",
+        """
+        UPDATE watch_device_bindings newer
+        SET revoked_at = CURRENT_TIMESTAMP
+        WHERE newer.revoked_at IS NULL
+          AND EXISTS (
+              SELECT 1
+              FROM watch_device_bindings keeper
+              WHERE keeper.child_profile_key = newer.child_profile_key
+                AND keeper.revoked_at IS NULL
+                AND keeper.id < newer.id
+          )
+        """,
+        "CREATE UNIQUE INDEX IF NOT EXISTS ux_watch_device_bindings_active_child ON watch_device_bindings(child_profile_key) WHERE revoked_at IS NULL",
+        "CREATE INDEX IF NOT EXISTS idx_watch_device_unbind_codes_device ON watch_device_unbind_codes(device_binding_id, expires_at DESC)",
         "CREATE INDEX IF NOT EXISTS idx_watch_reward_requests_family_child ON watch_reward_requests(family_group_id, child_id, requested_at DESC)",
         "CREATE INDEX IF NOT EXISTS idx_watch_reward_requests_status ON watch_reward_requests(status)"
     };
@@ -3160,7 +3314,9 @@ static async Task<(bool Success, Dictionary<string, object?>? Group, string? Err
     await using var conn = await OpenConnection(connectionString);
     try
     {
-        var id = await EnsureFamilyGroup(conn, name, userId, description);
+        var normalizedUserId = string.IsNullOrWhiteSpace(userId) ? DefaultUserId : userId;
+        var id = await EnsureFamilyGroup(conn, name, normalizedUserId, description);
+        await SyncOwnedChildrenToFamilyGroup(conn, id, normalizedUserId, "由所属账号自动加入");
         await using var cmd = new NpgsqlCommand("""
             SELECT fg.id, fg.name, fg.description, fg.created_by, fgu.role, fg.created_at, fg.updated_at
             FROM family_groups fg
@@ -3168,7 +3324,7 @@ static async Task<(bool Success, Dictionary<string, object?>? Group, string? Err
             WHERE fg.id = @id
             """, conn);
         cmd.Parameters.AddWithValue("id", id);
-        cmd.Parameters.AddWithValue("user_id", string.IsNullOrWhiteSpace(userId) ? DefaultUserId : userId);
+        cmd.Parameters.AddWithValue("user_id", normalizedUserId);
         await using var reader = await cmd.ExecuteReaderAsync();
         await reader.ReadAsync();
         return (true, ReadFamilyGroup(reader), null);
@@ -3201,6 +3357,162 @@ static async Task<bool> UpsertFamilyGroupUser(string connectionString, int famil
     cmd.Parameters.AddWithValue("role", string.IsNullOrWhiteSpace(role) ? "member" : role.Trim());
     await cmd.ExecuteNonQueryAsync();
     return true;
+}
+
+static async Task<(bool Success, bool Forbidden, string FamilyGroupName, string InviteCode, string Error)> GetOrCreateFamilyGroupInvite(
+    string connectionString,
+    int familyGroupId,
+    string appUserId)
+{
+    await using var conn = await OpenConnection(connectionString);
+    string familyGroupName;
+    await using (var groupCmd = new NpgsqlCommand("""
+        SELECT fg.name
+        FROM family_groups fg
+        LEFT JOIN family_group_users fgu
+          ON fgu.family_group_id = fg.id AND fgu.user_id = @user_id
+        WHERE fg.id = @family_group_id
+          AND (fg.created_by = @user_id OR fgu.role = 'owner' OR @user_id = @default_user_id)
+        LIMIT 1
+        """, conn))
+    {
+        groupCmd.Parameters.AddWithValue("family_group_id", familyGroupId);
+        groupCmd.Parameters.AddWithValue("user_id", appUserId);
+        groupCmd.Parameters.AddWithValue("default_user_id", DefaultUserId);
+        var result = await groupCmd.ExecuteScalarAsync();
+        if (result is null || result is DBNull)
+        {
+            await using var existsCmd = new NpgsqlCommand("SELECT COUNT(*) FROM family_groups WHERE id = @id", conn);
+            existsCmd.Parameters.AddWithValue("id", familyGroupId);
+            var exists = Convert.ToInt32(await existsCmd.ExecuteScalarAsync(), CultureInfo.InvariantCulture) > 0;
+            return (false, exists, "", "", exists ? "只有家庭组管理员可以生成邀请码" : "家庭组不存在");
+        }
+        familyGroupName = Convert.ToString(result, CultureInfo.InvariantCulture) ?? "";
+    }
+
+    await using (var existingCmd = new NpgsqlCommand("""
+        SELECT invite_code
+        FROM family_group_invites
+        WHERE family_group_id = @family_group_id AND revoked_at IS NULL
+        LIMIT 1
+        """, conn))
+    {
+        existingCmd.Parameters.AddWithValue("family_group_id", familyGroupId);
+        var existing = await existingCmd.ExecuteScalarAsync();
+        if (existing is not null && existing is not DBNull)
+        {
+            return (true, false, familyGroupName, Convert.ToString(existing, CultureInfo.InvariantCulture) ?? "", "");
+        }
+    }
+
+    for (var attempt = 0; attempt < 10; attempt++)
+    {
+        var inviteCode = RandomNumberGenerator.GetInt32(0, 100_000_000).ToString("D8", CultureInfo.InvariantCulture);
+        try
+        {
+            await using var insertCmd = new NpgsqlCommand("""
+                INSERT INTO family_group_invites (family_group_id, invite_code, created_by)
+                VALUES (@family_group_id, @invite_code, @created_by)
+                RETURNING invite_code
+                """, conn);
+            insertCmd.Parameters.AddWithValue("family_group_id", familyGroupId);
+            insertCmd.Parameters.AddWithValue("invite_code", inviteCode);
+            insertCmd.Parameters.AddWithValue("created_by", appUserId);
+            var created = Convert.ToString(await insertCmd.ExecuteScalarAsync(), CultureInfo.InvariantCulture) ?? "";
+            return (true, false, familyGroupName, created, "");
+        }
+        catch (PostgresException ex) when (ex.SqlState == PostgresErrorCodes.UniqueViolation)
+        {
+            await using var retryCmd = new NpgsqlCommand("""
+                SELECT invite_code
+                FROM family_group_invites
+                WHERE family_group_id = @family_group_id AND revoked_at IS NULL
+                LIMIT 1
+                """, conn);
+            retryCmd.Parameters.AddWithValue("family_group_id", familyGroupId);
+            var existing = await retryCmd.ExecuteScalarAsync();
+            if (existing is not null && existing is not DBNull)
+            {
+                return (true, false, familyGroupName, Convert.ToString(existing, CultureInfo.InvariantCulture) ?? "", "");
+            }
+        }
+    }
+
+    return (false, false, familyGroupName, "", "邀请码生成失败，请重试");
+}
+
+static string NormalizeFamilyGroupInviteCode(string value) => value.Trim();
+
+static async Task<(bool Success, int FamilyGroupId, string FamilyGroupName, int LinkedChildCount, string Error)> JoinFamilyGroupByInviteCode(
+    string connectionString,
+    string inviteCode,
+    string appUserId)
+{
+    await using var conn = await OpenConnection(connectionString);
+    await using var transaction = await conn.BeginTransactionAsync();
+    int familyGroupId;
+    string familyGroupName;
+    await using (var inviteCmd = new NpgsqlCommand("""
+        SELECT fg.id, fg.name
+        FROM family_group_invites fgi
+        JOIN family_groups fg ON fg.id = fgi.family_group_id
+        WHERE fgi.invite_code = @invite_code AND fgi.revoked_at IS NULL
+        LIMIT 1
+        """, conn, transaction))
+    {
+        inviteCmd.Parameters.AddWithValue("invite_code", inviteCode);
+        await using var reader = await inviteCmd.ExecuteReaderAsync();
+        if (!await reader.ReadAsync())
+        {
+            return (false, 0, "", 0, "邀请码不存在或已失效");
+        }
+        familyGroupId = reader.Int("id");
+        familyGroupName = reader.String("name");
+    }
+
+    await using (var memberCmd = new NpgsqlCommand("""
+        INSERT INTO family_group_users (family_group_id, user_id, role)
+        VALUES (@family_group_id, @user_id, 'member')
+        ON CONFLICT (family_group_id, user_id) DO UPDATE SET
+            updated_at = CURRENT_TIMESTAMP
+        """, conn, transaction))
+    {
+        memberCmd.Parameters.AddWithValue("family_group_id", familyGroupId);
+        memberCmd.Parameters.AddWithValue("user_id", appUserId);
+        await memberCmd.ExecuteNonQueryAsync();
+    }
+
+    var linkedChildCount = await SyncOwnedChildrenToFamilyGroup(conn, familyGroupId, appUserId, $"由 {appUserId} 通过邀请码加入", transaction);
+
+    await transaction.CommitAsync();
+    return (true, familyGroupId, familyGroupName, linkedChildCount, "");
+}
+
+static async Task<int> SyncOwnedChildrenToFamilyGroup(NpgsqlConnection conn, int familyGroupId, string parentAppUserId, string note, NpgsqlTransaction? tx = null)
+{
+    var ownedChildren = new List<(string ProfileKey, string Name)>();
+    await using (var childrenCmd = new NpgsqlCommand("""
+        SELECT DISTINCT cp.profile_key, cp.name
+        FROM child_user_bindings cub
+        JOIN child_profiles cp ON cp.profile_key = cub.child_profile_key
+        WHERE cub.parent_app_user_id = @parent_app_user_id
+          AND cp.status = 'active'
+        ORDER BY cp.name
+        """, conn, tx))
+    {
+        childrenCmd.Parameters.AddWithValue("parent_app_user_id", parentAppUserId);
+        await using var reader = await childrenCmd.ExecuteReaderAsync();
+        while (await reader.ReadAsync())
+        {
+            ownedChildren.Add((reader.String("profile_key"), reader.String("name")));
+        }
+    }
+
+    foreach (var child in ownedChildren)
+    {
+        await EnsureChildInFamilyGroup(conn, familyGroupId, child.ProfileKey, child.Name, note, tx);
+    }
+    return ownedChildren.Count;
 }
 
 static async Task<(AppUserProfile? Profile, IResult? Error)> RequireParentProfile(string connectionString, HttpRequest request)
@@ -3396,9 +3708,21 @@ static async Task UpsertChildBinding(NpgsqlConnection conn, string parentAppUser
     await cmd.ExecuteNonQueryAsync();
 }
 
-static async Task<int> EnsureChildInFamilyGroup(NpgsqlConnection conn, int familyGroupId, string profileKey, string name, string note)
+static async Task<int> EnsureChildInFamilyGroup(NpgsqlConnection conn, int familyGroupId, string profileKey, string name, string note, NpgsqlTransaction? tx = null)
 {
-    await using (var existingCmd = new NpgsqlCommand("SELECT id FROM children WHERE family_group_id = @family_group_id AND profile_key = @profile_key LIMIT 1", conn))
+    await using (var profileCmd = new NpgsqlCommand("""
+        INSERT INTO child_profiles (profile_key, name, status, note)
+        VALUES (@profile_key, @name, 'active', @note)
+        ON CONFLICT (profile_key) DO NOTHING
+        """, conn, tx))
+    {
+        profileCmd.Parameters.AddWithValue("profile_key", profileKey);
+        profileCmd.Parameters.AddWithValue("name", string.IsNullOrWhiteSpace(name) ? "宝宝1" : name.Trim());
+        profileCmd.Parameters.AddWithValue("note", note);
+        await profileCmd.ExecuteNonQueryAsync();
+    }
+
+    await using (var existingCmd = new NpgsqlCommand("SELECT id FROM children WHERE family_group_id = @family_group_id AND profile_key = @profile_key LIMIT 1", conn, tx))
     {
         existingCmd.Parameters.AddWithValue("family_group_id", familyGroupId);
         existingCmd.Parameters.AddWithValue("profile_key", profileKey);
@@ -3411,13 +3735,16 @@ static async Task<int> EnsureChildInFamilyGroup(NpgsqlConnection conn, int famil
 
     await using var cmd = new NpgsqlCommand("""
         INSERT INTO children (family_group_id, profile_key, name, status, note)
-        VALUES (@family_group_id, @profile_key, @name, 'active', @note)
-        ON CONFLICT (family_group_id, name) DO UPDATE SET
-            profile_key = @profile_key,
-            status = 'active',
+        SELECT @family_group_id, cp.profile_key, cp.name, cp.status, cp.note
+        FROM child_profiles cp
+        WHERE cp.profile_key = @profile_key
+        ON CONFLICT (family_group_id, profile_key) WHERE profile_key IS NOT NULL DO UPDATE SET
+            name = EXCLUDED.name,
+            status = EXCLUDED.status,
+            note = EXCLUDED.note,
             updated_at = CURRENT_TIMESTAMP
         RETURNING id
-        """, conn);
+        """, conn, tx);
     cmd.Parameters.AddWithValue("family_group_id", familyGroupId);
     cmd.Parameters.AddWithValue("profile_key", profileKey);
     cmd.Parameters.AddWithValue("name", string.IsNullOrWhiteSpace(name) ? "宝宝1" : name.Trim());
@@ -3433,51 +3760,6 @@ static async Task<int> EnsureChildInFamilyGroup(NpgsqlConnection conn, int famil
     accountCmd.Parameters.AddWithValue("profile_key", profileKey);
     await accountCmd.ExecuteNonQueryAsync();
     return childId;
-}
-
-static async Task<Dictionary<string, object?>> LinkChildToFamilyGroup(string connectionString, int sourceChildId, int familyGroupId, string parentAppUserId)
-{
-    await using var conn = await OpenConnection(connectionString);
-    try
-    {
-        string profileKey;
-        string name;
-        await using (var sourceCmd = new NpgsqlCommand("""
-            SELECT c.profile_key, c.name
-            FROM children c
-            LEFT JOIN child_user_bindings cub ON cub.child_profile_key = c.profile_key
-            WHERE c.id = @child_id AND (cub.parent_app_user_id = @parent_app_user_id OR @parent_app_user_id = @default_user_id)
-            LIMIT 1
-            """, conn))
-        {
-            sourceCmd.Parameters.AddWithValue("child_id", sourceChildId);
-            sourceCmd.Parameters.AddWithValue("parent_app_user_id", parentAppUserId);
-            sourceCmd.Parameters.AddWithValue("default_user_id", DefaultUserId);
-            await using var reader = await sourceCmd.ExecuteReaderAsync();
-            if (!await reader.ReadAsync())
-            {
-                return new Dictionary<string, object?> { ["error"] = "孩子不存在或不属于当前家长" };
-            }
-            profileKey = reader.String("profile_key");
-            name = reader.String("name");
-        }
-
-        await using (var groupCmd = new NpgsqlCommand("SELECT COUNT(*) FROM family_groups WHERE id = @id", conn))
-        {
-            groupCmd.Parameters.AddWithValue("id", familyGroupId);
-            if (Convert.ToInt32(await groupCmd.ExecuteScalarAsync(), CultureInfo.InvariantCulture) == 0)
-            {
-                return new Dictionary<string, object?> { ["error"] = "家庭组不存在" };
-            }
-        }
-
-        var childId = await EnsureChildInFamilyGroup(conn, familyGroupId, profileKey, name, $"由 {parentAppUserId} 绑定入组");
-        return new Dictionary<string, object?> { ["ok"] = true, ["childId"] = childId, ["familyGroupId"] = familyGroupId };
-    }
-    catch (Exception ex)
-    {
-        return new Dictionary<string, object?> { ["error"] = ex.Message };
-    }
 }
 
 static async Task<int> ResolveFamilyGroupId(string connectionString, HttpRequest request, JsonObject? body = null)
@@ -3682,14 +3964,19 @@ static async Task<List<Dictionary<string, object?>>> GetChildren(string connecti
     await using var conn = await OpenConnection(connectionString);
     await using var cmd = new NpgsqlCommand("""
         SELECT c.id, c.family_group_id, fg.name AS family_group_name,
-               c.profile_key, c.name, c.status, c.note, c.created_at, c.updated_at,
+               c.profile_key, COALESCE(cp.name, c.name) AS name,
+               COALESCE(cp.status, c.status) AS status,
+               COALESCE(cp.note, c.note) AS note,
+               COALESCE(cp.created_at, c.created_at) AS created_at,
+               COALESCE(cp.updated_at, c.updated_at) AS updated_at,
                COALESCE(a.points, 0) AS score,
                COALESCE(a.cash_cny, 0) AS cash,
                COALESCE(a.items_count, 0) AS items
         FROM children c
+        LEFT JOIN child_profiles cp ON cp.profile_key = c.profile_key
         LEFT JOIN family_groups fg ON fg.id = c.family_group_id
         LEFT JOIN accounts a ON a.profile_key = c.profile_key
-        WHERE c.status = 'active'
+        WHERE COALESCE(cp.status, c.status) = 'active'
           AND (@family_group_id IS NULL OR c.family_group_id = @family_group_id)
           AND (@child_profile_key IS NULL OR c.profile_key = @child_profile_key)
         ORDER BY c.id
@@ -3986,13 +4273,11 @@ static async Task<Dictionary<string, object?>> GetChildWatchDevices(string conne
     await using var cmd = new NpgsqlCommand("""
         SELECT id, child_id, family_group_id, child_profile_key, parent_app_user_id, device_name, platform, user_agent, bound_at, last_seen_at, revoked_at
         FROM watch_device_bindings
-        WHERE child_id = @child_id
-          AND family_group_id = @family_group_id
+        WHERE child_profile_key = @child_profile_key
           AND parent_app_user_id = @parent_app_user_id
         ORDER BY revoked_at NULLS FIRST, last_seen_at DESC, id DESC
         """, conn);
-    cmd.Parameters.AddWithValue("child_id", childId);
-    cmd.Parameters.AddWithValue("family_group_id", familyGroupId);
+    cmd.Parameters.AddWithValue("child_profile_key", Convert.ToString(child["profileKey"], CultureInfo.InvariantCulture) ?? "");
     cmd.Parameters.AddWithValue("parent_app_user_id", parentAppUserId);
     await using var reader = await cmd.ExecuteReaderAsync();
     while (await reader.ReadAsync())
@@ -4006,23 +4291,115 @@ static async Task<Dictionary<string, object?>> GetChildWatchDevices(string conne
 static async Task<Dictionary<string, object?>> RevokeChildWatchDevice(string connectionString, int childId, int deviceId, int familyGroupId, string parentAppUserId)
 {
     await using var conn = await OpenConnection(connectionString);
+    var child = await GetChildForFamily(conn, null, childId, familyGroupId);
+    if (child is null)
+    {
+        return new Dictionary<string, object?> { ["error"] = "孩子不属于当前家庭组" };
+    }
     await using var cmd = new NpgsqlCommand("""
         UPDATE watch_device_bindings
         SET revoked_at = CURRENT_TIMESTAMP
         WHERE id = @id
-          AND child_id = @child_id
-          AND family_group_id = @family_group_id
+          AND child_profile_key = @child_profile_key
           AND parent_app_user_id = @parent_app_user_id
           AND revoked_at IS NULL
         """, conn);
     cmd.Parameters.AddWithValue("id", deviceId);
-    cmd.Parameters.AddWithValue("child_id", childId);
-    cmd.Parameters.AddWithValue("family_group_id", familyGroupId);
+    cmd.Parameters.AddWithValue("child_profile_key", Convert.ToString(child["profileKey"], CultureInfo.InvariantCulture) ?? "");
     cmd.Parameters.AddWithValue("parent_app_user_id", parentAppUserId);
     var affected = await cmd.ExecuteNonQueryAsync();
     return affected == 0
         ? new Dictionary<string, object?> { ["error"] = "设备不存在或已解绑" }
         : new Dictionary<string, object?> { ["status"] = "ok" };
+}
+
+static async Task<Dictionary<string, object?>> CreateWatchDeviceUnbindCode(
+    string connectionString,
+    int childId,
+    int deviceId,
+    int familyGroupId,
+    string parentAppUserId,
+    int expiresInMinutes)
+{
+    await using var conn = await OpenConnection(connectionString);
+    await using var tx = await conn.BeginTransactionAsync();
+    try
+    {
+        var child = await GetChildForFamily(conn, tx, childId, familyGroupId);
+        if (child is null)
+        {
+            await tx.RollbackAsync();
+            return new Dictionary<string, object?> { ["error"] = "孩子不属于当前家庭组" };
+        }
+
+        var bindingChildId = 0;
+        var bindingFamilyGroupId = 0;
+        await using (var deviceCmd = new NpgsqlCommand("""
+            SELECT child_id, family_group_id
+            FROM watch_device_bindings
+            WHERE id = @id
+              AND child_profile_key = @child_profile_key
+              AND parent_app_user_id = @parent_app_user_id
+              AND revoked_at IS NULL
+            """, conn, tx))
+        {
+            deviceCmd.Parameters.AddWithValue("id", deviceId);
+            deviceCmd.Parameters.AddWithValue("child_profile_key", Convert.ToString(child["profileKey"], CultureInfo.InvariantCulture) ?? "");
+            deviceCmd.Parameters.AddWithValue("parent_app_user_id", parentAppUserId);
+            await using var reader = await deviceCmd.ExecuteReaderAsync();
+            if (!await reader.ReadAsync())
+            {
+                await tx.RollbackAsync();
+                return new Dictionary<string, object?> { ["error"] = "设备不存在或已解绑" };
+            }
+            bindingChildId = reader.Int("child_id");
+            bindingFamilyGroupId = reader.Int("family_group_id");
+        }
+
+        await using (var expireCmd = new NpgsqlCommand("""
+            UPDATE watch_device_unbind_codes
+            SET used_at = CURRENT_TIMESTAMP
+            WHERE device_binding_id = @device_binding_id
+              AND used_at IS NULL
+              AND expires_at > CURRENT_TIMESTAMP
+            """, conn, tx))
+        {
+            expireCmd.Parameters.AddWithValue("device_binding_id", deviceId);
+            await expireCmd.ExecuteNonQueryAsync();
+        }
+
+        var code = GenerateAuthCode();
+        var expiresAt = DateTime.UtcNow.AddMinutes(expiresInMinutes);
+        await using (var insertCmd = new NpgsqlCommand("""
+            INSERT INTO watch_device_unbind_codes
+                (device_binding_id, child_id, family_group_id, parent_app_user_id, code_hash, expires_at)
+            VALUES
+                (@device_binding_id, @child_id, @family_group_id, @parent_app_user_id, @code_hash, @expires_at)
+            """, conn, tx))
+        {
+            insertCmd.Parameters.AddWithValue("device_binding_id", deviceId);
+            insertCmd.Parameters.AddWithValue("child_id", bindingChildId);
+            insertCmd.Parameters.AddWithValue("family_group_id", bindingFamilyGroupId);
+            insertCmd.Parameters.AddWithValue("parent_app_user_id", parentAppUserId);
+            insertCmd.Parameters.AddWithValue("code_hash", HashSecret(code));
+            insertCmd.Parameters.AddWithValue("expires_at", expiresAt);
+            await insertCmd.ExecuteNonQueryAsync();
+        }
+
+        await tx.CommitAsync();
+        return new Dictionary<string, object?>
+        {
+            ["code"] = code,
+            ["deviceId"] = deviceId,
+            ["expiresAt"] = expiresAt.ToString("O", CultureInfo.InvariantCulture),
+            ["expiresInMinutes"] = expiresInMinutes
+        };
+    }
+    catch (Exception ex)
+    {
+        await tx.RollbackAsync();
+        return new Dictionary<string, object?> { ["error"] = ex.Message };
+    }
 }
 
 static async Task<Dictionary<string, object?>> BindWatchDevice(string connectionString, JsonObject body, HttpRequest request)
@@ -4073,6 +4450,21 @@ static async Task<Dictionary<string, object?>> BindWatchDevice(string connection
             return new Dictionary<string, object?> { ["error"] = "认证码无效或已过期" };
         }
 
+        await using (var activeDeviceCmd = new NpgsqlCommand("""
+            SELECT COUNT(*)
+            FROM watch_device_bindings
+            WHERE child_profile_key = @child_profile_key
+              AND revoked_at IS NULL
+            """, conn, tx))
+        {
+            activeDeviceCmd.Parameters.AddWithValue("child_profile_key", Convert.ToString(codeRow["childProfileKey"], CultureInfo.InvariantCulture) ?? "");
+            if (Convert.ToInt32(await activeDeviceCmd.ExecuteScalarAsync(), CultureInfo.InvariantCulture) > 0)
+            {
+                await tx.RollbackAsync();
+                return new Dictionary<string, object?> { ["error"] = "该孩子已绑定设备，请先由家长解绑现有设备" };
+            }
+        }
+
         var token = GenerateDeviceToken();
         var tokenHash = HashSecret(token);
         var deviceName = Truncate(body.String("deviceName", request.Headers.UserAgent.ToString()), 240);
@@ -4118,6 +4510,11 @@ static async Task<Dictionary<string, object?>> BindWatchDevice(string connection
             ["familyGroupId"] = codeRow["familyGroupId"],
             ["familyGroupName"] = codeRow["familyGroupName"]
         };
+    }
+    catch (PostgresException ex) when (ex.SqlState == PostgresErrorCodes.UniqueViolation && ex.ConstraintName == "ux_watch_device_bindings_active_child")
+    {
+        await tx.RollbackAsync();
+        return new Dictionary<string, object?> { ["error"] = "该孩子已绑定设备，请先由家长解绑现有设备" };
     }
     catch (Exception ex)
     {
@@ -4172,12 +4569,83 @@ static async Task<(WatchDeviceBinding? Binding, IResult? Error)> RequireWatchDev
     return (binding, null);
 }
 
-static async Task RevokeWatchDeviceByToken(string connectionString, string tokenHash)
+static async Task<Dictionary<string, object?>> UnbindWatchDeviceWithCode(string connectionString, WatchDeviceBinding binding, string rawCode)
 {
+    var code = NormalizeAuthCode(rawCode);
+    if (string.IsNullOrWhiteSpace(code))
+    {
+        return new Dictionary<string, object?> { ["error"] = "请输入家长端生成的解绑认证码" };
+    }
+
     await using var conn = await OpenConnection(connectionString);
-    await using var cmd = new NpgsqlCommand("UPDATE watch_device_bindings SET revoked_at = CURRENT_TIMESTAMP WHERE device_token_hash = @token_hash AND revoked_at IS NULL", conn);
-    cmd.Parameters.AddWithValue("token_hash", tokenHash);
-    await cmd.ExecuteNonQueryAsync();
+    await using var tx = await conn.BeginTransactionAsync();
+    try
+    {
+        int? codeId = null;
+        await using (var lookupCmd = new NpgsqlCommand("""
+            SELECT wduc.id
+            FROM watch_device_unbind_codes wduc
+            JOIN watch_device_bindings wdb ON wdb.id = wduc.device_binding_id
+            WHERE wduc.device_binding_id = @device_binding_id
+              AND wduc.child_id = @child_id
+              AND wduc.family_group_id = @family_group_id
+              AND wduc.parent_app_user_id = @parent_app_user_id
+              AND wduc.code_hash = @code_hash
+              AND wduc.used_at IS NULL
+              AND wduc.expires_at > CURRENT_TIMESTAMP
+              AND wdb.device_token_hash = @token_hash
+              AND wdb.revoked_at IS NULL
+            FOR UPDATE OF wduc, wdb
+            """, conn, tx))
+        {
+            lookupCmd.Parameters.AddWithValue("device_binding_id", binding.Id);
+            lookupCmd.Parameters.AddWithValue("child_id", binding.ChildId);
+            lookupCmd.Parameters.AddWithValue("family_group_id", binding.FamilyGroupId);
+            lookupCmd.Parameters.AddWithValue("parent_app_user_id", binding.ParentAppUserId);
+            lookupCmd.Parameters.AddWithValue("code_hash", HashSecret(code));
+            lookupCmd.Parameters.AddWithValue("token_hash", binding.TokenHash);
+            var value = await lookupCmd.ExecuteScalarAsync();
+            if (value is not null)
+            {
+                codeId = Convert.ToInt32(value, CultureInfo.InvariantCulture);
+            }
+        }
+
+        if (codeId is null)
+        {
+            await tx.RollbackAsync();
+            return new Dictionary<string, object?> { ["error"] = "解绑认证码无效或已过期" };
+        }
+
+        await using (var revokeCmd = new NpgsqlCommand("""
+            UPDATE watch_device_bindings
+            SET revoked_at = CURRENT_TIMESTAMP
+            WHERE id = @id AND device_token_hash = @token_hash AND revoked_at IS NULL
+            """, conn, tx))
+        {
+            revokeCmd.Parameters.AddWithValue("id", binding.Id);
+            revokeCmd.Parameters.AddWithValue("token_hash", binding.TokenHash);
+            if (await revokeCmd.ExecuteNonQueryAsync() != 1)
+            {
+                await tx.RollbackAsync();
+                return new Dictionary<string, object?> { ["error"] = "设备不存在或已解绑" };
+            }
+        }
+
+        await using (var useCodeCmd = new NpgsqlCommand("UPDATE watch_device_unbind_codes SET used_at = CURRENT_TIMESTAMP WHERE id = @id", conn, tx))
+        {
+            useCodeCmd.Parameters.AddWithValue("id", codeId.Value);
+            await useCodeCmd.ExecuteNonQueryAsync();
+        }
+
+        await tx.CommitAsync();
+        return new Dictionary<string, object?> { ["status"] = "ok" };
+    }
+    catch (Exception ex)
+    {
+        await tx.RollbackAsync();
+        return new Dictionary<string, object?> { ["error"] = ex.Message };
+    }
 }
 
 static async Task<Dictionary<string, object?>?> GetChildForFamily(NpgsqlConnection conn, NpgsqlTransaction? tx, int childId, int familyGroupId)
@@ -4858,7 +5326,7 @@ sealed class SystemConfigStore
             ["apiKey"] = "",
             ["model"] = "gpt-4o-mini",
             ["timeout_seconds"] = 20,
-            ["systemPrompt"] = "你是家庭积分系统智能助手，输出简短可执行建议。"
+            ["systemPrompt"] = "你是家加分智能助手，输出简短可执行建议。"
         }
     };
 }
