@@ -3307,8 +3307,19 @@ static async Task<int> EnsureFamilyGroup(NpgsqlConnection conn, string name, str
 static async Task<List<Dictionary<string, object?>>> GetFamilyGroups(string connectionString, string userId)
 {
     await using var conn = await OpenConnection(connectionString);
-    await EnsureFamilyGroup(conn, DefaultFamilyGroupName, string.IsNullOrWhiteSpace(userId) ? DefaultUserId : userId);
+    var normalizedUserId = string.IsNullOrWhiteSpace(userId) ? DefaultUserId : userId;
+    var rows = await QueryFamilyGroups(conn, normalizedUserId);
+    if (rows.Count > 0)
+    {
+        return rows;
+    }
 
+    await EnsureFamilyGroup(conn, DefaultFamilyGroupName, normalizedUserId);
+    return await QueryFamilyGroups(conn, normalizedUserId);
+}
+
+static async Task<List<Dictionary<string, object?>>> QueryFamilyGroups(NpgsqlConnection conn, string userId)
+{
     await using var cmd = new NpgsqlCommand("""
         SELECT fg.id, fg.name, fg.description, fg.created_by, fgu.role, fg.created_at, fg.updated_at
         FROM family_groups fg
@@ -3316,7 +3327,7 @@ static async Task<List<Dictionary<string, object?>>> GetFamilyGroups(string conn
         WHERE fg.created_by = @user_id OR fgu.user_id = @user_id OR @user_id = @default_user_id
         ORDER BY fg.id
         """, conn);
-    cmd.Parameters.AddWithValue("user_id", string.IsNullOrWhiteSpace(userId) ? DefaultUserId : userId);
+    cmd.Parameters.AddWithValue("user_id", userId);
     cmd.Parameters.AddWithValue("default_user_id", DefaultUserId);
 
     var rows = new List<Dictionary<string, object?>>();
