@@ -17,7 +17,6 @@ interface FamilyGroupContextType {
 const FamilyGroupContext = createContext<FamilyGroupContextType | null>(null);
 
 export function FamilyGroupProvider({ children }: { children: ReactNode }) {
-  const { userId } = useAuth();
   const [groups, setGroups] = useState<FamilyGroup[]>([]);
   const [selectedGroupId, setSelectedGroupId] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
@@ -27,7 +26,7 @@ export function FamilyGroupProvider({ children }: { children: ReactNode }) {
     try {
       setLoading(true);
       setError(null);
-      const res = await getFamilyGroups({ userId: userId || undefined });
+      const res = await getFamilyGroups();
       const nextGroups = Array.isArray(res) ? res : [];
       setGroups(nextGroups);
       setSelectedGroupId((current) => {
@@ -42,7 +41,7 @@ export function FamilyGroupProvider({ children }: { children: ReactNode }) {
     } finally {
       setLoading(false);
     }
-  }, [userId]);
+  }, []);
 
   useEffect(() => {
     refreshGroups();
@@ -57,12 +56,12 @@ export function FamilyGroupProvider({ children }: { children: ReactNode }) {
     if (!trimmed) {
       throw new Error('请输入家庭组名称');
     }
-    const created = await createFamilyGroup({ name: trimmed, userId: userId || undefined });
+    const created = await createFamilyGroup({ name: trimmed });
     setGroups((current) => [...current, created]);
     setSelectedGroupId(created.id);
     setError(null);
     return created;
-  }, [userId]);
+  }, []);
 
   const selectedGroup = useMemo(
     () => groups.find((group) => group.id === selectedGroupId) ?? null,

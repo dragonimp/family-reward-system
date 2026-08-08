@@ -7,7 +7,8 @@ import { useFamilyGroup } from '../contexts/FamilyGroupContext';
 import type { FamilyGroupInvite } from '../types';
 
 export default function FamilyGroups() {
-  const { userId } = useAuth();
+  const { userId, appProfile } = useAuth();
+  const appUserId = appProfile?.appUserId || userId;
   const {
     groups,
     selectedGroupId,
@@ -30,8 +31,8 @@ export default function FamilyGroups() {
     : '未选择';
 
   const ownedCount = useMemo(
-    () => groups.filter((group) => group.role === 'owner' || group.createdBy === userId).length,
-    [groups, userId],
+    () => groups.filter((group) => group.role === 'owner' || group.createdBy === appUserId).length,
+    [groups, appUserId],
   );
 
   useEffect(() => {
@@ -67,7 +68,6 @@ export default function FamilyGroups() {
       const created = await createFamilyGroup({
         name: trimmed,
         description: newDescription.trim(),
-        userId: userId || undefined,
       });
       await refreshGroups();
       selectGroup(created.id);
@@ -221,7 +221,7 @@ export default function FamilyGroups() {
 
           <Card className="p-5">
             <h3 className="text-lg font-semibold text-gray-900 mb-4">邀请</h3>
-            {selectedGroup && (selectedGroup.role === 'owner' || selectedGroup.createdBy === userId) && invite ? (
+            {selectedGroup && (selectedGroup.role === 'owner' || selectedGroup.createdBy === appUserId) && invite ? (
               <div className="space-y-3">
                 <div className="rounded-lg border border-blue-200 bg-blue-50 p-4 text-center">
                   <p className="text-xs text-blue-600 mb-1">8 位家庭邀请码</p>

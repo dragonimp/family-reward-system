@@ -148,17 +148,8 @@ app.MapPost("/api/family-groups", async (JsonObject body, HttpRequest request) =
 {
     var access = await RequireParentProfile(connectionString, request);
     if (access.Error is not null) return access.Error;
-    var userId = body.String("user_id");
-    if (string.IsNullOrWhiteSpace(userId))
-    {
-        userId = body.String("userId");
-    }
-    if (string.IsNullOrWhiteSpace(userId))
-    {
-        userId = access.Profile!.AppUserId;
-    }
 
-    var created = await CreateFamilyGroup(connectionString, body.String("name"), userId, body.String("description"));
+    var created = await CreateFamilyGroup(connectionString, body.String("name"), access.Profile!.AppUserId, body.String("description"));
     if (!created.Success)
     {
         return Results.BadRequest(new { error = created.Error });
@@ -2889,7 +2880,7 @@ static async Task InitDatabase(string connectionString)
         """
         CREATE TABLE IF NOT EXISTS family_groups (
             id SERIAL PRIMARY KEY,
-            name VARCHAR(100) NOT NULL UNIQUE,
+            name VARCHAR(100) NOT NULL,
             description TEXT,
             created_by VARCHAR(100) NOT NULL,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -3020,6 +3011,39 @@ static async Task InitDatabase(string connectionString)
             WHEN duplicate_object THEN NULL;
         END $$;
         """,
+        "ALTER TABLE family_groups DROP CONSTRAINT IF EXISTS family_groups_name_key",
+        """
+        DELETE FROM family_group_users old_user
+        USING app_user_profiles aup
+        WHERE old_user.user_id = aup.unified_user_id
+          AND aup.role = 'parent'
+          AND aup.app_user_id <> aup.unified_user_id
+          AND EXISTS (
+              SELECT 1
+              FROM family_group_users new_user
+              WHERE new_user.family_group_id = old_user.family_group_id
+                AND new_user.user_id = aup.app_user_id
+          )
+        """,
+        """
+        UPDATE family_group_users fgu
+        SET user_id = aup.app_user_id,
+            updated_at = CURRENT_TIMESTAMP
+        FROM app_user_profiles aup
+        WHERE fgu.user_id = aup.unified_user_id
+          AND aup.role = 'parent'
+          AND aup.app_user_id <> aup.unified_user_id
+        """,
+        """
+        UPDATE family_groups fg
+        SET created_by = aup.app_user_id,
+            updated_at = CURRENT_TIMESTAMP
+        FROM app_user_profiles aup
+        WHERE fg.created_by = aup.unified_user_id
+          AND aup.role = 'parent'
+          AND aup.app_user_id <> aup.unified_user_id
+        """,
+        "CREATE UNIQUE INDEX IF NOT EXISTS ux_family_groups_created_by_name ON family_groups(created_by, name)",
         "ALTER TABLE children DROP CONSTRAINT IF EXISTS children_name_key",
         "ALTER TABLE children DROP CONSTRAINT IF EXISTS children_family_group_id_name_key",
         "DROP INDEX IF EXISTS ux_children_family_group_name",
@@ -3137,6 +3161,7 @@ static async Task InitDatabase(string connectionString)
         "CREATE INDEX IF NOT EXISTS idx_tx_date ON transactions(date)",
         "CREATE INDEX IF NOT EXISTS idx_tx_type ON transactions(type)",
         "CREATE INDEX IF NOT EXISTS idx_children_family_group ON children(family_group_id)",
+        "CREATE INDEX IF NOT EXISTS idx_family_groups_created_by ON family_groups(created_by)",
         "CREATE INDEX IF NOT EXISTS idx_family_group_users_user ON family_group_users(user_id)",
         "CREATE INDEX IF NOT EXISTS idx_family_group_invites_code ON family_group_invites(invite_code) WHERE revoked_at IS NULL",
         "CREATE INDEX IF NOT EXISTS idx_app_user_profiles_unified ON app_user_profiles(unified_user_id)",
@@ -3259,7 +3284,7 @@ static async Task<int> EnsureFamilyGroup(NpgsqlConnection conn, string name, str
     await using var cmd = new NpgsqlCommand("""
         INSERT INTO family_groups (name, description, created_by)
         VALUES (@name, @description, @created_by)
-        ON CONFLICT (name) DO UPDATE SET updated_at = CURRENT_TIMESTAMP
+        ON CONFLICT (created_by, name) DO UPDATE SET updated_at = CURRENT_TIMESTAMP
         RETURNING id
         """, conn);
     cmd.Parameters.AddWithValue("name", name.Trim());
