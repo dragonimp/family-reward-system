@@ -82,6 +82,31 @@ if (!apiSource.includes("const formatPoints = (value)") ||
 if (formatPoints(9999.9) !== "9999.9") {
   errors.push("watch score formatter failed the 9999.9 regression case");
 }
+for (const responsiveRequirement of [
+  "height:100dvh",
+  "overflow:hidden",
+  "--watch-size:min(",
+  "const calculatePanelScale = (availableWidth, availableHeight, contentWidth, contentHeight)",
+  "window.addEventListener('orientationchange', fitActivePanel)",
+  "window.visualViewport.addEventListener('resize', fitActivePanel)"
+]) {
+  if (!apiSource.includes(responsiveRequirement)) {
+    errors.push(`watch viewport adaptation missing: ${responsiveRequirement}`);
+  }
+}
+if (/\.panel\{[^}]*overflow:auto/.test(apiSource)) {
+  errors.push("watch panels must fit the viewport without scrollbars");
+}
+const clamp = (min, value, max) => Math.min(max, Math.max(min, value));
+for (const [width, height] of [[194, 368], [240, 240], [320, 360], [466, 466], [368, 194]]) {
+  const vmin = Math.min(width, height) / 100;
+  const menuReserve = clamp(36, 14 * vmin, 52);
+  const shellMargin = clamp(26, 10 * vmin, 38);
+  const faceSize = Math.min(width - menuReserve, height - 8, 346);
+  if (faceSize <= 0 || faceSize + shellMargin > width) {
+    errors.push(`watch face does not fit representative viewport: ${width}x${height}`);
+  }
+}
 for (const unbindRequirement of [
   'app.MapPost("/api/watch/device-unbind", async (JsonObject body, HttpRequest request)',
   'app.MapPost("/api/children/{id:int}/devices/{deviceId:int}/unbind-code"',

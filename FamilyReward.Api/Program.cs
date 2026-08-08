@@ -233,7 +233,8 @@ app.MapGet("/api/children", async (HttpRequest request) =>
     var access = await RequireParentProfile(connectionString, request);
     if (access.Error is not null) return access.Error;
     var familyGroupId = await ResolveFamilyGroupId(connectionString, request);
-    return Results.Json(await GetChildren(connectionString, familyGroupId));
+    var ownedOnly = request.Query.Bool("ownedOnly") ?? request.Query.Bool("owned_only") ?? false;
+    return Results.Json(await GetChildren(connectionString, familyGroupId, ownerAppUserId: ownedOnly ? access.Profile!.AppUserId : null));
 });
 
 app.MapGet("/api/children/{id:int}", async (int id, HttpRequest request) =>
@@ -353,7 +354,33 @@ app.MapGet("/watch", () =>
           <link rel="icon" href="/watch/icon.svg" type="image/svg+xml">
           <title>手表积分</title>
           <style>
-            *{box-sizing:border-box}body{min-height:100vh;margin:0;overflow-x:hidden;background:#dce8e2;color:#102019;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}.wrap{width:min(100vw,390px);margin:0 auto;padding:10px 9px}.watch-shell{position:relative;margin:0 auto;width:min(calc(100vw - 52px),346px);max-width:346px}.watch-face{position:relative;aspect-ratio:1/1;overflow:hidden;border-radius:50%;border:10px solid #17231b;background:#f9fbf7;box-shadow:0 12px 30px rgba(16,32,25,.2),inset 0 0 0 1px #cad7ce}.watch-face:before{content:"";position:absolute;inset:14px;border:1px solid #d8e2dc;border-radius:50%;pointer-events:none}.screen{position:absolute;inset:24px;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center}.topline{position:absolute;top:23px;left:58px;right:58px;display:flex;align-items:center;justify-content:center;gap:4px;color:#65736b;font-size:11px;white-space:nowrap}.brand{font-size:12px;font-weight:900;color:#245138;letter-spacing:0}.home-child{max-width:170px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:24px;font-weight:900}.score-ring{display:grid;place-items:center;width:150px;height:150px;margin:10px 0 6px;border-radius:50%;border:7px solid #1f7a48;background:#fff}.score{width:100%;padding:0 4px;color:#0c6f3b;font-size:clamp(28px,10vw,38px);font-variant-numeric:tabular-nums;font-weight:900;letter-spacing:-1.5px;line-height:.95;white-space:nowrap}.unit{margin-top:5px;color:#5c6b62;font-size:12px;font-weight:800}.metric-row{display:grid;grid-template-columns:1fr 1fr;gap:6px;width:170px}.metric{min-width:0;border:1px solid #d7e1da;border-radius:8px;padding:5px 6px;background:#eef5f0}.metric b{display:block;color:#24352b;font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.metric span{display:block;margin-top:1px;color:#65736b;font-size:10px}.menu-dock{position:absolute;right:-3px;top:50%;z-index:3;display:grid;gap:6px;transform:translateY(-50%)}.menu-btn{display:grid;place-items:center;width:42px;height:42px;border:2px solid #17231b;border-radius:50%;background:#fff;color:#17231b;font-size:11px;font-weight:900;box-shadow:0 4px 10px rgba(16,32,25,.16)}.menu-btn.active{background:#1f7a48;color:#fff}.panel{display:none;width:205px;max-height:222px;overflow:auto;text-align:left}.panel.active{display:block}.panel[data-panel=home],#bind-panel .panel{text-align:center}.panel h1,.panel h2{margin:0 0 8px;text-align:center;font-size:18px;line-height:1.1}.bind-title{font-size:20px;font-weight:900}.bind-sub{margin:5px 0 10px;color:#65736b;font-size:12px}.rules{display:grid;gap:6px}.rule-btn{display:flex;align-items:center;justify-content:space-between;gap:6px;width:100%;min-height:34px;border:1px solid #d3ded7;border-radius:8px;background:#fff;color:#17231b;padding:6px 8px;font-size:12px;text-align:left}.rule-btn span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.rule-btn b{color:#0c6f3b;white-space:nowrap}label{display:block;margin:7px 0 3px;color:#44544a;font-size:11px;font-weight:700}input,textarea{width:100%;border:1px solid #cbd8cf;border-radius:8px;background:#fff;color:#17231b;padding:7px;font-size:14px}textarea{min-height:44px;resize:vertical}.submit,.ghost{width:100%;margin-top:8px;border:0;border-radius:8px;padding:9px;font-size:14px;font-weight:900}.submit{background:#1f7a48;color:#fff}.ghost{background:#e7efe9;color:#17462c}.msg{min-height:16px;margin:6px 0 0;text-align:center;color:#16643a;font-size:11px}.requests{list-style:none;margin:0;padding:0;display:grid;gap:5px}.requests li{display:grid;grid-template-columns:1fr auto;gap:6px;border-top:1px solid #e3ebe6;padding-top:5px;color:#25362c;font-size:11px}.requests span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.requests b{color:#71601b;white-space:nowrap}.empty,.empty-row{color:#64746a;text-align:center;font-size:12px}.code{text-align:center;letter-spacing:3px;font-size:22px;font-weight:900;text-transform:uppercase}.hidden{display:none!important}@media(max-width:260px){.wrap{padding:6px}.watch-face{border-width:8px}.screen{inset:20px}.topline{top:20px;left:48px;right:48px;font-size:10px}.home-child{font-size:20px}.score-ring{width:112px;height:112px}.score{font-size:28px;padding:0 2px}.metric-row{width:148px}.panel{width:176px;max-height:192px}.panel h1,.panel h2{font-size:16px}.menu-btn{width:35px;height:35px;font-size:10px}.rules{gap:4px}input,textarea{font-size:13px;padding:6px}}
+            *{box-sizing:border-box}
+            html,body{width:100%;height:100%;overscroll-behavior:none}
+            body{min-height:100vh;height:100vh;height:100dvh;margin:0;overflow:hidden;background:#dce8e2;color:#102019;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+            .wrap{display:grid;place-items:center;width:100%;height:100%;padding:4px;padding:4px max(4px,env(safe-area-inset-right)) 4px max(4px,env(safe-area-inset-left));overflow:hidden}
+            .watch-shell{--watch-size:min(calc(100vw - clamp(36px,14vmin,52px)),calc(100vh - 8px),346px);position:relative;width:var(--watch-size);height:var(--watch-size);margin-right:clamp(26px,10vmin,38px)}
+            @supports(height:100dvh){.watch-shell{--watch-size:min(calc(100vw - clamp(36px,14vmin,52px)),calc(100dvh - 8px),346px)}}
+            .watch-face{position:relative;width:100%;height:100%;overflow:hidden;border-radius:50%;border:clamp(6px,2.8vmin,10px) solid #17231b;background:#f9fbf7;box-shadow:0 12px 30px rgba(16,32,25,.2),inset 0 0 0 1px #cad7ce}
+            .watch-face:before{content:"";position:absolute;inset:clamp(8px,4vmin,14px);border:1px solid #d8e2dc;border-radius:50%;pointer-events:none}
+            .screen{position:absolute;inset:clamp(14px,7vmin,24px);display:flex;align-items:center;justify-content:center;overflow:hidden;text-align:center}
+            .topline{position:absolute;top:clamp(12px,6vmin,23px);left:18%;right:18%;display:flex;align-items:center;justify-content:center;gap:4px;overflow:hidden;color:#65736b;font-size:clamp(9px,3.2vmin,11px);white-space:nowrap}
+            .brand{font-size:clamp(10px,3.5vmin,12px);font-weight:900;color:#245138}
+            .home-child{max-width:min(170px,70vmin);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:clamp(18px,7vmin,24px);font-weight:900}
+            .score-ring{display:grid;place-items:center;width:clamp(76px,42vmin,150px);height:clamp(76px,42vmin,150px);margin:clamp(4px,2.8vmin,10px) 0 clamp(3px,1.8vmin,6px);border-radius:50%;border:clamp(4px,2vmin,7px) solid #1f7a48;background:#fff}
+            .score{width:100%;padding:0 2px;color:#0c6f3b;font-size:clamp(24px,10vmin,38px);font-variant-numeric:tabular-nums;font-weight:900;letter-spacing:-1.5px;line-height:.95;white-space:nowrap}
+            .unit{margin-top:clamp(2px,1.4vmin,5px);color:#5c6b62;font-size:clamp(9px,3.5vmin,12px);font-weight:800}
+            .metric-row{display:grid;grid-template-columns:1fr 1fr;gap:clamp(3px,1.8vmin,6px);width:min(170px,70vmin)}
+            .metric{min-width:0;border:1px solid #d7e1da;border-radius:8px;padding:clamp(3px,1.4vmin,5px) clamp(4px,1.8vmin,6px);background:#eef5f0}
+            .metric b{display:block;overflow:hidden;color:#24352b;font-size:clamp(11px,4vmin,14px);text-overflow:ellipsis;white-space:nowrap}.metric span{display:block;margin-top:1px;color:#65736b;font-size:clamp(8px,3vmin,10px)}
+            .menu-dock{position:absolute;right:clamp(-4px,-1vmin,-2px);top:50%;z-index:3;display:grid;gap:clamp(3px,1.8vmin,6px);transform:translateY(-50%)}
+            .menu-btn{display:grid;place-items:center;width:clamp(30px,12vmin,42px);height:clamp(30px,12vmin,42px);border:2px solid #17231b;border-radius:50%;background:#fff;color:#17231b;font-size:clamp(9px,3.2vmin,11px);font-weight:900;box-shadow:0 4px 10px rgba(16,32,25,.16)}.menu-btn.active{background:#1f7a48;color:#fff}
+            .panel{--panel-scale:1;display:none;width:min(205px,100%);max-width:100%;overflow:hidden;text-align:left;transform:scale(var(--panel-scale));transform-origin:center;will-change:transform}.panel.active{display:block}.panel[data-panel=home],#bind-panel .panel{text-align:center}
+            .panel h1,.panel h2{margin:0 0 8px;text-align:center;font-size:18px;line-height:1.1}.bind-title{font-size:20px;font-weight:900}.bind-sub{margin:5px 0 10px;color:#65736b;font-size:12px}.rules{display:grid;gap:6px}
+            .rule-btn{display:flex;align-items:center;justify-content:space-between;gap:6px;width:100%;min-height:34px;border:1px solid #d3ded7;border-radius:8px;background:#fff;color:#17231b;padding:6px 8px;font-size:12px;text-align:left}.rule-btn span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.rule-btn b{color:#0c6f3b;white-space:nowrap}
+            label{display:block;margin:7px 0 3px;color:#44544a;font-size:11px;font-weight:700}input,textarea{width:100%;border:1px solid #cbd8cf;border-radius:8px;background:#fff;color:#17231b;padding:7px;font-size:14px}textarea{min-height:44px;resize:none}.submit,.ghost{width:100%;margin-top:8px;border:0;border-radius:8px;padding:9px;font-size:14px;font-weight:900}.submit{background:#1f7a48;color:#fff}.ghost{background:#e7efe9;color:#17462c}.msg{min-height:16px;margin:6px 0 0;text-align:center;color:#16643a;font-size:11px}
+            .requests{list-style:none;margin:0;padding:0;display:grid;gap:5px}.requests li{display:grid;grid-template-columns:1fr auto;gap:6px;border-top:1px solid #e3ebe6;padding-top:5px;color:#25362c;font-size:11px}.requests span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.requests b{color:#71601b;white-space:nowrap}.empty,.empty-row{color:#64746a;text-align:center;font-size:12px}.code{text-align:center;letter-spacing:3px;font-size:22px;font-weight:900;text-transform:uppercase}.hidden{display:none!important}
+            @media(max-width:260px),(max-height:260px){.panel h1,.panel h2{font-size:16px}.rules{gap:4px}input,textarea{font-size:13px;padding:6px}}
+            @media(prefers-reduced-motion:reduce){.panel{will-change:auto}}
           </style>
         </head>
         <body>
@@ -439,14 +466,32 @@ app.MapGet("/watch", () =>
                 ? points.toLocaleString('zh-CN', { useGrouping: false, minimumFractionDigits: 0, maximumFractionDigits: 1 })
                 : '0';
             };
+            const calculatePanelScale = (availableWidth, availableHeight, contentWidth, contentHeight) =>
+              Math.min(1, availableWidth / Math.max(1, contentWidth), availableHeight / Math.max(1, contentHeight));
+            const fitActivePanel = () => requestAnimationFrame(() => {
+              document.querySelectorAll('.screen:not(.hidden)').forEach((screen) => {
+                const panel = screen.querySelector('.panel.active');
+                if (!panel) return;
+                panel.style.setProperty('--panel-scale', '1');
+                const scale = calculatePanelScale(
+                  Math.max(1, screen.clientWidth - 2),
+                  Math.max(1, screen.clientHeight - 2),
+                  Math.max(panel.offsetWidth, panel.scrollWidth),
+                  Math.max(panel.offsetHeight, panel.scrollHeight)
+                );
+                panel.style.setProperty('--panel-scale', String(Math.max(.1, scale)));
+              });
+            });
             const showBound = (bound) => {
               document.getElementById('bind-panel').classList.toggle('hidden', bound);
               document.getElementById('app-panel').classList.toggle('hidden', !bound);
               document.getElementById('menu').classList.toggle('hidden', !bound);
+              fitActivePanel();
             };
             const setView = (view) => {
               document.querySelectorAll('[data-panel]').forEach((panel) => panel.classList.toggle('active', panel.dataset.panel === view));
               document.querySelectorAll('.menu-btn').forEach((button) => button.classList.toggle('active', button.dataset.view === view));
+              fitActivePanel();
             };
             const fetchJson = async (url, options = {}) => {
               const response = await fetch(url, options);
@@ -483,6 +528,7 @@ app.MapGet("/watch", () =>
                 });
                 document.getElementById('requests').innerHTML = (requestsPayload.requests || []).map((item) => `
                   <li><span>${escapeText(item.childName)} · ${escapeText(item.title)}</span><b>${escapeText(item.statusText)}</b></li>`).join('') || '<li class="empty-row">暂无申请</li>';
+                fitActivePanel();
               } catch (error) {
                 localStorage.removeItem(tokenKey);
                 showBound(false);
@@ -544,6 +590,10 @@ app.MapGet("/watch", () =>
             document.querySelectorAll('.menu-btn').forEach((button) => {
               button.addEventListener('click', () => setView(button.dataset.view || 'home'));
             });
+            window.addEventListener('resize', fitActivePanel);
+            window.addEventListener('orientationchange', fitActivePanel);
+            if (window.visualViewport) window.visualViewport.addEventListener('resize', fitActivePanel);
+            if (document.fonts && document.fonts.ready) document.fonts.ready.then(fitActivePanel);
             load();
           </script>
         </body>
@@ -647,7 +697,7 @@ app.MapDelete("/api/children/{id:int}", async (int id, HttpRequest request) =>
     var access = await RequireParentProfile(connectionString, request);
     if (access.Error is not null) return access.Error;
     var familyGroupId = await ResolveFamilyGroupId(connectionString, request);
-    var result = await DeleteChildMembership(connectionString, id, familyGroupId);
+    var result = await DeleteChildMembership(connectionString, id, familyGroupId, access.Profile!.AppUserId);
     return result.ContainsKey("error") ? Results.NotFound(result) : Results.Json(result);
 });
 
@@ -2151,7 +2201,7 @@ static async Task<object> McpDeleteChild(string connectionString, JsonObject arg
     }
 
     var familyGroupId = GetInt(target, "family_group_id");
-    var result = await DeleteChildMembership(connectionString, GetInt(target, "id"), familyGroupId);
+    var result = await DeleteChildMembership(connectionString, GetInt(target, "id"), familyGroupId, arguments.String("user_id", DefaultUserId));
     return !result.ContainsKey("error")
         ? new { ok = true, action = "delete_child", child = target }
         : new { ok = false, error = result["error"] };
@@ -3791,7 +3841,7 @@ static async Task<int> EnsureChildInFamilyGroup(NpgsqlConnection conn, int famil
         INSERT INTO accounts (child_id, profile_key, points, cash_cny, items_count)
         VALUES (@child_id, @profile_key, 0, 0, 0)
         ON CONFLICT (profile_key) DO UPDATE SET updated_at = CURRENT_TIMESTAMP
-        """, conn);
+        """, conn, tx);
     accountCmd.Parameters.AddWithValue("child_id", childId);
     accountCmd.Parameters.AddWithValue("profile_key", profileKey);
     await accountCmd.ExecuteNonQueryAsync();
@@ -3995,7 +4045,11 @@ static Dictionary<string, object?> ReadFamilyGroup(IDataRecord reader) => new()
     ["updatedAt"] = reader.DateTime("updated_at").ToString("O")
 };
 
-static async Task<List<Dictionary<string, object?>>> GetChildren(string connectionString, int? familyGroupId = null, string? childProfileKey = null)
+static async Task<List<Dictionary<string, object?>>> GetChildren(
+    string connectionString,
+    int? familyGroupId = null,
+    string? childProfileKey = null,
+    string? ownerAppUserId = null)
 {
     await using var conn = await OpenConnection(connectionString);
     await using var cmd = new NpgsqlCommand("""
@@ -4015,6 +4069,14 @@ static async Task<List<Dictionary<string, object?>>> GetChildren(string connecti
         WHERE COALESCE(cp.status, c.status) = 'active'
           AND (@family_group_id IS NULL OR c.family_group_id = @family_group_id)
           AND (@child_profile_key IS NULL OR c.profile_key = @child_profile_key)
+          AND (
+              @owner_app_user_id IS NULL OR EXISTS (
+                  SELECT 1
+                  FROM child_user_bindings cub
+                  WHERE cub.child_profile_key = c.profile_key
+                    AND cub.parent_app_user_id = @owner_app_user_id
+              )
+          )
         ORDER BY c.id
         """, conn);
     cmd.Parameters.Add(new NpgsqlParameter("family_group_id", NpgsqlDbType.Integer)
@@ -4024,6 +4086,10 @@ static async Task<List<Dictionary<string, object?>>> GetChildren(string connecti
     cmd.Parameters.Add(new NpgsqlParameter("child_profile_key", NpgsqlDbType.Varchar)
     {
         Value = string.IsNullOrWhiteSpace(childProfileKey) ? DBNull.Value : childProfileKey
+    });
+    cmd.Parameters.Add(new NpgsqlParameter("owner_app_user_id", NpgsqlDbType.Varchar)
+    {
+        Value = string.IsNullOrWhiteSpace(ownerAppUserId) ? DBNull.Value : ownerAppUserId
     });
     var rows = new List<Dictionary<string, object?>>();
     await using var reader = await cmd.ExecuteReaderAsync();
@@ -4169,7 +4235,7 @@ static async Task<Dictionary<string, object?>> CreateTransaction(string connecti
     }
 }
 
-static async Task<Dictionary<string, object?>> DeleteChildMembership(string connectionString, int id, int familyGroupId)
+static async Task<Dictionary<string, object?>> DeleteChildMembership(string connectionString, int id, int familyGroupId, string parentAppUserId)
 {
     await using var conn = await OpenConnection(connectionString);
     await using var tx = await conn.BeginTransactionAsync();
@@ -4180,16 +4246,23 @@ static async Task<Dictionary<string, object?>> DeleteChildMembership(string conn
             SELECT profile_key
             FROM children
             WHERE id = @id AND family_group_id = @family_group_id
+              AND EXISTS (
+                  SELECT 1
+                  FROM child_user_bindings cub
+                  WHERE cub.child_profile_key = children.profile_key
+                    AND cub.parent_app_user_id = @parent_app_user_id
+              )
             FOR UPDATE
             """, conn, tx))
         {
             lookup.Parameters.AddWithValue("id", id);
             lookup.Parameters.AddWithValue("family_group_id", familyGroupId);
+            lookup.Parameters.AddWithValue("parent_app_user_id", parentAppUserId);
             var value = await lookup.ExecuteScalarAsync();
             if (value is null || value is DBNull)
             {
                 await tx.RollbackAsync();
-                return new Dictionary<string, object?> { ["error"] = "孩子不存在" };
+                return new Dictionary<string, object?> { ["error"] = "孩子不存在，或只有孩子的所属账号可以删除" };
             }
             profileKey = Convert.ToString(value, CultureInfo.InvariantCulture) ?? "";
         }
@@ -4242,11 +4315,11 @@ static async Task<Dictionary<string, object?>> CreateChildAuthCode(string connec
     await using var tx = await conn.BeginTransactionAsync();
     try
     {
-        var child = await GetChildForFamily(conn, tx, childId, familyGroupId);
+        var child = await GetChildForFamily(conn, tx, childId, familyGroupId, parentAppUserId);
         if (child is null)
         {
             await tx.RollbackAsync();
-            return new Dictionary<string, object?> { ["error"] = "孩子不属于当前家庭组" };
+            return new Dictionary<string, object?> { ["error"] = "孩子不属于当前家庭组，或只有孩子的所属账号可以生成认证码" };
         }
 
         await using (var expireCmd = new NpgsqlCommand("""
@@ -4299,10 +4372,10 @@ static async Task<Dictionary<string, object?>> CreateChildAuthCode(string connec
 static async Task<Dictionary<string, object?>> GetChildWatchDevices(string connectionString, int childId, int familyGroupId, string parentAppUserId)
 {
     await using var conn = await OpenConnection(connectionString);
-    var child = await GetChildForFamily(conn, null, childId, familyGroupId);
+    var child = await GetChildForFamily(conn, null, childId, familyGroupId, parentAppUserId);
     if (child is null)
     {
-        return new Dictionary<string, object?> { ["error"] = "孩子不属于当前家庭组" };
+        return new Dictionary<string, object?> { ["error"] = "孩子不属于当前家庭组，或只有孩子的所属账号可以查看设备" };
     }
 
     var devices = new List<Dictionary<string, object?>>();
@@ -4327,10 +4400,10 @@ static async Task<Dictionary<string, object?>> GetChildWatchDevices(string conne
 static async Task<Dictionary<string, object?>> RevokeChildWatchDevice(string connectionString, int childId, int deviceId, int familyGroupId, string parentAppUserId)
 {
     await using var conn = await OpenConnection(connectionString);
-    var child = await GetChildForFamily(conn, null, childId, familyGroupId);
+    var child = await GetChildForFamily(conn, null, childId, familyGroupId, parentAppUserId);
     if (child is null)
     {
-        return new Dictionary<string, object?> { ["error"] = "孩子不属于当前家庭组" };
+        return new Dictionary<string, object?> { ["error"] = "孩子不属于当前家庭组，或只有孩子的所属账号可以解绑设备" };
     }
     await using var cmd = new NpgsqlCommand("""
         UPDATE watch_device_bindings
@@ -4361,11 +4434,11 @@ static async Task<Dictionary<string, object?>> CreateWatchDeviceUnbindCode(
     await using var tx = await conn.BeginTransactionAsync();
     try
     {
-        var child = await GetChildForFamily(conn, tx, childId, familyGroupId);
+        var child = await GetChildForFamily(conn, tx, childId, familyGroupId, parentAppUserId);
         if (child is null)
         {
             await tx.RollbackAsync();
-            return new Dictionary<string, object?> { ["error"] = "孩子不属于当前家庭组" };
+            return new Dictionary<string, object?> { ["error"] = "孩子不属于当前家庭组，或只有孩子的所属账号可以生成解绑码" };
         }
 
         var bindingChildId = 0;
@@ -4684,7 +4757,12 @@ static async Task<Dictionary<string, object?>> UnbindWatchDeviceWithCode(string 
     }
 }
 
-static async Task<Dictionary<string, object?>?> GetChildForFamily(NpgsqlConnection conn, NpgsqlTransaction? tx, int childId, int familyGroupId)
+static async Task<Dictionary<string, object?>?> GetChildForFamily(
+    NpgsqlConnection conn,
+    NpgsqlTransaction? tx,
+    int childId,
+    int familyGroupId,
+    string? parentAppUserId = null)
 {
     await using var cmd = new NpgsqlCommand("""
         SELECT c.id, c.family_group_id, fg.name AS family_group_name,
@@ -4696,9 +4774,21 @@ static async Task<Dictionary<string, object?>?> GetChildForFamily(NpgsqlConnecti
         LEFT JOIN family_groups fg ON fg.id = c.family_group_id
         LEFT JOIN accounts a ON a.profile_key = c.profile_key
         WHERE c.id = @child_id AND c.family_group_id = @family_group_id AND c.status = 'active'
+          AND (
+              @parent_app_user_id IS NULL OR EXISTS (
+                  SELECT 1
+                  FROM child_user_bindings cub
+                  WHERE cub.child_profile_key = c.profile_key
+                    AND cub.parent_app_user_id = @parent_app_user_id
+              )
+          )
         """, conn, tx);
     cmd.Parameters.AddWithValue("child_id", childId);
     cmd.Parameters.AddWithValue("family_group_id", familyGroupId);
+    cmd.Parameters.Add(new NpgsqlParameter("parent_app_user_id", NpgsqlDbType.Varchar)
+    {
+        Value = string.IsNullOrWhiteSpace(parentAppUserId) ? DBNull.Value : parentAppUserId
+    });
     await using var reader = await cmd.ExecuteReaderAsync();
     if (!await reader.ReadAsync())
     {
@@ -5456,6 +5546,15 @@ static class QueryExtensions
 
     public static int? Int(this IQueryCollection query, string name) =>
         int.TryParse(query.String(name), NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsed) ? parsed : null;
+
+    public static bool? Bool(this IQueryCollection query, string name)
+    {
+        var value = query.String(name);
+        if (string.IsNullOrWhiteSpace(value)) return null;
+        return bool.TryParse(value, out var parsed)
+            ? parsed
+            : value is "1" or "yes" or "on";
+    }
 }
 
 static class FamilyRewardJson

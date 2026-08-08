@@ -11,7 +11,7 @@ export const joinFamilyGroup = (data: { inviteCode: string }) =>
   http.post<unknown, JoinFamilyGroupResult>('/api/family-groups/join', data);
 export const linkFamilyGroupUser = (id: number, data: { userId: string; role?: string }) => http.put(`/api/family-groups/${id}/users`, data);
 
-export const getChildren = (params?: { familyGroupId?: number; userId?: string }) => http.get('/api/children', { params });
+export const getChildren = (params?: { familyGroupId?: number; ownedOnly?: boolean }) => http.get('/api/children', { params });
 export const getChild = (id: number) => http.get(`/api/children/${id}`);
 export const createChild = (data: Partial<Child>) => http.post('/api/children', data);
 export const updateChild = (id: number, data: Partial<Child>) => http.put(`/api/children/${id}`, data);

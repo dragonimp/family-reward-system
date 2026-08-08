@@ -1,5 +1,21 @@
 # 家加分 - 进展日志
 
+## [2026-08-09] family-reward-REQ-014 全局孩子管理边界收紧
+- `/api/children` 增加 `ownedOnly` 服务端过滤；【孩子管理】页面只请求当前家长通过 `child_user_bindings` 绑定的孩子，不再从前端透传统一用户 ID。
+- 删除孩子、生成儿童认证码、查看/解绑手表设备、生成设备解绑码均校验当前家长是否为该孩子所属账号，避免家庭组成员通过手工 childId 管理别人孩子。
+- 保留仪表盘、积分操作、交易记录、统计报表按家庭组展示组内孩子的协作视图；只收紧“孩子管理”和设备管理边界。
+- `EnsureChildInFamilyGroup` 的账户初始化语句复用外层事务，保证创建家庭组、加入家庭组时自动同步名下孩子的事务一致性。
+- 验证证据：ASP.NET Core 构建通过（0 警告、0 错误）；前端 Node 测试 4/4、TypeScript/Vite 生产构建通过；watch app 校验通过；`git diff --check` 通过。`npm run lint` 仍受已登记 BUG-002 影响，缺少 ESLint 可执行文件。
+
+## [2026-08-09] family-reward-REQ-016 手表查询界面跨机型适配
+- `/watch` 页面改为锁定动态可视视口，表盘尺寸同时受宽度、`100dvh` 高度、横竖屏与安全区约束，短屏、方屏及横屏不再产生页面级滚动条。
+- 移除内容面板的 `overflow:auto` 和文本域拖动能力；激活面板根据实际可用宽高及内容尺寸计算缩放比例，在菜单切换、设备旋转、窗口/可视视口变化和字体加载完成后主动重新适配，避免内部滚动条。
+- 响应式尺寸使用 `clamp()`/`vmin` 覆盖表盘边框、内容边距、积分环、指标区和菜单按钮；菜单预留横向空间，避免窄屏被裁切。保留 `100vh` 和基础 padding 作为旧 WebView 回退。
+- 扩展 `watch-app/scripts/verify-watch-app.mjs`，检查动态视口、无滚动面板、主动适配事件，并覆盖 `194x368`、`240x240`、`320x360`、`466x466`、`368x194` 五组代表性纵向、方形和横向视口。
+- 验证证据：watch app 校验通过；ASP.NET Core 构建通过（0 警告、0 错误）；前端 Node 测试 4/4、TypeScript 检查和 Vite 生产构建通过；本地 `/health` 返回 200，实际 `/watch` 响应包含动态视口和主动适配逻辑且不含 `overflow:auto`；`git diff --check` 通过。当前 shell 没有 `npm`，仓库也未安装 ESLint 可执行文件，因此无法重跑 lint；本次未修改 React/TypeScript 源码。
+- Atlas 同步阻塞：运行时未暴露 Atlas MCP 工具或资源，`list_mcp_resources` 仅有其他插件，且 `codex mcp list` 返回 `No MCP servers configured yet`。因此无法读取 Atlas 中 REQ-016 的真实关联需求、缺陷、任务、公约和环境，也无法将 `family-reward-REQ-016`、`family-reward-TASK-008`、测试及完成证据写回或关闭。Atlas 连接恢复后应将需求和任务更新为完成，并补录本节全部实现与验证证据。
+- Orbit 重试复查：再次扫描运行时工具仍无 Atlas，MCP 资源只有 `codex_apps`，本机 Codex 也仍未配置 MCP server；REQ-016 实现、代表性视口回归和 `git diff --check` 复验通过，远端写回与关闭的阻塞条件未变化。
+
 ## [2026-05-29 16:30] 项目启动与开发
 - 完成后端 API 开发 (Python HTTP Server，零依赖)
 - 完成前端页面开发 (React + HTML)

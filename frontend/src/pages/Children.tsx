@@ -15,7 +15,6 @@ import {
   revokeChildWatchDevice,
   generateWatchDeviceUnbindCode,
 } from '../services';
-import { useAuth } from '../contexts/AuthContext';
 import { useFamilyGroup } from '../contexts/FamilyGroupContext';
 
 interface ChildForm {
@@ -27,7 +26,6 @@ interface ChildForm {
 
 export default function Children() {
   const navigate = useNavigate();
-  const { userId } = useAuth();
   const { selectedGroupId, selectedGroup, loading: familyGroupsLoading, error: familyGroupsError } = useFamilyGroup();
   const [children, setChildren] = useState<Child[]>([]);
   const [loading, setLoading] = useState(true);
@@ -56,7 +54,7 @@ export default function Children() {
     }
     try {
       if (!silent) setLoading(true);
-      const res = await getChildren({ familyGroupId: selectedGroupId, userId: userId || undefined });
+      const res = await getChildren({ familyGroupId: selectedGroupId, ownedOnly: true });
       setChildren(Array.isArray(res) ? res : res?.data || []);
     } catch (error) {
       console.error('加载失败:', error);
@@ -65,7 +63,7 @@ export default function Children() {
     } finally {
       setLoading(false);
     }
-  }, [selectedGroupId, userId]);
+  }, [selectedGroupId]);
 
   useEffect(() => {
     loadChildren();
@@ -110,7 +108,6 @@ export default function Children() {
         await createChild({
           ...formData,
           familyGroupId: selectedGroupId ?? undefined,
-          userId: userId || undefined,
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
         } as any);
