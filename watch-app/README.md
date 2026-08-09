@@ -23,6 +23,7 @@
 - `android/`：Android WebView 手表壳工程，可用于小米、华为以及 Android 系手表渠道打包。
 - `platforms/`：三家平台的上架适配配置和审核说明。
 - `store-listing/`：中文上架文案、权限说明、截图清单。
+- `STORE-SUBMISSION-GUIDE.md`：按小天才、小米、华为区分的上架执行手册。
 - `RELEASE-CHECKLIST.md`：平台账号、签名、真机截图、合规资料和完成证据边界。
 - `scripts/verify-watch-app.mjs`：不依赖 Android SDK 的发布配置校验。
 
