@@ -20,3 +20,25 @@ test('all account actions live inside the username menu', async () => {
   assert.match(userMenu, /修改密码/);
   assert.match(userMenu, /退出登录/);
 });
+
+test('username menu only switches families and closes after use', async () => {
+  const userMenu = await readFile(new URL('./src/components/UserMenu.tsx', import.meta.url), 'utf8');
+
+  assert.match(userMenu, /切换家庭/);
+  assert.doesNotMatch(userMenu, /新增家庭组|createGroup|showCreateGroupModal/);
+  assert.match(userMenu, /selectGroup\(group\.id\);\s*closeMenu\(\)/);
+  assert.match(userMenu, /menuRef\.current\?\.removeAttribute\('open'\)/);
+});
+
+test('family management exposes child owners and scoped removal', async () => {
+  const [page, services] = await Promise.all([
+    readFile(new URL('./src/pages/FamilyGroups.tsx', import.meta.url), 'utf8'),
+    readFile(new URL('./src/services/index.ts', import.meta.url), 'utf8'),
+  ]);
+
+  assert.match(page, />家庭管理</);
+  assert.match(page, /归属家长：\{child\.parentNames/);
+  assert.match(page, /removeFamilyGroupChild\(selectedGroupId, childToRemove\.id\)/);
+  assert.match(services, /api\/family-groups\/\$\{id\}\/children/);
+  assert.match(services, /api\/family-groups\/\$\{id\}\/children\/\$\{childId\}/);
+});

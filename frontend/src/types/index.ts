@@ -11,6 +11,7 @@ export interface Child {
   score?: number;
   cash?: number;
   items?: number;
+  parentNames?: string;
   avatar?: string;
   createdAt?: string;
   updatedAt?: string;

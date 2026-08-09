@@ -10,6 +10,10 @@ export const getFamilyGroupInvite = (id: number) => http.get<unknown, FamilyGrou
 export const joinFamilyGroup = (data: { inviteCode: string }) =>
   http.post<unknown, JoinFamilyGroupResult>('/api/family-groups/join', data);
 export const linkFamilyGroupUser = (id: number, data: { userId: string; role?: string }) => http.put(`/api/family-groups/${id}/users`, data);
+export const getFamilyGroupChildren = (id: number) =>
+  http.get<unknown, Child[]>(`/api/family-groups/${id}/children`);
+export const removeFamilyGroupChild = (id: number, childId: number) =>
+  http.delete(`/api/family-groups/${id}/children/${childId}`);
 
 export const getChildren = (params?: { familyGroupId?: number; ownedOnly?: boolean }) => http.get('/api/children', { params });
 export const getChild = (id: number) => http.get(`/api/children/${id}`);

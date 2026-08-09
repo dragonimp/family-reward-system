@@ -232,6 +232,30 @@ app.MapPut("/api/family-groups/{id:int}/users", async (int id, JsonObject body, 
     return linked.Success ? Results.Json(new { ok = true }) : Results.NotFound(new { error = linked.Error });
 });
 
+app.MapGet("/api/family-groups/{id:int}/children", async (int id, HttpRequest request) =>
+{
+    var access = await RequireParentProfile(connectionString, request);
+    if (access.Error is not null) return access.Error;
+    var result = await GetFamilyGroupChildren(connectionString, id, access.Profile!.AppUserId);
+    if (result.Forbidden)
+    {
+        return Results.Json(new { error = result.Error }, statusCode: StatusCodes.Status403Forbidden);
+    }
+    return result.Success ? Results.Json(result.Children) : Results.NotFound(new { error = result.Error });
+});
+
+app.MapDelete("/api/family-groups/{id:int}/children/{childId:int}", async (int id, int childId, HttpRequest request) =>
+{
+    var access = await RequireParentProfile(connectionString, request);
+    if (access.Error is not null) return access.Error;
+    var result = await RemoveChildFromFamilyGroup(connectionString, id, childId, access.Profile!.AppUserId);
+    if (result.Forbidden)
+    {
+        return Results.Json(new { error = result.Error }, statusCode: StatusCodes.Status403Forbidden);
+    }
+    return result.Success ? Results.Json(new { status = "ok" }) : Results.NotFound(new { error = result.Error });
+});
+
 app.MapGet("/api/children", async (HttpRequest request) =>
 {
     var access = await RequireParentProfile(connectionString, request);
@@ -381,9 +405,11 @@ app.MapGet("/watch", () =>
             .metric-row{display:grid;grid-template-columns:1fr 1fr;gap:clamp(3px,1.8vmin,6px);width:min(170px,70vmin)}
             .metric{min-width:0;border:1px solid #d7e1da;border-radius:8px;padding:clamp(3px,1.4vmin,5px) clamp(4px,1.8vmin,6px);background:#eef5f0}
             .metric b{display:block;overflow:hidden;color:#24352b;font-size:clamp(11px,4vmin,14px);text-overflow:ellipsis;white-space:nowrap}.metric span{display:block;margin-top:1px;color:#65736b;font-size:clamp(8px,3vmin,10px)}
-            .menu-dock{position:absolute;right:clamp(-4px,-1vmin,-2px);top:50%;z-index:3;display:grid;gap:clamp(3px,1.8vmin,6px);transform:translateY(-50%)}
-            .menu-btn{display:grid;place-items:center;width:clamp(30px,12vmin,42px);height:clamp(30px,12vmin,42px);border:2px solid #17231b;border-radius:50%;background:#fff;color:#17231b;font-size:clamp(9px,3.2vmin,11px);font-weight:900;box-shadow:0 4px 10px rgba(16,32,25,.16)}.menu-btn.active{background:#1f7a48;color:#fff}
+            .menu-dock{position:absolute;right:clamp(-4px,-1vmin,-2px);top:50%;z-index:3;transform:translateY(-50%)}
+            .menu-toggle,.menu-btn{place-items:center;width:clamp(30px,12vmin,42px);height:clamp(30px,12vmin,42px);border:2px solid #17231b;border-radius:50%;background:#fff;color:#17231b;font-size:clamp(9px,3.2vmin,11px);font-weight:900;box-shadow:0 4px 10px rgba(16,32,25,.16)}
+            .menu-toggle{display:grid;background:#17231b;color:#fff}.menu-items{display:none;gap:clamp(3px,1.8vmin,6px)}.menu-dock.open .menu-toggle{display:none}.menu-dock.open .menu-items{display:grid}.menu-btn{display:grid}.menu-btn.active{background:#1f7a48;color:#fff}
             .panel{--panel-scale:1;display:none;width:min(205px,100%);max-width:100%;overflow:hidden;text-align:left;transform:scale(var(--panel-scale));transform-origin:center;will-change:transform}.panel.active{display:block}.panel[data-panel=home],#bind-panel .panel{text-align:center}.panel[data-panel=home].active{display:flex;flex-direction:column;align-items:center;justify-content:center}
+            .panel[data-panel=request]{height:100%;padding:1px 5px 4px 1px;overflow-x:hidden;overflow-y:auto;overscroll-behavior:contain;scrollbar-color:#5d7768 transparent;scrollbar-gutter:stable;scrollbar-width:thin;touch-action:pan-y}.panel[data-panel=request]::-webkit-scrollbar{width:4px}.panel[data-panel=request]::-webkit-scrollbar-thumb{border-radius:4px;background:#5d7768}.panel[data-panel=request]::-webkit-scrollbar-track{background:transparent}
             .panel h1,.panel h2{margin:0 0 8px;text-align:center;font-size:18px;line-height:1.1}.bind-title{font-size:20px;font-weight:900}.bind-sub{margin:5px 0 10px;color:#65736b;font-size:12px}.rules{display:grid;gap:6px}
             .rule-btn{display:flex;align-items:center;justify-content:space-between;gap:6px;width:100%;min-height:34px;border:1px solid #d3ded7;border-radius:8px;background:#fff;color:#17231b;padding:6px 8px;font-size:12px;text-align:left}.rule-btn span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.rule-btn b{color:#0c6f3b;white-space:nowrap}
             label{display:block;margin:7px 0 3px;color:#44544a;font-size:11px;font-weight:700}input,textarea{width:100%;border:1px solid #cbd8cf;border-radius:8px;background:#fff;color:#17231b;padding:7px;font-size:14px}textarea{min-height:44px;resize:none}.submit,.ghost{width:100%;margin-top:8px;border:0;border-radius:8px;padding:9px;font-size:14px;font-weight:900}.submit{background:#1f7a48;color:#fff}.ghost{background:#e7efe9;color:#17462c}.msg{min-height:16px;margin:6px 0 0;text-align:center;color:#16643a;font-size:11px}
@@ -453,10 +479,13 @@ app.MapGet("/watch", () =>
                 </section>
               </div>
               <nav class="menu-dock hidden" id="menu" aria-label="功能菜单">
-                <button class="menu-btn active" type="button" data-view="home">积分</button>
-                <button class="menu-btn" type="button" data-view="request">申请</button>
-                <button class="menu-btn" type="button" data-view="requests">记录</button>
-                <button class="menu-btn" type="button" data-view="device">设备</button>
+                <button class="menu-toggle" id="menu-toggle" type="button" aria-expanded="false" aria-controls="menu-items">菜单</button>
+                <div class="menu-items" id="menu-items">
+                  <button class="menu-btn active" type="button" data-view="home">积分</button>
+                  <button class="menu-btn" type="button" data-view="request">申请</button>
+                  <button class="menu-btn" type="button" data-view="requests">记录</button>
+                  <button class="menu-btn" type="button" data-view="device">设备</button>
+                </div>
               </nav>
             </div>
           </main>
@@ -482,6 +511,7 @@ app.MapGet("/watch", () =>
                 const panel = screen.querySelector('.panel.active');
                 if (!panel) return;
                 panel.style.setProperty('--panel-scale', '1');
+                if (panel.matches('[data-panel="request"]')) return;
                 const scale = calculatePanelScale(
                   Math.max(1, screen.clientWidth - 2),
                   Math.max(1, screen.clientHeight - 2),
@@ -500,6 +530,8 @@ app.MapGet("/watch", () =>
             const setView = (view) => {
               document.querySelectorAll('[data-panel]').forEach((panel) => panel.classList.toggle('active', panel.dataset.panel === view));
               document.querySelectorAll('.menu-btn').forEach((button) => button.classList.toggle('active', button.dataset.view === view));
+              document.getElementById('menu').classList.remove('open');
+              document.getElementById('menu-toggle').setAttribute('aria-expanded', 'false');
               fitActivePanel();
             };
             const fetchJson = async (url, options = {}) => {
@@ -598,6 +630,11 @@ app.MapGet("/watch", () =>
             });
             document.querySelectorAll('.menu-btn').forEach((button) => {
               button.addEventListener('click', () => setView(button.dataset.view || 'home'));
+            });
+            document.getElementById('menu-toggle').addEventListener('click', () => {
+              const menu = document.getElementById('menu');
+              const expanded = menu.classList.toggle('open');
+              document.getElementById('menu-toggle').setAttribute('aria-expanded', String(expanded));
             });
             window.addEventListener('resize', fitActivePanel);
             window.addEventListener('orientationchange', fitActivePanel);
@@ -3470,6 +3507,201 @@ static async Task<(bool Success, bool Forbidden, string Error)> UpsertFamilyGrou
     cmd.Parameters.AddWithValue("role", string.IsNullOrWhiteSpace(role) ? "member" : role.Trim());
     await cmd.ExecuteNonQueryAsync();
     await SyncOwnedChildrenToFamilyGroup(conn, familyGroupId, userId.Trim(), $"由 {operatorAppUserId} 加入家庭组");
+    return (true, false, "");
+}
+
+static async Task<(bool Success, bool Forbidden, List<Dictionary<string, object?>> Children, string Error)> GetFamilyGroupChildren(
+    string connectionString,
+    int familyGroupId,
+    string appUserId)
+{
+    await using var conn = await OpenConnection(connectionString);
+    await using (var accessCmd = new NpgsqlCommand("""
+        SELECT COUNT(*)
+        FROM family_groups fg
+        LEFT JOIN family_group_users fgu
+          ON fgu.family_group_id = fg.id AND fgu.user_id = @user_id
+        WHERE fg.id = @family_group_id
+          AND (fg.created_by = @user_id OR fgu.user_id = @user_id OR @user_id = @default_user_id)
+        """, conn))
+    {
+        accessCmd.Parameters.AddWithValue("family_group_id", familyGroupId);
+        accessCmd.Parameters.AddWithValue("user_id", appUserId);
+        accessCmd.Parameters.AddWithValue("default_user_id", DefaultUserId);
+        var canView = Convert.ToInt32(await accessCmd.ExecuteScalarAsync(), CultureInfo.InvariantCulture) > 0;
+        if (!canView)
+        {
+            await using var existsCmd = new NpgsqlCommand("SELECT COUNT(*) FROM family_groups WHERE id = @id", conn);
+            existsCmd.Parameters.AddWithValue("id", familyGroupId);
+            var exists = Convert.ToInt32(await existsCmd.ExecuteScalarAsync(), CultureInfo.InvariantCulture) > 0;
+            return (false, exists, [], exists ? "你不是该家庭成员" : "家庭不存在");
+        }
+    }
+
+    await using var cmd = new NpgsqlCommand("""
+        SELECT c.id, c.family_group_id, c.profile_key,
+               COALESCE(cp.name, c.name) AS name,
+               COALESCE(cp.status, c.status) AS status,
+               COALESCE(cp.note, c.note) AS note,
+               COALESCE(cp.created_at, c.created_at) AS created_at,
+               COALESCE(cp.updated_at, c.updated_at) AS updated_at,
+               COALESCE(a.points, 0) AS score,
+               COALESCE(a.cash_cny, 0) AS cash,
+               COALESCE(a.items_count, 0) AS items,
+               COALESCE(
+                   string_agg(DISTINCT COALESCE(NULLIF(aup.username, ''), cub.parent_app_user_id), '、')
+                       FILTER (WHERE cub.parent_app_user_id IS NOT NULL),
+                   ''
+               ) AS parent_names
+        FROM children c
+        LEFT JOIN child_profiles cp ON cp.profile_key = c.profile_key
+        LEFT JOIN accounts a ON a.profile_key = c.profile_key
+        LEFT JOIN child_user_bindings cub ON cub.child_profile_key = c.profile_key
+        LEFT JOIN app_user_profiles aup
+          ON aup.app_user_id = cub.parent_app_user_id AND aup.role = 'parent'
+        WHERE c.family_group_id = @family_group_id
+          AND COALESCE(cp.status, c.status) = 'active'
+        GROUP BY c.id, c.family_group_id, c.profile_key, cp.name, c.name, cp.status, c.status,
+                 cp.note, c.note, cp.created_at, c.created_at, cp.updated_at, c.updated_at,
+                 a.points, a.cash_cny, a.items_count
+        ORDER BY COALESCE(cp.name, c.name), c.id
+        """, conn);
+    cmd.Parameters.AddWithValue("family_group_id", familyGroupId);
+    var children = new List<Dictionary<string, object?>>();
+    await using var reader = await cmd.ExecuteReaderAsync();
+    while (await reader.ReadAsync())
+    {
+        children.Add(new Dictionary<string, object?>
+        {
+            ["id"] = reader.Int("id"),
+            ["familyGroupId"] = reader.Int("family_group_id"),
+            ["profileKey"] = reader.String("profile_key"),
+            ["name"] = reader.String("name"),
+            ["status"] = reader.String("status"),
+            ["note"] = reader.String("note"),
+            ["createdAt"] = reader.DateTime("created_at").ToString("O"),
+            ["updatedAt"] = reader.DateTime("updated_at").ToString("O"),
+            ["score"] = reader.Decimal("score"),
+            ["cash"] = reader.Decimal("cash"),
+            ["items"] = reader.Int("items"),
+            ["parentNames"] = reader.String("parent_names")
+        });
+    }
+    return (true, false, children, "");
+}
+
+static async Task<(bool Success, bool Forbidden, string Error)> RemoveChildFromFamilyGroup(
+    string connectionString,
+    int familyGroupId,
+    int childId,
+    string appUserId)
+{
+    await using var conn = await OpenConnection(connectionString);
+    await using var tx = await conn.BeginTransactionAsync();
+    await using (var accessCmd = new NpgsqlCommand("""
+        SELECT COUNT(*)
+        FROM family_groups fg
+        LEFT JOIN family_group_users fgu
+          ON fgu.family_group_id = fg.id AND fgu.user_id = @user_id
+        WHERE fg.id = @family_group_id
+          AND (fg.created_by = @user_id OR fgu.role = 'owner' OR @user_id = @default_user_id)
+        """, conn, tx))
+    {
+        accessCmd.Parameters.AddWithValue("family_group_id", familyGroupId);
+        accessCmd.Parameters.AddWithValue("user_id", appUserId);
+        accessCmd.Parameters.AddWithValue("default_user_id", DefaultUserId);
+        var canManage = Convert.ToInt32(await accessCmd.ExecuteScalarAsync(), CultureInfo.InvariantCulture) > 0;
+        if (!canManage)
+        {
+            await using var existsCmd = new NpgsqlCommand("SELECT COUNT(*) FROM family_groups WHERE id = @id", conn, tx);
+            existsCmd.Parameters.AddWithValue("id", familyGroupId);
+            var exists = Convert.ToInt32(await existsCmd.ExecuteScalarAsync(), CultureInfo.InvariantCulture) > 0;
+            await tx.RollbackAsync();
+            return (false, exists, exists ? "只有家庭管理员可以移除孩子成员" : "家庭不存在");
+        }
+    }
+
+    string profileKey;
+    await using (var childCmd = new NpgsqlCommand("""
+        SELECT profile_key
+        FROM children
+        WHERE id = @child_id AND family_group_id = @family_group_id
+        FOR UPDATE
+        """, conn, tx))
+    {
+        childCmd.Parameters.AddWithValue("child_id", childId);
+        childCmd.Parameters.AddWithValue("family_group_id", familyGroupId);
+        var value = await childCmd.ExecuteScalarAsync();
+        if (value is null || value is DBNull)
+        {
+            await tx.RollbackAsync();
+            return (false, false, "该孩子不在当前家庭中");
+        }
+        profileKey = Convert.ToString(value, CultureInfo.InvariantCulture) ?? "";
+    }
+
+    int? replacementChildId;
+    await using (var replacementCmd = new NpgsqlCommand("""
+        SELECT id
+        FROM children
+        WHERE profile_key = @profile_key AND id <> @child_id AND family_group_id IS NOT NULL
+        ORDER BY id
+        LIMIT 1
+        """, conn, tx))
+    {
+        replacementCmd.Parameters.AddWithValue("profile_key", profileKey);
+        replacementCmd.Parameters.AddWithValue("child_id", childId);
+        var value = await replacementCmd.ExecuteScalarAsync();
+        replacementChildId = value is null || value is DBNull
+            ? null
+            : Convert.ToInt32(value, CultureInfo.InvariantCulture);
+    }
+
+    await using (var codeCmd = new NpgsqlCommand("""
+        UPDATE child_auth_codes
+        SET used_at = CURRENT_TIMESTAMP
+        WHERE child_id = @child_id AND family_group_id = @family_group_id AND used_at IS NULL
+        """, conn, tx))
+    {
+        codeCmd.Parameters.AddWithValue("child_id", childId);
+        codeCmd.Parameters.AddWithValue("family_group_id", familyGroupId);
+        await codeCmd.ExecuteNonQueryAsync();
+    }
+    await using (var deviceCmd = new NpgsqlCommand("""
+        UPDATE watch_device_bindings
+        SET revoked_at = CURRENT_TIMESTAMP
+        WHERE child_id = @child_id AND family_group_id = @family_group_id AND revoked_at IS NULL
+        """, conn, tx))
+    {
+        deviceCmd.Parameters.AddWithValue("child_id", childId);
+        deviceCmd.Parameters.AddWithValue("family_group_id", familyGroupId);
+        await deviceCmd.ExecuteNonQueryAsync();
+    }
+
+    if (replacementChildId is null)
+    {
+        await using var detachCmd = new NpgsqlCommand("""
+            UPDATE children
+            SET family_group_id = NULL, updated_at = CURRENT_TIMESTAMP
+            WHERE id = @child_id
+            """, conn, tx);
+        detachCmd.Parameters.AddWithValue("child_id", childId);
+        await detachCmd.ExecuteNonQueryAsync();
+    }
+    else
+    {
+        await using (var accountCmd = new NpgsqlCommand("UPDATE accounts SET child_id = @replacement_id WHERE child_id = @child_id", conn, tx))
+        {
+            accountCmd.Parameters.AddWithValue("replacement_id", replacementChildId.Value);
+            accountCmd.Parameters.AddWithValue("child_id", childId);
+            await accountCmd.ExecuteNonQueryAsync();
+        }
+        await using var deleteCmd = new NpgsqlCommand("DELETE FROM children WHERE id = @child_id", conn, tx);
+        deleteCmd.Parameters.AddWithValue("child_id", childId);
+        await deleteCmd.ExecuteNonQueryAsync();
+    }
+
+    await tx.CommitAsync();
     return (true, false, "");
 }
 

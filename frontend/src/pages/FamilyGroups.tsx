@@ -1,10 +1,17 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Card, StatCard } from '../components/Card';
-import { createFamilyGroup, getFamilyGroupInvite, joinFamilyGroup } from '../services';
+import { Modal } from '../components/Modal';
+import {
+  createFamilyGroup,
+  getFamilyGroupChildren,
+  getFamilyGroupInvite,
+  joinFamilyGroup,
+  removeFamilyGroupChild,
+} from '../services';
 import { useAuth } from '../contexts/AuthContext';
 import { useFamilyGroup } from '../contexts/FamilyGroupContext';
-import type { FamilyGroupInvite } from '../types';
+import type { Child, FamilyGroupInvite } from '../types';
 
 export default function FamilyGroups() {
   const { userId, appProfile } = useAuth();
@@ -23,6 +30,9 @@ export default function FamilyGroups() {
   const [newDescription, setNewDescription] = useState('');
   const [joinInviteCode, setJoinInviteCode] = useState(searchParams.get('inviteCode') || '');
   const [invite, setInvite] = useState<FamilyGroupInvite | null>(null);
+  const [familyChildren, setFamilyChildren] = useState<Child[]>([]);
+  const [childrenLoading, setChildrenLoading] = useState(false);
+  const [childToRemove, setChildToRemove] = useState<Child | null>(null);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
 
@@ -33,6 +43,9 @@ export default function FamilyGroups() {
   const ownedCount = useMemo(
     () => groups.filter((group) => group.role === 'owner' || group.createdBy === appUserId).length,
     [groups, appUserId],
+  );
+  const canManageSelectedGroup = Boolean(
+    selectedGroup && (selectedGroup.role === 'owner' || selectedGroup.createdBy === appUserId),
   );
 
   useEffect(() => {
@@ -48,6 +61,33 @@ export default function FamilyGroups() {
       })
       .catch(() => {
         if (!cancelled) setInvite(null);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedGroupId]);
+
+  useEffect(() => {
+    if (!selectedGroupId) {
+      setFamilyChildren([]);
+      return;
+    }
+
+    let cancelled = false;
+    setChildrenLoading(true);
+    getFamilyGroupChildren(selectedGroupId)
+      .then((children) => {
+        if (!cancelled) setFamilyChildren(Array.isArray(children) ? children : []);
+      })
+      .catch((err) => {
+        if (!cancelled) {
+          setFamilyChildren([]);
+          setMessage(err instanceof Error ? err.message : '家庭孩子成员加载失败');
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setChildrenLoading(false);
       });
 
     return () => {
@@ -114,6 +154,21 @@ export default function FamilyGroups() {
     }
   };
 
+  const handleRemoveChild = async () => {
+    if (!selectedGroupId || !childToRemove) return;
+    try {
+      setBusy(true);
+      await removeFamilyGroupChild(selectedGroupId, childToRemove.id);
+      setFamilyChildren((children) => children.filter((child) => child.id !== childToRemove.id));
+      setMessage(`已将「${childToRemove.name}」从当前家庭移除`);
+      setChildToRemove(null);
+    } catch (err) {
+      setMessage(err instanceof Error ? err.message : '移除孩子成员失败');
+    } finally {
+      setBusy(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-20">
@@ -132,7 +187,7 @@ export default function FamilyGroups() {
 
       <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
         <div>
-          <h2 className="text-2xl font-bold text-gray-900">家庭组管理</h2>
+          <h2 className="text-2xl font-bold text-gray-900">家庭管理</h2>
           <p className="text-sm text-gray-500 mt-1">
             当前家庭组：{selectedGroupLabel}{error ? `，${error}` : ''}
           </p>
@@ -144,6 +199,52 @@ export default function FamilyGroups() {
         <StatCard title="我管理的" value={ownedCount} icon="👤" color="green" />
         <StatCard title="当前选择" value={selectedGroup?.name || '-'} icon="✅" color="orange" />
       </div>
+
+      <Card className="p-5">
+        <div className="mb-4 flex items-center justify-between gap-3">
+          <div>
+            <h3 className="text-lg font-semibold text-gray-900">孩子成员</h3>
+            <p className="mt-1 text-sm text-gray-500">查看当前家庭中的孩子信息及其归属家长</p>
+          </div>
+          <span className="rounded-full bg-blue-50 px-3 py-1 text-sm font-medium text-blue-700">
+            {familyChildren.length} 名
+          </span>
+        </div>
+        {childrenLoading ? (
+          <div className="py-8 text-center text-sm text-gray-400">加载孩子成员中...</div>
+        ) : familyChildren.length === 0 ? (
+          <div className="py-8 text-center text-sm text-gray-400">当前家庭暂无孩子成员</div>
+        ) : (
+          <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
+            {familyChildren.map((child) => (
+              <div key={child.id} className="rounded-lg border border-gray-200 p-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="truncate font-semibold text-gray-900">{child.name}</p>
+                    <p className="mt-1 text-sm text-gray-500">
+                      归属家长：{child.parentNames || '未关联'}
+                    </p>
+                  </div>
+                  {canManageSelectedGroup && (
+                    <button
+                      type="button"
+                      onClick={() => setChildToRemove(child)}
+                      className="shrink-0 rounded-md px-2.5 py-1.5 text-sm text-red-600 hover:bg-red-50"
+                    >
+                      移除
+                    </button>
+                  )}
+                </div>
+                <div className="mt-3 grid grid-cols-3 gap-2 text-center text-sm">
+                  <div className="rounded-md bg-blue-50 px-2 py-2 text-blue-700">积分 {child.score ?? 0}</div>
+                  <div className="rounded-md bg-green-50 px-2 py-2 text-green-700">现金 {child.cash ?? 0}</div>
+                  <div className="rounded-md bg-orange-50 px-2 py-2 text-orange-700">物品 {child.items ?? 0}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </Card>
 
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
         <Card className="xl:col-span-2 p-5">
@@ -246,6 +347,34 @@ export default function FamilyGroups() {
           </Card>
         </div>
       </div>
+      <Modal
+        isOpen={Boolean(childToRemove)}
+        onClose={() => setChildToRemove(null)}
+        title="移除孩子成员"
+        footer={
+          <>
+            <button
+              type="button"
+              onClick={() => setChildToRemove(null)}
+              className="rounded-lg border border-gray-300 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+            >
+              取消
+            </button>
+            <button
+              type="button"
+              disabled={busy}
+              onClick={handleRemoveChild}
+              className="rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-60"
+            >
+              {busy ? '移除中...' : '确认移除'}
+            </button>
+          </>
+        }
+      >
+        <p className="text-sm text-gray-600">
+          确认将「{childToRemove?.name}」从「{selectedGroup?.name}」移除吗？孩子与归属家长的全局关系会保留。
+        </p>
+      </Modal>
     </div>
   );
 }

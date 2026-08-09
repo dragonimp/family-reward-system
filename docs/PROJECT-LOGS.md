@@ -1,5 +1,22 @@
 # 家加分 - 进展日志
 
+## [2026-08-09] family-reward-REQ-018 家庭孩子成员管理与头像菜单收敛
+- Orbit：`gpt_8bedc53115a644c1af0182627969bebf`；需求：`family-reward-REQ-018`（`1504c58c-a463-41f7-8aea-1979a970aa70`）；任务：`family-reward-TASK-033`（`89577270-3cc6-4892-9ad1-e56ae20c1cca`）；功能点：`5ec785f2-cce2-4e52-aa7f-ba1170f242e1`。
+- 家庭组页面和导航统一更名为“家庭管理”；新增当前家庭的孩子成员区，展示孩子姓名、积分、现金、物品及归属家长。新增带家庭访问校验的 `GET /api/family-groups/{id}/children`，避免通过任意家庭 ID 越权查看。
+- 新增管理员限定的 `DELETE /api/family-groups/{id}/children/{childId}`。删除仅移除所选家庭的孩子成员关系并撤销该家庭的有效认证码/设备；保留孩子与家长的全局归属。当孩子仍属于其他家庭时重挂全局账户锚点，当这是唯一家庭时保留无家庭归属的孩子记录，避免误删全局档案和账户。
+- 用户头像菜单移除“新增家庭组”入口，仅保留家庭切换；选中家庭、系统设置、修改信息、修改密码或退出登录后自动关闭菜单。
+- 自动化验证：前端 Node 测试 6/6 通过（新增头像菜单与家庭成员管理源码回归）；TypeScript 检查与 Vite 生产构建通过；ASP.NET Core 构建通过（0 警告、0 错误）；`git diff --check` 通过。当前环境无 `npm` 且 `frontend/node_modules` 未安装 ESLint 包，无法执行 lint。
+- API 冒烟证据（运行 `req0181786256895`）：`/health` 返回 200；管理员家庭成员查询返回孩子及 `parentNames`；非管理员删除返回 403；管理员删除返回 `{"status":"ok"}`；移除后目标家庭孩子数为 0、原家庭仍为 1、家长全局孩子列表仍为 1。
+- Atlas 同步阻塞：运行时工具与 MCP 资源均未暴露 Atlas，`list_mcp_resources` 仅有 `codex_apps`，本机 `codex mcp list` 返回 `No MCP servers configured yet`。因此无法读取 Atlas 中 REQ-018 的真实关联缺陷、公约和环境详情，也无法将需求、任务、测试与证据写回或关闭。Atlas 恢复后应将 `family-reward-REQ-018` 与 `family-reward-TASK-033` 更新为完成，并补录本节全部实现与验证证据。
+
+## [2026-08-09] family-reward-REQ-017 手表申请页滚动与紧凑菜单
+- Orbit：`gpt_1a0d077811ca46d3b7bfcb30a6758d27`；关联任务：`family-reward-TASK-032`（`cca1e8c3-a4d1-41a2-96e8-677c170e8494`）；功能点：`2ac19545-280c-485e-a6d2-0fc63884643f`。
+- 申请页改为独立纵向滚动区域，支持触摸纵向滑动、细滚动条、滚动边界约束和 WebKit 手表 WebView 滚动条样式；申请页保持 1:1 字号，不再因表单较长被整体缩小。积分、记录、设备和绑定页继续使用既有无滚动缩放适配，不受本次改动影响。
+- 右侧四个常驻功能键收纳为单个“菜单”按钮；点开后显示积分、申请、记录和设备入口，选择任一功能后自动收起并同步 `aria-expanded`，减少小表盘菜单长期挤占空间。
+- 回归：扩展 `watch-app/scripts/verify-watch-app.mjs`，检查申请页只开放纵向滚动、跳过申请页缩放、触摸滚动和细滚动条，以及菜单折叠、展开与选中后收起行为。
+- 验证证据：`node watch-app/scripts/verify-watch-app.mjs` 通过；`dotnet build FamilyReward.Api/FamilyReward.Api.csproj --no-restore` 通过（0 警告、0 错误）；前端 Node 测试 4/4、TypeScript 检查和 Vite 生产构建通过；本地 `/health` 与 `/watch` 均返回 200，实际 `/watch` 响应包含申请页滚动和紧凑菜单规则；`git diff --check` 通过。当前 shell 没有 `npm`，且仓库未安装 ESLint 可执行文件，无法运行 `npm run lint`；本次未修改 React/TypeScript 源码。
+- Atlas 同步阻塞：按任务要求检查运行时 MCP，未暴露 Atlas 工具或资源，`list_mcp_resources` 只有 `codex_apps`；本机 `codex mcp list` 也返回 `No MCP servers configured yet`。因此无法读取 Atlas 中 REQ-017 的真实关联缺陷、任务、公约和环境详情，也无法将需求、任务、测试及证据写回或关闭。Atlas 恢复后应将 `family-reward-REQ-017` 与 `family-reward-TASK-032` 更新为完成，并补录本节实现和验证证据。
+
 ## [2026-08-09] family-reward-REQ-014 孩子管理与家庭组关系修正
 - 根因：前一版【孩子管理】仍随当前家庭组传递 `familyGroupId`，后端也先按家庭组解析再查孩子，导致同一家长切换家庭组时孩子列表变化。
 - 修复：Web【孩子管理】改为按当前家长账号查询全局孩子；后端 `ownedOnly=true` 且未显式传家庭组时按 `child_user_bindings` 去重返回家长拥有的孩子，编辑、删除、手表认证码和设备管理均按家长-孩子绑定校验。

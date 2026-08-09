@@ -104,8 +104,30 @@ for (const responsiveRequirement of [
     errors.push(`watch viewport adaptation missing: ${responsiveRequirement}`);
   }
 }
+for (const requestScrollRequirement of [
+  ".panel[data-panel=request]{height:100%",
+  "overflow-y:auto",
+  "scrollbar-width:thin",
+  "touch-action:pan-y",
+  `panel.matches('[data-panel="request"]')`
+]) {
+  if (!apiSource.includes(requestScrollRequirement)) {
+    errors.push(`watch request panel scrolling missing: ${requestScrollRequirement}`);
+  }
+}
 if (/\.panel\{[^}]*overflow:auto/.test(apiSource)) {
-  errors.push("watch panels must fit the viewport without scrollbars");
+  errors.push("only the watch request panel may use a scrollbar");
+}
+for (const compactMenuRequirement of [
+  'id="menu-toggle"',
+  'aria-expanded="false"',
+  ".menu-dock.open .menu-items{display:grid}",
+  "menu.classList.toggle('open')",
+  "document.getElementById('menu').classList.remove('open')"
+]) {
+  if (!apiSource.includes(compactMenuRequirement)) {
+    errors.push(`watch compact menu missing: ${compactMenuRequirement}`);
+  }
 }
 const clamp = (min, value, max) => Math.min(max, Math.max(min, value));
 for (const [width, height] of [[194, 368], [240, 240], [320, 360], [466, 466], [368, 194]]) {
