@@ -1,5 +1,18 @@
 # 家加分 - 进展日志
 
+## [2026-08-09] family-reward-REQ-014 孩子管理与家庭组关系修正
+- 根因：前一版【孩子管理】仍随当前家庭组传递 `familyGroupId`，后端也先按家庭组解析再查孩子，导致同一家长切换家庭组时孩子列表变化。
+- 修复：Web【孩子管理】改为按当前家长账号查询全局孩子；后端 `ownedOnly=true` 且未显式传家庭组时按 `child_user_bindings` 去重返回家长拥有的孩子，编辑、删除、手表认证码和设备管理均按家长-孩子绑定校验。
+- 家庭组边界：家庭组列表保持只返回自己创建或已加入的组；直接管理家庭组成员接口增加创建者/owner 权限校验，新增/加入成员时同步该成员名下孩子到家庭组。
+- 验证证据：`dotnet build FamilyReward.Api/FamilyReward.Api.csproj` 通过；`npm run build` 通过。
+
+## [2026-08-09] family-reward-BUG-003 手表端展示效果问题
+- 根因：积分查询首页只设置了 `text-align:center`，积分圆环和现金/物品指标仍按普通块级流从面板左侧开始排列，视觉上没有真正居中。
+- 修复：查询首页激活时使用纵向 Flex 布局，通过 `align-items:center` 与 `justify-content:center` 将儿童姓名、积分圆环和指标区作为一个整体双轴居中；保留现有动态视口、无滚动和内容缩放适配。
+- 回归：扩展 `watch-app/scripts/verify-watch-app.mjs`，明确检查查询首页的纵向排列、水平居中和垂直居中约束，防止再次退化为仅文字居中。
+- 验证证据：`node watch-app/scripts/verify-watch-app.mjs` 通过；`dotnet build FamilyReward.Api/FamilyReward.Api.csproj --no-restore` 通过（0 警告、0 错误）；本地 `/health` 返回 200，实际 `/watch` 响应包含完整双轴居中规则；`git diff --check` 通过。
+- Atlas 同步阻塞：当前运行时未暴露 Atlas MCP 工具或资源，且 `codex mcp list` 返回 `No MCP servers configured yet`，无法读取 BUG-003/TASK-010 的真实关联需求、公约和环境，也无法把缺陷、任务、测试及完成证据写回或关闭。连接恢复后应将 `family-reward-BUG-003` 与 `family-reward-TASK-010` 更新为完成并补录本节证据。
+
 ## [2026-08-09] family-reward-REQ-014 全局孩子管理边界收紧
 - `/api/children` 增加 `ownedOnly` 服务端过滤；【孩子管理】页面只请求当前家长通过 `child_user_bindings` 绑定的孩子，不再从前端透传统一用户 ID。
 - 删除孩子、生成儿童认证码、查看/解绑手表设备、生成设备解绑码均校验当前家长是否为该孩子所属账号，避免家庭组成员通过手工 childId 管理别人孩子。

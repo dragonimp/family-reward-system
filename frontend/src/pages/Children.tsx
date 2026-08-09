@@ -15,7 +15,6 @@ import {
   revokeChildWatchDevice,
   generateWatchDeviceUnbindCode,
 } from '../services';
-import { useFamilyGroup } from '../contexts/FamilyGroupContext';
 
 interface ChildForm {
   name: string;
@@ -26,7 +25,6 @@ interface ChildForm {
 
 export default function Children() {
   const navigate = useNavigate();
-  const { selectedGroupId, selectedGroup, loading: familyGroupsLoading, error: familyGroupsError } = useFamilyGroup();
   const [children, setChildren] = useState<Child[]>([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
@@ -47,14 +45,9 @@ export default function Children() {
   };
 
   const loadChildren = useCallback(async (silent = false) => {
-    if (!selectedGroupId) {
-      setChildren([]);
-      setLoading(false);
-      return;
-    }
     try {
       if (!silent) setLoading(true);
-      const res = await getChildren({ familyGroupId: selectedGroupId, ownedOnly: true });
+      const res = await getChildren({ ownedOnly: true });
       setChildren(Array.isArray(res) ? res : res?.data || []);
     } catch (error) {
       console.error('加载失败:', error);
@@ -63,7 +56,7 @@ export default function Children() {
     } finally {
       setLoading(false);
     }
-  }, [selectedGroupId]);
+  }, []);
 
   useEffect(() => {
     loadChildren();
@@ -102,12 +95,11 @@ export default function Children() {
     }
     try {
       if (editingChild) {
-        await updateChild(editingChild.id, { ...formData, familyGroupId: selectedGroupId ?? undefined, id: editingChild.id, createdAt: editingChild.createdAt, updatedAt: new Date().toISOString() });
+        await updateChild(editingChild.id, { ...formData, id: editingChild.id, createdAt: editingChild.createdAt, updatedAt: new Date().toISOString() });
         showToast('更新成功');
       } else {
         await createChild({
           ...formData,
-          familyGroupId: selectedGroupId ?? undefined,
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
         } as any);
@@ -129,7 +121,7 @@ export default function Children() {
   const handleDelete = async () => {
     if (childToDelete) {
       try {
-        await deleteChild(childToDelete, { familyGroupId: selectedGroupId ?? undefined });
+        await deleteChild(childToDelete);
         showToast('删除成功');
         setShowDeleteConfirm(false);
         loadChildren();
@@ -147,7 +139,7 @@ export default function Children() {
     setDevices([]);
     setDeviceLoading(true);
     try {
-      const result = await getChildWatchDevices(child.id, { familyGroupId: selectedGroupId ?? undefined });
+      const result = await getChildWatchDevices(child.id);
       setDevices(result.devices || []);
     } catch (error) {
       console.error('设备加载失败:', error);
@@ -162,7 +154,6 @@ export default function Children() {
     setDeviceLoading(true);
     try {
       const result = await generateChildAuthCode(deviceChild.id, {
-        familyGroupId: selectedGroupId ?? undefined,
         expiresInMinutes: 24 * 60,
       });
       setAuthCode({ code: result.code, expiresAt: result.expiresAt });
@@ -179,8 +170,8 @@ export default function Children() {
     if (!deviceChild) return;
     setDeviceLoading(true);
     try {
-      await revokeChildWatchDevice(deviceChild.id, deviceId, { familyGroupId: selectedGroupId ?? undefined });
-      const result = await getChildWatchDevices(deviceChild.id, { familyGroupId: selectedGroupId ?? undefined });
+      await revokeChildWatchDevice(deviceChild.id, deviceId);
+      const result = await getChildWatchDevices(deviceChild.id);
       setDevices(result.devices || []);
       showToast('设备已解绑');
     } catch (error) {
@@ -196,7 +187,6 @@ export default function Children() {
     setDeviceLoading(true);
     try {
       const result = await generateWatchDeviceUnbindCode(deviceChild.id, deviceId, {
-        familyGroupId: selectedGroupId ?? undefined,
         expiresInMinutes: 10,
       });
       setUnbindCode({ code: result.code, deviceId: result.deviceId, expiresAt: result.expiresAt });
@@ -209,7 +199,7 @@ export default function Children() {
     }
   };
 
-  if (loading || familyGroupsLoading) {
+  if (loading) {
     return (
       <div className="flex items-center justify-center py-20">
         <div className="text-center">
@@ -234,8 +224,7 @@ export default function Children() {
         <div>
           <h2 className="text-2xl font-bold text-gray-900">孩子管理</h2>
           <p className="text-sm text-gray-500 mt-1">
-            当前家庭组：{selectedGroup?.name || '未选择'}
-            {familyGroupsError ? `，${familyGroupsError}` : ''}
+            管理当前家长账号下的孩子，可将同一组家长和孩子加入多个家庭组
           </p>
         </div>
         <button onClick={openCreateModal} className="btn-primary flex items-center gap-2">

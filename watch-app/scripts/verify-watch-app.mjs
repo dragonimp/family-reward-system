@@ -82,6 +82,16 @@ if (!apiSource.includes("const formatPoints = (value)") ||
 if (formatPoints(9999.9) !== "9999.9") {
   errors.push("watch score formatter failed the 9999.9 regression case");
 }
+for (const centeredQueryRequirement of [
+  ".panel[data-panel=home].active{display:flex",
+  "flex-direction:column",
+  "align-items:center",
+  "justify-content:center"
+]) {
+  if (!apiSource.includes(centeredQueryRequirement)) {
+    errors.push(`watch score query is not centered: ${centeredQueryRequirement}`);
+  }
+}
 for (const responsiveRequirement of [
   "height:100dvh",
   "overflow:hidden",

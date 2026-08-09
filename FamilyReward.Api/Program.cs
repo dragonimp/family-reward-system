@@ -224,16 +224,22 @@ app.MapPut("/api/family-groups/{id:int}/users", async (int id, JsonObject body, 
     }
 
     var role = body.String("role", "member");
-    var linked = await UpsertFamilyGroupUser(connectionString, id, userId, role);
-    return linked ? Results.Json(new { ok = true }) : Results.NotFound(new { error = "家庭组不存在" });
+    var linked = await UpsertFamilyGroupUser(connectionString, id, userId, role, access.Profile!.AppUserId);
+    if (linked.Forbidden)
+    {
+        return Results.Json(new { error = linked.Error }, statusCode: StatusCodes.Status403Forbidden);
+    }
+    return linked.Success ? Results.Json(new { ok = true }) : Results.NotFound(new { error = linked.Error });
 });
 
 app.MapGet("/api/children", async (HttpRequest request) =>
 {
     var access = await RequireParentProfile(connectionString, request);
     if (access.Error is not null) return access.Error;
-    var familyGroupId = await ResolveFamilyGroupId(connectionString, request);
     var ownedOnly = request.Query.Bool("ownedOnly") ?? request.Query.Bool("owned_only") ?? false;
+    int? familyGroupId = ownedOnly && !HasFamilyGroupSelector(request)
+        ? null
+        : await ResolveFamilyGroupId(connectionString, request);
     return Results.Json(await GetChildren(connectionString, familyGroupId, ownerAppUserId: ownedOnly ? access.Profile!.AppUserId : null));
 });
 
@@ -241,8 +247,11 @@ app.MapGet("/api/children/{id:int}", async (int id, HttpRequest request) =>
 {
     var access = await RequireParentProfile(connectionString, request);
     if (access.Error is not null) return access.Error;
-    var familyGroupId = await ResolveFamilyGroupId(connectionString, request);
-    var child = (await GetChildren(connectionString, familyGroupId)).FirstOrDefault(c => GetInt(c, "id") == id);
+    var ownedOnly = request.Query.Bool("ownedOnly") ?? request.Query.Bool("owned_only") ?? true;
+    int? familyGroupId = HasFamilyGroupSelector(request)
+        ? await ResolveFamilyGroupId(connectionString, request)
+        : null;
+    var child = (await GetChildren(connectionString, familyGroupId, ownerAppUserId: ownedOnly ? access.Profile!.AppUserId : null)).FirstOrDefault(c => GetInt(c, "id") == id);
     return child is null ? Results.NotFound(new { error = "不存在" }) : Results.Json(child);
 });
 
@@ -374,7 +383,7 @@ app.MapGet("/watch", () =>
             .metric b{display:block;overflow:hidden;color:#24352b;font-size:clamp(11px,4vmin,14px);text-overflow:ellipsis;white-space:nowrap}.metric span{display:block;margin-top:1px;color:#65736b;font-size:clamp(8px,3vmin,10px)}
             .menu-dock{position:absolute;right:clamp(-4px,-1vmin,-2px);top:50%;z-index:3;display:grid;gap:clamp(3px,1.8vmin,6px);transform:translateY(-50%)}
             .menu-btn{display:grid;place-items:center;width:clamp(30px,12vmin,42px);height:clamp(30px,12vmin,42px);border:2px solid #17231b;border-radius:50%;background:#fff;color:#17231b;font-size:clamp(9px,3.2vmin,11px);font-weight:900;box-shadow:0 4px 10px rgba(16,32,25,.16)}.menu-btn.active{background:#1f7a48;color:#fff}
-            .panel{--panel-scale:1;display:none;width:min(205px,100%);max-width:100%;overflow:hidden;text-align:left;transform:scale(var(--panel-scale));transform-origin:center;will-change:transform}.panel.active{display:block}.panel[data-panel=home],#bind-panel .panel{text-align:center}
+            .panel{--panel-scale:1;display:none;width:min(205px,100%);max-width:100%;overflow:hidden;text-align:left;transform:scale(var(--panel-scale));transform-origin:center;will-change:transform}.panel.active{display:block}.panel[data-panel=home],#bind-panel .panel{text-align:center}.panel[data-panel=home].active{display:flex;flex-direction:column;align-items:center;justify-content:center}
             .panel h1,.panel h2{margin:0 0 8px;text-align:center;font-size:18px;line-height:1.1}.bind-title{font-size:20px;font-weight:900}.bind-sub{margin:5px 0 10px;color:#65736b;font-size:12px}.rules{display:grid;gap:6px}
             .rule-btn{display:flex;align-items:center;justify-content:space-between;gap:6px;width:100%;min-height:34px;border:1px solid #d3ded7;border-radius:8px;background:#fff;color:#17231b;padding:6px 8px;font-size:12px;text-align:left}.rule-btn span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.rule-btn b{color:#0c6f3b;white-space:nowrap}
             label{display:block;margin:7px 0 3px;color:#44544a;font-size:11px;font-weight:700}input,textarea{width:100%;border:1px solid #cbd8cf;border-radius:8px;background:#fff;color:#17231b;padding:7px;font-size:14px}textarea{min-height:44px;resize:none}.submit,.ghost{width:100%;margin-top:8px;border:0;border-radius:8px;padding:9px;font-size:14px;font-weight:900}.submit{background:#1f7a48;color:#fff}.ghost{background:#e7efe9;color:#17462c}.msg{min-height:16px;margin:6px 0 0;text-align:center;color:#16643a;font-size:11px}
@@ -608,7 +617,7 @@ app.MapPost("/api/children", async (JsonObject body, HttpRequest request) =>
     if (access.Error is not null) return access.Error;
     body["user_id"] = access.Profile!.AppUserId;
     body["parent_app_user_id"] = access.Profile!.AppUserId;
-    var familyGroupId = await ResolveFamilyGroupId(connectionString, request, body);
+    var familyGroupId = await ResolveInitialFamilyGroupIdForChild(connectionString, request, body, access.Profile!.AppUserId);
     var created = await CreateChildCore(connectionString, body, familyGroupId);
     if (!created.Success)
     {
@@ -621,7 +630,6 @@ app.MapPut("/api/children/{id:int}", async (int id, JsonObject body, HttpRequest
 {
     var access = await RequireParentProfile(connectionString, request);
     if (access.Error is not null) return access.Error;
-    var familyGroupId = await ResolveFamilyGroupId(connectionString, request, body);
     await using var conn = await OpenConnection(connectionString);
     await using var tx = await conn.BeginTransactionAsync();
     await using var cmd = new NpgsqlCommand("""
@@ -629,12 +637,10 @@ app.MapPut("/api/children/{id:int}", async (int id, JsonObject body, HttpRequest
         FROM children c
         JOIN child_user_bindings cub ON cub.child_profile_key = c.profile_key
         WHERE c.id = @id
-          AND c.family_group_id = @family_group_id
           AND cub.parent_app_user_id = @parent_app_user_id
         LIMIT 1
         """, conn, tx);
     cmd.Parameters.AddWithValue("id", id);
-    cmd.Parameters.AddWithValue("family_group_id", familyGroupId);
     cmd.Parameters.AddWithValue("parent_app_user_id", access.Profile!.AppUserId);
     var profileKeyValue = await cmd.ExecuteScalarAsync();
     if (profileKeyValue is null || profileKeyValue is DBNull)
@@ -688,7 +694,8 @@ app.MapPut("/api/children/{id:int}", async (int id, JsonObject body, HttpRequest
     await accountCmd.ExecuteNonQueryAsync();
     await tx.CommitAsync();
 
-    var updated = (await GetChildren(connectionString, familyGroupId)).First(c => GetInt(c, "id") == id);
+    var updated = (await GetChildren(connectionString, ownerAppUserId: access.Profile!.AppUserId))
+        .First(c => string.Equals(Convert.ToString(c["profileKey"], CultureInfo.InvariantCulture), profileKey, StringComparison.Ordinal));
     return Results.Json(updated);
 });
 
@@ -696,8 +703,7 @@ app.MapDelete("/api/children/{id:int}", async (int id, HttpRequest request) =>
 {
     var access = await RequireParentProfile(connectionString, request);
     if (access.Error is not null) return access.Error;
-    var familyGroupId = await ResolveFamilyGroupId(connectionString, request);
-    var result = await DeleteChildMembership(connectionString, id, familyGroupId, access.Profile!.AppUserId);
+    var result = await DeleteChildMembership(connectionString, id, access.Profile!.AppUserId);
     return result.ContainsKey("error") ? Results.NotFound(result) : Results.Json(result);
 });
 
@@ -705,7 +711,7 @@ app.MapPost("/api/children/{id:int}/auth-code", async (int id, JsonObject body, 
 {
     var access = await RequireParentProfile(connectionString, request);
     if (access.Error is not null) return access.Error;
-    var familyGroupId = await ResolveFamilyGroupId(connectionString, request, body);
+    var familyGroupId = await ResolveChildFamilyGroupId(connectionString, request, body, id, access.Profile!.AppUserId);
     var minutes = Math.Clamp(body.Int("expiresInMinutes") ?? 24 * 60, 10, 24 * 60);
     var result = await CreateChildAuthCode(connectionString, id, familyGroupId, access.Profile!.AppUserId, minutes);
     return result.ContainsKey("error") ? Results.BadRequest(result) : Results.Json(result);
@@ -715,7 +721,7 @@ app.MapGet("/api/children/{id:int}/devices", async (int id, HttpRequest request)
 {
     var access = await RequireParentProfile(connectionString, request);
     if (access.Error is not null) return access.Error;
-    var familyGroupId = await ResolveFamilyGroupId(connectionString, request);
+    var familyGroupId = await ResolveChildFamilyGroupId(connectionString, request, null, id, access.Profile!.AppUserId);
     var result = await GetChildWatchDevices(connectionString, id, familyGroupId, access.Profile!.AppUserId);
     return result.ContainsKey("error") ? Results.NotFound(result) : Results.Json(result);
 });
@@ -724,7 +730,7 @@ app.MapDelete("/api/children/{id:int}/devices/{deviceId:int}", async (int id, in
 {
     var access = await RequireParentProfile(connectionString, request);
     if (access.Error is not null) return access.Error;
-    var familyGroupId = await ResolveFamilyGroupId(connectionString, request);
+    var familyGroupId = await ResolveChildFamilyGroupId(connectionString, request, null, id, access.Profile!.AppUserId);
     var result = await RevokeChildWatchDevice(connectionString, id, deviceId, familyGroupId, access.Profile!.AppUserId);
     return result.ContainsKey("error") ? Results.NotFound(result) : Results.Json(result);
 });
@@ -733,7 +739,7 @@ app.MapPost("/api/children/{id:int}/devices/{deviceId:int}/unbind-code", async (
 {
     var access = await RequireParentProfile(connectionString, request);
     if (access.Error is not null) return access.Error;
-    var familyGroupId = await ResolveFamilyGroupId(connectionString, request, body);
+    var familyGroupId = await ResolveChildFamilyGroupId(connectionString, request, body, id, access.Profile!.AppUserId);
     var minutes = Math.Clamp(body.Int("expiresInMinutes") ?? 10, 5, 30);
     var result = await CreateWatchDeviceUnbindCode(connectionString, id, deviceId, familyGroupId, access.Profile!.AppUserId, minutes);
     return result.ContainsKey("error") ? Results.NotFound(result) : Results.Json(result);
@@ -2200,8 +2206,7 @@ static async Task<object> McpDeleteChild(string connectionString, JsonObject arg
         return new { ok = false, error = "未找到目标孩子" };
     }
 
-    var familyGroupId = GetInt(target, "family_group_id");
-    var result = await DeleteChildMembership(connectionString, GetInt(target, "id"), familyGroupId, arguments.String("user_id", DefaultUserId));
+    var result = await DeleteChildMembership(connectionString, GetInt(target, "id"), arguments.String("user_id", DefaultUserId));
     return !result.ContainsKey("error")
         ? new { ok = true, action = "delete_child", child = target }
         : new { ok = false, error = result["error"] };
@@ -3421,15 +3426,37 @@ static async Task<(bool Success, Dictionary<string, object?>? Group, string? Err
     }
 }
 
-static async Task<bool> UpsertFamilyGroupUser(string connectionString, int familyGroupId, string userId, string role)
+static async Task<(bool Success, bool Forbidden, string Error)> UpsertFamilyGroupUser(
+    string connectionString,
+    int familyGroupId,
+    string userId,
+    string role,
+    string operatorAppUserId)
 {
     await using var conn = await OpenConnection(connectionString);
-    await using (var existsCmd = new NpgsqlCommand("SELECT COUNT(*) FROM family_groups WHERE id = @id", conn))
+    await using (var accessCmd = new NpgsqlCommand("""
+        SELECT fg.id,
+               (fg.created_by = @operator_app_user_id OR EXISTS (
+                   SELECT 1
+                   FROM family_group_users fgu
+                   WHERE fgu.family_group_id = fg.id
+                     AND fgu.user_id = @operator_app_user_id
+                     AND fgu.role = 'owner'
+               )) AS can_manage
+        FROM family_groups fg
+        WHERE fg.id = @id
+        """, conn))
     {
-        existsCmd.Parameters.AddWithValue("id", familyGroupId);
-        if (Convert.ToInt32(await existsCmd.ExecuteScalarAsync(), CultureInfo.InvariantCulture) == 0)
+        accessCmd.Parameters.AddWithValue("id", familyGroupId);
+        accessCmd.Parameters.AddWithValue("operator_app_user_id", operatorAppUserId);
+        await using var reader = await accessCmd.ExecuteReaderAsync();
+        if (!await reader.ReadAsync())
         {
-            return false;
+            return (false, false, "家庭组不存在");
+        }
+        if (!reader.GetBoolean(reader.GetOrdinal("can_manage")))
+        {
+            return (false, true, "只有家庭组创建者或管理员可以管理成员");
         }
     }
 
@@ -3442,7 +3469,8 @@ static async Task<bool> UpsertFamilyGroupUser(string connectionString, int famil
     cmd.Parameters.AddWithValue("user_id", userId.Trim());
     cmd.Parameters.AddWithValue("role", string.IsNullOrWhiteSpace(role) ? "member" : role.Trim());
     await cmd.ExecuteNonQueryAsync();
-    return true;
+    await SyncOwnedChildrenToFamilyGroup(conn, familyGroupId, userId.Trim(), $"由 {operatorAppUserId} 加入家庭组");
+    return (true, false, "");
 }
 
 static async Task<(bool Success, bool Forbidden, string FamilyGroupName, string InviteCode, string Error)> GetOrCreateFamilyGroupInvite(
@@ -3895,6 +3923,84 @@ static async Task<int> ResolveFamilyGroupId(string connectionString, HttpRequest
     return await EnsureFamilyGroup(conn, DefaultFamilyGroupName, userId);
 }
 
+static bool HasFamilyGroupSelector(HttpRequest request, JsonObject? body = null)
+{
+    if (body?.Int("family_group_id") is not null || body?.Int("familyGroupId") is not null)
+    {
+        return true;
+    }
+    if (!string.IsNullOrWhiteSpace(body?.String("family_group_name")) || !string.IsNullOrWhiteSpace(body?.String("familyGroupName")))
+    {
+        return true;
+    }
+    if (request.Query.Int("familyGroupId") is not null || request.Query.Int("family_group_id") is not null)
+    {
+        return true;
+    }
+    return !string.IsNullOrWhiteSpace(request.Query.String("familyGroupName")) || !string.IsNullOrWhiteSpace(request.Query.String("family_group_name"));
+}
+
+static async Task<int> ResolveInitialFamilyGroupIdForChild(
+    string connectionString,
+    HttpRequest request,
+    JsonObject body,
+    string parentAppUserId)
+{
+    if (HasFamilyGroupSelector(request, body))
+    {
+        return await ResolveFamilyGroupId(connectionString, request, body);
+    }
+
+    await using var conn = await OpenConnection(connectionString);
+    await using var cmd = new NpgsqlCommand("""
+        SELECT fg.id
+        FROM family_groups fg
+        LEFT JOIN family_group_users fgu ON fgu.family_group_id = fg.id AND fgu.user_id = @user_id
+        WHERE fg.created_by = @user_id OR fgu.user_id = @user_id
+        ORDER BY fg.id
+        LIMIT 1
+        """, conn);
+    cmd.Parameters.AddWithValue("user_id", parentAppUserId);
+    var result = await cmd.ExecuteScalarAsync();
+    if (result is not null && result is not DBNull)
+    {
+        return Convert.ToInt32(result, CultureInfo.InvariantCulture);
+    }
+
+    return await EnsureFamilyGroup(conn, DefaultFamilyGroupName, parentAppUserId);
+}
+
+static async Task<int> ResolveChildFamilyGroupId(
+    string connectionString,
+    HttpRequest request,
+    JsonObject? body,
+    int childId,
+    string parentAppUserId)
+{
+    if (HasFamilyGroupSelector(request, body))
+    {
+        return await ResolveFamilyGroupId(connectionString, request, body);
+    }
+
+    await using var conn = await OpenConnection(connectionString);
+    await using var cmd = new NpgsqlCommand("""
+        SELECT c.family_group_id
+        FROM children c
+        JOIN child_user_bindings cub ON cub.child_profile_key = c.profile_key
+        WHERE c.id = @child_id
+          AND c.status = 'active'
+          AND cub.parent_app_user_id = @parent_app_user_id
+        ORDER BY c.id
+        LIMIT 1
+        """, conn);
+    cmd.Parameters.AddWithValue("child_id", childId);
+    cmd.Parameters.AddWithValue("parent_app_user_id", parentAppUserId);
+    var result = await cmd.ExecuteScalarAsync();
+    return result is not null && result is not DBNull
+        ? Convert.ToInt32(result, CultureInfo.InvariantCulture)
+        : -1;
+}
+
 static string GetRequestUserId(HttpRequest request)
 {
     var userId = request.Headers.TryGetValue("X-App-User-Id", out var appUserId) ? appUserId.ToString() : "";
@@ -4052,6 +4158,73 @@ static async Task<List<Dictionary<string, object?>>> GetChildren(
     string? ownerAppUserId = null)
 {
     await using var conn = await OpenConnection(connectionString);
+    if (!string.IsNullOrWhiteSpace(ownerAppUserId) && familyGroupId is null)
+    {
+        await using var ownedCmd = new NpgsqlCommand("""
+            SELECT COALESCE(rep.id, cub.child_id, 0) AS id,
+                   rep.family_group_id,
+                   fg.name AS family_group_name,
+                   cub.child_profile_key AS profile_key,
+                   cp.name,
+                   cp.status,
+                   cp.note,
+                   cp.created_at,
+                   cp.updated_at,
+                   COALESCE(a.points, 0) AS score,
+                   COALESCE(a.cash_cny, 0) AS cash,
+                   COALESCE(a.items_count, 0) AS items
+            FROM child_user_bindings cub
+            JOIN child_profiles cp ON cp.profile_key = cub.child_profile_key
+            LEFT JOIN LATERAL (
+                SELECT c.id, c.family_group_id
+                FROM children c
+                WHERE c.profile_key = cub.child_profile_key
+                  AND c.status = 'active'
+                ORDER BY CASE WHEN c.id = cub.child_id THEN 0 ELSE 1 END, c.id
+                LIMIT 1
+            ) rep ON true
+            LEFT JOIN family_groups fg ON fg.id = rep.family_group_id
+            LEFT JOIN accounts a ON a.profile_key = cub.child_profile_key
+            WHERE cub.parent_app_user_id = @owner_app_user_id
+              AND cp.status = 'active'
+              AND (@child_profile_key IS NULL OR cub.child_profile_key = @child_profile_key)
+            ORDER BY cp.name, cub.child_profile_key
+            """, conn);
+        ownedCmd.Parameters.Add(new NpgsqlParameter("owner_app_user_id", NpgsqlDbType.Varchar)
+        {
+            Value = ownerAppUserId
+        });
+        ownedCmd.Parameters.Add(new NpgsqlParameter("child_profile_key", NpgsqlDbType.Varchar)
+        {
+            Value = string.IsNullOrWhiteSpace(childProfileKey) ? DBNull.Value : childProfileKey
+        });
+
+        var ownedRows = new List<Dictionary<string, object?>>();
+        await using var ownedReader = await ownedCmd.ExecuteReaderAsync();
+        while (await ownedReader.ReadAsync())
+        {
+            ownedRows.Add(new Dictionary<string, object?>
+            {
+                ["id"] = ownedReader.Int("id"),
+                ["familyGroupId"] = ownedReader.Int("family_group_id"),
+                ["family_group_id"] = ownedReader.Int("family_group_id"),
+                ["familyGroupName"] = ownedReader.String("family_group_name"),
+                ["family_group_name"] = ownedReader.String("family_group_name"),
+                ["profileKey"] = ownedReader.String("profile_key"),
+                ["profile_key"] = ownedReader.String("profile_key"),
+                ["name"] = ownedReader.String("name"),
+                ["status"] = ownedReader.String("status"),
+                ["note"] = ownedReader.String("note"),
+                ["createdAt"] = ownedReader.DateTime("created_at").ToString("O"),
+                ["updatedAt"] = ownedReader.DateTime("updated_at").ToString("O"),
+                ["score"] = ownedReader.Decimal("score"),
+                ["cash"] = ownedReader.Decimal("cash"),
+                ["items"] = ownedReader.Int("items")
+            });
+        }
+        return ownedRows;
+    }
+
     await using var cmd = new NpgsqlCommand("""
         SELECT c.id, c.family_group_id, fg.name AS family_group_name,
                c.profile_key, COALESCE(cp.name, c.name) AS name,
@@ -4235,7 +4408,7 @@ static async Task<Dictionary<string, object?>> CreateTransaction(string connecti
     }
 }
 
-static async Task<Dictionary<string, object?>> DeleteChildMembership(string connectionString, int id, int familyGroupId, string parentAppUserId)
+static async Task<Dictionary<string, object?>> DeleteChildMembership(string connectionString, int id, string parentAppUserId)
 {
     await using var conn = await OpenConnection(connectionString);
     await using var tx = await conn.BeginTransactionAsync();
@@ -4245,7 +4418,7 @@ static async Task<Dictionary<string, object?>> DeleteChildMembership(string conn
         await using (var lookup = new NpgsqlCommand("""
             SELECT profile_key
             FROM children
-            WHERE id = @id AND family_group_id = @family_group_id
+            WHERE id = @id
               AND EXISTS (
                   SELECT 1
                   FROM child_user_bindings cub
@@ -4256,7 +4429,6 @@ static async Task<Dictionary<string, object?>> DeleteChildMembership(string conn
             """, conn, tx))
         {
             lookup.Parameters.AddWithValue("id", id);
-            lookup.Parameters.AddWithValue("family_group_id", familyGroupId);
             lookup.Parameters.AddWithValue("parent_app_user_id", parentAppUserId);
             var value = await lookup.ExecuteScalarAsync();
             if (value is null || value is DBNull)
@@ -4267,40 +4439,92 @@ static async Task<Dictionary<string, object?>> DeleteChildMembership(string conn
             profileKey = Convert.ToString(value, CultureInfo.InvariantCulture) ?? "";
         }
 
-        await using (var replacement = new NpgsqlCommand("""
-            SELECT id
-            FROM children
-            WHERE profile_key = @profile_key AND id <> @id
-            ORDER BY id
-            LIMIT 1
+        await using (var bindingCmd = new NpgsqlCommand("""
+            DELETE FROM child_user_bindings
+            WHERE parent_app_user_id = @parent_app_user_id
+              AND child_profile_key = @profile_key
             """, conn, tx))
         {
-            replacement.Parameters.AddWithValue("profile_key", profileKey);
-            replacement.Parameters.AddWithValue("id", id);
-            var replacementId = await replacement.ExecuteScalarAsync();
-            if (replacementId is not null && replacementId is not DBNull)
+            bindingCmd.Parameters.AddWithValue("parent_app_user_id", parentAppUserId);
+            bindingCmd.Parameters.AddWithValue("profile_key", profileKey);
+            await bindingCmd.ExecuteNonQueryAsync();
+        }
+
+        await using (var parentCodeCmd = new NpgsqlCommand("""
+            UPDATE child_auth_codes
+            SET used_at = CURRENT_TIMESTAMP
+            WHERE child_profile_key = @profile_key
+              AND parent_app_user_id = @parent_app_user_id
+              AND used_at IS NULL
+            """, conn, tx))
+        {
+            parentCodeCmd.Parameters.AddWithValue("profile_key", profileKey);
+            parentCodeCmd.Parameters.AddWithValue("parent_app_user_id", parentAppUserId);
+            await parentCodeCmd.ExecuteNonQueryAsync();
+        }
+
+        await using (var parentDeviceCmd = new NpgsqlCommand("""
+            UPDATE watch_device_bindings
+            SET revoked_at = CURRENT_TIMESTAMP
+            WHERE child_profile_key = @profile_key
+              AND parent_app_user_id = @parent_app_user_id
+              AND revoked_at IS NULL
+            """, conn, tx))
+        {
+            parentDeviceCmd.Parameters.AddWithValue("profile_key", profileKey);
+            parentDeviceCmd.Parameters.AddWithValue("parent_app_user_id", parentAppUserId);
+            await parentDeviceCmd.ExecuteNonQueryAsync();
+        }
+
+        var remainingBindings = 0;
+        await using (var remainingCmd = new NpgsqlCommand("""
+            SELECT COUNT(*)
+            FROM child_user_bindings
+            WHERE child_profile_key = @profile_key
+            """, conn, tx))
+        {
+            remainingCmd.Parameters.AddWithValue("profile_key", profileKey);
+            remainingBindings = Convert.ToInt32(await remainingCmd.ExecuteScalarAsync(), CultureInfo.InvariantCulture);
+        }
+
+        if (remainingBindings == 0)
+        {
+            await using (var codeCmd = new NpgsqlCommand("""
+                UPDATE child_auth_codes
+                SET used_at = CURRENT_TIMESTAMP
+                WHERE child_profile_key = @profile_key
+                  AND used_at IS NULL
+                """, conn, tx))
             {
-                await using var reassign = new NpgsqlCommand("""
-                    UPDATE accounts
-                    SET child_id = @replacement_id
-                    WHERE child_id = @id AND profile_key = @profile_key
-                    """, conn, tx);
-                reassign.Parameters.AddWithValue("replacement_id", Convert.ToInt32(replacementId, CultureInfo.InvariantCulture));
-                reassign.Parameters.AddWithValue("id", id);
-                reassign.Parameters.AddWithValue("profile_key", profileKey);
-                await reassign.ExecuteNonQueryAsync();
+                codeCmd.Parameters.AddWithValue("profile_key", profileKey);
+                await codeCmd.ExecuteNonQueryAsync();
+            }
+
+            await using (var deviceCmd = new NpgsqlCommand("""
+                UPDATE watch_device_bindings
+                SET revoked_at = CURRENT_TIMESTAMP
+                WHERE child_profile_key = @profile_key
+                  AND revoked_at IS NULL
+                """, conn, tx))
+            {
+                deviceCmd.Parameters.AddWithValue("profile_key", profileKey);
+                await deviceCmd.ExecuteNonQueryAsync();
+            }
+
+            await using (var deleteCmd = new NpgsqlCommand("DELETE FROM children WHERE profile_key = @profile_key", conn, tx))
+            {
+                deleteCmd.Parameters.AddWithValue("profile_key", profileKey);
+                await deleteCmd.ExecuteNonQueryAsync();
             }
         }
 
-        await using (var cmd = new NpgsqlCommand("DELETE FROM children WHERE id = @id AND family_group_id = @family_group_id", conn, tx))
-        {
-            cmd.Parameters.AddWithValue("id", id);
-            cmd.Parameters.AddWithValue("family_group_id", familyGroupId);
-            await cmd.ExecuteNonQueryAsync();
-        }
-
         await tx.CommitAsync();
-        return new Dictionary<string, object?> { ["status"] = "ok" };
+        return new Dictionary<string, object?>
+        {
+            ["status"] = "ok",
+            ["removedOwnerBinding"] = true,
+            ["deletedChildRows"] = remainingBindings == 0
+        };
     }
     catch (Exception ex)
     {
