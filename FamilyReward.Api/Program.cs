@@ -2562,7 +2562,11 @@ static async Task<object> McpCreateFamilyGroup(string connectionString, JsonObje
 
 static async Task<List<Dictionary<string, object?>>> GetMcpChildren(string connectionString, JsonObject? arguments)
 {
-    return await GetChildren(connectionString, arguments?.Int("family_group_id"));
+    var ownerAppUserId = arguments?.String("user_id") ?? arguments?.String("parent_app_user_id");
+    return await GetChildren(
+        connectionString,
+        arguments?.Int("family_group_id"),
+        ownerAppUserId: string.IsNullOrWhiteSpace(ownerAppUserId) ? null : ownerAppUserId);
 }
 
 static async Task<JsonObject> NormalizeRecordArguments(string connectionString, JsonObject arguments, bool allowMissingChild = false)
@@ -4473,6 +4477,7 @@ static async Task<List<Dictionary<string, object?>>> GetChildren(
         LEFT JOIN accounts a ON a.profile_key = c.profile_key
         WHERE COALESCE(cp.status, c.status) = 'active'
           AND (@family_group_id IS NULL OR c.family_group_id = @family_group_id)
+          AND (@family_group_id IS NOT NULL OR c.family_group_id IS NOT NULL)
           AND (@child_profile_key IS NULL OR c.profile_key = @child_profile_key)
           AND (
               @owner_app_user_id IS NULL OR EXISTS (
@@ -4648,16 +4653,16 @@ static async Task<Dictionary<string, object?>> DeleteChildMembership(string conn
     {
         string profileKey;
         await using (var lookup = new NpgsqlCommand("""
-            SELECT profile_key
-            FROM children
-            WHERE id = @id
-              AND EXISTS (
-                  SELECT 1
-                  FROM child_user_bindings cub
-                  WHERE cub.child_profile_key = children.profile_key
-                    AND cub.parent_app_user_id = @parent_app_user_id
-              )
-            FOR UPDATE
+            SELECT COALESCE(c.profile_key, cub.child_profile_key) AS profile_key
+            FROM child_user_bindings cub
+            LEFT JOIN children c
+              ON c.profile_key = cub.child_profile_key
+             AND c.id = @id
+            WHERE cub.parent_app_user_id = @parent_app_user_id
+              AND (c.id IS NOT NULL OR cub.child_id = @id)
+            ORDER BY CASE WHEN c.id IS NOT NULL THEN 0 ELSE 1 END
+            LIMIT 1
+            FOR UPDATE OF cub
             """, conn, tx))
         {
             lookup.Parameters.AddWithValue("id", id);
@@ -4747,6 +4752,25 @@ static async Task<Dictionary<string, object?>> DeleteChildMembership(string conn
             {
                 deleteCmd.Parameters.AddWithValue("profile_key", profileKey);
                 await deleteCmd.ExecuteNonQueryAsync();
+            }
+
+            await using (var profileCmd = new NpgsqlCommand("""
+                DELETE FROM child_profiles cp
+                WHERE cp.profile_key = @profile_key
+                  AND NOT EXISTS (
+                      SELECT 1
+                      FROM children c
+                      WHERE c.profile_key = cp.profile_key
+                  )
+                  AND NOT EXISTS (
+                      SELECT 1
+                      FROM child_user_bindings cub
+                      WHERE cub.child_profile_key = cp.profile_key
+                  )
+                """, conn, tx))
+            {
+                profileCmd.Parameters.AddWithValue("profile_key", profileKey);
+                await profileCmd.ExecuteNonQueryAsync();
             }
         }
 
