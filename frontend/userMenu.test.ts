@@ -42,3 +42,26 @@ test('family management exposes child owners and scoped removal', async () => {
   assert.match(services, /api\/family-groups\/\$\{id\}\/children/);
   assert.match(services, /api\/family-groups\/\$\{id\}\/children\/\$\{childId\}/);
 });
+
+test('family management can delete families without deleting global children', async () => {
+  const [page, services] = await Promise.all([
+    readFile(new URL('./src/pages/FamilyGroups.tsx', import.meta.url), 'utf8'),
+    readFile(new URL('./src/services/index.ts', import.meta.url), 'utf8'),
+  ]);
+
+  assert.match(services, /deleteFamilyGroup = \(id: number\) => http\.delete\(`\/api\/family-groups\/\$\{id\}`\)/);
+  assert.match(page, /title="删除家庭"/);
+  assert.match(page, /孩子、归属家长和积分账户会保留/);
+});
+
+test('reward and transaction pages use parent-owned children globally', async () => {
+  const [reward, transactions] = await Promise.all([
+    readFile(new URL('./src/pages/Reward.tsx', import.meta.url), 'utf8'),
+    readFile(new URL('./src/pages/Transactions.tsx', import.meta.url), 'utf8'),
+  ]);
+
+  assert.match(reward, /getChildren\(\{ ownedOnly: true \}\)/);
+  assert.doesNotMatch(reward, /family_group_id: selectedGroupId|familyGroupId: selectedGroupId/);
+  assert.match(transactions, /getChildren\(\{ ownedOnly: true \}\)/);
+  assert.doesNotMatch(transactions, /familyGroupId: selectedGroupId/);
+});

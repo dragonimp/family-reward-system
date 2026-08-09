@@ -2,7 +2,6 @@ import { Card } from '../components/Card';
 import type { Transaction, Child } from '../types';
 import { useState, useEffect, useCallback } from 'react';
 import { getTransactions, getChildren } from '../services';
-import { useFamilyGroup } from '../contexts/FamilyGroupContext';
 
 type TransactionType = 'score' | 'cash' | 'item';
 
@@ -19,7 +18,6 @@ const typeColors: Record<string, string> = {
 };
 
 export default function Transactions() {
-  const { selectedGroupId } = useFamilyGroup();
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [children, setChildren] = useState<Child[]>([]);
   const [loading, setLoading] = useState(true);
@@ -38,7 +36,7 @@ export default function Transactions() {
   const loadData = useCallback(async () => {
     try {
       setLoading(true);
-      const params: any = { page, pageSize, familyGroupId: selectedGroupId ?? undefined };
+      const params: any = { page, pageSize };
       if (filterChild) params.childId = parseInt(filterChild);
       if (filterType) params.type = filterType;
       if (filterCategory) params.category = filterCategory;
@@ -48,7 +46,7 @@ export default function Transactions() {
 
       const [txRes, childRes] = await Promise.all([
         getTransactions(params),
-        getChildren({ familyGroupId: selectedGroupId ?? undefined }),
+        getChildren({ ownedOnly: true }),
       ]);
 
       const txData = (txRes as any).data ?? txRes;
@@ -63,16 +61,11 @@ export default function Transactions() {
     } finally {
       setLoading(false);
     }
-  }, [page, pageSize, filterChild, filterType, filterCategory, filterStartDate, filterEndDate, filterSearch, selectedGroupId]);
+  }, [page, pageSize, filterChild, filterType, filterCategory, filterStartDate, filterEndDate, filterSearch]);
 
   useEffect(() => {
     loadData();
   }, [loadData]);
-
-  useEffect(() => {
-    setPage(1);
-    setFilterChild('');
-  }, [selectedGroupId]);
 
   const categories = Array.from(new Set(transactions.map((t) => t.category)));
   const totalPages = Math.ceil(total / pageSize);
@@ -120,12 +113,12 @@ export default function Transactions() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h2 className="text-2xl font-bold text-gray-900">交易记录</h2>
-          <p className="text-gray-500 mt-1">查看所有积分、现金和物品变更记录</p>
+          <p className="text-gray-500 mt-1">只查看当前家长账号名下孩子的积分、现金和物品变更记录</p>
         </div>
-        <button onClick={exportCSV} className="btn-primary flex items-center gap-2">
+        <button onClick={exportCSV} className="btn-primary flex w-full items-center justify-center gap-2 sm:w-auto">
           <span>📥</span> 导出 CSV
         </button>
       </div>
@@ -213,7 +206,33 @@ export default function Transactions() {
 
       {/* 交易列表 */}
       <Card>
-        <div className="overflow-x-auto">
+        <div className="block sm:hidden">
+          <div className="divide-y divide-gray-100">
+            {transactions.map((tx) => (
+              <div key={tx.id} className="p-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="font-semibold text-gray-900">{tx.childName}</p>
+                    <p className="mt-1 text-sm text-gray-500">{tx.category || '未分类'}</p>
+                  </div>
+                  <span className={`inline-flex shrink-0 items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${typeColors[tx.type] || 'bg-gray-100 text-gray-700'}`}>
+                    {typeLabels[tx.type] || tx.type}
+                  </span>
+                </div>
+                <div className="mt-3 flex items-end justify-between gap-3">
+                  <p className="min-w-0 text-sm text-gray-500">{tx.description || ''}</p>
+                  <p className={`shrink-0 text-lg font-bold ${(tx.amount ?? 0) > 0 ? 'text-green-600' : 'text-red-600'}`}>
+                    {(tx.amount ?? 0) > 0 ? '+' : ''}{tx.amount ?? 0}
+                  </p>
+                </div>
+                <p className="mt-2 text-xs text-gray-400">
+                  {new Date(tx.createdAt || '').toLocaleString('zh-CN')}
+                </p>
+              </div>
+            ))}
+          </div>
+        </div>
+        <div className="hidden overflow-x-auto sm:block">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-gray-200 bg-gray-50/50">
@@ -250,19 +269,19 @@ export default function Transactions() {
               ))}
             </tbody>
           </table>
-          {transactions.length === 0 && (
-            <div className="text-center py-12 text-gray-400">
-              <p className="text-4xl mb-3">📝</p>
-              <p>暂无交易记录</p>
-            </div>
-          )}
         </div>
+        {transactions.length === 0 && (
+          <div className="text-center py-12 text-gray-400">
+            <p className="text-4xl mb-3">📝</p>
+            <p>暂无交易记录</p>
+          </div>
+        )}
 
         {/* 分页 */}
         {totalPages > 1 && (
-          <div className="flex items-center justify-between px-4 py-4 border-t border-gray-200">
+          <div className="flex flex-col gap-3 px-4 py-4 border-t border-gray-200 sm:flex-row sm:items-center sm:justify-between">
             <p className="text-sm text-gray-500">共 {total} 条记录</p>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <button
                 onClick={() => setPage(Math.max(1, page - 1))}
                 disabled={page === 1}

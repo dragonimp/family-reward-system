@@ -158,6 +158,27 @@ app.MapPost("/api/family-groups", async (JsonObject body, HttpRequest request) =
     return Results.Created($"/api/family-groups/{GetInt(created.Group!, "id")}", created.Group);
 });
 
+app.MapDelete("/api/family-groups/{id:int}", async (int id, HttpRequest request) =>
+{
+    var access = await RequireParentProfile(connectionString, request);
+    if (access.Error is not null) return access.Error;
+
+    var result = await DeleteFamilyGroup(connectionString, id, access.Profile!.AppUserId);
+    if (result.Forbidden)
+    {
+        return Results.Json(new { error = result.Error }, statusCode: StatusCodes.Status403Forbidden);
+    }
+    return result.Success
+        ? Results.Json(new
+        {
+            status = "ok",
+            familyGroupId = id,
+            familyGroupName = result.FamilyGroupName,
+            removedChildren = result.RemovedChildren
+        })
+        : Results.NotFound(new { error = result.Error });
+});
+
 app.MapGet("/api/family-groups/{id:int}/invite", async (int id, HttpRequest request) =>
 {
     var access = await RequireParentProfile(connectionString, request);
@@ -787,7 +808,6 @@ app.MapGet("/api/transactions", async (HttpRequest request) =>
     var access = await RequireParentProfile(connectionString, request);
     if (access.Error is not null) return access.Error;
     var query = request.Query;
-    var familyGroupId = await ResolveFamilyGroupId(connectionString, request);
     var childId = query.Int("childId") ?? query.Int("child_id");
     var type = NormalizeTransactionType(query.String("type"));
     var category = query.String("category");
@@ -805,9 +825,14 @@ app.MapGet("/api/transactions", async (HttpRequest request) =>
         return Results.BadRequest(new { error = "endDate 日期格式无效，请使用 yyyy-MM-dd" });
     }
 
-    var where = new List<string> { "1=1", "c.family_group_id = @family_group_id" };
-    var parameters = new List<NpgsqlParameter>();
-    parameters.Add(new NpgsqlParameter("family_group_id", familyGroupId));
+    var where = new List<string>
+    {
+        "cub.parent_app_user_id = @parent_app_user_id"
+    };
+    var parameters = new List<NpgsqlParameter>
+    {
+        new("parent_app_user_id", access.Profile!.AppUserId)
+    };
     AddFilter(where, parameters, childId is null, "t.child_id = @child_id", "child_id", childId ?? 0);
     AddFilter(where, parameters, string.IsNullOrWhiteSpace(type), "t.type = @type", "type", type);
     AddFilter(where, parameters, string.IsNullOrWhiteSpace(category), "t.category = @category", "category", category);
@@ -821,16 +846,19 @@ app.MapGet("/api/transactions", async (HttpRequest request) =>
     await using var countCmd = new NpgsqlCommand($"""
         SELECT COUNT(*)
         FROM transactions t
-        LEFT JOIN children c ON c.id = t.child_id
+        JOIN children c ON c.id = t.child_id
+        JOIN child_user_bindings cub ON cub.child_profile_key = c.profile_key
         WHERE {whereSql}
         """, conn);
     countCmd.Parameters.AddRange(parameters.Select(CloneParameter).ToArray());
     var total = Convert.ToInt32(await countCmd.ExecuteScalarAsync(), CultureInfo.InvariantCulture);
 
     await using var cmd = new NpgsqlCommand($"""
-        SELECT t.*, c.name AS child_name
+        SELECT t.*, COALESCE(cp.name, c.name) AS child_name
         FROM transactions t
-        LEFT JOIN children c ON c.id = t.child_id
+        JOIN children c ON c.id = t.child_id
+        JOIN child_user_bindings cub ON cub.child_profile_key = c.profile_key
+        LEFT JOIN child_profiles cp ON cp.profile_key = c.profile_key
         WHERE {whereSql}
         ORDER BY t.date DESC, t.id DESC
         LIMIT @limit OFFSET @offset
@@ -854,7 +882,7 @@ app.MapPost("/api/transactions", async (JsonObject body, HttpRequest request) =>
     var access = await RequireParentProfile(connectionString, request);
     if (access.Error is not null) return access.Error;
     var familyGroupId = await ResolveFamilyGroupId(connectionString, request, body);
-    var result = await CreateTransaction(connectionString, body, familyGroupId);
+    var result = await CreateTransaction(connectionString, body, familyGroupId, access.Profile!.AppUserId);
     return result.ContainsKey("error") ? Results.BadRequest(result) : Results.Json(result);
 });
 
@@ -866,7 +894,7 @@ app.MapPost("/api/transactions/batch", async (JsonArray body, HttpRequest reques
     foreach (var node in body.OfType<JsonObject>())
     {
         var familyGroupId = await ResolveFamilyGroupId(connectionString, request, node);
-        var result = await CreateTransaction(connectionString, node, familyGroupId);
+        var result = await CreateTransaction(connectionString, node, familyGroupId, access.Profile!.AppUserId);
         results.Add(new
         {
             child_id = node.Int("child_id") ?? node.Int("childId"),
@@ -882,8 +910,7 @@ app.MapDelete("/api/transactions/{id:int}", async (int id, HttpRequest request) 
 {
     var access = await RequireParentProfile(connectionString, request);
     if (access.Error is not null) return access.Error;
-    var familyGroupId = await ResolveFamilyGroupId(connectionString, request);
-    var result = await DeleteTransaction(connectionString, id, familyGroupId);
+    var result = await DeleteTransaction(connectionString, id, parentAppUserId: access.Profile!.AppUserId);
     return result.ContainsKey("error") ? Results.NotFound(result) : Results.Json(result);
 });
 
@@ -1041,8 +1068,7 @@ app.MapPost("/api/agent/parse-reward", async (JsonObject body, IHttpClientFactor
         return Results.BadRequest(new { ok = false, error = "未配置智能体服务地址，请先到系统配置页填写并保存" });
     }
 
-    var familyGroupId = await ResolveFamilyGroupId(connectionString, request, body);
-    var children = await GetChildren(connectionString, familyGroupId);
+    var children = await GetChildren(connectionString, ownerAppUserId: access.Profile!.AppUserId);
     var rules = await GetRules(connectionString);
     var prompt = $$$"""
         你是家加分的语音纠错和结构化解析智能体。
@@ -2685,13 +2711,17 @@ static async Task<Dictionary<string, object?>> UpdateTransaction(string connecti
     }
 }
 
-static async Task<Dictionary<string, object?>> DeleteTransaction(string connectionString, int id, int? familyGroupId = null)
+static async Task<Dictionary<string, object?>> DeleteTransaction(
+    string connectionString,
+    int id,
+    int? familyGroupId = null,
+    string? parentAppUserId = null)
 {
     await using var conn = await OpenConnection(connectionString);
     await using var tx = await conn.BeginTransactionAsync();
     try
     {
-        var existing = await ReadTransactionForUpdate(conn, tx, id, familyGroupId);
+        var existing = await ReadTransactionForUpdate(conn, tx, id, familyGroupId, parentAppUserId);
         if (existing is null)
         {
             await tx.RollbackAsync();
@@ -2712,7 +2742,12 @@ static async Task<Dictionary<string, object?>> DeleteTransaction(string connecti
     }
 }
 
-static async Task<Dictionary<string, object?>?> ReadTransactionForUpdate(NpgsqlConnection conn, NpgsqlTransaction tx, int id, int? familyGroupId = null)
+static async Task<Dictionary<string, object?>?> ReadTransactionForUpdate(
+    NpgsqlConnection conn,
+    NpgsqlTransaction tx,
+    int id,
+    int? familyGroupId = null,
+    string? parentAppUserId = null)
 {
     await using var cmd = new NpgsqlCommand("""
         SELECT t.*, c.name AS child_name
@@ -2720,12 +2755,24 @@ static async Task<Dictionary<string, object?>?> ReadTransactionForUpdate(NpgsqlC
         LEFT JOIN children c ON c.id = t.child_id
         WHERE t.id = @id
           AND (@family_group_id IS NULL OR c.family_group_id = @family_group_id)
+          AND (
+              @parent_app_user_id IS NULL OR EXISTS (
+                  SELECT 1
+                  FROM child_user_bindings cub
+                  WHERE cub.child_profile_key = c.profile_key
+                    AND cub.parent_app_user_id = @parent_app_user_id
+              )
+          )
         FOR UPDATE OF t
         """, conn, tx);
     cmd.Parameters.AddWithValue("id", id);
     cmd.Parameters.Add(new NpgsqlParameter("family_group_id", NpgsqlDbType.Integer)
     {
         Value = familyGroupId is null ? DBNull.Value : familyGroupId.Value
+    });
+    cmd.Parameters.Add(new NpgsqlParameter("parent_app_user_id", NpgsqlDbType.Varchar)
+    {
+        Value = string.IsNullOrWhiteSpace(parentAppUserId) ? DBNull.Value : parentAppUserId
     });
     await using var reader = await cmd.ExecuteReaderAsync();
     return await reader.ReadAsync() ? ReadTransaction(reader) : null;
@@ -3464,6 +3511,159 @@ static async Task<(bool Success, Dictionary<string, object?>? Group, string? Err
     catch (Exception ex)
     {
         return (false, null, ex.Message);
+    }
+}
+
+static async Task<(bool Success, bool Forbidden, string FamilyGroupName, int RemovedChildren, string Error)> DeleteFamilyGroup(
+    string connectionString,
+    int familyGroupId,
+    string operatorAppUserId)
+{
+    await using var conn = await OpenConnection(connectionString);
+    await using var tx = await conn.BeginTransactionAsync();
+    try
+    {
+        string familyGroupName = "";
+        bool? canManage = null;
+        await using (var groupCmd = new NpgsqlCommand("""
+            SELECT fg.name,
+                   (fg.created_by = @operator_app_user_id OR EXISTS (
+                       SELECT 1
+                       FROM family_group_users fgu
+                       WHERE fgu.family_group_id = fg.id
+                         AND fgu.user_id = @operator_app_user_id
+                         AND fgu.role = 'owner'
+                   ) OR @operator_app_user_id = @default_user_id) AS can_manage
+            FROM family_groups fg
+            WHERE fg.id = @family_group_id
+            FOR UPDATE
+            """, conn, tx))
+        {
+            groupCmd.Parameters.AddWithValue("family_group_id", familyGroupId);
+            groupCmd.Parameters.AddWithValue("operator_app_user_id", operatorAppUserId);
+            groupCmd.Parameters.AddWithValue("default_user_id", DefaultUserId);
+            await using var reader = await groupCmd.ExecuteReaderAsync();
+            if (await reader.ReadAsync())
+            {
+                familyGroupName = reader.String("name");
+                canManage = reader.GetBoolean(reader.GetOrdinal("can_manage"));
+            }
+        }
+        if (canManage is null)
+        {
+            await tx.RollbackAsync();
+            return (false, false, "", 0, "家庭不存在");
+        }
+        if (canManage is false)
+        {
+            await tx.RollbackAsync();
+            return (false, true, familyGroupName, 0, "只有家庭创建者或管理员可以删除家庭");
+        }
+
+        await using (var codeCmd = new NpgsqlCommand("""
+            UPDATE child_auth_codes
+            SET used_at = CURRENT_TIMESTAMP
+            WHERE family_group_id = @family_group_id
+              AND used_at IS NULL
+            """, conn, tx))
+        {
+            codeCmd.Parameters.AddWithValue("family_group_id", familyGroupId);
+            await codeCmd.ExecuteNonQueryAsync();
+        }
+
+        await using (var deviceCmd = new NpgsqlCommand("""
+            UPDATE watch_device_bindings
+            SET revoked_at = CURRENT_TIMESTAMP
+            WHERE family_group_id = @family_group_id
+              AND revoked_at IS NULL
+            """, conn, tx))
+        {
+            deviceCmd.Parameters.AddWithValue("family_group_id", familyGroupId);
+            await deviceCmd.ExecuteNonQueryAsync();
+        }
+
+        await using (var accountCmd = new NpgsqlCommand("""
+            WITH group_children AS (
+                SELECT id, profile_key
+                FROM children
+                WHERE family_group_id = @family_group_id
+            ), replacements AS (
+                SELECT gc.id AS old_id,
+                       (
+                           SELECT c2.id
+                           FROM children c2
+                           WHERE c2.profile_key = gc.profile_key
+                             AND c2.id <> gc.id
+                             AND c2.family_group_id IS NOT NULL
+                           ORDER BY c2.id
+                           LIMIT 1
+                       ) AS replacement_id
+                FROM group_children gc
+            )
+            UPDATE accounts a
+            SET child_id = r.replacement_id,
+                updated_at = CURRENT_TIMESTAMP
+            FROM replacements r
+            WHERE a.child_id = r.old_id
+              AND r.replacement_id IS NOT NULL
+            """, conn, tx))
+        {
+            accountCmd.Parameters.AddWithValue("family_group_id", familyGroupId);
+            await accountCmd.ExecuteNonQueryAsync();
+        }
+
+        int removedChildren;
+        await using (var childCmd = new NpgsqlCommand("""
+            WITH group_children AS (
+                SELECT id, profile_key
+                FROM children
+                WHERE family_group_id = @family_group_id
+                FOR UPDATE
+            ), replacements AS (
+                SELECT gc.id,
+                       EXISTS (
+                           SELECT 1
+                           FROM children c2
+                           WHERE c2.profile_key = gc.profile_key
+                             AND c2.id <> gc.id
+                             AND c2.family_group_id IS NOT NULL
+                       ) AS has_replacement
+                FROM group_children gc
+            ), deleted AS (
+                DELETE FROM children c
+                USING replacements r
+                WHERE c.id = r.id
+                  AND r.has_replacement
+                RETURNING c.id
+            ), detached AS (
+                UPDATE children c
+                SET family_group_id = NULL,
+                    updated_at = CURRENT_TIMESTAMP
+                FROM replacements r
+                WHERE c.id = r.id
+                  AND NOT r.has_replacement
+                RETURNING c.id
+            )
+            SELECT (SELECT COUNT(*) FROM deleted) + (SELECT COUNT(*) FROM detached)
+            """, conn, tx))
+        {
+            childCmd.Parameters.AddWithValue("family_group_id", familyGroupId);
+            removedChildren = Convert.ToInt32(await childCmd.ExecuteScalarAsync(), CultureInfo.InvariantCulture);
+        }
+
+        await using (var deleteCmd = new NpgsqlCommand("DELETE FROM family_groups WHERE id = @family_group_id", conn, tx))
+        {
+            deleteCmd.Parameters.AddWithValue("family_group_id", familyGroupId);
+            await deleteCmd.ExecuteNonQueryAsync();
+        }
+
+        await tx.CommitAsync();
+        return (true, false, familyGroupName, removedChildren, "");
+    }
+    catch (Exception ex)
+    {
+        await tx.RollbackAsync();
+        return (false, false, "", 0, ex.Message);
     }
 }
 
@@ -4587,7 +4787,11 @@ static async Task<List<Dictionary<string, object?>>> GetRecentTransactions(strin
     return rows;
 }
 
-static async Task<Dictionary<string, object?>> CreateTransaction(string connectionString, JsonObject body, int? familyGroupId = null)
+static async Task<Dictionary<string, object?>> CreateTransaction(
+    string connectionString,
+    JsonObject body,
+    int? familyGroupId = null,
+    string? parentAppUserId = null)
 {
     await using var conn = await OpenConnection(connectionString);
     await using var tx = await conn.BeginTransactionAsync();
@@ -4600,7 +4804,25 @@ static async Task<Dictionary<string, object?>> CreateTransaction(string connecti
         var cash = body.Decimal("cash_cny") ?? (type == "cash" ? body.Decimal("amount") : null) ?? 0;
         var itemText = body.String("items");
 
-        if (familyGroupId is not null)
+        if (!string.IsNullOrWhiteSpace(parentAppUserId))
+        {
+            await using var ownerCmd = new NpgsqlCommand("""
+                SELECT COUNT(*)
+                FROM children c
+                JOIN child_user_bindings cub ON cub.child_profile_key = c.profile_key
+                WHERE c.id = @child_id
+                  AND cub.parent_app_user_id = @parent_app_user_id
+                  AND c.status = 'active'
+                """, conn, tx);
+            ownerCmd.Parameters.AddWithValue("child_id", childId);
+            ownerCmd.Parameters.AddWithValue("parent_app_user_id", parentAppUserId);
+            if (Convert.ToInt32(await ownerCmd.ExecuteScalarAsync(), CultureInfo.InvariantCulture) == 0)
+            {
+                await tx.RollbackAsync();
+                return new Dictionary<string, object?> { ["error"] = "只能操作自己名下的孩子" };
+            }
+        }
+        else if (familyGroupId is not null)
         {
             await using var childCmd = new NpgsqlCommand("SELECT COUNT(*) FROM children WHERE id = @child_id AND family_group_id = @family_group_id", conn, tx);
             childCmd.Parameters.AddWithValue("child_id", childId);

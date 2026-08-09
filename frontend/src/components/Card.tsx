@@ -15,7 +15,7 @@ interface StatCardProps {
 
 export function Card({ children, className = '' }: CardProps) {
   return (
-    <div className={`bg-white rounded-xl shadow-sm border border-gray-100 ${className}`}>
+    <div className={`bg-white rounded-lg shadow-sm border border-gray-100 ${className}`}>
       {children}
     </div>
   );
@@ -31,13 +31,13 @@ const colorMap: Record<string, string> = {
 
 export function StatCard({ title, value, icon, color, className = '' }: StatCardProps) {
   return (
-    <Card className={`p-5 ${className}`}>
+    <Card className={`p-4 sm:p-5 ${className}`}>
       <div className="flex items-center justify-between">
         <div>
           <p className="text-sm text-gray-500 mb-1">{title}</p>
-          <p className="text-2xl font-bold text-gray-900">{value}</p>
+          <p className="truncate text-xl font-bold text-gray-900 sm:text-2xl">{value}</p>
         </div>
-        <div className={`w-12 h-12 rounded-xl flex items-center justify-center text-2xl ${colorMap[color]}`}>
+        <div className={`w-10 h-10 rounded-lg flex items-center justify-center text-xl sm:h-12 sm:w-12 sm:text-2xl ${colorMap[color]}`}>
           {icon}
         </div>
       </div>

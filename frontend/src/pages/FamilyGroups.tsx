@@ -4,6 +4,7 @@ import { Card, StatCard } from '../components/Card';
 import { Modal } from '../components/Modal';
 import {
   createFamilyGroup,
+  deleteFamilyGroup,
   getFamilyGroupChildren,
   getFamilyGroupInvite,
   joinFamilyGroup,
@@ -33,6 +34,7 @@ export default function FamilyGroups() {
   const [familyChildren, setFamilyChildren] = useState<Child[]>([]);
   const [childrenLoading, setChildrenLoading] = useState(false);
   const [childToRemove, setChildToRemove] = useState<Child | null>(null);
+  const [familyToDelete, setFamilyToDelete] = useState<{ id: number; name: string } | null>(null);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
 
@@ -169,6 +171,22 @@ export default function FamilyGroups() {
     }
   };
 
+  const handleDeleteFamily = async () => {
+    if (!familyToDelete) return;
+    try {
+      setBusy(true);
+      setMessage('');
+      await deleteFamilyGroup(familyToDelete.id);
+      setMessage(`已删除家庭「${familyToDelete.name}」，孩子全局信息已保留`);
+      setFamilyToDelete(null);
+      await refreshGroups();
+    } catch (err) {
+      setMessage(err instanceof Error ? err.message : '删除家庭失败');
+    } finally {
+      setBusy(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-20">
@@ -194,14 +212,14 @@ export default function FamilyGroups() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3 sm:gap-4">
         <StatCard title="家庭组" value={groups.length} icon="🏠" color="blue" />
         <StatCard title="我管理的" value={ownedCount} icon="👤" color="green" />
         <StatCard title="当前选择" value={selectedGroup?.name || '-'} icon="✅" color="orange" />
       </div>
 
-      <Card className="p-5">
-        <div className="mb-4 flex items-center justify-between gap-3">
+      <Card className="p-4 sm:p-5">
+        <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h3 className="text-lg font-semibold text-gray-900">孩子成员</h3>
             <p className="mt-1 text-sm text-gray-500">查看当前家庭中的孩子信息及其归属家长</p>
@@ -235,7 +253,7 @@ export default function FamilyGroups() {
                     </button>
                   )}
                 </div>
-                <div className="mt-3 grid grid-cols-3 gap-2 text-center text-sm">
+                <div className="mt-3 grid grid-cols-1 gap-2 text-sm sm:grid-cols-3 sm:text-center">
                   <div className="rounded-md bg-blue-50 px-2 py-2 text-blue-700">积分 {child.score ?? 0}</div>
                   <div className="rounded-md bg-green-50 px-2 py-2 text-green-700">现金 {child.cash ?? 0}</div>
                   <div className="rounded-md bg-orange-50 px-2 py-2 text-orange-700">物品 {child.items ?? 0}</div>
@@ -247,31 +265,46 @@ export default function FamilyGroups() {
       </Card>
 
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-        <Card className="xl:col-span-2 p-5">
+        <Card className="xl:col-span-2 p-4 sm:p-5">
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-lg font-semibold text-gray-900">家庭组列表</h3>
           </div>
           <div className="space-y-3">
             {groups.map((group) => (
-              <button
+              <div
                 key={group.id}
-                type="button"
-                onClick={() => selectGroup(group.id)}
-                className={`w-full text-left rounded-lg border px-4 py-3 transition-colors ${
+                className={`rounded-lg border px-4 py-3 transition-colors ${
                   selectedGroupId === group.id
                     ? 'border-[#4A90D9] bg-[#4A90D9]/5'
                     : 'border-gray-200 hover:bg-gray-50'
                 }`}
               >
-                <div className="flex items-center justify-between gap-3">
-                  <div>
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="min-w-0">
                     <p className="font-semibold text-gray-900">{group.name}</p>
                     <p className="text-sm text-gray-500">ID：{group.id} · 角色：{group.role || 'member'}</p>
                   </div>
-                  <span className="text-sm text-[#4A90D9]">{selectedGroupId === group.id ? '当前' : '选择'}</span>
+                  <div className="flex items-center gap-2 self-start sm:self-center">
+                    {(group.role === 'owner' || group.createdBy === appUserId) && (
+                      <button
+                        type="button"
+                        onClick={() => setFamilyToDelete({ id: group.id, name: group.name })}
+                        className="rounded-md px-2.5 py-1.5 text-sm text-red-600 hover:bg-red-50"
+                      >
+                        删除
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => selectGroup(group.id)}
+                      className="rounded-md px-2.5 py-1.5 text-sm text-[#4A90D9] hover:bg-[#4A90D9]/10"
+                    >
+                      {selectedGroupId === group.id ? '当前' : '选择'}
+                    </button>
+                  </div>
                 </div>
                 {group.description && <p className="text-sm text-gray-500 mt-2">{group.description}</p>}
-              </button>
+              </div>
             ))}
             {groups.length === 0 && (
               <div className="text-center py-10 text-gray-400">暂无家庭组</div>
@@ -280,7 +313,7 @@ export default function FamilyGroups() {
         </Card>
 
         <div className="space-y-6">
-          <Card className="p-5">
+          <Card className="p-4 sm:p-5">
             <h3 className="text-lg font-semibold text-gray-900 mb-4">新增家庭</h3>
             <div className="space-y-3">
               <input
@@ -302,7 +335,7 @@ export default function FamilyGroups() {
             </div>
           </Card>
 
-          <Card className="p-5">
+          <Card className="p-4 sm:p-5">
             <h3 className="text-lg font-semibold text-gray-900 mb-4">加入家庭组</h3>
             <div className="space-y-3">
               <input
@@ -320,7 +353,7 @@ export default function FamilyGroups() {
             </div>
           </Card>
 
-          <Card className="p-5">
+          <Card className="p-4 sm:p-5">
             <h3 className="text-lg font-semibold text-gray-900 mb-4">邀请</h3>
             {selectedGroup && (selectedGroup.role === 'owner' || selectedGroup.createdBy === appUserId) && invite ? (
               <div className="space-y-3">
@@ -373,6 +406,34 @@ export default function FamilyGroups() {
       >
         <p className="text-sm text-gray-600">
           确认将「{childToRemove?.name}」从「{selectedGroup?.name}」移除吗？孩子与归属家长的全局关系会保留。
+        </p>
+      </Modal>
+      <Modal
+        isOpen={Boolean(familyToDelete)}
+        onClose={() => setFamilyToDelete(null)}
+        title="删除家庭"
+        footer={
+          <>
+            <button
+              type="button"
+              onClick={() => setFamilyToDelete(null)}
+              className="rounded-lg border border-gray-300 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+            >
+              取消
+            </button>
+            <button
+              type="button"
+              disabled={busy}
+              onClick={handleDeleteFamily}
+              className="rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-60"
+            >
+              {busy ? '删除中...' : '确认删除'}
+            </button>
+          </>
+        }
+      >
+        <p className="text-sm text-gray-600">
+          确认删除「{familyToDelete?.name}」吗？这只删除家庭关系，孩子、归属家长和积分账户会保留。
         </p>
       </Modal>
     </div>

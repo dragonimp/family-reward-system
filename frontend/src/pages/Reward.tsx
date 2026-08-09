@@ -4,13 +4,11 @@ import type { Child, Rule, Transaction } from '../types';
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getChildren, getRules, createTransaction, parseRewardVoice } from '../services';
-import { useFamilyGroup } from '../contexts/FamilyGroupContext';
 
 type TransactionType = 'score' | 'cash' | 'item';
 
 export default function Reward() {
   const navigate = useNavigate();
-  const { selectedGroupId } = useFamilyGroup();
   const [children, setChildren] = useState<Child[]>([]);
   const [rules, setRules] = useState<Rule[]>([]);
   const [loading, setLoading] = useState(true);
@@ -37,7 +35,7 @@ export default function Reward() {
     try {
       if (!silent) setLoading(true);
       const [childrenRes, rulesRes] = await Promise.all([
-        getChildren({ familyGroupId: selectedGroupId ?? undefined }),
+        getChildren({ ownedOnly: true }),
         getRules(),
       ]);
       const childList = Array.isArray(childrenRes) ? childrenRes : (childrenRes as any)?.data || [];
@@ -65,7 +63,7 @@ export default function Reward() {
     } finally {
       setLoading(false);
     }
-  }, [selectedGroupId]);
+  }, []);
 
   useEffect(() => {
     loadData();
@@ -76,7 +74,7 @@ export default function Reward() {
     setSelectedRule(null);
     setShowConfirm(false);
     setTransactionPreview(null);
-  }, [selectedGroupId]);
+  }, []);
 
   useEffect(() => {
     const interval = window.setInterval(() => {
@@ -103,7 +101,7 @@ export default function Reward() {
   const applyVoiceCommand = async (text: string) => {
     try {
       setVoiceParsing(true);
-      const result = await parseRewardVoice({ text, familyGroupId: selectedGroupId ?? undefined });
+      const result = await parseRewardVoice({ text });
       if (!result.ok || !result.command) {
         showToast(result.error || '智能体解析失败', 'error');
         return;
@@ -216,7 +214,6 @@ export default function Reward() {
 
     const txData: any = {
       child_id: child.id,
-      family_group_id: selectedGroupId ?? undefined,
       child_name: child.name,
       category: category || '其他',
       description: description || (rule?.name || '自定义操作'),
@@ -271,7 +268,7 @@ export default function Reward() {
     <div className="space-y-6">
       {/* Toast */}
       {toast.show && (
-        <div className={`fixed top-4 right-4 z-50 px-6 py-3 rounded-lg shadow-lg text-white transition-all
+        <div className={`fixed left-3 right-3 top-3 z-50 rounded-lg px-4 py-3 text-sm text-white shadow-lg transition-all sm:left-auto sm:right-4 sm:top-4 sm:px-6
           ${toast.type === 'success' ? 'bg-green-500' : 'bg-red-500'}`}>
           {toast.message}
         </div>
@@ -279,10 +276,10 @@ export default function Reward() {
 
       <div>
         <h2 className="text-2xl font-bold text-gray-900">积分操作</h2>
-        <p className="text-gray-500 mt-1">为孩子添加或扣减积分、现金或物品</p>
+        <p className="text-gray-500 mt-1">只操作当前家长账号名下的孩子，积分在各家庭中同步</p>
       </div>
 
-      <Card className="p-5 border-[#4A90D9]/30">
+      <Card className="p-4 border-[#4A90D9]/30 sm:p-5">
         <div className="flex flex-col sm:flex-row sm:items-center gap-3 justify-between">
           <div>
             <h3 className="text-sm font-semibold text-gray-700">语音记录积分</h3>
@@ -296,7 +293,7 @@ export default function Reward() {
             type="button"
             onClick={startVoiceRecord}
             disabled={voiceListening || voiceParsing || children.length === 0}
-            className="px-4 py-2 bg-[#4A90D9] text-white rounded-lg text-sm font-medium disabled:opacity-60"
+            className="w-full px-4 py-2 bg-[#4A90D9] text-white rounded-lg text-sm font-medium disabled:opacity-60 sm:w-auto"
           >
             {voiceListening ? '正在听...' : voiceParsing ? '智能体解析中...' : '🎤 语音记录'}
           </button>
@@ -305,19 +302,19 @@ export default function Reward() {
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* 选择孩子 */}
-        <Card className="p-5">
+        <Card className="p-4 sm:p-5">
           <h3 className="text-sm font-semibold text-gray-700 mb-4">1. 选择孩子</h3>
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
             {children.map((child) => (
               <button
                 key={child.id}
                 onClick={() => setSelectedChild(child.id)}
-                className={`p-4 rounded-xl border-2 text-center transition-all
+                className={`p-3 rounded-lg border-2 text-center transition-all sm:p-4
                   ${selectedChild === child.id
                     ? 'border-[#4A90D9] bg-[#4A90D9]/5'
                     : 'border-gray-200 hover:border-gray-300'}`}
               >
-                <div className={`w-12 h-12 rounded-full flex items-center justify-center text-white font-bold text-lg mx-auto mb-2
+                <div className={`w-10 h-10 rounded-full flex items-center justify-center text-white font-bold text-base mx-auto mb-2 sm:h-12 sm:w-12 sm:text-lg
                   ${['bg-[#4A90D9]', 'bg-[#7ED321]', 'bg-[#F5A623]', 'bg-[#E74C3C]', 'bg-purple-500'][child.id % 5]}`}>
                   {child.name[0]}
                 </div>
@@ -329,7 +326,7 @@ export default function Reward() {
         </Card>
 
         {/* 选择规则 */}
-        <Card className="p-5">
+        <Card className="p-4 sm:p-5">
           <h3 className="text-sm font-semibold text-gray-700 mb-4">2. 选择规则</h3>
 
           {/* 正向规则 */}
@@ -372,7 +369,7 @@ export default function Reward() {
         </Card>
 
         {/* 自定义操作 */}
-        <Card className="p-5 lg:col-span-2">
+        <Card className="p-4 sm:p-5 lg:col-span-2">
           <h3 className="text-sm font-semibold text-gray-700 mb-4">3. 自定义操作</h3>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             <div>
@@ -424,7 +421,7 @@ export default function Reward() {
       <div className="flex justify-center">
         <button
           onClick={handleOpenConfirm}
-          className="px-8 py-3 bg-[#4A90D9] text-white rounded-xl text-lg font-semibold hover:bg-[#3A7BC8] transition-colors shadow-lg"
+          className="w-full px-8 py-3 bg-[#4A90D9] text-white rounded-lg text-base font-semibold hover:bg-[#3A7BC8] transition-colors shadow-lg sm:w-auto sm:text-lg"
         >
           ✅ 确认操作
         </button>
