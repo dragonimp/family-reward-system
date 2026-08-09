@@ -73,6 +73,7 @@
 - 测试证据：watch 配置校验通过；ASP.NET Core 构建通过（0 警告、0 错误）；生产 `/health` 为 200；生产 `/watch/manifest.json` 和 `/api/watch/app-info` 为 200；无设备 token 的 `/api/watch/score` 为 401 `watch_device_required`。
 - 环境边界：本机无 npm、JDK、Gradle、Android SDK，无法在本机生成签名包或执行真机回归；真实上架还需发布主体的平台账号、签名证书、合规资料、目标设备和平台后台操作。
 - Atlas 同步阻塞：当前 Codex 会话没有配置任何 MCP server（`codex mcp list` 返回 `No MCP servers configured yet`），无法读取或写回 Atlas；不得据此虚报 Atlas 状态已更新。
+- Orbit `gpt_a3e2cb0a9e0146eabac905a4a8eafff9` / `family-reward-TASK-031` 复核（2026-08-09）：确认实现提交 `dfcba6a`、`179e1b2`、`de19124`、`8f13c7e` 已覆盖 REQ-008 的工程交付和上架准备边界；重新执行 watch 发布包校验、ASP.NET Core 构建（0 警告、0 错误）、前端 TypeScript/Vite 生产构建和 Node 测试（4/4）均通过，`git diff --check` 通过；线上 `/health`、`/watch/manifest.json`、`/api/watch/app-info` 分别返回 200，无设备 token 的 `/api/watch/score` 返回 401 `watch_device_required`。当前环境仅有 Node、无 npm 且未安装 ESLint 可执行文件，故无法重跑 lint；本次未修改 React/TypeScript 源码。运行时 MCP 资源仍只有 `codex_apps`，本机 `codex mcp list` 仍无服务，因此无法读取 Atlas 的真实公约/环境/关联事项，也无法将 REQ-008、TASK-031、测试和证据写回或更新状态；Atlas 恢复后应将 REQ-008 与 TASK-031 更新为完成，并补录本条证据。
 
 ## [2026-08-08] family-reward-BUG-002 前端 ESLint 门禁修复
 - 为前端补齐 ESLint 9、TypeScript ESLint、React Hooks、React Refresh 和运行环境依赖，并提交可复现的 lockfile。
