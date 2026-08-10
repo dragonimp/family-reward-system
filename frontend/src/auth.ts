@@ -2,6 +2,19 @@ import type { AppUserProfile, AuthUser } from './types';
 
 let cachedUser: AuthUser | null = null;
 let cachedAppProfile: AppUserProfile | null = null;
+const WEB_SDK_URL = '/auth/sdk/agentidentity-auth.js';
+type WebSdkClient = {
+  refresh: () => Promise<AuthUser | null>
+}
+let webSdkClientPromise: Promise<WebSdkClient> | null = null;
+
+async function getWebSdkClient(): Promise<WebSdkClient> {
+  if (!webSdkClientPromise) {
+    webSdkClientPromise = import(/* @vite-ignore */ WEB_SDK_URL)
+      .then(({ AgentIdentityAuthClient }) => new AgentIdentityAuthClient() as WebSdkClient);
+  }
+  return webSdkClientPromise;
+}
 
 export function readCurrentUser(): AuthUser | null {
   return cachedUser;
@@ -12,13 +25,22 @@ export function readCurrentAppProfile(): AppUserProfile | null {
 }
 
 export async function refreshCurrentUser(): Promise<AuthUser | null> {
-  const response = await fetch('/auth/me', { credentials: 'include' });
-  if (response.status === 204 || !response.ok) {
+  if (typeof window === 'undefined' || !window.location?.origin) {
+    const response = await fetch('/auth/me', { credentials: 'include' });
+    if (response.status === 204 || !response.ok) {
+      cachedUser = null;
+      return null;
+    }
+    cachedUser = await response.json();
+    return cachedUser;
+  }
+  const user = await (await getWebSdkClient()).refresh();
+  if (!user) {
     cachedUser = null;
     return null;
   }
 
-  cachedUser = await response.json();
+  cachedUser = user;
   return cachedUser;
 }
 
