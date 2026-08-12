@@ -1,0 +1,102 @@
+{
+  "projectCode": "HappyLife",
+  "appCode": "happylife-watch",
+  "appName": "家加分手表积分",
+  "packageId": "net.impx.happylife.watch",
+  "versionName": "1.0.0",
+  "versionCode": 100,
+  "preparedAt": "2026-08-13",
+  "entryUrls": {
+    "xiaotiancai": "https://happylife.ai.impx.net/watch?source=watch-app&platform=xiaotiancai",
+    "xiaomi": "https://happylife.ai.impx.net/watch?source=watch-app&platform=xiaomi",
+    "huawei": "https://happylife.ai.impx.net/watch?source=watch-app&platform=huawei"
+  },
+  "commonMaterials": [
+    {
+      "type": "android_project",
+      "path": "watch-app/android/",
+      "status": "prepared"
+    },
+    {
+      "type": "store_listing_copy",
+      "path": "watch-app/store-listing/listing.zh-CN.md",
+      "status": "prepared"
+    },
+    {
+      "type": "release_checklist",
+      "path": "watch-app/RELEASE-CHECKLIST.md",
+      "status": "prepared"
+    },
+    {
+      "type": "signed_apk",
+      "path": "",
+      "status": "needs_publisher",
+      "reason": "需要发布 keystore 和正式构建环境"
+    },
+    {
+      "type": "software_copyright",
+      "path": "",
+      "status": "needs_publisher",
+      "reason": "需发布主体提供软著或版权证书"
+    },
+    {
+      "type": "privacy_policy_url",
+      "path": "",
+      "status": "needs_publisher",
+      "reason": "需发布主体确认正式 HTTPS URL"
+    },
+    {
+      "type": "user_agreement_url",
+      "path": "",
+      "status": "needs_publisher",
+      "reason": "需发布主体确认正式 HTTPS URL"
+    },
+    {
+      "type": "review_test_account",
+      "path": "",
+      "status": "needs_platform_account_config",
+      "reason": "应从项目管理项目平台账号读取测试家长账号和一次性儿童认证码"
+    }
+  ],
+  "platforms": {
+    "xiaotiancai": {
+      "materials": [
+        { "type": "basic_info", "path": "docs/publishing/xiaotiancai/01-app-basic-info.md", "status": "prepared" },
+        { "type": "review_guide", "path": "docs/publishing/xiaotiancai/02-review-user-guide.md", "status": "prepared" },
+        { "type": "test_report_template", "path": "docs/publishing/xiaotiancai/03-test-cases-and-report.md", "status": "prepared" },
+        { "type": "privacy_policy_draft", "path": "docs/publishing/xiaotiancai/04-privacy-policy-draft.md", "status": "prepared" },
+        { "type": "user_agreement_draft", "path": "docs/publishing/xiaotiancai/05-user-agreement-draft.md", "status": "prepared" },
+        { "type": "disclaimer_draft", "path": "docs/publishing/xiaotiancai/06-disclaimer-draft.md", "status": "prepared" },
+        { "type": "release_email_template", "path": "docs/publishing/xiaotiancai/07-release-email-template.md", "status": "prepared" },
+        { "type": "official_requirements", "path": "docs/publishing/xiaotiancai/09-official-requirements-notes.md", "status": "prepared" },
+        { "type": "icon_png_148", "path": "", "status": "needs_asset" },
+        { "type": "intro_images_png_320x360", "path": "", "status": "needs_asset" }
+      ],
+      "automationMode": "email_or_manual"
+    },
+    "xiaomi": {
+      "materials": [
+        { "type": "basic_info", "path": "docs/publishing/xiaomi/01-app-basic-info.md", "status": "prepared" },
+        { "type": "review_guide", "path": "docs/publishing/xiaomi/02-review-user-guide.md", "status": "prepared" },
+        { "type": "test_report_template", "path": "docs/publishing/xiaomi/03-test-cases-and-report.md", "status": "prepared" },
+        { "type": "official_requirements", "path": "docs/publishing/xiaomi/05-official-requirements-notes.md", "status": "prepared" },
+        { "type": "icon_png_512", "path": "", "status": "needs_asset" },
+        { "type": "screenshots_png_1080x1080", "path": "", "status": "needs_asset" },
+        { "type": "app_record_info", "path": "", "status": "needs_publisher" }
+      ],
+      "automationMode": "browser"
+    },
+    "huawei": {
+      "materials": [
+        { "type": "basic_info", "path": "docs/publishing/huawei/01-app-basic-info.md", "status": "prepared" },
+        { "type": "review_guide", "path": "docs/publishing/huawei/02-review-user-guide.md", "status": "prepared" },
+        { "type": "test_report_template", "path": "docs/publishing/huawei/03-test-cases-and-report.md", "status": "prepared" },
+        { "type": "official_requirements", "path": "docs/publishing/huawei/05-official-requirements-notes.md", "status": "prepared" },
+        { "type": "target_device_confirmation", "path": "", "status": "needs_publisher" },
+        { "type": "harmonyos_native_package", "path": "", "status": "conditional_needed" }
+      ],
+      "automationMode": "api_preferred"
+    }
+  },
+  "toolingSpec": "docs/publishing/marketplace-release-tooling.md"
+}

@@ -1,0 +1,16 @@
+# Local build and runtime outputs
+[Bb]in/
+[Oo]bj/
+node_modules/
+*.log
+*.tmp
+
+# Local configuration and secrets
+.env
+.env.*
+*.key
+*.pem
+*.p12
+*.db
+*.db-shm
+*.db-wal
