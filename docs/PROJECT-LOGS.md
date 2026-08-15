@@ -7,6 +7,7 @@
 - 家长端新增好友消息通知：孩子通过手表添加好友后，相关家长账号可在【孩子管理】收到未读消息，并可标记已读。
 - 数据模型新增 `watch_face_preferences`、`child_friend_codes`、`child_friendships`、`child_friend_notifications`，并补充必要索引；所有家长查看接口均通过当前家长与孩子绑定关系校验。
 - 验证证据：`dotnet build FamilyReward.Api/FamilyReward.Api.csproj --no-restore` 通过（0 警告、0 错误）；前端 `npm run build` 通过；本地 `/health` 返回 200，本地 `/watch` 响应包含“表盘设置”、“HelloKitty”、“星光梦可”、“生成好友码”和好友菜单；`git diff --check` 通过。
+- 部署证据：提交 `549b096` 已推送 `origin/main`；生产主机 `zz.impx.net` 已备份 `/var/www/happylife/api` 与 `/var/www/happylife/frontend/static` 后同步新产物并重启 `family-reward-api.service`。线上 `https://happylife.ai.impx.net/health` 返回 200，`/watch` 已包含表盘设置、三款表盘和好友菜单，首页静态资源更新到 `index-BOkcMgBp.js` / `index-Cqr4TRPv.css`。
 
 ## [2026-08-09] family-reward-REQ-018 家庭孩子成员管理与头像菜单收敛
 - Orbit：`gpt_8bedc53115a644c1af0182627969bebf`；需求：`family-reward-REQ-018`（`1504c58c-a463-41f7-8aea-1979a970aa70`）；任务：`family-reward-TASK-033`（`89577270-3cc6-4892-9ad1-e56ae20c1cca`）；功能点：`5ec785f2-cce2-4e52-aa7f-ba1170f242e1`。
