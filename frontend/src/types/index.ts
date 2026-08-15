@@ -44,6 +44,40 @@ export interface ChildWatchDevices {
   devices: WatchDeviceBinding[];
 }
 
+export interface ChildFriend {
+  friendshipId?: number;
+  profileKey: string;
+  name: string;
+  score: number;
+  cash: number;
+  items: number;
+  createdAt?: string;
+  rank?: number;
+  isSelf?: boolean;
+}
+
+export interface ChildFriendsPayload {
+  child?: Child;
+  friends: ChildFriend[];
+  leaderboard: ChildFriend[];
+}
+
+export interface ChildFriendNotification {
+  id: number;
+  childProfileKey: string;
+  childName: string;
+  friendProfileKey: string;
+  friendName: string;
+  friendshipId: number;
+  message: string;
+  readAt?: string | null;
+  createdAt: string;
+}
+
+export interface ChildFriendNotificationsPayload {
+  notifications: ChildFriendNotification[];
+}
+
 export interface WatchDeviceUnbindCode {
   code: string;
   deviceId: number;

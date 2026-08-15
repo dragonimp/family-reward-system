@@ -1,17 +1,17 @@
-import { Card, StatCard } from '../components/Card';
+import { Card } from '../components/Card';
 import { Modal } from '../components/Modal';
-import type { Child, Transaction, WatchDeviceBinding } from '../types';
+import type { Child, ChildFriend, ChildFriendNotification, WatchDeviceBinding } from '../types';
 import { useState, useEffect, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
 import {
   getChildren,
   createChild,
   updateChild,
   deleteChild,
-  getTransactions,
-  createTransaction,
   generateChildAuthCode,
+  getChildFriendNotifications,
+  getChildFriends,
   getChildWatchDevices,
+  markChildFriendNotificationRead,
   revokeChildWatchDevice,
   generateWatchDeviceUnbindCode,
 } from '../services';
@@ -24,7 +24,6 @@ interface ChildForm {
 }
 
 export default function Children() {
-  const navigate = useNavigate();
   const [children, setChildren] = useState<Child[]>([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
@@ -37,6 +36,11 @@ export default function Children() {
   const [devices, setDevices] = useState<WatchDeviceBinding[]>([]);
   const [unbindCode, setUnbindCode] = useState<{ code: string; deviceId: number; expiresAt: string } | null>(null);
   const [deviceLoading, setDeviceLoading] = useState(false);
+  const [friendChild, setFriendChild] = useState<Child | null>(null);
+  const [friends, setFriends] = useState<ChildFriend[]>([]);
+  const [friendLeaderboard, setFriendLeaderboard] = useState<ChildFriend[]>([]);
+  const [friendNotifications, setFriendNotifications] = useState<ChildFriendNotification[]>([]);
+  const [friendsLoading, setFriendsLoading] = useState(false);
   const [toast, setToast] = useState<{ show: boolean; message: string; type: 'success' | 'error' }>({ show: false, message: '', type: 'success' });
 
   const showToast = (message: string, type: 'success' | 'error' = 'success') => {
@@ -58,23 +62,38 @@ export default function Children() {
     }
   }, []);
 
+  const loadFriendNotifications = useCallback(async () => {
+    try {
+      const result = await getChildFriendNotifications({ unreadOnly: true });
+      setFriendNotifications(result.notifications || []);
+    } catch (error) {
+      console.error('好友通知加载失败:', error);
+      setFriendNotifications([]);
+    }
+  }, []);
+
   useEffect(() => {
     loadChildren();
-  }, [loadChildren]);
+    loadFriendNotifications();
+  }, [loadChildren, loadFriendNotifications]);
 
   useEffect(() => {
     const interval = window.setInterval(() => {
       loadChildren(true);
+      loadFriendNotifications();
     }, 10000);
     const handleVisibilityChange = () => {
-      if (!document.hidden) loadChildren(true);
+      if (!document.hidden) {
+        loadChildren(true);
+        loadFriendNotifications();
+      }
     };
     document.addEventListener('visibilitychange', handleVisibilityChange);
     return () => {
       window.clearInterval(interval);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
-  }, [loadChildren]);
+  }, [loadChildren, loadFriendNotifications]);
 
   const openCreateModal = () => {
     setEditingChild(null);
@@ -199,6 +218,33 @@ export default function Children() {
     }
   };
 
+  const openFriendsModal = async (child: Child) => {
+    setFriendChild(child);
+    setFriends([]);
+    setFriendLeaderboard([]);
+    setFriendsLoading(true);
+    try {
+      const result = await getChildFriends(child.id);
+      setFriends(result.friends || []);
+      setFriendLeaderboard(result.leaderboard || []);
+    } catch (error) {
+      console.error('好友列表加载失败:', error);
+      showToast('好友列表加载失败', 'error');
+    } finally {
+      setFriendsLoading(false);
+    }
+  };
+
+  const handleReadFriendNotification = async (id: number) => {
+    try {
+      await markChildFriendNotificationRead(id);
+      setFriendNotifications((items) => items.filter((item) => item.id !== id));
+    } catch (error) {
+      console.error('好友通知标记失败:', error);
+      showToast('好友通知处理失败', 'error');
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-20">
@@ -231,6 +277,35 @@ export default function Children() {
           <span>➕</span> 新增孩子
         </button>
       </div>
+
+      {friendNotifications.length > 0 && (
+        <Card>
+          <div className="flex flex-col gap-3">
+            <div>
+              <h3 className="text-base font-semibold text-gray-900">好友消息</h3>
+              <p className="mt-1 text-sm text-gray-500">孩子通过手表添加好友后，家长会在这里收到消息。</p>
+            </div>
+            <div className="space-y-2">
+              {friendNotifications.map((item) => (
+                <div key={item.id} className="flex items-center justify-between gap-3 rounded-lg border border-blue-100 bg-blue-50 px-4 py-3">
+                  <div className="min-w-0">
+                    <div className="truncate text-sm font-medium text-blue-950">{item.message}</div>
+                    <div className="mt-1 text-xs text-blue-700">
+                      {new Date(item.createdAt).toLocaleString('zh-CN', { hour12: false })}
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => handleReadFriendNotification(item.id)}
+                    className="shrink-0 text-sm font-medium text-blue-700 hover:text-blue-900"
+                  >
+                    已读
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        </Card>
+      )}
 
       {/* 表格 */}
       <Card>
@@ -279,6 +354,9 @@ export default function Children() {
                       </button>
                       <button onClick={() => openDeviceModal(child)} className="text-[#16A085] hover:text-[#0E7D67] text-sm font-medium">
                         手表
+                      </button>
+                      <button onClick={() => openFriendsModal(child)} className="text-[#8E44AD] hover:text-[#6C3483] text-sm font-medium">
+                        好友
                       </button>
                       <button onClick={() => confirmDelete(child.id)} className="text-[#E74C3C] hover:text-red-700 text-sm font-medium">
                         删除
@@ -439,6 +517,67 @@ export default function Children() {
                         </button>
                       </div>
                     )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      </Modal>
+
+      <Modal
+        isOpen={!!friendChild}
+        onClose={() => setFriendChild(null)}
+        title={friendChild ? `${friendChild.name}的手表好友` : '手表好友'}
+        footer={
+          <button onClick={() => setFriendChild(null)} className="btn-primary">
+            关闭
+          </button>
+        }
+      >
+        <div className="space-y-5">
+          <div>
+            <div className="mb-2 text-sm font-medium text-gray-700">好友列表</div>
+            {friendsLoading ? (
+              <div className="py-6 text-center text-gray-400">加载中...</div>
+            ) : friends.length === 0 ? (
+              <div className="rounded-lg border border-gray-200 py-6 text-center text-sm text-gray-400">
+                暂无好友，可在手表端用 8 位好友认证码添加
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {friends.map((friend) => (
+                  <div key={friend.profileKey} className="grid grid-cols-[1fr_auto] items-center gap-3 rounded-lg border border-gray-200 p-3">
+                    <div className="min-w-0">
+                      <div className="truncate text-sm font-medium text-gray-900">{friend.name}</div>
+                      <div className="mt-1 text-xs text-gray-500">
+                        现金 ¥{friend.cash} · 物品 {friend.items}
+                      </div>
+                    </div>
+                    <div className="rounded-full bg-blue-100 px-3 py-1 text-sm font-semibold text-blue-700">
+                      {friend.score} 分
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <div>
+            <div className="mb-2 text-sm font-medium text-gray-700">好友积分榜</div>
+            {friendLeaderboard.length === 0 ? (
+              <div className="rounded-lg border border-gray-200 py-6 text-center text-sm text-gray-400">暂无排行数据</div>
+            ) : (
+              <div className="divide-y divide-gray-100 rounded-lg border border-gray-200">
+                {friendLeaderboard.map((item) => (
+                  <div key={item.profileKey} className="grid grid-cols-[36px_1fr_auto] items-center gap-3 px-3 py-2">
+                    <div className="text-center text-sm font-black text-gray-500">#{item.rank}</div>
+                    <div className="min-w-0">
+                      <div className="truncate text-sm font-medium text-gray-900">
+                        {item.name}{item.isSelf ? '（自己）' : ''}
+                      </div>
+                    </div>
+                    <div className="font-semibold text-blue-700">{item.score} 分</div>
                   </div>
                 ))}
               </div>

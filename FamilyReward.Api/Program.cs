@@ -344,6 +344,48 @@ app.MapGet("/api/watch/rules", async (HttpRequest request) =>
     return Results.Json(new { rules });
 });
 
+app.MapGet("/api/watch/settings", async (HttpRequest request) =>
+{
+    var binding = await RequireWatchDeviceBinding(connectionString, request, touch: false);
+    if (binding.Error is not null) return binding.Error;
+    return Results.Json(await GetWatchSettings(connectionString, binding.Binding!.ChildProfileKey));
+});
+
+app.MapPut("/api/watch/settings", async (JsonObject body, HttpRequest request) =>
+{
+    var binding = await RequireWatchDeviceBinding(connectionString, request, touch: false);
+    if (binding.Error is not null) return binding.Error;
+    var result = await UpdateWatchSettings(connectionString, binding.Binding!.ChildProfileKey, body.String("watchFace"));
+    return result.ContainsKey("error") ? Results.BadRequest(result) : Results.Json(result);
+});
+
+app.MapGet("/api/watch/friends", async (HttpRequest request) =>
+{
+    var binding = await RequireWatchDeviceBinding(connectionString, request);
+    if (binding.Error is not null) return binding.Error;
+    return Results.Json(new
+    {
+        friends = await GetChildFriends(connectionString, binding.Binding!.ChildProfileKey),
+        leaderboard = await GetChildFriendLeaderboard(connectionString, binding.Binding!.ChildProfileKey)
+    });
+});
+
+app.MapPost("/api/watch/friend-code", async (JsonObject body, HttpRequest request) =>
+{
+    var binding = await RequireWatchDeviceBinding(connectionString, request, touch: false);
+    if (binding.Error is not null) return binding.Error;
+    var minutes = Math.Clamp(body.Int("expiresInMinutes") ?? 30, 5, 120);
+    return Results.Json(await CreateWatchFriendCode(connectionString, binding.Binding!, minutes));
+});
+
+app.MapPost("/api/watch/friends", async (JsonObject body, HttpRequest request) =>
+{
+    var binding = await RequireWatchDeviceBinding(connectionString, request);
+    if (binding.Error is not null) return binding.Error;
+    var result = await AddWatchFriendByCode(connectionString, binding.Binding!, body.String("code"));
+    return result.ContainsKey("error") ? Results.BadRequest(result) : Results.Json(result);
+});
+
 app.MapGet("/api/watch/requests", async (HttpRequest request) =>
 {
     var binding = await RequireWatchDeviceBinding(connectionString, request);
@@ -416,12 +458,16 @@ app.MapGet("/watch", () =>
             @supports(height:100dvh){.watch-shell{--watch-size:min(calc(100vw - clamp(36px,14vmin,52px)),calc(100dvh - 8px),346px)}}
             .watch-face{position:relative;width:100%;height:100%;overflow:hidden;border-radius:50%;border:clamp(6px,2.8vmin,10px) solid #17231b;background:#f9fbf7;box-shadow:0 12px 30px rgba(16,32,25,.2),inset 0 0 0 1px #cad7ce}
             .watch-face:before{content:"";position:absolute;inset:clamp(8px,4vmin,14px);border:1px solid #d8e2dc;border-radius:50%;pointer-events:none}
+            .watch-face.face-world{background:linear-gradient(135deg,#e8f6e9 0 22%,#b9e0b3 22% 39%,#f6f0d3 39% 58%,#96c66d 58% 76%,#e8f6e9 76%);color:#102019}
+            .watch-face.face-hellokitty{background:radial-gradient(circle at 68% 23%,#fff 0 10%,transparent 11%),linear-gradient(145deg,#ffeaf3,#fff7fb 48%,#ffd7e8);color:#2d1d24}
+            .watch-face.face-starlight{background:radial-gradient(circle at 24% 22%,#ffe27a 0 2.8%,transparent 3.2%),radial-gradient(circle at 72% 34%,#8dd9ff 0 2.5%,transparent 3%),linear-gradient(145deg,#10233b,#284c72 58%,#8bd0d4);color:#f8fbff}
+            .watch-face.face-starlight .topline,.watch-face.face-starlight .brand{color:#f8fbff}.watch-face.face-starlight .metric,.watch-face.face-starlight .rule-btn,.watch-face.face-starlight input,.watch-face.face-starlight textarea{background:rgba(255,255,255,.94)}
             .screen{position:absolute;inset:clamp(14px,7vmin,24px);display:flex;align-items:center;justify-content:center;overflow:hidden;text-align:center}
             .topline{position:absolute;top:clamp(12px,6vmin,23px);left:18%;right:18%;display:flex;align-items:center;justify-content:center;gap:4px;overflow:hidden;color:#65736b;font-size:clamp(9px,3.2vmin,11px);white-space:nowrap}
             .brand{font-size:clamp(10px,3.5vmin,12px);font-weight:900;color:#245138}
             .home-child{max-width:min(170px,70vmin);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:clamp(18px,7vmin,24px);font-weight:900}
             .score-ring{display:grid;place-items:center;width:clamp(76px,42vmin,150px);height:clamp(76px,42vmin,150px);margin:clamp(4px,2.8vmin,10px) 0 clamp(3px,1.8vmin,6px);border-radius:50%;border:clamp(4px,2vmin,7px) solid #1f7a48;background:#fff}
-            .score{width:100%;padding:0 2px;color:#0c6f3b;font-size:clamp(24px,10vmin,38px);font-variant-numeric:tabular-nums;font-weight:900;letter-spacing:-1.5px;line-height:.95;white-space:nowrap}
+            .score{width:100%;padding:0 2px;color:#0c6f3b;font-size:clamp(24px,10vmin,38px);font-variant-numeric:tabular-nums;font-weight:900;letter-spacing:0;line-height:.95;white-space:nowrap}
             .unit{margin-top:clamp(2px,1.4vmin,5px);color:#5c6b62;font-size:clamp(9px,3.5vmin,12px);font-weight:800}
             .metric-row{display:grid;grid-template-columns:1fr 1fr;gap:clamp(3px,1.8vmin,6px);width:min(170px,70vmin)}
             .metric{min-width:0;border:1px solid #d7e1da;border-radius:8px;padding:clamp(3px,1.4vmin,5px) clamp(4px,1.8vmin,6px);background:#eef5f0}
@@ -430,11 +476,12 @@ app.MapGet("/watch", () =>
             .menu-toggle,.menu-btn{place-items:center;width:clamp(30px,12vmin,42px);height:clamp(30px,12vmin,42px);border:2px solid #17231b;border-radius:50%;background:#fff;color:#17231b;font-size:clamp(9px,3.2vmin,11px);font-weight:900;box-shadow:0 4px 10px rgba(16,32,25,.16)}
             .menu-toggle{display:grid;background:#17231b;color:#fff}.menu-items{display:none;gap:clamp(3px,1.8vmin,6px)}.menu-dock.open .menu-toggle{display:none}.menu-dock.open .menu-items{display:grid}.menu-btn{display:grid}.menu-btn.active{background:#1f7a48;color:#fff}
             .panel{--panel-scale:1;display:none;width:min(205px,100%);max-width:100%;overflow:hidden;text-align:left;transform:scale(var(--panel-scale));transform-origin:center;will-change:transform}.panel.active{display:block}.panel[data-panel=home],#bind-panel .panel{text-align:center}.panel[data-panel=home].active{display:flex;flex-direction:column;align-items:center;justify-content:center}
-            .panel[data-panel=request]{height:100%;padding:1px 5px 4px 1px;overflow-x:hidden;overflow-y:auto;overscroll-behavior:contain;scrollbar-color:#5d7768 transparent;scrollbar-gutter:stable;scrollbar-width:thin;touch-action:pan-y}.panel[data-panel=request]::-webkit-scrollbar{width:4px}.panel[data-panel=request]::-webkit-scrollbar-thumb{border-radius:4px;background:#5d7768}.panel[data-panel=request]::-webkit-scrollbar-track{background:transparent}
+            .panel[data-panel=request],.panel[data-panel=friends],.panel[data-panel=settings]{height:100%;padding:1px 5px 4px 1px;overflow-x:hidden;overflow-y:auto;overscroll-behavior:contain;scrollbar-color:#5d7768 transparent;scrollbar-gutter:stable;scrollbar-width:thin;touch-action:pan-y}.panel[data-panel=request]::-webkit-scrollbar,.panel[data-panel=friends]::-webkit-scrollbar,.panel[data-panel=settings]::-webkit-scrollbar{width:4px}.panel[data-panel=request]::-webkit-scrollbar-thumb,.panel[data-panel=friends]::-webkit-scrollbar-thumb,.panel[data-panel=settings]::-webkit-scrollbar-thumb{border-radius:4px;background:#5d7768}.panel[data-panel=request]::-webkit-scrollbar-track,.panel[data-panel=friends]::-webkit-scrollbar-track,.panel[data-panel=settings]::-webkit-scrollbar-track{background:transparent}
             .panel h1,.panel h2{margin:0 0 8px;text-align:center;font-size:18px;line-height:1.1}.bind-title{font-size:20px;font-weight:900}.bind-sub{margin:5px 0 10px;color:#65736b;font-size:12px}.rules{display:grid;gap:6px}
             .rule-btn{display:flex;align-items:center;justify-content:space-between;gap:6px;width:100%;min-height:34px;border:1px solid #d3ded7;border-radius:8px;background:#fff;color:#17231b;padding:6px 8px;font-size:12px;text-align:left}.rule-btn span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.rule-btn b{color:#0c6f3b;white-space:nowrap}
             label{display:block;margin:7px 0 3px;color:#44544a;font-size:11px;font-weight:700}input,textarea{width:100%;border:1px solid #cbd8cf;border-radius:8px;background:#fff;color:#17231b;padding:7px;font-size:14px}textarea{min-height:44px;resize:none}.submit,.ghost{width:100%;margin-top:8px;border:0;border-radius:8px;padding:9px;font-size:14px;font-weight:900}.submit{background:#1f7a48;color:#fff}.ghost{background:#e7efe9;color:#17462c}.msg{min-height:16px;margin:6px 0 0;text-align:center;color:#16643a;font-size:11px}
             .requests{list-style:none;margin:0;padding:0;display:grid;gap:5px}.requests li{display:grid;grid-template-columns:1fr auto;gap:6px;border-top:1px solid #e3ebe6;padding-top:5px;color:#25362c;font-size:11px}.requests span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.requests b{color:#71601b;white-space:nowrap}.empty,.empty-row{color:#64746a;text-align:center;font-size:12px}.code{text-align:center;letter-spacing:3px;font-size:22px;font-weight:900;text-transform:uppercase}.hidden{display:none!important}
+            .friend-code{margin:5px 0;border:1px solid #cfe1d4;border-radius:8px;background:#fff;padding:8px;text-align:center}.friend-code b{display:block;color:#102019;font-size:22px;letter-spacing:3px}.friend-code span{display:block;margin-top:2px;color:#637268;font-size:10px}.compact-list{list-style:none;margin:0;padding:0;display:grid;gap:5px}.compact-list li{display:grid;grid-template-columns:auto 1fr auto;gap:5px;align-items:center;border:1px solid #e0e9e3;border-radius:8px;background:rgba(255,255,255,.9);padding:5px 6px;font-size:11px}.compact-list li.empty-row{display:block;text-align:center}.compact-list em{font-style:normal;font-weight:900;color:#5e6a63}.compact-list span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.compact-list b{color:#0c6f3b;white-space:nowrap}.face-grid{display:grid;gap:6px}.face-option{display:flex;align-items:center;justify-content:space-between;width:100%;border:1px solid #d8e4dc;border-radius:8px;background:#fff;padding:7px;color:#17231b;font-size:12px;font-weight:900}.face-option.active{border-color:#1f7a48;background:#e7f5ec;color:#0c6f3b}.face-swatch{width:22px;height:22px;border-radius:50%;border:1px solid #becdc4}.swatch-world{background:linear-gradient(135deg,#b9e0b3 0 45%,#f6f0d3 45% 65%,#96c66d 65%)}.swatch-hellokitty{background:linear-gradient(145deg,#ffeaf3,#ffd7e8)}.swatch-starlight{background:linear-gradient(145deg,#10233b,#8bd0d4)}
             @media(max-width:260px),(max-height:260px){.panel h1,.panel h2{font-size:16px}.rules{gap:4px}input,textarea{font-size:13px;padding:6px}}
             @media(prefers-reduced-motion:reduce){.panel{will-change:auto}}
           </style>
@@ -442,7 +489,7 @@ app.MapGet("/watch", () =>
         <body>
           <main class="wrap">
             <div class="watch-shell">
-              <div class="watch-face">
+              <div class="watch-face face-world" id="watch-face">
                 <div class="topline"><span class="brand">家加分</span><span id="updated-at"></span></div>
                 <section class="screen" id="bind-panel">
                   <div class="panel active">
@@ -486,6 +533,31 @@ app.MapGet("/watch", () =>
                     <h2>最近申请</h2>
                     <ul class="requests" id="requests"></ul>
                   </div>
+                  <div class="panel" data-panel="friends">
+                    <h2>好友</h2>
+                    <button class="submit" id="make-friend-code" type="button">生成好友码</button>
+                    <div class="friend-code hidden" id="friend-code-box">
+                      <b id="friend-code">--------</b>
+                      <span id="friend-code-expire"></span>
+                    </div>
+                    <label for="friend-code-input">输入好友码</label>
+                    <input id="friend-code-input" class="code" maxlength="8" inputmode="numeric" autocomplete="one-time-code" placeholder="8位">
+                    <button class="ghost" id="add-friend" type="button">添加好友</button>
+                    <p id="friend-msg" class="msg"></p>
+                    <label>好友列表</label>
+                    <ul class="compact-list" id="friends-list"></ul>
+                    <label>积分榜</label>
+                    <ul class="compact-list" id="friend-leaderboard"></ul>
+                  </div>
+                  <div class="panel" data-panel="settings">
+                    <h2>表盘设置</h2>
+                    <div class="face-grid">
+                      <button class="face-option" type="button" data-face="world"><span>我的世界</span><i class="face-swatch swatch-world"></i></button>
+                      <button class="face-option" type="button" data-face="hellokitty"><span>HelloKitty</span><i class="face-swatch swatch-hellokitty"></i></button>
+                      <button class="face-option" type="button" data-face="starlight"><span>星光梦可</span><i class="face-swatch swatch-starlight"></i></button>
+                    </div>
+                    <p id="settings-msg" class="msg"></p>
+                  </div>
                   <div class="panel" data-panel="device">
                     <h2>设备</h2>
                     <div class="requests">
@@ -505,6 +577,8 @@ app.MapGet("/watch", () =>
                   <button class="menu-btn active" type="button" data-view="home">积分</button>
                   <button class="menu-btn" type="button" data-view="request">申请</button>
                   <button class="menu-btn" type="button" data-view="requests">记录</button>
+                  <button class="menu-btn" type="button" data-view="friends">好友</button>
+                  <button class="menu-btn" type="button" data-view="settings">设置</button>
                   <button class="menu-btn" type="button" data-view="device">设备</button>
                 </div>
               </nav>
@@ -524,6 +598,28 @@ app.MapGet("/watch", () =>
               return Number.isFinite(points)
                 ? points.toLocaleString('zh-CN', { useGrouping: false, minimumFractionDigits: 0, maximumFractionDigits: 1 })
                 : '0';
+            };
+            const faceLabels = { world: '我的世界', hellokitty: 'HelloKitty', starlight: '星光梦可' };
+            const normalizeFace = (value) => ['world', 'hellokitty', 'starlight'].includes(value) ? value : 'world';
+            const applyWatchFace = (value) => {
+              const face = normalizeFace(value);
+              const watchFace = document.getElementById('watch-face');
+              watchFace.classList.remove('face-world', 'face-hellokitty', 'face-starlight');
+              watchFace.classList.add('face-' + face);
+              document.querySelectorAll('.face-option').forEach((button) => {
+                button.classList.toggle('active', button.dataset.face === face);
+              });
+              return face;
+            };
+            const renderFriends = (payload = {}) => {
+              const friends = payload.friends || [];
+              const leaderboard = payload.leaderboard || [];
+              document.getElementById('friends-list').innerHTML = friends.map((friend, index) => `
+                <li><em>${index + 1}</em><span>${escapeText(friend.name)}</span><b>${formatPoints(friend.score)}</b></li>
+              `).join('') || '<li class="empty-row"><span>暂无好友</span></li>';
+              document.getElementById('friend-leaderboard').innerHTML = leaderboard.map((item) => `
+                <li><em>#${escapeText(item.rank)}</em><span>${escapeText(item.name)}${item.isSelf ? ' · 我' : ''}</span><b>${formatPoints(item.score)}</b></li>
+              `).join('') || '<li class="empty-row"><span>暂无排行</span></li>';
             };
             const calculatePanelScale = (availableWidth, availableHeight, contentWidth, contentHeight) =>
               Math.min(1, availableWidth / Math.max(1, contentWidth), availableHeight / Math.max(1, contentHeight));
@@ -564,12 +660,16 @@ app.MapGet("/watch", () =>
             const load = async () => {
               if (!token()) { showBound(false); return; }
               try {
-                const [score, rulesPayload, requestsPayload] = await Promise.all([
+                const [score, rulesPayload, requestsPayload, settingsPayload, friendsPayload] = await Promise.all([
                   fetchJson('/api/watch/score', { headers: authHeaders() }),
                   fetchJson('/api/watch/rules', { headers: authHeaders() }),
-                  fetchJson('/api/watch/requests?limit=6', { headers: authHeaders() })
+                  fetchJson('/api/watch/requests?limit=6', { headers: authHeaders() }),
+                  fetchJson('/api/watch/settings', { headers: authHeaders() }),
+                  fetchJson('/api/watch/friends', { headers: authHeaders() })
                 ]);
                 showBound(true);
+                applyWatchFace(settingsPayload.watchFace);
+                renderFriends(friendsPayload);
                 const child = (score.children || [])[0] || {};
                 document.getElementById('updated-at').textContent = new Date(score.updatedAt).toLocaleTimeString('zh-CN', { hour12: false, hour: '2-digit', minute: '2-digit' });
                 document.getElementById('child-name').textContent = child.name || '暂无孩子';
@@ -648,6 +748,59 @@ app.MapGet("/watch", () =>
               } catch (error) {
                 unbindMsg.textContent = error.message || '解绑失败';
               }
+            });
+            document.getElementById('make-friend-code').addEventListener('click', async () => {
+              const friendMsg = document.getElementById('friend-msg');
+              friendMsg.textContent = '正在生成...';
+              try {
+                const payload = await fetchJson('/api/watch/friend-code', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json', ...authHeaders() },
+                  body: JSON.stringify({ expiresInMinutes: 30 })
+                });
+                document.getElementById('friend-code-box').classList.remove('hidden');
+                document.getElementById('friend-code').textContent = payload.code;
+                document.getElementById('friend-code-expire').textContent = '有效期至 ' + new Date(payload.expiresAt).toLocaleTimeString('zh-CN', { hour12: false, hour: '2-digit', minute: '2-digit' });
+                friendMsg.textContent = '让对方手表输入此码';
+                fitActivePanel();
+              } catch (error) {
+                friendMsg.textContent = error.message || '生成失败';
+              }
+            });
+            document.getElementById('add-friend').addEventListener('click', async () => {
+              const friendMsg = document.getElementById('friend-msg');
+              friendMsg.textContent = '正在添加...';
+              try {
+                const payload = await fetchJson('/api/watch/friends', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json', ...authHeaders() },
+                  body: JSON.stringify({ code: document.getElementById('friend-code-input').value })
+                });
+                document.getElementById('friend-code-input').value = '';
+                renderFriends(payload);
+                friendMsg.textContent = '已添加好友';
+                fitActivePanel();
+              } catch (error) {
+                friendMsg.textContent = error.message || '添加失败';
+              }
+            });
+            document.querySelectorAll('.face-option').forEach((button) => {
+              button.addEventListener('click', async () => {
+                const settingsMsg = document.getElementById('settings-msg');
+                const face = normalizeFace(button.dataset.face || 'world');
+                settingsMsg.textContent = '正在保存...';
+                try {
+                  const payload = await fetchJson('/api/watch/settings', {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json', ...authHeaders() },
+                    body: JSON.stringify({ watchFace: face })
+                  });
+                  applyWatchFace(payload.watchFace);
+                  settingsMsg.textContent = '已切换到 ' + faceLabels[normalizeFace(payload.watchFace)];
+                } catch (error) {
+                  settingsMsg.textContent = error.message || '保存失败';
+                }
+              });
             });
             document.querySelectorAll('.menu-btn').forEach((button) => {
               button.addEventListener('click', () => setView(button.dataset.view || 'home'));
@@ -781,6 +934,38 @@ app.MapGet("/api/children/{id:int}/devices", async (int id, HttpRequest request)
     if (access.Error is not null) return access.Error;
     var familyGroupId = await ResolveChildFamilyGroupId(connectionString, request, null, id, access.Profile!.AppUserId);
     var result = await GetChildWatchDevices(connectionString, id, familyGroupId, access.Profile!.AppUserId);
+    return result.ContainsKey("error") ? Results.NotFound(result) : Results.Json(result);
+});
+
+app.MapGet("/api/children/{id:int}/friends", async (int id, HttpRequest request) =>
+{
+    var access = await RequireParentProfile(connectionString, request);
+    if (access.Error is not null) return access.Error;
+    var familyGroupId = await ResolveChildFamilyGroupId(connectionString, request, null, id, access.Profile!.AppUserId);
+    var child = await GetParentOwnedChild(connectionString, id, familyGroupId, access.Profile!.AppUserId);
+    if (child is null) return Results.Json(new { error = "孩子不属于当前家长账号" }, statusCode: StatusCodes.Status403Forbidden);
+    var profileKey = Convert.ToString(child["profileKey"], CultureInfo.InvariantCulture) ?? "";
+    return Results.Json(new
+    {
+        child,
+        friends = await GetChildFriends(connectionString, profileKey),
+        leaderboard = await GetChildFriendLeaderboard(connectionString, profileKey)
+    });
+});
+
+app.MapGet("/api/children/friend-notifications", async (HttpRequest request) =>
+{
+    var access = await RequireParentProfile(connectionString, request);
+    if (access.Error is not null) return access.Error;
+    var unreadOnly = request.Query.Bool("unreadOnly") ?? request.Query.Bool("unread_only") ?? false;
+    return Results.Json(new { notifications = await GetChildFriendNotifications(connectionString, access.Profile!.AppUserId, unreadOnly) });
+});
+
+app.MapPost("/api/children/friend-notifications/{id:int}/read", async (int id, HttpRequest request) =>
+{
+    var access = await RequireParentProfile(connectionString, request);
+    if (access.Error is not null) return access.Error;
+    var result = await MarkChildFriendNotificationRead(connectionString, id, access.Profile!.AppUserId);
     return result.ContainsKey("error") ? Results.NotFound(result) : Results.Json(result);
 });
 
@@ -3131,6 +3316,50 @@ static async Task InitDatabase(string connectionString)
         )
         """,
         """
+        CREATE TABLE IF NOT EXISTS watch_face_preferences (
+            child_profile_key VARCHAR(180) PRIMARY KEY,
+            watch_face VARCHAR(40) NOT NULL DEFAULT 'world',
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+        """,
+        """
+        CREATE TABLE IF NOT EXISTS child_friend_codes (
+            id SERIAL PRIMARY KEY,
+            child_profile_key VARCHAR(180) NOT NULL,
+            parent_app_user_id VARCHAR(180) NOT NULL,
+            code_hash VARCHAR(128) NOT NULL UNIQUE,
+            expires_at TIMESTAMP NOT NULL,
+            used_at TIMESTAMP NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+        """,
+        """
+        CREATE TABLE IF NOT EXISTS child_friendships (
+            id SERIAL PRIMARY KEY,
+            child_profile_key_a VARCHAR(180) NOT NULL,
+            child_profile_key_b VARCHAR(180) NOT NULL,
+            status VARCHAR(20) NOT NULL DEFAULT 'active',
+            created_by_child_profile_key VARCHAR(180) NOT NULL,
+            created_by_code_id INTEGER REFERENCES child_friend_codes(id) ON DELETE SET NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            CHECK (child_profile_key_a < child_profile_key_b),
+            UNIQUE(child_profile_key_a, child_profile_key_b)
+        )
+        """,
+        """
+        CREATE TABLE IF NOT EXISTS child_friend_notifications (
+            id SERIAL PRIMARY KEY,
+            parent_app_user_id VARCHAR(180) NOT NULL,
+            child_profile_key VARCHAR(180) NOT NULL,
+            friend_profile_key VARCHAR(180) NOT NULL,
+            friendship_id INTEGER REFERENCES child_friendships(id) ON DELETE CASCADE,
+            message TEXT NOT NULL,
+            read_at TIMESTAMP NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+        """,
+        """
         CREATE TABLE IF NOT EXISTS children (
             id SERIAL PRIMARY KEY,
             family_group_id INTEGER REFERENCES family_groups(id) ON DELETE RESTRICT,
@@ -3328,7 +3557,11 @@ static async Task InitDatabase(string connectionString)
         "CREATE UNIQUE INDEX IF NOT EXISTS ux_watch_device_bindings_active_child ON watch_device_bindings(child_profile_key) WHERE revoked_at IS NULL",
         "CREATE INDEX IF NOT EXISTS idx_watch_device_unbind_codes_device ON watch_device_unbind_codes(device_binding_id, expires_at DESC)",
         "CREATE INDEX IF NOT EXISTS idx_watch_reward_requests_family_child ON watch_reward_requests(family_group_id, child_id, requested_at DESC)",
-        "CREATE INDEX IF NOT EXISTS idx_watch_reward_requests_status ON watch_reward_requests(status)"
+        "CREATE INDEX IF NOT EXISTS idx_watch_reward_requests_status ON watch_reward_requests(status)",
+        "CREATE INDEX IF NOT EXISTS idx_child_friend_codes_child ON child_friend_codes(child_profile_key, expires_at DESC)",
+        "CREATE INDEX IF NOT EXISTS idx_child_friendships_a ON child_friendships(child_profile_key_a)",
+        "CREATE INDEX IF NOT EXISTS idx_child_friendships_b ON child_friendships(child_profile_key_b)",
+        "CREATE INDEX IF NOT EXISTS idx_child_friend_notifications_parent ON child_friend_notifications(parent_app_user_id, read_at, created_at DESC)"
     };
 
     foreach (var sql in statements)
@@ -5011,6 +5244,413 @@ static async Task<Dictionary<string, object?>> DeleteChildMembership(string conn
     }
 }
 
+static async Task<Dictionary<string, object?>?> GetParentOwnedChild(string connectionString, int childId, int familyGroupId, string parentAppUserId)
+{
+    await using var conn = await OpenConnection(connectionString);
+    return await GetChildForFamily(conn, null, childId, familyGroupId, parentAppUserId);
+}
+
+static async Task<Dictionary<string, object?>> GetWatchSettings(string connectionString, string childProfileKey)
+{
+    await using var conn = await OpenConnection(connectionString);
+    await using var cmd = new NpgsqlCommand("""
+        SELECT watch_face, updated_at
+        FROM watch_face_preferences
+        WHERE child_profile_key = @child_profile_key
+        """, conn);
+    cmd.Parameters.AddWithValue("child_profile_key", childProfileKey);
+    await using var reader = await cmd.ExecuteReaderAsync();
+    if (await reader.ReadAsync())
+    {
+        return new Dictionary<string, object?>
+        {
+            ["watchFace"] = NormalizeWatchFace(reader.String("watch_face")),
+            ["updatedAt"] = reader.DateTime("updated_at").ToString("O")
+        };
+    }
+
+    return new Dictionary<string, object?>
+    {
+        ["watchFace"] = "world",
+        ["updatedAt"] = DateTime.UtcNow.ToString("O", CultureInfo.InvariantCulture)
+    };
+}
+
+static async Task<Dictionary<string, object?>> UpdateWatchSettings(string connectionString, string childProfileKey, string watchFace)
+{
+    var normalized = NormalizeWatchFace(watchFace);
+    await using var conn = await OpenConnection(connectionString);
+    await using var cmd = new NpgsqlCommand("""
+        INSERT INTO watch_face_preferences (child_profile_key, watch_face, updated_at)
+        VALUES (@child_profile_key, @watch_face, CURRENT_TIMESTAMP)
+        ON CONFLICT (child_profile_key) DO UPDATE SET
+            watch_face = EXCLUDED.watch_face,
+            updated_at = CURRENT_TIMESTAMP
+        RETURNING watch_face, updated_at
+        """, conn);
+    cmd.Parameters.AddWithValue("child_profile_key", childProfileKey);
+    cmd.Parameters.AddWithValue("watch_face", normalized);
+    await using var reader = await cmd.ExecuteReaderAsync();
+    await reader.ReadAsync();
+    return new Dictionary<string, object?>
+    {
+        ["watchFace"] = reader.String("watch_face"),
+        ["updatedAt"] = reader.DateTime("updated_at").ToString("O")
+    };
+}
+
+static async Task<Dictionary<string, object?>> CreateWatchFriendCode(string connectionString, WatchDeviceBinding binding, int expiresInMinutes)
+{
+    await using var conn = await OpenConnection(connectionString);
+    await using var tx = await conn.BeginTransactionAsync();
+    try
+    {
+        await using (var expireCmd = new NpgsqlCommand("""
+            UPDATE child_friend_codes
+            SET used_at = CURRENT_TIMESTAMP
+            WHERE child_profile_key = @child_profile_key
+              AND used_at IS NULL
+              AND expires_at > CURRENT_TIMESTAMP
+            """, conn, tx))
+        {
+            expireCmd.Parameters.AddWithValue("child_profile_key", binding.ChildProfileKey);
+            await expireCmd.ExecuteNonQueryAsync();
+        }
+
+        var code = "";
+        var codeHash = "";
+        var created = false;
+        for (var i = 0; i < 8; i++)
+        {
+            code = GenerateNumericCode(8);
+            codeHash = HashSecret(code);
+            await using var existsCmd = new NpgsqlCommand("SELECT COUNT(*) FROM child_friend_codes WHERE code_hash = @code_hash", conn, tx);
+            existsCmd.Parameters.AddWithValue("code_hash", codeHash);
+            if (Convert.ToInt32(await existsCmd.ExecuteScalarAsync(), CultureInfo.InvariantCulture) == 0)
+            {
+                created = true;
+                break;
+            }
+        }
+        if (!created)
+        {
+            await tx.RollbackAsync();
+            return new Dictionary<string, object?> { ["error"] = "好友认证码生成失败" };
+        }
+
+        var expiresAt = DateTime.UtcNow.AddMinutes(expiresInMinutes);
+        await using (var insertCmd = new NpgsqlCommand("""
+            INSERT INTO child_friend_codes (child_profile_key, parent_app_user_id, code_hash, expires_at)
+            VALUES (@child_profile_key, @parent_app_user_id, @code_hash, @expires_at)
+            """, conn, tx))
+        {
+            insertCmd.Parameters.AddWithValue("child_profile_key", binding.ChildProfileKey);
+            insertCmd.Parameters.AddWithValue("parent_app_user_id", binding.ParentAppUserId);
+            insertCmd.Parameters.AddWithValue("code_hash", codeHash);
+            insertCmd.Parameters.AddWithValue("expires_at", expiresAt);
+            await insertCmd.ExecuteNonQueryAsync();
+        }
+
+        await tx.CommitAsync();
+        return new Dictionary<string, object?>
+        {
+            ["code"] = code,
+            ["expiresAt"] = expiresAt.ToString("O", CultureInfo.InvariantCulture),
+            ["expiresInMinutes"] = expiresInMinutes
+        };
+    }
+    catch (Exception ex)
+    {
+        await tx.RollbackAsync();
+        return new Dictionary<string, object?> { ["error"] = ex.Message };
+    }
+}
+
+static async Task<Dictionary<string, object?>> AddWatchFriendByCode(string connectionString, WatchDeviceBinding binding, string rawCode)
+{
+    var code = NormalizeDigits(rawCode);
+    if (code.Length != 8)
+    {
+        return new Dictionary<string, object?> { ["error"] = "请输入 8 位好友认证码" };
+    }
+
+    await using var conn = await OpenConnection(connectionString);
+    await using var tx = await conn.BeginTransactionAsync();
+    try
+    {
+        int codeId;
+        string targetProfileKey;
+        string targetParentAppUserId;
+        await using (var lookupCmd = new NpgsqlCommand("""
+            SELECT id, child_profile_key, parent_app_user_id
+            FROM child_friend_codes
+            WHERE code_hash = @code_hash
+              AND used_at IS NULL
+              AND expires_at > CURRENT_TIMESTAMP
+            FOR UPDATE
+            """, conn, tx))
+        {
+            lookupCmd.Parameters.AddWithValue("code_hash", HashSecret(code));
+            await using var reader = await lookupCmd.ExecuteReaderAsync();
+            if (!await reader.ReadAsync())
+            {
+                await tx.RollbackAsync();
+                return new Dictionary<string, object?> { ["error"] = "好友认证码无效或已过期" };
+            }
+
+            codeId = reader.Int("id");
+            targetProfileKey = reader.String("child_profile_key");
+            targetParentAppUserId = reader.String("parent_app_user_id");
+        }
+
+        if (string.Equals(targetProfileKey, binding.ChildProfileKey, StringComparison.Ordinal))
+        {
+            await tx.RollbackAsync();
+            return new Dictionary<string, object?> { ["error"] = "不能添加自己为好友" };
+        }
+
+        var ordered = OrderFriendKeys(binding.ChildProfileKey, targetProfileKey);
+        int friendshipId;
+        bool friendshipCreated;
+        await using (var insertCmd = new NpgsqlCommand("""
+            INSERT INTO child_friendships
+                (child_profile_key_a, child_profile_key_b, status, created_by_child_profile_key, created_by_code_id)
+            VALUES
+                (@child_profile_key_a, @child_profile_key_b, 'active', @created_by_child_profile_key, @created_by_code_id)
+            ON CONFLICT (child_profile_key_a, child_profile_key_b) DO UPDATE SET
+                status = 'active',
+                updated_at = CURRENT_TIMESTAMP
+            RETURNING id, (xmax = 0) AS created
+            """, conn, tx))
+        {
+            insertCmd.Parameters.AddWithValue("child_profile_key_a", ordered.A);
+            insertCmd.Parameters.AddWithValue("child_profile_key_b", ordered.B);
+            insertCmd.Parameters.AddWithValue("created_by_child_profile_key", binding.ChildProfileKey);
+            insertCmd.Parameters.AddWithValue("created_by_code_id", codeId);
+            await using var reader = await insertCmd.ExecuteReaderAsync();
+            await reader.ReadAsync();
+            friendshipId = reader.Int("id");
+            friendshipCreated = reader.Bool("created");
+        }
+
+        await using (var useCodeCmd = new NpgsqlCommand("UPDATE child_friend_codes SET used_at = CURRENT_TIMESTAMP WHERE id = @id", conn, tx))
+        {
+            useCodeCmd.Parameters.AddWithValue("id", codeId);
+            await useCodeCmd.ExecuteNonQueryAsync();
+        }
+
+        var childName = await GetChildNameByProfileKey(conn, tx, binding.ChildProfileKey);
+        var friendName = await GetChildNameByProfileKey(conn, tx, targetProfileKey);
+        if (friendshipCreated)
+        {
+            await InsertFriendNotifications(conn, tx, friendshipId, binding.ChildProfileKey, targetProfileKey, childName, friendName);
+        }
+
+        await tx.CommitAsync();
+        return new Dictionary<string, object?>
+        {
+            ["status"] = "ok",
+            ["friendshipId"] = friendshipId,
+            ["friend"] = new Dictionary<string, object?>
+            {
+                ["profileKey"] = targetProfileKey,
+                ["name"] = friendName,
+                ["parentAppUserId"] = targetParentAppUserId
+            },
+            ["friends"] = await GetChildFriends(connectionString, binding.ChildProfileKey),
+            ["leaderboard"] = await GetChildFriendLeaderboard(connectionString, binding.ChildProfileKey)
+        };
+    }
+    catch (Exception ex)
+    {
+        await tx.RollbackAsync();
+        return new Dictionary<string, object?> { ["error"] = ex.Message };
+    }
+}
+
+static async Task<List<Dictionary<string, object?>>> GetChildFriends(string connectionString, string childProfileKey)
+{
+    await using var conn = await OpenConnection(connectionString);
+    await using var cmd = new NpgsqlCommand("""
+        SELECT cf.id, other_cp.profile_key, other_cp.name,
+               COALESCE(a.points, 0) AS score,
+               COALESCE(a.cash_cny, 0) AS cash,
+               COALESCE(a.items_count, 0) AS items,
+               cf.created_at
+        FROM child_friendships cf
+        JOIN child_profiles other_cp ON other_cp.profile_key = CASE
+            WHEN cf.child_profile_key_a = @child_profile_key THEN cf.child_profile_key_b
+            ELSE cf.child_profile_key_a
+        END
+        LEFT JOIN accounts a ON a.profile_key = other_cp.profile_key
+        WHERE cf.status = 'active'
+          AND @child_profile_key IN (cf.child_profile_key_a, cf.child_profile_key_b)
+          AND other_cp.status = 'active'
+        ORDER BY other_cp.name
+        """, conn);
+    cmd.Parameters.AddWithValue("child_profile_key", childProfileKey);
+
+    var rows = new List<Dictionary<string, object?>>();
+    await using var reader = await cmd.ExecuteReaderAsync();
+    while (await reader.ReadAsync())
+    {
+        rows.Add(new Dictionary<string, object?>
+        {
+            ["friendshipId"] = reader.Int("id"),
+            ["profileKey"] = reader.String("profile_key"),
+            ["name"] = reader.String("name"),
+            ["score"] = reader.Decimal("score"),
+            ["cash"] = reader.Decimal("cash"),
+            ["items"] = reader.Int("items"),
+            ["createdAt"] = reader.DateTime("created_at").ToString("O")
+        });
+    }
+    return rows;
+}
+
+static async Task<List<Dictionary<string, object?>>> GetChildFriendLeaderboard(string connectionString, string childProfileKey)
+{
+    await using var conn = await OpenConnection(connectionString);
+    await using var cmd = new NpgsqlCommand("""
+        WITH visible_children AS (
+            SELECT CAST(@child_profile_key AS varchar) AS profile_key, true AS is_self
+            UNION
+            SELECT CASE
+                WHEN cf.child_profile_key_a = @child_profile_key THEN cf.child_profile_key_b
+                ELSE cf.child_profile_key_a
+            END AS profile_key, false AS is_self
+            FROM child_friendships cf
+            WHERE cf.status = 'active'
+              AND @child_profile_key IN (cf.child_profile_key_a, cf.child_profile_key_b)
+        )
+        SELECT vc.profile_key, vc.is_self, cp.name,
+               COALESCE(a.points, 0) AS score,
+               COALESCE(a.cash_cny, 0) AS cash,
+               COALESCE(a.items_count, 0) AS items
+        FROM visible_children vc
+        JOIN child_profiles cp ON cp.profile_key = vc.profile_key AND cp.status = 'active'
+        LEFT JOIN accounts a ON a.profile_key = vc.profile_key
+        ORDER BY COALESCE(a.points, 0) DESC, cp.name
+        """, conn);
+    cmd.Parameters.AddWithValue("child_profile_key", childProfileKey);
+
+    var rows = new List<Dictionary<string, object?>>();
+    await using var reader = await cmd.ExecuteReaderAsync();
+    var rank = 1;
+    while (await reader.ReadAsync())
+    {
+        rows.Add(new Dictionary<string, object?>
+        {
+            ["rank"] = rank++,
+            ["profileKey"] = reader.String("profile_key"),
+            ["name"] = reader.String("name"),
+            ["score"] = reader.Decimal("score"),
+            ["cash"] = reader.Decimal("cash"),
+            ["items"] = reader.Int("items"),
+            ["isSelf"] = reader.Bool("is_self")
+        });
+    }
+    return rows;
+}
+
+static Dictionary<string, object?> ReadFriendNotification(IDataRecord reader) => new()
+{
+    ["id"] = reader.Int("id"),
+    ["childProfileKey"] = reader.String("child_profile_key"),
+    ["childName"] = reader.HasColumn("child_name") ? reader.String("child_name") : "",
+    ["friendProfileKey"] = reader.String("friend_profile_key"),
+    ["friendName"] = reader.HasColumn("friend_name") ? reader.String("friend_name") : "",
+    ["friendshipId"] = reader.Int("friendship_id"),
+    ["message"] = reader.String("message"),
+    ["readAt"] = NullableDateTimeString(reader, "read_at"),
+    ["createdAt"] = reader.DateTime("created_at").ToString("O")
+};
+
+static async Task<List<Dictionary<string, object?>>> GetChildFriendNotifications(string connectionString, string parentAppUserId, bool unreadOnly)
+{
+    await using var conn = await OpenConnection(connectionString);
+    await using var cmd = new NpgsqlCommand("""
+        SELECT cfn.id, cfn.child_profile_key, cp.name AS child_name,
+               cfn.friend_profile_key, fcp.name AS friend_name,
+               cfn.friendship_id, cfn.message, cfn.read_at, cfn.created_at
+        FROM child_friend_notifications cfn
+        LEFT JOIN child_profiles cp ON cp.profile_key = cfn.child_profile_key
+        LEFT JOIN child_profiles fcp ON fcp.profile_key = cfn.friend_profile_key
+        WHERE cfn.parent_app_user_id = @parent_app_user_id
+          AND (@unread_only = false OR cfn.read_at IS NULL)
+        ORDER BY cfn.created_at DESC, cfn.id DESC
+        LIMIT 50
+        """, conn);
+    cmd.Parameters.AddWithValue("parent_app_user_id", parentAppUserId);
+    cmd.Parameters.AddWithValue("unread_only", unreadOnly);
+    var rows = new List<Dictionary<string, object?>>();
+    await using var reader = await cmd.ExecuteReaderAsync();
+    while (await reader.ReadAsync())
+    {
+        rows.Add(ReadFriendNotification(reader));
+    }
+    return rows;
+}
+
+static async Task<Dictionary<string, object?>> MarkChildFriendNotificationRead(string connectionString, int notificationId, string parentAppUserId)
+{
+    await using var conn = await OpenConnection(connectionString);
+    await using var cmd = new NpgsqlCommand("""
+        UPDATE child_friend_notifications
+        SET read_at = CURRENT_TIMESTAMP
+        WHERE id = @id
+          AND parent_app_user_id = @parent_app_user_id
+        """, conn);
+    cmd.Parameters.AddWithValue("id", notificationId);
+    cmd.Parameters.AddWithValue("parent_app_user_id", parentAppUserId);
+    return await cmd.ExecuteNonQueryAsync() == 0
+        ? new Dictionary<string, object?> { ["error"] = "通知不存在" }
+        : new Dictionary<string, object?> { ["status"] = "ok" };
+}
+
+static async Task<string> GetChildNameByProfileKey(NpgsqlConnection conn, NpgsqlTransaction tx, string childProfileKey)
+{
+    await using var cmd = new NpgsqlCommand("SELECT name FROM child_profiles WHERE profile_key = @profile_key", conn, tx);
+    cmd.Parameters.AddWithValue("profile_key", childProfileKey);
+    return Convert.ToString(await cmd.ExecuteScalarAsync(), CultureInfo.InvariantCulture) ?? "孩子";
+}
+
+static async Task InsertFriendNotifications(
+    NpgsqlConnection conn,
+    NpgsqlTransaction tx,
+    int friendshipId,
+    string childProfileKey,
+    string friendProfileKey,
+    string childName,
+    string friendName)
+{
+    await using var cmd = new NpgsqlCommand("""
+        INSERT INTO child_friend_notifications
+            (parent_app_user_id, child_profile_key, friend_profile_key, friendship_id, message)
+        SELECT DISTINCT cub.parent_app_user_id,
+               @child_profile_key,
+               @friend_profile_key,
+               @friendship_id,
+               @message
+        FROM child_user_bindings cub
+        WHERE cub.child_profile_key = @child_profile_key
+        UNION
+        SELECT DISTINCT cub.parent_app_user_id,
+               @friend_profile_key,
+               @child_profile_key,
+               @friendship_id,
+               @reverse_message
+        FROM child_user_bindings cub
+        WHERE cub.child_profile_key = @friend_profile_key
+        """, conn, tx);
+    cmd.Parameters.AddWithValue("child_profile_key", childProfileKey);
+    cmd.Parameters.AddWithValue("friend_profile_key", friendProfileKey);
+    cmd.Parameters.AddWithValue("friendship_id", friendshipId);
+    cmd.Parameters.AddWithValue("message", $"{childName} 已添加 {friendName} 为手表好友");
+    cmd.Parameters.AddWithValue("reverse_message", $"{friendName} 已添加 {childName} 为手表好友");
+    await cmd.ExecuteNonQueryAsync();
+}
+
 static async Task<Dictionary<string, object?>> CreateChildAuthCode(string connectionString, int childId, int familyGroupId, string parentAppUserId, int expiresInMinutes)
 {
     await using var conn = await OpenConnection(connectionString);
@@ -5916,6 +6556,20 @@ static decimal GetDecimal(IReadOnlyDictionary<string, object?> row, string key) 
 static string NormalizeAuthCode(string value) =>
     new(value.Trim().Where(char.IsLetterOrDigit).Select(char.ToUpperInvariant).ToArray());
 
+static string NormalizeDigits(string value) =>
+    new(value.Trim().Where(char.IsAsciiDigit).ToArray());
+
+static string NormalizeWatchFace(string value) => value.Trim().ToLowerInvariant() switch
+{
+    "world" or "minecraft" or "我的世界" => "world",
+    "hellokitty" or "hello_kitty" or "kitty" or "hello kitty" or "hellokitty表盘" or "hello kitty表盘" => "hellokitty",
+    "starlight" or "star" or "星光梦可" => "starlight",
+    _ => "world"
+};
+
+static (string A, string B) OrderFriendKeys(string first, string second) =>
+    string.CompareOrdinal(first, second) <= 0 ? (first, second) : (second, first);
+
 static string GenerateAuthCode()
 {
     const string alphabet = "23456789ABCDEFGHJKLMNPQRSTUVWXYZ";
@@ -5923,6 +6577,16 @@ static string GenerateAuthCode()
     for (var i = 0; i < chars.Length; i++)
     {
         chars[i] = alphabet[RandomNumberGenerator.GetInt32(alphabet.Length)];
+    }
+    return new string(chars);
+}
+
+static string GenerateNumericCode(int length)
+{
+    Span<char> chars = stackalloc char[length];
+    for (var i = 0; i < chars.Length; i++)
+    {
+        chars[i] = (char)('0' + RandomNumberGenerator.GetInt32(10));
     }
     return new string(chars);
 }
@@ -6189,6 +6853,12 @@ static class ReaderExtensions
     {
         var value = reader[name];
         return value is DBNull ? 0 : Convert.ToDecimal(value, CultureInfo.InvariantCulture);
+    }
+
+    public static bool Bool(this IDataRecord reader, string name)
+    {
+        var value = reader[name];
+        return value is not DBNull && Convert.ToBoolean(value, CultureInfo.InvariantCulture);
     }
 
     public static DateTime DateTime(this IDataRecord reader, string name)

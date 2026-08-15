@@ -1,7 +1,13 @@
 import http from './api';
 import type { Child } from '../types';
 import type { FamilyGroup, FamilyGroupInvite, JoinFamilyGroupResult } from '../types';
-import type { ChildAuthCode, ChildWatchDevices, WatchDeviceUnbindCode } from '../types';
+import type {
+  ChildAuthCode,
+  ChildFriendNotificationsPayload,
+  ChildFriendsPayload,
+  ChildWatchDevices,
+  WatchDeviceUnbindCode,
+} from '../types';
 import type { AgentInvokeRequest, AgentInvokeResponse, RewardParseRequest, RewardParseResponse, SystemConfig } from '../types';
 
 export const getFamilyGroups = (params?: { userId?: string }) => http.get<unknown, FamilyGroup[]>('/api/family-groups', { params });
@@ -32,6 +38,12 @@ export const generateWatchDeviceUnbindCode = (
   deviceId: number,
   data?: { familyGroupId?: number; expiresInMinutes?: number },
 ) => http.post<unknown, WatchDeviceUnbindCode>(`/api/children/${childId}/devices/${deviceId}/unbind-code`, data || {});
+export const getChildFriends = (id: number, params?: { familyGroupId?: number }) =>
+  http.get<unknown, ChildFriendsPayload>(`/api/children/${id}/friends`, { params });
+export const getChildFriendNotifications = (params?: { unreadOnly?: boolean }) =>
+  http.get<unknown, ChildFriendNotificationsPayload>('/api/children/friend-notifications', { params });
+export const markChildFriendNotificationRead = (id: number) =>
+  http.post<unknown, { status: string }>(`/api/children/friend-notifications/${id}/read`, {});
 
 export const getTransactions = (params: any) => http.get('/api/transactions', { params });
 export const createTransaction = (data: any) => http.post('/api/transactions', data);

@@ -1,5 +1,13 @@
 # 家加分 - 进展日志
 
+## [2026-08-15] family-reward-REQ-023 手表表盘设置与孩子好友
+- 手表端新增“设置-表盘设置”，支持“我的世界”、“HelloKitty”、“星光梦可”三款表盘；表盘偏好按孩子全局 `profile_key` 保存，切换后同一孩子设备继续复用该偏好。
+- 手表端新增“好友”菜单：孩子可生成 8 位数字好友认证码，也可输入对方认证码添加好友；好友关系按孩子全局身份去重，不能添加自己，认证码一次性使用并有有效期。
+- 新增好友列表和好友积分榜，手表端可查看好友积分，Web 家长端【孩子管理】可查看每个孩子的好友列表和包含自己的好友积分榜。
+- 家长端新增好友消息通知：孩子通过手表添加好友后，相关家长账号可在【孩子管理】收到未读消息，并可标记已读。
+- 数据模型新增 `watch_face_preferences`、`child_friend_codes`、`child_friendships`、`child_friend_notifications`，并补充必要索引；所有家长查看接口均通过当前家长与孩子绑定关系校验。
+- 验证证据：`dotnet build FamilyReward.Api/FamilyReward.Api.csproj --no-restore` 通过（0 警告、0 错误）；前端 `npm run build` 通过；本地 `/health` 返回 200，本地 `/watch` 响应包含“表盘设置”、“HelloKitty”、“星光梦可”、“生成好友码”和好友菜单；`git diff --check` 通过。
+
 ## [2026-08-09] family-reward-REQ-018 家庭孩子成员管理与头像菜单收敛
 - Orbit：`gpt_8bedc53115a644c1af0182627969bebf`；需求：`family-reward-REQ-018`（`1504c58c-a463-41f7-8aea-1979a970aa70`）；任务：`family-reward-TASK-033`（`89577270-3cc6-4892-9ad1-e56ae20c1cca`）；功能点：`5ec785f2-cce2-4e52-aa7f-ba1170f242e1`。
 - 家庭组页面和导航统一更名为“家庭管理”；新增当前家庭的孩子成员区，展示孩子姓名、积分、现金、物品及归属家长。新增带家庭访问校验的 `GET /api/family-groups/{id}/children`，避免通过任意家庭 ID 越权查看。
