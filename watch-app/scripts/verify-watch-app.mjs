@@ -105,14 +105,14 @@ for (const responsiveRequirement of [
   }
 }
 for (const requestScrollRequirement of [
-  ".panel[data-panel=request]{height:100%",
+  ".panel[data-panel=request],.panel[data-panel=friends],.panel[data-panel=settings]{height:100%",
   "overflow-y:auto",
   "scrollbar-width:thin",
   "touch-action:pan-y",
-  `panel.matches('[data-panel="request"]')`
+  `panel.matches('[data-panel="request"],[data-panel="friends"],[data-panel="settings"]')`
 ]) {
   if (!apiSource.includes(requestScrollRequirement)) {
-    errors.push(`watch request panel scrolling missing: ${requestScrollRequirement}`);
+    errors.push(`watch scrollable panel support missing: ${requestScrollRequirement}`);
   }
 }
 if (/\.panel\{[^}]*overflow:auto/.test(apiSource)) {
@@ -174,6 +174,27 @@ if (!apiSource.includes('app.MapGet("/watch/manifest.json"') ||
 for (const feature of ["积分查询", "积分申请", "儿童认证码设备绑定"]) {
   if (!apiSource.includes(feature)) {
     errors.push(`API app-info missing watch feature: ${feature}`);
+  }
+}
+
+for (const req023Requirement of [
+  'app.MapGet("/api/watch/settings"',
+  'app.MapPut("/api/watch/settings"',
+  'app.MapGet("/api/watch/friends"',
+  'app.MapPost("/api/watch/friend-code"',
+  'app.MapPost("/api/watch/friends"',
+  'app.MapGet("/api/children/{id:int}/friends"',
+  'app.MapGet("/api/children/friend-notifications"',
+  'data-face="world"',
+  'data-face="hellokitty"',
+  'data-face="starlight"',
+  'maxlength="8" inputmode="numeric"',
+  "SHA256.HashData",
+  "AND used_at IS NULL",
+  "AND expires_at > CURRENT_TIMESTAMP"
+]) {
+  if (!apiSource.includes(req023Requirement)) {
+    errors.push(`REQ-023 watch face or friend support missing: ${req023Requirement}`);
   }
 }
 

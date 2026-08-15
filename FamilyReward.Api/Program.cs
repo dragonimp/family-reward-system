@@ -674,7 +674,7 @@ app.MapGet("/watch", () =>
                 const panel = screen.querySelector('.panel.active');
                 if (!panel) return;
                 panel.style.setProperty('--panel-scale', '1');
-                if (panel.matches('[data-panel="request"]')) return;
+                if (panel.matches('[data-panel="request"],[data-panel="friends"],[data-panel="settings"]')) return;
                 const scale = calculatePanelScale(
                   Math.max(1, screen.clientWidth - 2),
                   Math.max(1, screen.clientHeight - 2),
