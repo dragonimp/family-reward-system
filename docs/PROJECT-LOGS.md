@@ -1,5 +1,12 @@
 # 家加分 - 进展日志
 
+## [2026-08-15] family-reward-REQ-024 项目功能点重新梳理
+- Orbit：`gpt_c354eadfb7cd41a0b6687c54dc51e00d`；需求：`family-reward-REQ-024`（`0d9d1800-2a87-4208-992c-423e4b9a2d1c`）；任务：`family-reward-TASK-038`（`e5bb76bf-c74b-47a4-88f3-1dad1b1f4043`）；Atlas 功能点引用：`4b179f4c-0585-4c66-ac31-8461fca54284`。
+- 以 ASP.NET Core、React、手表端、PostgreSQL 和 MCP 的现有实现为准，新增 `docs/FEATURE-CATALOG.md`，将产品重组为登录身份、家庭协作、孩子账户、奖励账本、记录统计、儿童手表、系统集成、安全运维八个模块，共 48 个带稳定 `FR-*` 编号的功能点。
+- 每个功能点补齐验收口径、实现状态和代码/测试证据；另外明确家长所有权与家庭协作范围的区别、全局孩子档案/家庭成员关系/共享账户的数据边界，以及手表三类凭据边界。
+- 更新需求清单、任务分解和项目状态，使其引用统一功能目录；真实三平台上架继续作为外部发布事项，不将工程准备误记为商店审核完成。
+- Atlas 同步阻塞：运行时工具和 MCP 资源没有 Atlas，本机 `codex mcp list` 返回 `No MCP servers configured yet`。因此无法按任务要求读取 Atlas 的真实需求、缺陷、任务、公约和环境，亦无法把 REQ-024、TASK-038、测试及证据写回或更新状态。Atlas 恢复后应以功能目录为基线同步，并将需求分析任务更新为完成。
+
 ## [2026-08-09] family-reward-REQ-018 家庭孩子成员管理与头像菜单收敛
 - Orbit：`gpt_8bedc53115a644c1af0182627969bebf`；需求：`family-reward-REQ-018`（`1504c58c-a463-41f7-8aea-1979a970aa70`）；任务：`family-reward-TASK-033`（`89577270-3cc6-4892-9ad1-e56ae20c1cca`）；功能点：`5ec785f2-cce2-4e52-aa7f-ba1170f242e1`。
 - 家庭组页面和导航统一更名为“家庭管理”；新增当前家庭的孩子成员区，展示孩子姓名、积分、现金、物品及归属家长。新增带家庭访问校验的 `GET /api/family-groups/{id}/children`，避免通过任意家庭 ID 越权查看。
