@@ -1,5 +1,12 @@
 # 家加分 - 进展日志
 
+## [2026-08-16] family-reward-BUG-001 孩子手表积分申请家长端未收到
+- 根因：手表端已有积分申请提交和最近申请查询，服务端也有审批函数，但家长 Web 端没有待确认申请列表；已有 `/api/watch/requests` 仅面向手表设备 token，家长端不会收到孩子提交的申请。
+- 修复：新增家长端 `GET /api/reward-requests`，按当前家庭和当前家长名下孩子返回手表端待确认申请；新增 `POST /api/reward-requests/{id}/approve`，确认后复用交易入账逻辑并把申请标记为 `approved`。
+- 权限边界：家长端申请列表需要当前用户属于所选家庭，且只返回当前家长通过 `child_user_bindings` 归属的孩子申请；审批时将当前 `parent_app_user_id` 传入 `CreateTransaction`，继续执行“只能操作自己名下的孩子”校验。
+- 前端：积分操作页新增“待确认申请”区域，展示孩子、申请事项、分类、积分和提交时间，可直接确认领取；确认成功后刷新孩子积分和待确认列表。
+- 验证证据：`dotnet build FamilyReward.Api/FamilyReward.Api.csproj --no-restore` 通过（0 警告、0 错误）；前端 `npm run build` 通过；本地 API 临时数据闭环通过，创建家庭组 `group_id=62` 和申请 `request_id=2`，覆盖儿童认证码、手表设备绑定、手表提交 6 分申请、家长端待确认列表可见、家长确认后积分入账为 6、删除临时家庭清理。
+
 ## [2026-08-16] family-reward-REQ-026 家庭组改名
 - 家庭管理新增家庭组改名能力：后端新增 `PUT /api/family-groups/{id}`，支持更新家庭名称和说明；前端家庭组列表中，创建者或 `owner` 可打开“修改家庭”弹窗并保存。
 - 权限边界：沿用现有家庭组管理规则，仅家庭创建者、`owner` 角色或默认管理员可修改；普通已加入成员只能查看和选择，越权修改返回 403。

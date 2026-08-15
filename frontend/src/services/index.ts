@@ -7,6 +7,7 @@ import type {
   ChildFriendsPayload,
   ChildWatchDevices,
   WatchDeviceUnbindCode,
+  WatchRewardRequestsPayload,
 } from '../types';
 import type { AgentInvokeRequest, AgentInvokeResponse, RewardParseRequest, RewardParseResponse, SystemConfig } from '../types';
 
@@ -46,6 +47,10 @@ export const getChildFriendNotifications = (params?: { unreadOnly?: boolean }) =
   http.get<unknown, ChildFriendNotificationsPayload>('/api/children/friend-notifications', { params });
 export const markChildFriendNotificationRead = (id: number) =>
   http.post<unknown, { status: string }>(`/api/children/friend-notifications/${id}/read`, {});
+export const getRewardRequests = (params?: { familyGroupId?: number; status?: string; limit?: number }) =>
+  http.get<unknown, WatchRewardRequestsPayload>('/api/reward-requests', { params });
+export const approveRewardRequest = (id: number, data?: { familyGroupId?: number; reviewNote?: string }) =>
+  http.post<unknown, { status: string; request: unknown; transaction: unknown }>(`/api/reward-requests/${id}/approve`, data || {});
 
 export const getTransactions = (params: any) => http.get('/api/transactions', { params });
 export const createTransaction = (data: any) => http.post('/api/transactions', data);

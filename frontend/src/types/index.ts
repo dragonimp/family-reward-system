@@ -85,6 +85,29 @@ export interface WatchDeviceUnbindCode {
   expiresInMinutes: number;
 }
 
+export interface WatchRewardRequest {
+  id: number;
+  familyGroupId: number;
+  childId: number;
+  childName: string;
+  ruleId?: number | null;
+  ruleName?: string;
+  title: string;
+  category: string;
+  points: number;
+  note?: string;
+  status: string;
+  statusText: string;
+  requestedAt: string;
+  reviewedAt?: string | null;
+  completedAt?: string | null;
+}
+
+export interface WatchRewardRequestsPayload {
+  familyGroupId: number;
+  requests: WatchRewardRequest[];
+}
+
 export interface FamilyGroup {
   id: number;
   name: string;

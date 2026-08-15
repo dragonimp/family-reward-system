@@ -452,7 +452,27 @@ app.MapPost("/api/watch/requests/{id:int}/approve", async (int id, JsonObject bo
     var access = await RequireParentProfile(connectionString, request);
     if (access.Error is not null) return access.Error;
     var familyGroupId = await ResolveFamilyGroupId(connectionString, request, body);
-    var result = await ApproveWatchRewardRequest(connectionString, id, familyGroupId, body.String("reviewNote"));
+    var result = await ApproveWatchRewardRequest(connectionString, id, familyGroupId, access.Profile!.AppUserId, body.String("reviewNote"));
+    return result.ContainsKey("error") ? Results.BadRequest(result) : Results.Json(result);
+});
+
+app.MapGet("/api/reward-requests", async (HttpRequest request) =>
+{
+    var access = await RequireParentProfile(connectionString, request);
+    if (access.Error is not null) return access.Error;
+    var familyGroupId = await ResolveFamilyGroupId(connectionString, request);
+    var limit = Math.Clamp(request.Query.Int("limit") ?? 20, 1, 50);
+    var status = request.Query.String("status");
+    var result = await GetParentWatchRewardRequests(connectionString, familyGroupId, access.Profile!.AppUserId, status, limit);
+    return result.ContainsKey("error") ? Results.BadRequest(result) : Results.Json(result);
+});
+
+app.MapPost("/api/reward-requests/{id:int}/approve", async (int id, JsonObject body, HttpRequest request) =>
+{
+    var access = await RequireParentProfile(connectionString, request);
+    if (access.Error is not null) return access.Error;
+    var familyGroupId = await ResolveFamilyGroupId(connectionString, request, body);
+    var result = await ApproveWatchRewardRequest(connectionString, id, familyGroupId, access.Profile!.AppUserId, body.String("reviewNote"));
     return result.ContainsKey("error") ? Results.BadRequest(result) : Results.Json(result);
 });
 
@@ -6307,6 +6327,65 @@ static async Task<List<Dictionary<string, object?>>> GetWatchRewardRequests(stri
     return rows;
 }
 
+static async Task<Dictionary<string, object?>> GetParentWatchRewardRequests(
+    string connectionString,
+    int familyGroupId,
+    string parentAppUserId,
+    string status,
+    int limit)
+{
+    await using var conn = await OpenConnection(connectionString);
+    await using (var accessCmd = new NpgsqlCommand("""
+        SELECT COUNT(*)
+        FROM family_groups fg
+        LEFT JOIN family_group_users fgu
+          ON fgu.family_group_id = fg.id AND fgu.user_id = @parent_app_user_id
+        WHERE fg.id = @family_group_id
+          AND (fg.created_by = @parent_app_user_id OR fgu.user_id = @parent_app_user_id OR @parent_app_user_id = @default_user_id)
+        """, conn))
+    {
+        accessCmd.Parameters.AddWithValue("family_group_id", familyGroupId);
+        accessCmd.Parameters.AddWithValue("parent_app_user_id", parentAppUserId);
+        accessCmd.Parameters.AddWithValue("default_user_id", DefaultUserId);
+        if (Convert.ToInt32(await accessCmd.ExecuteScalarAsync(), CultureInfo.InvariantCulture) == 0)
+        {
+            return new Dictionary<string, object?> { ["error"] = "你不是该家庭成员" };
+        }
+    }
+
+    var normalizedStatus = status.Trim();
+    await using var cmd = new NpgsqlCommand("""
+        SELECT wrr.*, COALESCE(cp.name, c.name) AS child_name, r.name AS rule_name
+        FROM watch_reward_requests wrr
+        JOIN children c ON c.id = wrr.child_id
+        JOIN child_user_bindings cub
+          ON cub.child_profile_key = c.profile_key AND cub.parent_app_user_id = @parent_app_user_id
+        LEFT JOIN child_profiles cp ON cp.profile_key = c.profile_key
+        LEFT JOIN rules r ON r.id = wrr.rule_id
+        WHERE wrr.family_group_id = @family_group_id
+          AND (@status = '' OR wrr.status = @status)
+        ORDER BY wrr.requested_at DESC, wrr.id DESC
+        LIMIT @limit
+        """, conn);
+    cmd.Parameters.AddWithValue("family_group_id", familyGroupId);
+    cmd.Parameters.AddWithValue("parent_app_user_id", parentAppUserId);
+    cmd.Parameters.AddWithValue("status", normalizedStatus);
+    cmd.Parameters.AddWithValue("limit", limit);
+
+    var rows = new List<Dictionary<string, object?>>();
+    await using var reader = await cmd.ExecuteReaderAsync();
+    while (await reader.ReadAsync())
+    {
+        rows.Add(ReadWatchRewardRequest(reader));
+    }
+
+    return new Dictionary<string, object?>
+    {
+        ["familyGroupId"] = familyGroupId,
+        ["requests"] = rows
+    };
+}
+
 static async Task<Dictionary<string, object?>> CreateWatchRewardRequest(string connectionString, JsonObject body, int familyGroupId, string requestedBy, string? childProfileKey = null)
 {
     var childId = body.Int("child_id") ?? body.Int("childId") ?? 0;
@@ -6397,7 +6476,12 @@ static async Task<Dictionary<string, object?>> CreateWatchRewardRequest(string c
         .First(row => GetInt(row, "id") == id);
 }
 
-static async Task<Dictionary<string, object?>> ApproveWatchRewardRequest(string connectionString, int id, int familyGroupId, string reviewNote)
+static async Task<Dictionary<string, object?>> ApproveWatchRewardRequest(
+    string connectionString,
+    int id,
+    int familyGroupId,
+    string parentAppUserId,
+    string reviewNote)
 {
     Dictionary<string, object?> request;
     await using (var conn = await OpenConnection(connectionString))
@@ -6434,7 +6518,7 @@ static async Task<Dictionary<string, object?>> ApproveWatchRewardRequest(string 
         ["category"] = Convert.ToString(request["category"], CultureInfo.InvariantCulture) ?? "手表申请",
         ["description"] = Convert.ToString(request["title"], CultureInfo.InvariantCulture) ?? "手表积分申请",
         ["notes"] = $"手表端申请 #{id}"
-    }, familyGroupId);
+    }, familyGroupId, parentAppUserId);
 
     if (transactionResult.TryGetValue("error", out var error))
     {

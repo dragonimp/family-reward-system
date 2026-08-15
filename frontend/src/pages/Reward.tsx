@@ -1,16 +1,26 @@
 import { Card } from '../components/Card';
 import { Modal } from '../components/Modal';
-import type { Child, Rule, Transaction } from '../types';
+import type { Child, Rule, WatchRewardRequest } from '../types';
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { getChildren, getRules, createTransaction, parseRewardVoice } from '../services';
+import { useFamilyGroup } from '../contexts/FamilyGroupContext';
+import {
+  approveRewardRequest,
+  createTransaction,
+  getChildren,
+  getRewardRequests,
+  getRules,
+  parseRewardVoice,
+} from '../services';
 
 type TransactionType = 'score' | 'cash' | 'item';
 
 export default function Reward() {
   const navigate = useNavigate();
+  const { selectedGroupId } = useFamilyGroup();
   const [children, setChildren] = useState<Child[]>([]);
   const [rules, setRules] = useState<Rule[]>([]);
+  const [pendingRequests, setPendingRequests] = useState<WatchRewardRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedChild, setSelectedChild] = useState<number | null>(null);
   const [selectedRule, setSelectedRule] = useState<number | null>(null);
@@ -22,6 +32,7 @@ export default function Reward() {
   const [voiceListening, setVoiceListening] = useState(false);
   const [voiceParsing, setVoiceParsing] = useState(false);
   const recognitionRef = useRef<any>(null);
+  const [approvingRequestId, setApprovingRequestId] = useState<number | null>(null);
   const [showConfirm, setShowConfirm] = useState(false);
   const [transactionPreview, setTransactionPreview] = useState<any>(null);
   const [toast, setToast] = useState<{ show: boolean; message: string; type: 'success' | 'error' }>({ show: false, message: '', type: 'success' });
@@ -34,9 +45,10 @@ export default function Reward() {
   const loadData = useCallback(async (silent = false) => {
     try {
       if (!silent) setLoading(true);
-      const [childrenRes, rulesRes] = await Promise.all([
+      const [childrenRes, rulesRes, requestRes] = await Promise.all([
         getChildren({ ownedOnly: true }),
         getRules(),
+        getRewardRequests({ familyGroupId: selectedGroupId ?? undefined, status: 'pending', limit: 20 }),
       ]);
       const childList = Array.isArray(childrenRes) ? childrenRes : (childrenRes as any)?.data || [];
       const rulePayload = (rulesRes as any)?.data || rulesRes;
@@ -55,15 +67,17 @@ export default function Reward() {
       }));
       setChildren(childList);
       setRules([...baseRules, ...redlineRules]);
+      setPendingRequests(Array.isArray(requestRes?.requests) ? requestRes.requests : []);
     } catch (error) {
       console.error('加载失败:', error);
       setChildren([]);
       setRules([]);
+      setPendingRequests([]);
       showToast('数据加载失败，暂时无法操作', 'error');
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [selectedGroupId]);
 
   useEffect(() => {
     loadData();
@@ -250,6 +264,34 @@ export default function Reward() {
     }
   };
 
+  const handleApproveRequest = async (requestId: number) => {
+    try {
+      setApprovingRequestId(requestId);
+      await approveRewardRequest(requestId, {
+        familyGroupId: selectedGroupId ?? undefined,
+        reviewNote: '家长端确认领取',
+      });
+      showToast('申请已确认，积分已入账');
+      await loadData(true);
+    } catch (error) {
+      console.error('确认申请失败:', error);
+      showToast(error instanceof Error ? error.message : '确认申请失败', 'error');
+    } finally {
+      setApprovingRequestId(null);
+    }
+  };
+
+  const formatRequestTime = (value: string) => {
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return '';
+    return date.toLocaleString('zh-CN', {
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+  };
+
   const positiveRules = rules.filter((r) => r.enabled && r.type === 'positive');
   const negativeRules = rules.filter((r) => r.enabled && r.type === 'negative');
 
@@ -278,6 +320,53 @@ export default function Reward() {
         <h2 className="text-2xl font-bold text-gray-900">积分操作</h2>
         <p className="text-gray-500 mt-1">只操作当前家长账号名下的孩子，积分在各家庭中同步</p>
       </div>
+
+      <Card className="p-4 sm:p-5">
+        <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h3 className="text-sm font-semibold text-gray-700">待确认申请</h3>
+            <p className="mt-1 text-xs text-gray-500">孩子从手表端提交的积分申请会显示在这里</p>
+          </div>
+          <span className="rounded-full bg-orange-50 px-3 py-1 text-sm font-medium text-orange-700">
+            {pendingRequests.length} 条
+          </span>
+        </div>
+        {pendingRequests.length === 0 ? (
+          <div className="rounded-lg border border-dashed border-gray-200 py-6 text-center text-sm text-gray-400">
+            暂无待确认申请
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
+            {pendingRequests.map((item) => (
+              <div key={item.id} className="rounded-lg border border-orange-100 bg-orange-50/50 p-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="font-semibold text-gray-900">{item.childName}</span>
+                      <span className="rounded-full bg-white px-2 py-0.5 text-xs font-medium text-orange-700">
+                        +{item.points} 分
+                      </span>
+                    </div>
+                    <p className="mt-1 truncate text-sm text-gray-700">{item.title}</p>
+                    <p className="mt-1 text-xs text-gray-500">
+                      {item.category || '手表申请'}{item.requestedAt ? ` · ${formatRequestTime(item.requestedAt)}` : ''}
+                    </p>
+                    {item.note && <p className="mt-2 text-xs text-gray-500">{item.note}</p>}
+                  </div>
+                  <button
+                    type="button"
+                    disabled={approvingRequestId === item.id}
+                    onClick={() => handleApproveRequest(item.id)}
+                    className="shrink-0 rounded-lg bg-[#4A90D9] px-3 py-2 text-sm font-medium text-white hover:bg-[#3A7BC8] disabled:opacity-60"
+                  >
+                    {approvingRequestId === item.id ? '确认中...' : '确认'}
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </Card>
 
       <Card className="p-4 border-[#4A90D9]/30 sm:p-5">
         <div className="flex flex-col sm:flex-row sm:items-center gap-3 justify-between">
