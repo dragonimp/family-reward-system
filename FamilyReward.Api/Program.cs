@@ -451,7 +451,9 @@ app.MapPost("/api/watch/requests/{id:int}/approve", async (int id, JsonObject bo
 {
     var access = await RequireParentProfile(connectionString, request);
     if (access.Error is not null) return access.Error;
-    var familyGroupId = await ResolveFamilyGroupId(connectionString, request, body);
+    var familyGroupId = HasFamilyGroupSelector(request, body)
+        ? await ResolveFamilyGroupId(connectionString, request, body)
+        : (int?)null;
     var result = await ApproveWatchRewardRequest(connectionString, id, familyGroupId, access.Profile!.AppUserId, body.String("reviewNote"));
     return result.ContainsKey("error") ? Results.BadRequest(result) : Results.Json(result);
 });
@@ -460,7 +462,9 @@ app.MapGet("/api/reward-requests", async (HttpRequest request) =>
 {
     var access = await RequireParentProfile(connectionString, request);
     if (access.Error is not null) return access.Error;
-    var familyGroupId = await ResolveFamilyGroupId(connectionString, request);
+    var familyGroupId = HasFamilyGroupSelector(request)
+        ? await ResolveFamilyGroupId(connectionString, request)
+        : (int?)null;
     var limit = Math.Clamp(request.Query.Int("limit") ?? 20, 1, 50);
     var status = request.Query.String("status");
     var result = await GetParentWatchRewardRequests(connectionString, familyGroupId, access.Profile!.AppUserId, status, limit);
@@ -471,7 +475,9 @@ app.MapPost("/api/reward-requests/{id:int}/approve", async (int id, JsonObject b
 {
     var access = await RequireParentProfile(connectionString, request);
     if (access.Error is not null) return access.Error;
-    var familyGroupId = await ResolveFamilyGroupId(connectionString, request, body);
+    var familyGroupId = HasFamilyGroupSelector(request, body)
+        ? await ResolveFamilyGroupId(connectionString, request, body)
+        : (int?)null;
     var result = await ApproveWatchRewardRequest(connectionString, id, familyGroupId, access.Profile!.AppUserId, body.String("reviewNote"));
     return result.ContainsKey("error") ? Results.BadRequest(result) : Results.Json(result);
 });
@@ -6329,22 +6335,23 @@ static async Task<List<Dictionary<string, object?>>> GetWatchRewardRequests(stri
 
 static async Task<Dictionary<string, object?>> GetParentWatchRewardRequests(
     string connectionString,
-    int familyGroupId,
+    int? familyGroupId,
     string parentAppUserId,
     string status,
     int limit)
 {
     await using var conn = await OpenConnection(connectionString);
-    await using (var accessCmd = new NpgsqlCommand("""
-        SELECT COUNT(*)
-        FROM family_groups fg
-        LEFT JOIN family_group_users fgu
-          ON fgu.family_group_id = fg.id AND fgu.user_id = @parent_app_user_id
-        WHERE fg.id = @family_group_id
-          AND (fg.created_by = @parent_app_user_id OR fgu.user_id = @parent_app_user_id OR @parent_app_user_id = @default_user_id)
-        """, conn))
+    if (familyGroupId is not null)
     {
-        accessCmd.Parameters.AddWithValue("family_group_id", familyGroupId);
+        await using var accessCmd = new NpgsqlCommand("""
+            SELECT COUNT(*)
+            FROM family_groups fg
+            LEFT JOIN family_group_users fgu
+              ON fgu.family_group_id = fg.id AND fgu.user_id = @parent_app_user_id
+            WHERE fg.id = @family_group_id
+              AND (fg.created_by = @parent_app_user_id OR fgu.user_id = @parent_app_user_id OR @parent_app_user_id = @default_user_id)
+            """, conn);
+        accessCmd.Parameters.AddWithValue("family_group_id", familyGroupId.Value);
         accessCmd.Parameters.AddWithValue("parent_app_user_id", parentAppUserId);
         accessCmd.Parameters.AddWithValue("default_user_id", DefaultUserId);
         if (Convert.ToInt32(await accessCmd.ExecuteScalarAsync(), CultureInfo.InvariantCulture) == 0)
@@ -6362,13 +6369,21 @@ static async Task<Dictionary<string, object?>> GetParentWatchRewardRequests(
           ON cub.child_profile_key = c.profile_key AND cub.parent_app_user_id = @parent_app_user_id
         LEFT JOIN child_profiles cp ON cp.profile_key = c.profile_key
         LEFT JOIN rules r ON r.id = wrr.rule_id
-        WHERE wrr.family_group_id = @family_group_id
+        LEFT JOIN family_groups fg ON fg.id = wrr.family_group_id
+        LEFT JOIN family_group_users fgu
+          ON fgu.family_group_id = wrr.family_group_id AND fgu.user_id = @parent_app_user_id
+        WHERE (@family_group_id IS NULL OR wrr.family_group_id = @family_group_id)
           AND (@status = '' OR wrr.status = @status)
+          AND (fg.created_by = @parent_app_user_id OR fgu.user_id = @parent_app_user_id OR @parent_app_user_id = @default_user_id)
         ORDER BY wrr.requested_at DESC, wrr.id DESC
         LIMIT @limit
         """, conn);
-    cmd.Parameters.AddWithValue("family_group_id", familyGroupId);
+    cmd.Parameters.Add(new NpgsqlParameter("family_group_id", NpgsqlDbType.Integer)
+    {
+        Value = familyGroupId is null ? DBNull.Value : familyGroupId.Value
+    });
     cmd.Parameters.AddWithValue("parent_app_user_id", parentAppUserId);
+    cmd.Parameters.AddWithValue("default_user_id", DefaultUserId);
     cmd.Parameters.AddWithValue("status", normalizedStatus);
     cmd.Parameters.AddWithValue("limit", limit);
 
@@ -6479,7 +6494,7 @@ static async Task<Dictionary<string, object?>> CreateWatchRewardRequest(string c
 static async Task<Dictionary<string, object?>> ApproveWatchRewardRequest(
     string connectionString,
     int id,
-    int familyGroupId,
+    int? requestedFamilyGroupId,
     string parentAppUserId,
     string reviewNote)
 {
@@ -6488,13 +6503,25 @@ static async Task<Dictionary<string, object?>> ApproveWatchRewardRequest(
     await using (var cmd = new NpgsqlCommand("""
         SELECT wrr.*, c.name AS child_name, r.name AS rule_name
         FROM watch_reward_requests wrr
-        LEFT JOIN children c ON c.id = wrr.child_id
+        JOIN children c ON c.id = wrr.child_id
+        JOIN child_user_bindings cub
+          ON cub.child_profile_key = c.profile_key AND cub.parent_app_user_id = @parent_app_user_id
+        LEFT JOIN family_groups fg ON fg.id = wrr.family_group_id
+        LEFT JOIN family_group_users fgu
+          ON fgu.family_group_id = wrr.family_group_id AND fgu.user_id = @parent_app_user_id
         LEFT JOIN rules r ON r.id = wrr.rule_id
-        WHERE wrr.id = @id AND wrr.family_group_id = @family_group_id
+        WHERE wrr.id = @id
+          AND (@family_group_id IS NULL OR wrr.family_group_id = @family_group_id)
+          AND (fg.created_by = @parent_app_user_id OR fgu.user_id = @parent_app_user_id OR @parent_app_user_id = @default_user_id)
         """, conn))
     {
         cmd.Parameters.AddWithValue("id", id);
-        cmd.Parameters.AddWithValue("family_group_id", familyGroupId);
+        cmd.Parameters.Add(new NpgsqlParameter("family_group_id", NpgsqlDbType.Integer)
+        {
+            Value = requestedFamilyGroupId is null ? DBNull.Value : requestedFamilyGroupId.Value
+        });
+        cmd.Parameters.AddWithValue("parent_app_user_id", parentAppUserId);
+        cmd.Parameters.AddWithValue("default_user_id", DefaultUserId);
         await using var reader = await cmd.ExecuteReaderAsync();
         if (!await reader.ReadAsync())
         {
@@ -6509,6 +6536,7 @@ static async Task<Dictionary<string, object?>> ApproveWatchRewardRequest(
         return new Dictionary<string, object?> { ["error"] = "申请已处理" };
     }
 
+    var familyGroupId = GetInt(request, "familyGroupId");
     var transactionResult = await CreateTransaction(connectionString, new JsonObject
     {
         ["child_id"] = GetInt(request, "childId"),

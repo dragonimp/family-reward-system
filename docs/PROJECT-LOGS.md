@@ -163,3 +163,9 @@
 - 更新 README、项目状态、需求清单、任务分解和 Goldfish/MCP 接入资料。为保持部署与客户端兼容，保留 `family-reward`、`FamilyReward`、现有域名、Android 包名以及 `HappyLifeWatch` 工程名/User-Agent 等技术标识。
 - 验证证据：`dotnet build FamilyReward.Api/FamilyReward.Api.csproj --no-restore` 通过（0 警告、0 错误）；项目本地 ESLint 入口零 warning 通过；前端 Node 测试 4/4 通过；TypeScript 与 Vite 生产构建通过；`node watch-app/scripts/verify-watch-app.mjs` 通过；JSON 配置解析通过；8 个代表性品牌面断言通过；`git diff --check` 通过。当前 shell 没有全局 `npm` 命令，已直接调用仓库内相同的 ESLint、TypeScript、Vite 和 Node 测试入口完成等价验证。
 - Atlas 同步阻塞：运行时没有 Atlas MCP 工具或资源，`codex mcp list` 返回 `No MCP servers configured yet`。因此无法读取 Atlas 中 REQ-015 的真实关联需求、功能点、任务、公约和环境信息，也无法将需求、测试与完成证据写回或把 `family-reward-REQ-015` 关闭；Atlas 连接恢复后应将该事项更新为完成，并补录本节实现边界与全部验证证据。
+
+## [2026-08-16] family-reward-BUG-001 手表积分申请跨家庭不可见
+- 复现数据：生产库 `watch_reward_requests` 中存在 3 条 `pending` 申请，孩子为玥玥（`child_id=139`），实际家庭组为 `220`（长安在哪里），绑定家长为 `wssparent`。
+- 根因：家长 Web 端“待确认申请”查询和确认请求都携带当前页面选中的家庭组；当家长切换到其他家庭组时，自己孩子在实际家庭组下提交的手表积分申请被 `family_group_id` 过滤掉。
+- 修复：家长端默认按当前家长名下孩子聚合查询所有待确认手表申请；后端在未指定家庭组时按申请自身 `family_group_id` 入账，并继续校验家长与孩子绑定关系、家庭组成员权限。
+- 验证证据：生产 SQL 按新查询条件确认 `wssparent` 可见 3 条待处理申请；`dotnet build FamilyReward.Api/FamilyReward.Api.csproj --no-restore` 通过（0 警告、0 错误）；前端 `npm run build` 通过；待部署后补充生产 HTTP 验证。

@@ -3,7 +3,6 @@ import { Modal } from '../components/Modal';
 import type { Child, Rule, WatchRewardRequest } from '../types';
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useFamilyGroup } from '../contexts/FamilyGroupContext';
 import {
   approveRewardRequest,
   createTransaction,
@@ -17,7 +16,6 @@ type TransactionType = 'score' | 'cash' | 'item';
 
 export default function Reward() {
   const navigate = useNavigate();
-  const { selectedGroupId } = useFamilyGroup();
   const [children, setChildren] = useState<Child[]>([]);
   const [rules, setRules] = useState<Rule[]>([]);
   const [pendingRequests, setPendingRequests] = useState<WatchRewardRequest[]>([]);
@@ -48,7 +46,7 @@ export default function Reward() {
       const [childrenRes, rulesRes, requestRes] = await Promise.all([
         getChildren({ ownedOnly: true }),
         getRules(),
-        getRewardRequests({ familyGroupId: selectedGroupId ?? undefined, status: 'pending', limit: 20 }),
+        getRewardRequests({ status: 'pending', limit: 20 }),
       ]);
       const childList = Array.isArray(childrenRes) ? childrenRes : (childrenRes as any)?.data || [];
       const rulePayload = (rulesRes as any)?.data || rulesRes;
@@ -77,7 +75,7 @@ export default function Reward() {
     } finally {
       setLoading(false);
     }
-  }, [selectedGroupId]);
+  }, []);
 
   useEffect(() => {
     loadData();
@@ -268,7 +266,6 @@ export default function Reward() {
     try {
       setApprovingRequestId(requestId);
       await approveRewardRequest(requestId, {
-        familyGroupId: selectedGroupId ?? undefined,
         reviewNote: '家长端确认领取',
       });
       showToast('申请已确认，积分已入账');
