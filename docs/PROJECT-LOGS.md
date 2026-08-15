@@ -8,6 +8,7 @@
 - 数据模型新增 `watch_face_preferences`、`child_friend_codes`、`child_friendships`、`child_friend_notifications`，并补充必要索引；所有家长查看接口均通过当前家长与孩子绑定关系校验。
 - 验证证据：`dotnet build FamilyReward.Api/FamilyReward.Api.csproj --no-restore` 通过（0 警告、0 错误）；前端 `npm run build` 通过；本地 `/health` 返回 200，本地 `/watch` 响应包含“表盘设置”、“HelloKitty”、“星光梦可”、“生成好友码”和好友菜单；`git diff --check` 通过。
 - 部署证据：提交 `549b096` 已推送 `origin/main`；生产主机 `zz.impx.net` 已备份 `/var/www/happylife/api` 与 `/var/www/happylife/frontend/static` 后同步新产物并重启 `family-reward-api.service`。线上 `https://happylife.ai.impx.net/health` 返回 200，`/watch` 已包含表盘设置、三款表盘和好友菜单，首页静态资源更新到 `index-BOkcMgBp.js` / `index-Cqr4TRPv.css`。
+- Orbit `gpt_112eef0db67045cca2bfb7908720bbc3` / `family-reward-TASK-039` 复核：修复好友与表盘设置面板仍被内容缩放逻辑处理、无法按设计保持独立纵向滚动的问题；手表发布包校验新增 REQ-023 的表盘、好友接口、家长通知和一次性限时哈希好友码回归项。ASP.NET Core 构建通过（0 警告、0 错误），前端生产构建通过，Node 测试 8/8 通过，手表发布包校验与 `git diff --check` 通过。系统没有 `npm` 且复用的主工作树依赖缺少 ESLint 可执行文件，因此 lint 未运行。运行时未暴露 Atlas MCP 工具或资源，本机 `codex mcp list` 也无已配置服务，故无法读取 Atlas 公约/环境/关联事项，亦无法将 REQ-023、TASK-039、测试和完成证据写回或关闭；Atlas 恢复后应补录本节证据并将两项更新为完成。
 
 ## [2026-08-09] family-reward-REQ-018 家庭孩子成员管理与头像菜单收敛
 - Orbit：`gpt_8bedc53115a644c1af0182627969bebf`；需求：`family-reward-REQ-018`（`1504c58c-a463-41f7-8aea-1979a970aa70`）；任务：`family-reward-TASK-033`（`89577270-3cc6-4892-9ad1-e56ae20c1cca`）；功能点：`5ec785f2-cce2-4e52-aa7f-ba1170f242e1`。
