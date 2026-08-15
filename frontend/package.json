@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
-    "test": "node --test auth.test.ts authProxy.test.ts userMenu.test.ts",
+    "test": "node --test auth.test.ts authProxy.test.ts userMenu.test.ts mobileLayout.test.ts",
     "preview": "vite preview",
     "lint": "eslint . --report-unused-disable-directives --max-warnings 0"
   },

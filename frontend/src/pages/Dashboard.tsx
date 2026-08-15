@@ -24,7 +24,7 @@ function ChildCard({ child, index }: ChildCardProps) {
   const color = childColors[index % 5];
   
   return (
-    <div className={`${color.light} rounded-2xl border ${color.border} p-4 transition-all hover:shadow-lg hover:scale-105`}>
+    <div className={`${color.light} rounded-2xl border ${color.border} p-4 transition-all hover:shadow-lg sm:hover:scale-[1.02]`}>
       {/* 头部 */}
       <div className="flex items-center gap-3 mb-3">
         <div className={`w-10 h-10 rounded-full bg-gradient-to-br ${color.bg} flex items-center justify-center text-xl shadow-sm`}>
@@ -213,16 +213,16 @@ export default function Dashboard() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5 sm:space-y-6">
       {/* 页面标题 */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-3">
         <div>
-          <h2 className="text-2xl font-bold text-gray-900">🏠 家加分</h2>
+          <h2 className="text-xl font-bold text-gray-900 sm:text-2xl">🏠 家加分</h2>
           <p className="text-sm text-gray-500 mt-1">记录每个孩子的成长瞬间</p>
         </div>
         <button
           onClick={() => loadData()}
-          className="px-4 py-2 bg-[#4A90D9] text-white rounded-lg text-sm font-medium hover:bg-[#3a7bc8] transition-colors shadow-sm"
+          className="shrink-0 rounded-lg bg-[#4A90D9] px-3 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-[#3a7bc8] sm:px-4"
         >
           🔄 刷新
         </button>
@@ -293,7 +293,7 @@ export default function Dashboard() {
       </div>
 
       {/* 最新交易 */}
-      <Card className="p-5">
+      <Card className="p-4 sm:p-5">
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-lg font-bold text-gray-800">📜 最近动态</h3>
           <button

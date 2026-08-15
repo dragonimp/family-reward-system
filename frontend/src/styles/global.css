@@ -10,6 +10,54 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   background-color: #F7F9FC;
+  color: #1f2937;
+  overscroll-behavior: none;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+button,
+a,
+input,
+select,
+textarea {
+  -webkit-tap-highlight-color: transparent;
+}
+
+.app-shell {
+  height: 100vh;
+  height: 100dvh;
+}
+
+.mobile-safe-bottom {
+  padding-bottom: max(0.25rem, env(safe-area-inset-bottom));
+}
+
+.mobile-safe-sheet {
+  padding-bottom: max(1rem, env(safe-area-inset-bottom));
+}
+
+@media (max-width: 639px) {
+  input,
+  select,
+  textarea {
+    font-size: 16px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }
 
 /* 自定义滚动条 */

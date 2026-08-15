@@ -171,3 +171,11 @@
 - 根因：家长 Web 端“待确认申请”查询和确认请求都携带当前页面选中的家庭组；当家长切换到其他家庭组时，自己孩子在实际家庭组下提交的手表积分申请被 `family_group_id` 过滤掉。
 - 修复：家长端默认按当前家长名下孩子聚合查询所有待确认手表申请；后端在未指定家庭组时按申请自身 `family_group_id` 入账，并继续校验家长与孩子绑定关系、家庭组成员权限。
 - 验证证据：生产 SQL 按新查询条件确认 `wssparent` 可见 3 条待处理申请；`dotnet build FamilyReward.Api/FamilyReward.Api.csproj --no-restore` 通过（0 警告、0 错误）；前端 `npm run build` 通过；生产 `/health` 返回 200，首页加载 `index-C3YY20Jm.js`；生产 HTTP 使用 `wssparent` 查询 `/api/reward-requests?status=pending&limit=20` 返回玥玥 3 条待确认申请，使用 `wzsparent` 查询返回空。
+
+## [2026-08-16] family-reward-REQ-032 家长端服务号手机适配
+- Orbit：`gpt_0ecabdee287d48db96efbfad554a0387`；需求：`family-reward-REQ-032`（`09dcd758-ba7c-40f8-aecd-faff66393aaf`）；需求分析任务：`family-reward-TASK-049`（`05a0c888-f3e8-4a0b-9135-6c359366a9f8`）。
+- 验收边界：320–430px 手机页面应保持单列、无壳层横向滚动；底部只保留首页、积分、记录、统计、管理 5 个等宽高频入口；低频管理入口通过底部抽屉呈现；兼容微信内置浏览器的动态视口和 iPhone 底部安全区；平板及桌面导航保持可用。
+- 实现：家长端壳层改用 `100dvh`、安全区 padding 和最大内容宽度；删除顶部重复手机菜单及 7 等分拥挤底栏，新增 5 项底栏与两列管理抽屉；孩子管理在手机端改为积分/现金/物品卡片及 4 项直接操作，平板和桌面继续使用表格；统一优化移动标题、提示、筛选、按钮和表单字号。
+- 回归：新增 `mobileLayout.test.ts`，静态校验 5 项导航、管理对话框、动态视口、安全区、viewport cover 与孩子手机卡片/桌面表格双布局，前端 Node 测试 10/10 通过；TypeScript 类型检查及 Vite 生产构建通过；`git diff --check` 通过。
+- 环境限制：当前 shell 无 `npm`，已直接复用仓库 `node_modules` 的 TypeScript/Vite 和 Node 测试入口；已有依赖中缺少 ESLint 可执行文件，无法执行 lint。
+- Atlas 同步阻塞：运行时没有 Atlas MCP 工具或资源，`list_mcp_resources` 仅返回 `codex_apps`，且 `codex mcp list` 返回 `No MCP servers configured yet`。因此无法读取 Atlas 中该需求的真实关联缺陷、公约和环境，也无法将 REQ-032、TASK-049、测试与完成证据写回或更新状态；Atlas 恢复后应补录本节证据并将需求分析任务更新为完成。

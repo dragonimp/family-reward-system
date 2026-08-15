@@ -146,32 +146,32 @@ export default function Rules() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       {/* Toast */}
       {toast.show && (
-        <div className={`fixed top-4 right-4 z-50 px-6 py-3 rounded-lg shadow-lg text-white transition-all
+        <div className={`fixed left-3 right-3 top-3 z-50 rounded-lg px-4 py-3 text-sm text-white shadow-lg transition-all sm:left-auto sm:right-4 sm:top-4 sm:px-6
           ${toast.type === 'success' ? 'bg-green-500' : 'bg-red-500'}`}>
           {toast.message}
         </div>
       )}
 
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h2 className="text-2xl font-bold text-gray-900">规则管理</h2>
+          <h2 className="text-xl font-bold text-gray-900 sm:text-2xl">规则管理</h2>
           <p className="text-gray-500 mt-1">管理积分规则和红线规则</p>
         </div>
-        <button onClick={openCreateModal} className="btn-primary flex items-center gap-2">
+        <button onClick={openCreateModal} className="btn-primary flex w-full items-center justify-center gap-2 sm:w-auto">
           <span>➕</span> 新增规则
         </button>
       </div>
 
       {/* 筛选 */}
       <Card className="p-4">
-        <div className="flex flex-wrap gap-3">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:flex">
           <select
             value={filterCategory}
             onChange={(e) => setFilterCategory(e.target.value)}
-            className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#4A90D9]"
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#4A90D9] sm:w-auto"
           >
             <option value="">全部分类</option>
             {categories.map((cat) => (
@@ -181,7 +181,7 @@ export default function Rules() {
           <select
             value={filterType}
             onChange={(e) => setFilterType(e.target.value)}
-            className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#4A90D9]"
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#4A90D9] sm:w-auto"
           >
             <option value="">全部类型</option>
             <option value="positive">正向行为</option>
@@ -192,16 +192,16 @@ export default function Rules() {
 
       {/* 红线规则 */}
       {redLineRules.length > 0 && (
-        <Card className="p-5 border-red-200">
+        <Card className="border-red-200 p-4 sm:p-5">
           <h3 className="text-sm font-semibold text-red-600 mb-4 flex items-center gap-2">
             <span>🚨</span> 红线规则（不可违反）
           </h3>
           <div className="space-y-3">
             {redLineRules.map((rule) => (
-              <div key={rule.id} className="flex items-center justify-between p-3 bg-red-50 rounded-lg border border-red-200">
-                <div>
+              <div key={rule.id} className="flex flex-col gap-3 rounded-lg border border-red-200 bg-red-50 p-3 sm:flex-row sm:items-center sm:justify-between">
+                <div className="min-w-0">
                   <span className="font-medium text-red-700">{rule.name}</span>
-                  <span className="text-sm text-red-500 ml-3">{rule.description}</span>
+                  <span className="mt-1 block text-sm text-red-500 sm:ml-3 sm:mt-0 sm:inline">{rule.description}</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <span className="text-sm font-bold text-red-600">{rule.score} 分</span>
@@ -215,7 +215,7 @@ export default function Rules() {
       )}
 
       {/* 正向规则 */}
-      <Card className="p-5">
+      <Card className="p-4 sm:p-5">
         <h3 className="text-sm font-semibold text-green-600 mb-4 flex items-center gap-2">
           <span>👍</span> 正向行为规则 ({positiveRules.length})
         </h3>
@@ -244,7 +244,7 @@ export default function Rules() {
 
       {/* 负向规则 */}
       {negativeRules.length > 0 && (
-        <Card className="p-5">
+        <Card className="p-4 sm:p-5">
           <h3 className="text-sm font-semibold text-red-600 mb-4 flex items-center gap-2">
             <span>👎</span> 负向行为规则 ({negativeRules.length})
           </h3>

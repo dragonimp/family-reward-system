@@ -257,23 +257,23 @@ export default function Children() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       {/* Toast */}
       {toast.show && (
-        <div className={`fixed top-4 right-4 z-50 px-6 py-3 rounded-lg shadow-lg text-white transition-all
+        <div className={`fixed left-3 right-3 top-3 z-50 rounded-lg px-4 py-3 text-sm text-white shadow-lg transition-all sm:left-auto sm:right-4 sm:top-4 sm:px-6
           ${toast.type === 'success' ? 'bg-green-500' : 'bg-red-500'}`}>
           {toast.message}
         </div>
       )}
 
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h2 className="text-2xl font-bold text-gray-900">孩子管理</h2>
+          <h2 className="text-xl font-bold text-gray-900 sm:text-2xl">孩子管理</h2>
           <p className="text-sm text-gray-500 mt-1">
             管理当前家长账号下的孩子，可将同一组家长和孩子加入多个家庭组
           </p>
         </div>
-        <button onClick={openCreateModal} className="btn-primary flex items-center gap-2">
+        <button onClick={openCreateModal} className="btn-primary flex w-full items-center justify-center gap-2 sm:w-auto">
           <span>➕</span> 新增孩子
         </button>
       </div>
@@ -287,7 +287,7 @@ export default function Children() {
             </div>
             <div className="space-y-2">
               {friendNotifications.map((item) => (
-                <div key={item.id} className="flex items-center justify-between gap-3 rounded-lg border border-blue-100 bg-blue-50 px-4 py-3">
+                <div key={item.id} className="flex flex-col gap-3 rounded-lg border border-blue-100 bg-blue-50 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
                   <div className="min-w-0">
                     <div className="truncate text-sm font-medium text-blue-950">{item.message}</div>
                     <div className="mt-1 text-xs text-blue-700">
@@ -307,8 +307,43 @@ export default function Children() {
         </Card>
       )}
 
-      {/* 表格 */}
-      <Card>
+      {/* 手机端卡片列表 */}
+      <div className="space-y-3 sm:hidden">
+        {children.map((child, i) => (
+          <Card key={child.id} className="p-4">
+            <div className="flex items-center gap-3">
+              <div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-sm font-bold text-white
+                ${['bg-[#4A90D9]', 'bg-[#7ED321]', 'bg-[#F5A623]', 'bg-[#E74C3C]', 'bg-purple-500'][i % 5]}`}>
+                {child.name[0]}
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="truncate font-semibold text-gray-900">{child.name}</p>
+                <p className="mt-0.5 text-xs text-gray-400">孩子编号 {child.id}</p>
+              </div>
+            </div>
+            <div className="mt-4 grid grid-cols-3 gap-2 text-center">
+              <div className="rounded-xl bg-blue-50 px-2 py-2.5"><p className="text-[11px] text-blue-500">积分</p><p className="mt-0.5 font-bold text-blue-700">{child.score ?? 0}</p></div>
+              <div className="rounded-xl bg-green-50 px-2 py-2.5"><p className="text-[11px] text-green-500">现金</p><p className="mt-0.5 font-bold text-green-700">¥{child.cash ?? 0}</p></div>
+              <div className="rounded-xl bg-orange-50 px-2 py-2.5"><p className="text-[11px] text-orange-500">物品</p><p className="mt-0.5 font-bold text-orange-700">{child.items ?? 0}</p></div>
+            </div>
+            <div className="mt-3 grid grid-cols-4 gap-1 border-t border-gray-100 pt-3 text-center text-sm font-medium">
+              <button onClick={() => openEditModal(child)} className="rounded-lg py-2 text-[#4A90D9] active:bg-blue-50">编辑</button>
+              <button onClick={() => openDeviceModal(child)} className="rounded-lg py-2 text-[#16A085] active:bg-green-50">手表</button>
+              <button onClick={() => openFriendsModal(child)} className="rounded-lg py-2 text-[#8E44AD] active:bg-purple-50">好友</button>
+              <button onClick={() => confirmDelete(child.id)} className="rounded-lg py-2 text-[#E74C3C] active:bg-red-50">删除</button>
+            </div>
+          </Card>
+        ))}
+        {children.length === 0 && (
+          <Card className="py-12 text-center text-gray-400">
+            <p className="mb-3 text-4xl">👶</p>
+            <p>暂无孩子数据</p>
+          </Card>
+        )}
+      </div>
+
+      {/* 平板及桌面端表格 */}
+      <Card className="hidden sm:block">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
@@ -403,7 +438,7 @@ export default function Children() {
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4A90D9] focus:border-transparent"
             />
           </div>
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">初始积分</label>
               <input
