@@ -14,6 +14,9 @@
 - 权限边界：家长端申请列表需要当前用户属于所选家庭，且只返回当前家长通过 `child_user_bindings` 归属的孩子申请；审批时将当前 `parent_app_user_id` 传入 `CreateTransaction`，继续执行“只能操作自己名下的孩子”校验。
 - 前端：积分操作页新增“待确认申请”区域，展示孩子、申请事项、分类、积分和提交时间，可直接确认领取；确认成功后刷新孩子积分和待确认列表。
 - 验证证据：`dotnet build FamilyReward.Api/FamilyReward.Api.csproj --no-restore` 通过（0 警告、0 错误）；前端 `npm run build` 通过；本地 API 临时数据闭环通过，创建家庭组 `group_id=62` 和申请 `request_id=2`，覆盖儿童认证码、手表设备绑定、手表提交 6 分申请、家长端待确认列表可见、家长确认后积分入账为 6、删除临时家庭清理。
+- Orbit 缺陷复测 `3d5ca1b8af7c` / `family-reward-TASK-046`：在独立本地 API 端口重跑 `family-reward-TC-E2E-001` 核心闭环，覆盖临时家庭和孩子创建、手表绑定、提交 7 分申请、家长待确认列表可见、家长确认、手表状态变为“已领取”、孩子积分变为 7，以及重复确认返回 400；测试数据已清理，复测通过。
+- 回归验证：ASP.NET Core 构建通过（0 警告、0 错误）；前端 Node 测试 8/8、TypeScript 检查和 Vite 生产构建通过；`git diff --check` 通过。修正了既有回归用例的过宽断言，使普通积分操作继续按家长全局孩子范围工作，同时明确验证待确认申请读取和确认携带家庭范围。当前主工作树复用的 `node_modules` 不包含 ESLint，且环境没有 `npm`，因此无法执行 lint。
+- Atlas 同步阻塞：当前运行时未暴露 Atlas MCP 工具或资源，本机 `codex mcp list` 返回 `No MCP servers configured yet`。因此无法读取 Atlas 中的真实公约、环境和关联事项，也无法将测试执行 `3d5ca1b8-af7c-4770-a579-9f0edce49e7b`、缺陷 `42eaa97f-c23d-4ae2-a002-0414b207acef`、修复任务 `f28b29e8-3fef-4c32-a9dd-ff9156e6f8fc`、执行任务 `family-reward-TASK-046` 及上述证据写回或关闭；Atlas 恢复后应将本次测试标记为通过，并据此关闭缺陷及关联任务。
 
 ## [2026-08-16] family-reward-REQ-026 家庭组改名
 - 家庭管理新增家庭组改名能力：后端新增 `PUT /api/family-groups/{id}`，支持更新家庭名称和说明；前端家庭组列表中，创建者或 `owner` 可打开“修改家庭”弹窗并保存。
