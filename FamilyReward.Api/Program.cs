@@ -158,6 +158,26 @@ app.MapPost("/api/family-groups", async (JsonObject body, HttpRequest request) =
     return Results.Created($"/api/family-groups/{GetInt(created.Group!, "id")}", created.Group);
 });
 
+app.MapPut("/api/family-groups/{id:int}", async (int id, JsonObject body, HttpRequest request) =>
+{
+    var access = await RequireParentProfile(connectionString, request);
+    if (access.Error is not null) return access.Error;
+
+    var updated = await UpdateFamilyGroup(connectionString, id, body.String("name"), access.Profile!.AppUserId, body.String("description"));
+    if (updated.Forbidden)
+    {
+        return Results.Json(new { error = updated.Error }, statusCode: StatusCodes.Status403Forbidden);
+    }
+    if (!updated.Success)
+    {
+        return updated.NotFound
+            ? Results.NotFound(new { error = updated.Error })
+            : Results.BadRequest(new { error = updated.Error });
+    }
+
+    return Results.Json(updated.Group);
+});
+
 app.MapDelete("/api/family-groups/{id:int}", async (int id, HttpRequest request) =>
 {
     var access = await RequireParentProfile(connectionString, request);
@@ -3744,6 +3764,102 @@ static async Task<(bool Success, Dictionary<string, object?>? Group, string? Err
     catch (Exception ex)
     {
         return (false, null, ex.Message);
+    }
+}
+
+static async Task<(bool Success, bool Forbidden, bool NotFound, Dictionary<string, object?>? Group, string Error)> UpdateFamilyGroup(
+    string connectionString,
+    int familyGroupId,
+    string name,
+    string operatorAppUserId,
+    string description)
+{
+    name = name.Trim();
+    if (string.IsNullOrWhiteSpace(name))
+    {
+        return (false, false, false, null, "家庭组名称不能为空");
+    }
+
+    await using var conn = await OpenConnection(connectionString);
+    await using var tx = await conn.BeginTransactionAsync();
+    try
+    {
+        bool? canManage = null;
+        await using (var accessCmd = new NpgsqlCommand("""
+            SELECT (fg.created_by = @operator_app_user_id OR EXISTS (
+                       SELECT 1
+                       FROM family_group_users fgu
+                       WHERE fgu.family_group_id = fg.id
+                         AND fgu.user_id = @operator_app_user_id
+                         AND fgu.role = 'owner'
+                   ) OR @operator_app_user_id = @default_user_id) AS can_manage
+            FROM family_groups fg
+            WHERE fg.id = @family_group_id
+            FOR UPDATE
+            """, conn, tx))
+        {
+            accessCmd.Parameters.AddWithValue("family_group_id", familyGroupId);
+            accessCmd.Parameters.AddWithValue("operator_app_user_id", operatorAppUserId);
+            accessCmd.Parameters.AddWithValue("default_user_id", DefaultUserId);
+            await using var reader = await accessCmd.ExecuteReaderAsync();
+            if (await reader.ReadAsync())
+            {
+                canManage = reader.GetBoolean(reader.GetOrdinal("can_manage"));
+            }
+        }
+
+        if (canManage is null)
+        {
+            await tx.RollbackAsync();
+            return (false, false, true, null, "家庭不存在");
+        }
+        if (canManage is false)
+        {
+            await tx.RollbackAsync();
+            return (false, true, false, null, "只有家庭创建者或管理员可以修改家庭");
+        }
+
+        await using (var updateCmd = new NpgsqlCommand("""
+            UPDATE family_groups
+            SET name = @name,
+                description = @description,
+                updated_at = CURRENT_TIMESTAMP
+            WHERE id = @family_group_id
+            """, conn, tx))
+        {
+            updateCmd.Parameters.AddWithValue("family_group_id", familyGroupId);
+            updateCmd.Parameters.AddWithValue("name", name);
+            updateCmd.Parameters.AddWithValue("description", description.Trim());
+            await updateCmd.ExecuteNonQueryAsync();
+        }
+
+        Dictionary<string, object?> group;
+        await using (var readCmd = new NpgsqlCommand("""
+            SELECT fg.id, fg.name, fg.description, fg.created_by, fgu.role, fg.created_at, fg.updated_at
+            FROM family_groups fg
+            LEFT JOIN family_group_users fgu ON fgu.family_group_id = fg.id AND fgu.user_id = @operator_app_user_id
+            WHERE fg.id = @family_group_id
+            """, conn, tx))
+        {
+            readCmd.Parameters.AddWithValue("family_group_id", familyGroupId);
+            readCmd.Parameters.AddWithValue("operator_app_user_id", operatorAppUserId);
+            await using var reader = await readCmd.ExecuteReaderAsync();
+            await reader.ReadAsync();
+            group = ReadFamilyGroup(reader);
+        }
+
+        await tx.CommitAsync();
+        return (true, false, false, group, "");
+    }
+    catch (PostgresException ex) when (ex.SqlState == PostgresErrorCodes.UniqueViolation)
+    {
+        await tx.RollbackAsync();
+        return (false, false, false, null, "你已经有同名家庭组");
+    }
+    catch (Exception ex)
+    {
+        await tx.RollbackAsync();
+        return (false, false, false, null, ex.Message);
     }
 }
 

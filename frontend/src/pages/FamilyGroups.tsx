@@ -9,10 +9,11 @@ import {
   getFamilyGroupInvite,
   joinFamilyGroup,
   removeFamilyGroupChild,
+  updateFamilyGroup,
 } from '../services';
 import { useAuth } from '../contexts/AuthContext';
 import { useFamilyGroup } from '../contexts/FamilyGroupContext';
-import type { Child, FamilyGroupInvite } from '../types';
+import type { Child, FamilyGroup, FamilyGroupInvite } from '../types';
 
 export default function FamilyGroups() {
   const { userId, appProfile } = useAuth();
@@ -34,6 +35,9 @@ export default function FamilyGroups() {
   const [familyChildren, setFamilyChildren] = useState<Child[]>([]);
   const [childrenLoading, setChildrenLoading] = useState(false);
   const [childToRemove, setChildToRemove] = useState<Child | null>(null);
+  const [familyToEdit, setFamilyToEdit] = useState<FamilyGroup | null>(null);
+  const [editName, setEditName] = useState('');
+  const [editDescription, setEditDescription] = useState('');
   const [familyToDelete, setFamilyToDelete] = useState<{ id: number; name: string } | null>(null);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
@@ -171,6 +175,41 @@ export default function FamilyGroups() {
     }
   };
 
+  const openEditFamily = (group: FamilyGroup) => {
+    setFamilyToEdit(group);
+    setEditName(group.name);
+    setEditDescription(group.description || '');
+    setMessage('');
+  };
+
+  const handleUpdateFamily = async () => {
+    if (!familyToEdit) return;
+    const trimmed = editName.trim();
+    if (!trimmed) {
+      setMessage('请输入家庭名称');
+      return;
+    }
+
+    try {
+      setBusy(true);
+      setMessage('');
+      const updated = await updateFamilyGroup(familyToEdit.id, {
+        name: trimmed,
+        description: editDescription.trim(),
+      });
+      await refreshGroups();
+      selectGroup(updated.id);
+      setMessage(`已更新家庭「${updated.name}」`);
+      setFamilyToEdit(null);
+      setEditName('');
+      setEditDescription('');
+    } catch (err) {
+      setMessage(err instanceof Error ? err.message : '修改家庭失败');
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const handleDeleteFamily = async () => {
     if (!familyToDelete) return;
     try {
@@ -286,13 +325,22 @@ export default function FamilyGroups() {
                   </div>
                   <div className="flex items-center gap-2 self-start sm:self-center">
                     {(group.role === 'owner' || group.createdBy === appUserId) && (
-                      <button
-                        type="button"
-                        onClick={() => setFamilyToDelete({ id: group.id, name: group.name })}
-                        className="rounded-md px-2.5 py-1.5 text-sm text-red-600 hover:bg-red-50"
-                      >
-                        删除
-                      </button>
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => openEditFamily(group)}
+                          className="rounded-md px-2.5 py-1.5 text-sm text-gray-600 hover:bg-gray-100"
+                        >
+                          改名
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setFamilyToDelete({ id: group.id, name: group.name })}
+                          className="rounded-md px-2.5 py-1.5 text-sm text-red-600 hover:bg-red-50"
+                        >
+                          删除
+                        </button>
+                      </>
                     )}
                     <button
                       type="button"
@@ -407,6 +455,46 @@ export default function FamilyGroups() {
         <p className="text-sm text-gray-600">
           确认将「{childToRemove?.name}」从「{selectedGroup?.name}」移除吗？孩子与归属家长的全局关系会保留。
         </p>
+      </Modal>
+      <Modal
+        isOpen={Boolean(familyToEdit)}
+        onClose={() => setFamilyToEdit(null)}
+        title="修改家庭"
+        footer={
+          <>
+            <button
+              type="button"
+              onClick={() => setFamilyToEdit(null)}
+              className="rounded-lg border border-gray-300 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+            >
+              取消
+            </button>
+            <button
+              type="button"
+              disabled={busy}
+              onClick={handleUpdateFamily}
+              className="btn-primary"
+            >
+              {busy ? '保存中...' : '保存'}
+            </button>
+          </>
+        }
+      >
+        <div className="space-y-3">
+          <input
+            value={editName}
+            onChange={(event) => setEditName(event.target.value)}
+            placeholder="家庭名称"
+            className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#4A90D9]"
+          />
+          <textarea
+            value={editDescription}
+            onChange={(event) => setEditDescription(event.target.value)}
+            placeholder="说明，可选"
+            rows={3}
+            className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#4A90D9]"
+          />
+        </div>
       </Modal>
       <Modal
         isOpen={Boolean(familyToDelete)}
