@@ -5536,7 +5536,6 @@ static async Task<Dictionary<string, object?>> AddWatchFriendByCode(string conne
             await using var reader = await lookupCmd.ExecuteReaderAsync();
             if (!await reader.ReadAsync())
             {
-                await tx.RollbackAsync();
                 return new Dictionary<string, object?> { ["error"] = "好友认证码无效或已过期" };
             }
 
