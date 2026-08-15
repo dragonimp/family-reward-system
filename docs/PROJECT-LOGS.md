@@ -1,5 +1,11 @@
 # 家加分 - 进展日志
 
+## [2026-08-16] family-reward-REQ-033 家长端移动智能体对话需求分析
+- Orbit：`gpt_dc202bc7acb84dd887c9f2b6791deacf`；需求：`family-reward-REQ-033`（`58e2855d-a3bd-4383-bd7c-d7afd5f9084a`）；任务：`family-reward-TASK-050`（`f5f05423-748e-44b1-b245-170e3b5492f5`）；Atlas 功能点引用：`245414ae-7163-46af-82bb-1bb73cf9a63b`。
+- 完成需求分析：明确手机端保留仪表盘、底部“菜单 + 默认语音/文本输入”、发送后切换会话模式、固定绑定“家庭积分应用”智能体、Orbit WebApp 会话/SSE 代理、写操作确认、身份隔离、响应式/可访问性和故障恢复边界；形成接口建议、11 条验收标准、6 类测试设计和 A–G 开发拆分。
+- 参考家加分现有 `Layout.tsx`、`Reward.tsx`、`Settings.tsx`、`/api/agent/invoke` 和家长鉴权，以及 bigdata 的 AgentFree 会话、消息、interaction 与 SSE 流式代理实现。现有通用 invoke 无会话、非流式且允许请求体提供 apiKey，不适合作为本需求产品聊天接口。
+- 本次只完成需求分析，不实施业务代码；REQ-033 仍应保持待开发。Atlas 同步阻塞：运行时未暴露 Atlas MCP 工具或资源，`list_mcp_resources` 只有 `codex_apps`，本机 `codex mcp list` 返回 `No MCP servers configured yet`。因此无法读取 Atlas 的真实关联需求/缺陷/任务、公约、环境和功能点详情，也无法将分析、测试及证据写回或关闭 TASK-050；Atlas 恢复后应补录本节与 `docs/REQ-033-ANALYSIS.md`，将 TASK-050 更新为完成，同时保持 REQ-033 为待开发。
+
 ## [2026-08-16] family-reward-REQ-030 手表端菜单重构需求分析
 - Orbit：`gpt_9b1f884295314ee8b3cea458658ce107`；需求：`family-reward-REQ-030`（`d34bd45e-a08c-49bd-b848-686797a54d87`）；任务：`family-reward-TASK-047`（`6382c278-699f-49d0-8723-1bc54ab02209`）；Atlas 功能点引用：`245414ae-7163-46af-82bb-1bb73cf9a63b`。
 - 基于 Git `bfa6712` 的实际 `/watch` 页面和 API 完成差距分析：当前单按钮会展开六个右侧按钮，需改为表盘内独立菜单页；现有积分申请、申请记录、好友、排行榜、表盘设置和设备解绑 API 可复用，预计无需数据迁移。
