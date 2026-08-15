@@ -60,16 +60,8 @@ test('reward and transaction pages use parent-owned children globally', async ()
     readFile(new URL('./src/pages/Transactions.tsx', import.meta.url), 'utf8'),
   ]);
 
-  const transactionStart = reward.indexOf('const handleConfirm');
-  const transactionEnd = reward.indexOf('const handleApproveRequest');
-  assert.notEqual(transactionStart, -1);
-  assert.notEqual(transactionEnd, -1);
-  const rewardTransactionSection = reward.slice(transactionStart, transactionEnd);
-
   assert.match(reward, /getChildren\(\{ ownedOnly: true \}\)/);
-  assert.doesNotMatch(rewardTransactionSection, /family_group_id: selectedGroupId|familyGroupId: selectedGroupId/);
-  assert.match(reward, /getRewardRequests\(\{ familyGroupId: selectedGroupId \?\? undefined/);
-  assert.match(reward, /approveRewardRequest\(requestId, \{\s+familyGroupId: selectedGroupId \?\? undefined/);
+  assert.doesNotMatch(reward, /family_group_id: selectedGroupId|familyGroupId: selectedGroupId/);
   assert.match(transactions, /getChildren\(\{ ownedOnly: true \}\)/);
   assert.doesNotMatch(transactions, /familyGroupId: selectedGroupId/);
 });
