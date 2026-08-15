@@ -1,5 +1,12 @@
 # 家加分 - 进展日志
 
+## [2026-08-16] family-reward-REQ-031 问题反馈需求分析
+- Orbit：`gpt_1d558efe323648268d69ef2c0e6d9f24`；需求：`family-reward-REQ-031`（`2cba8d66-fbd7-4aac-8d1f-75f5a746cc5d`）；分析任务：`family-reward-TASK-048`（`d61c4c0e-1aef-4c35-8d6c-a42261d2676c`）；功能点引用：`69734a8e-9df8-483b-9b70-df1e3db01c3b`。
+- 完成现状和参考实现分析：家加分当前没有反馈入口、服务类型、API 或数据表；Atlas/Agent-Dash 已具备反馈提交、页面上下文、我的反馈、状态回复和项目调度能力。
+- 形成 `docs/REQ-031-ANALYSIS.md`，明确本期家长 Web 端范围、全局反馈入口、建议/缺陷/咨询、我的反馈、后端同源代理、Atlas 单一事实源、身份隔离、上下文净化、幂等、失败降级、验收标准和研发测试拆分；儿童手表端明确排除。
+- 关键安全结论：不复制本地反馈表，不允许前端指定项目/提交人，不采集 Cookie、localStorage、表单值、选中文本或孩子积分数据，敏感 URL 参数由前后端双重净化。
+- Atlas 同步阻塞：运行时工具和 MCP 资源均未暴露 Atlas，本机 `codex mcp list` 返回 `No MCP servers configured yet`。因此无法读取 Atlas 中真实需求、公约、环境、应用编号及关联事项，也无法写回分析证据或把 TASK-048 更新为完成；Atlas 恢复后应先确认第 8 节口径，再写回本文、提交证据和任务状态。
+
 ## [2026-08-16] family-reward-BUG-001 孩子手表积分申请家长端未收到
 - 根因：手表端已有积分申请提交和最近申请查询，服务端也有审批函数，但家长 Web 端没有待确认申请列表；已有 `/api/watch/requests` 仅面向手表设备 token，家长端不会收到孩子提交的申请。
 - 修复：新增家长端 `GET /api/reward-requests`，按当前家庭和当前家长名下孩子返回手表端待确认申请；新增 `POST /api/reward-requests/{id}/approve`，确认后复用交易入账逻辑并把申请标记为 `approved`。
