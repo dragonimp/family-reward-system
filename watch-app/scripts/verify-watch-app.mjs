@@ -104,16 +104,16 @@ for (const responsiveRequirement of [
     errors.push(`watch viewport adaptation missing: ${responsiveRequirement}`);
   }
 }
-for (const requestScrollRequirement of [
-  ".panel[data-panel=request]{height:100%",
-  "overflow-y:auto",
-  "scrollbar-width:thin",
-  "touch-action:pan-y",
-  `panel.matches('[data-panel="request"]')`
-]) {
-  if (!apiSource.includes(requestScrollRequirement)) {
+const requestPanelRule = apiSource
+  .match(/[^{}]+\{[^{}]*\}/g)
+  ?.find((rule) => rule.slice(0, rule.indexOf("{")).includes(".panel[data-panel=request]")) || "";
+for (const requestScrollRequirement of ["height:100%", "overflow-y:auto", "scrollbar-width:thin", "touch-action:pan-y"]) {
+  if (!requestPanelRule.includes(requestScrollRequirement)) {
     errors.push(`watch request panel scrolling missing: ${requestScrollRequirement}`);
   }
+}
+if (!apiSource.includes(`panel.matches('[data-panel="request"]')`)) {
+  errors.push("watch request panel must skip content scaling");
 }
 if (/\.panel\{[^}]*overflow:auto/.test(apiSource)) {
   errors.push("only the watch request panel may use a scrollbar");
