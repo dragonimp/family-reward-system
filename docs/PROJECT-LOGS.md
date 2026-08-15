@@ -168,4 +168,4 @@
 - 复现数据：生产库 `watch_reward_requests` 中存在 3 条 `pending` 申请，孩子为玥玥（`child_id=139`），实际家庭组为 `220`（长安在哪里），绑定家长为 `wssparent`。
 - 根因：家长 Web 端“待确认申请”查询和确认请求都携带当前页面选中的家庭组；当家长切换到其他家庭组时，自己孩子在实际家庭组下提交的手表积分申请被 `family_group_id` 过滤掉。
 - 修复：家长端默认按当前家长名下孩子聚合查询所有待确认手表申请；后端在未指定家庭组时按申请自身 `family_group_id` 入账，并继续校验家长与孩子绑定关系、家庭组成员权限。
-- 验证证据：生产 SQL 按新查询条件确认 `wssparent` 可见 3 条待处理申请；`dotnet build FamilyReward.Api/FamilyReward.Api.csproj --no-restore` 通过（0 警告、0 错误）；前端 `npm run build` 通过；待部署后补充生产 HTTP 验证。
+- 验证证据：生产 SQL 按新查询条件确认 `wssparent` 可见 3 条待处理申请；`dotnet build FamilyReward.Api/FamilyReward.Api.csproj --no-restore` 通过（0 警告、0 错误）；前端 `npm run build` 通过；生产 `/health` 返回 200，首页加载 `index-C3YY20Jm.js`；生产 HTTP 使用 `wssparent` 查询 `/api/reward-requests?status=pending&limit=20` 返回玥玥 3 条待确认申请，使用 `wzsparent` 查询返回空。
