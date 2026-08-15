@@ -1,5 +1,13 @@
 # 家加分 - 进展日志
 
+## [2026-08-16] family-reward-REQ-030 手表端菜单重构需求分析
+- Orbit：`gpt_9b1f884295314ee8b3cea458658ce107`；需求：`family-reward-REQ-030`（`d34bd45e-a08c-49bd-b848-686797a54d87`）；任务：`family-reward-TASK-047`（`6382c278-699f-49d0-8723-1bc54ab02209`）；Atlas 功能点引用：`245414ae-7163-46af-82bb-1bb73cf9a63b`。
+- 基于 Git `bfa6712` 的实际 `/watch` 页面和 API 完成差距分析：当前单按钮会展开六个右侧按钮，需改为表盘内独立菜单页；现有积分申请、申请记录、好友、排行榜、表盘设置和设备解绑 API 可复用，预计无需数据迁移。
+- 新增 `docs/REQ-030-ANALYSIS.md`，明确首页不变、右侧单入口、六个带图标叶子菜单、返回规则、积分详情边界、常用申请项图标、语音转文字降级和 WebView 麦克风最小权限、安全解绑、五组代表性视口及十项验收标准。
+- 将后续实施拆为菜单导航、积分申请增强、详情与好友拆页、设置迁移和综合验证五组；本次仅完成需求分析，不把尚未开发的 REQ-030 标记为完成。
+- 分析验证：核对需求所涉及的 `/api/watch/score`、`rules`、`requests`、`friends`、`settings`、`device-bind`、`device-unbind` 路由；修复 `verify-watch-app.mjs` 对 REQ-023 合并 CSS 选择器的格式耦合，使申请页滚动检查读取实际声明块而不再误报。
+- Atlas 同步阻塞：当前运行时没有 Atlas MCP 工具或资源，本机 `codex mcp list` 返回 `No MCP servers configured yet`。因此无法读取 Atlas 中真实公约、环境、关联缺陷/任务和功能点详情，也无法将 REQ-030、TASK-047、测试与证据写回。Atlas 恢复后应写回本文、将 TASK-047 更新为完成，并保持 REQ-030 为待开发状态。
+
 ## [2026-08-16] family-reward-BUG-001 孩子手表积分申请家长端未收到
 - 根因：手表端已有积分申请提交和最近申请查询，服务端也有审批函数，但家长 Web 端没有待确认申请列表；已有 `/api/watch/requests` 仅面向手表设备 token，家长端不会收到孩子提交的申请。
 - 修复：新增家长端 `GET /api/reward-requests`，按当前家庭和当前家长名下孩子返回手表端待确认申请；新增 `POST /api/reward-requests/{id}/approve`，确认后复用交易入账逻辑并把申请标记为 `approved`。
