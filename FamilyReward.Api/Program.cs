@@ -1665,7 +1665,12 @@ app.MapGet("/api/agentfree/sessions", async (IHttpClientFactory httpClientFactor
             null,
             userName,
             request.HttpContext.RequestAborted);
-        return Results.Json(FilterFamilyRewardAgentFreeSessions(sessions, agentId.Value));
+        var familySessions = FilterFamilyRewardAgentFreeSessions(sessions, agentId.Value);
+        return Results.Json(await FilterReadableFamilyRewardAgentFreeSessions(
+            httpClientFactory,
+            familySessions,
+            userName,
+            request.HttpContext.RequestAborted));
     }
     catch (Exception ex)
     {
@@ -1723,6 +1728,7 @@ app.MapGet("/api/agentfree/sessions/{id}/messages", async (string id, IHttpClien
     }
     catch (Exception ex)
     {
+        if (IsAgentFreeAccessDenied(ex)) return Results.Json(new JsonArray());
         return Results.Json(new { error = $"获取智能体消息失败: {ex.Message}" }, statusCode: StatusCodes.Status502BadGateway);
     }
 });
@@ -1750,6 +1756,7 @@ app.MapGet("/api/agentfree/sessions/{id}/timeline", async (string id, IHttpClien
     }
     catch (Exception ex)
     {
+        if (IsAgentFreeAccessDenied(ex)) return Results.Json(new JsonArray());
         return Results.Json(new { error = $"获取智能体会话过程失败: {ex.Message}" }, statusCode: StatusCodes.Status502BadGateway);
     }
 });
@@ -2167,6 +2174,40 @@ static JsonArray FilterFamilyRewardAgentFreeSessions(JsonNode? sessions, int age
     }
     return result;
 }
+
+static async Task<JsonArray> FilterReadableFamilyRewardAgentFreeSessions(
+    IHttpClientFactory httpClientFactory,
+    JsonArray sessions,
+    string userName,
+    CancellationToken cancellationToken)
+{
+    var result = new JsonArray();
+    foreach (var item in sessions.OfType<JsonObject>())
+    {
+        var sessionId = item.String("id");
+        if (string.IsNullOrWhiteSpace(sessionId)) continue;
+        try
+        {
+            var session = await SendAgentFreeJson(
+                httpClientFactory,
+                HttpMethod.Get,
+                $"/api/webapp/sessions/{Uri.EscapeDataString(sessionId)}",
+                null,
+                userName,
+                cancellationToken) as JsonObject;
+            if (session?.Int("agentId") == item.Int("agentId")) result.Add(item.DeepClone());
+        }
+        catch (Exception ex) when (IsAgentFreeAccessDenied(ex))
+        {
+        }
+    }
+    return result;
+}
+
+static bool IsAgentFreeAccessDenied(Exception ex) =>
+    ex.Message.Contains("无权限", StringComparison.OrdinalIgnoreCase)
+    || ex.Message.Contains("Forbidden", StringComparison.OrdinalIgnoreCase)
+    || ex.Message.Contains("403", StringComparison.OrdinalIgnoreCase);
 
 static async Task<(bool Ok, string Text, string Error)> InvokeGoldfishAcp(
     HttpClient client,
