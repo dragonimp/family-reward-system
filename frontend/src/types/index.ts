@@ -195,6 +195,7 @@ export interface AuthUser {
   userId?: string;
   username: string;
   displayName?: string;
+  realName?: string;
   email?: string;
   phoneNumber?: string;
   role?: string;

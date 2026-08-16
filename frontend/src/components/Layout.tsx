@@ -30,6 +30,7 @@ export default function Layout({ children }: LayoutProps) {
   const { logout, user, userId } = useAuth();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [manageOpen, setManageOpen] = useState(false);
+  const assistantOpen = location.pathname.startsWith('/assistant');
 
   const handleLogout = () => {
     setMobileOpen(false);
@@ -155,12 +156,14 @@ export default function Layout({ children }: LayoutProps) {
         )}
       </header>
       {/* 主内容区 - 自适应高度 */}
-      <main className="flex-1 overflow-y-auto overflow-x-hidden px-3 py-4 pb-5 sm:px-4 sm:py-6">
-        <div className="max-w-full mx-auto">
+      <main className={assistantOpen
+        ? 'flex-1 min-h-0 overflow-hidden'
+        : 'flex-1 overflow-y-auto overflow-x-hidden px-3 py-4 pb-20 sm:px-4 sm:py-6 sm:pb-6'}>
+        <div className={assistantOpen ? 'h-full min-h-0 max-w-full' : 'max-w-full mx-auto'}>
           {children}
         </div>
       </main>
-      <MobileAssistantBar />
+      {!assistantOpen && <MobileAssistantBar />}
       <PublicFeedbackWidget />
     </div>
   );

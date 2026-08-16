@@ -47,36 +47,38 @@ test('REQ-032 keeps service configuration usable on narrow screens', async () =>
 });
 
 test('REQ-033 streams mobile family agent responses without waiting for the full turn', async () => {
-  const [layout, assistant, api, streamService, streamParser, project, deploy] = await Promise.all([
+  const [layout, launcher, assistant, chat, cleanChat, agentApi, api, project, deploy] = await Promise.all([
     readFile(new URL('./src/components/Layout.tsx', import.meta.url), 'utf8'),
     readFile(new URL('./src/components/MobileAssistantBar.tsx', import.meta.url), 'utf8'),
+    readFile(new URL('./src/pages/Assistant.tsx', import.meta.url), 'utf8'),
+    readFile(new URL('./src/components/agentfree-webapp/AgentFreeWebAppChat.tsx', import.meta.url), 'utf8'),
+    readFile(new URL('./src/components/agentfree-webapp/CleanChatView.tsx', import.meta.url), 'utf8'),
+    readFile(new URL('./src/components/agentfree-webapp/api.ts', import.meta.url), 'utf8'),
     readFile(new URL('../FamilyReward.Api/Program.cs', import.meta.url), 'utf8'),
-    readFile(new URL('./src/services/agentStream.ts', import.meta.url), 'utf8'),
-    readFile(new URL('./src/services/agentSse.ts', import.meta.url), 'utf8'),
     readFile(new URL('../FamilyReward.Api/FamilyReward.Api.csproj', import.meta.url), 'utf8'),
     readFile(new URL('../scripts/deploy-production.sh', import.meta.url), 'utf8'),
   ]);
   assert.match(layout, /<MobileAssistantBar/);
   assert.doesNotMatch(layout, /mobileNavItems\.slice\(0, 6\)/);
-  assert.match(assistant, /家庭积分应用/);
-  assert.match(assistant, /startVoice/);
-  assert.match(assistant, /streamAgent/);
-  assert.match(assistant, /streamedText/);
-  assert.match(assistant, /停止生成/);
-  assert.doesNotMatch(assistant, /onOpenMenu/);
-  assert.match(assistant, /fixed inset-0/);
-  assert.doesNotMatch(assistant, /grid-cols-\[44px_1fr_44px\]/);
+  assert.match(launcher, /navigate\('\/assistant'\)/);
+  assert.match(assistant, /<AgentFreeWebAppChat/);
+  assert.match(assistant, /currentUser=\{user\}/);
+  assert.match(assistant, /webAppBotId="web"/);
+  assert.match(chat, /import CleanChatView/);
+  assert.match(chat, /getSessions\('WebApp'/);
+  assert.match(cleanChat, /parseAgUiEnvelope/);
+  assert.match(cleanChat, /stream\.delta/);
+  assert.match(cleanChat, /stream\.done/);
+  assert.match(agentApi, /\/api\/agentfree\/chat\/stream/);
+  assert.match(agentApi, /credentials: 'include'/);
   assert.match(api, /InvokeGoldfishAcp/);
-  assert.match(api, /session\/new/);
-  assert.match(api, /session\/prompt/);
-  assert.match(api, /\/api\/agent\/invoke\/stream/);
+  assert.match(api, /\/api\/agentfree\/sessions/);
+  assert.match(api, /\/api\/webapp\/sessions/);
+  assert.match(api, /\/api\/webapp\/chat\/stream/);
+  assert.match(api, /agentCode"\), "happylife"/);
   assert.match(api, /text\/event-stream/);
   assert.match(api, /X-Accel-Buffering/);
-  assert.match(api, /stream\.delta/);
-  assert.match(streamService, /consumeAgentEventStream\(response\.body/);
-  assert.match(streamParser, /stream\.getReader\(\)/);
-  assert.match(streamParser, /new TextDecoder\(\)/);
-  assert.match(streamParser, /event\.type === 'stream\.error'/);
+  assert.doesNotMatch(api, /\/api\/agent\/invoke\/stream/);
   assert.match(project, /system_config\.json" CopyToPublishDirectory="Never"/);
   assert.match(deploy, /--exclude system_config\.json/);
 });

@@ -1635,7 +1635,235 @@ app.MapPost("/api/agent/invoke", async (JsonObject body, IHttpClientFactory http
     }
 });
 
-app.MapPost("/api/agent/invoke/stream", async (JsonObject body, IHttpClientFactory httpClientFactory, HttpContext context) =>
+app.MapGet("/api/agentfree/agents", async (IHttpClientFactory httpClientFactory, HttpRequest request) =>
+{
+    var access = await RequireParentProfile(connectionString, request);
+    if (access.Error is not null) return access.Error;
+    try
+    {
+        return Results.Json(await GetFamilyRewardAgentFreeAgents(httpClientFactory, GetUnifiedUsername(request), request.HttpContext.RequestAborted));
+    }
+    catch (Exception ex)
+    {
+        return Results.Json(new { error = $"获取家庭积分应用智能体失败: {ex.Message}" }, statusCode: StatusCodes.Status502BadGateway);
+    }
+});
+
+app.MapGet("/api/agentfree/sessions", async (IHttpClientFactory httpClientFactory, HttpRequest request) =>
+{
+    var access = await RequireParentProfile(connectionString, request);
+    if (access.Error is not null) return access.Error;
+    try
+    {
+        var userName = GetUnifiedUsername(request);
+        var agentId = await ResolveFamilyRewardAgentFreeAgentId(httpClientFactory, userName, request.HttpContext.RequestAborted);
+        if (agentId is null) return Results.Json(new JsonArray());
+        var sessions = await SendAgentFreeJson(
+            httpClientFactory,
+            HttpMethod.Get,
+            "/api/webapp/sessions?gatewayType=WebApp",
+            null,
+            userName,
+            request.HttpContext.RequestAborted);
+        return Results.Json(FilterFamilyRewardAgentFreeSessions(sessions, agentId.Value));
+    }
+    catch (Exception ex)
+    {
+        return Results.Json(new { error = $"获取智能体会话失败: {ex.Message}" }, statusCode: StatusCodes.Status502BadGateway);
+    }
+});
+
+app.MapGet("/api/agentfree/sessions/{id}", async (string id, IHttpClientFactory httpClientFactory, HttpRequest request) =>
+{
+    var access = await RequireParentProfile(connectionString, request);
+    if (access.Error is not null) return access.Error;
+    try
+    {
+        var userName = GetUnifiedUsername(request);
+        var agentId = await ResolveFamilyRewardAgentFreeAgentId(httpClientFactory, userName, request.HttpContext.RequestAborted);
+        var session = await SendAgentFreeJson(
+            httpClientFactory,
+            HttpMethod.Get,
+            $"/api/webapp/sessions/{Uri.EscapeDataString(id)}",
+            null,
+            userName,
+            request.HttpContext.RequestAborted);
+        if (agentId is null || session is not JsonObject sessionObject || sessionObject.Int("agentId") != agentId)
+        {
+            return Results.Json(new { error = "无权访问该智能体会话" }, statusCode: StatusCodes.Status403Forbidden);
+        }
+        return Results.Json(session);
+    }
+    catch (Exception ex)
+    {
+        return Results.Json(new { error = $"获取智能体会话失败: {ex.Message}" }, statusCode: StatusCodes.Status502BadGateway);
+    }
+});
+
+app.MapGet("/api/agentfree/sessions/{id}/messages", async (string id, IHttpClientFactory httpClientFactory, HttpRequest request) =>
+{
+    var access = await RequireParentProfile(connectionString, request);
+    if (access.Error is not null) return access.Error;
+    try
+    {
+        var userName = GetUnifiedUsername(request);
+        if (await GetFamilyRewardAgentFreeSession(httpClientFactory, id, userName, request.HttpContext.RequestAborted) is null)
+        {
+            return Results.Json(new { error = "无权访问该智能体会话" }, statusCode: StatusCodes.Status403Forbidden);
+        }
+        var query = request.QueryString.HasValue ? request.QueryString.Value : "";
+        var messages = await SendAgentFreeJson(
+            httpClientFactory,
+            HttpMethod.Get,
+            $"/api/webapp/sessions/{Uri.EscapeDataString(id)}/messages{query}",
+            null,
+            userName,
+            request.HttpContext.RequestAborted);
+        return Results.Json(messages ?? new JsonArray());
+    }
+    catch (Exception ex)
+    {
+        return Results.Json(new { error = $"获取智能体消息失败: {ex.Message}" }, statusCode: StatusCodes.Status502BadGateway);
+    }
+});
+
+app.MapGet("/api/agentfree/sessions/{id}/timeline", async (string id, IHttpClientFactory httpClientFactory, HttpRequest request) =>
+{
+    var access = await RequireParentProfile(connectionString, request);
+    if (access.Error is not null) return access.Error;
+    try
+    {
+        var userName = GetUnifiedUsername(request);
+        if (await GetFamilyRewardAgentFreeSession(httpClientFactory, id, userName, request.HttpContext.RequestAborted) is null)
+        {
+            return Results.Json(new { error = "无权访问该智能体会话" }, statusCode: StatusCodes.Status403Forbidden);
+        }
+        var query = request.QueryString.HasValue ? request.QueryString.Value : "";
+        var timeline = await SendAgentFreeJson(
+            httpClientFactory,
+            HttpMethod.Get,
+            $"/api/sessions/{Uri.EscapeDataString(id)}/timeline{query}",
+            null,
+            userName,
+            request.HttpContext.RequestAborted);
+        return Results.Json(timeline ?? new JsonArray());
+    }
+    catch (Exception ex)
+    {
+        return Results.Json(new { error = $"获取智能体会话过程失败: {ex.Message}" }, statusCode: StatusCodes.Status502BadGateway);
+    }
+});
+
+app.MapPost("/api/agentfree/sessions", async (JsonObject body, IHttpClientFactory httpClientFactory, HttpRequest request) =>
+{
+    var access = await RequireParentProfile(connectionString, request);
+    if (access.Error is not null) return access.Error;
+    try
+    {
+        var userName = GetUnifiedUsername(request);
+        var agentId = await ResolveFamilyRewardAgentFreeAgentId(httpClientFactory, userName, request.HttpContext.RequestAborted);
+        if (agentId is null)
+        {
+            return Results.Json(new { error = "未找到家庭积分应用智能体" }, statusCode: StatusCodes.Status502BadGateway);
+        }
+        var session = await SendAgentFreeJson(
+            httpClientFactory,
+            HttpMethod.Post,
+            "/api/webapp/sessions",
+            new JsonObject
+            {
+                ["agentId"] = agentId.Value,
+                ["name"] = string.IsNullOrWhiteSpace(body.String("name")) ? "家庭积分会话" : body.String("name").Trim(),
+                ["webAppBotId"] = "web"
+            },
+            userName,
+            request.HttpContext.RequestAborted);
+        return Results.Json(session);
+    }
+    catch (Exception ex)
+    {
+        return Results.Json(new { error = $"创建智能体会话失败: {ex.Message}" }, statusCode: StatusCodes.Status502BadGateway);
+    }
+});
+
+app.MapPut("/api/agentfree/sessions/{id}", async (string id, JsonObject body, IHttpClientFactory httpClientFactory, HttpRequest request) =>
+{
+    var access = await RequireParentProfile(connectionString, request);
+    if (access.Error is not null) return access.Error;
+    try
+    {
+        var userName = GetUnifiedUsername(request);
+        if (await GetFamilyRewardAgentFreeSession(httpClientFactory, id, userName, request.HttpContext.RequestAborted) is null)
+        {
+            return Results.Json(new { error = "无权访问该智能体会话" }, statusCode: StatusCodes.Status403Forbidden);
+        }
+        var result = await SendAgentFreeJson(
+            httpClientFactory,
+            HttpMethod.Put,
+            $"/api/webapp/sessions/{Uri.EscapeDataString(id)}",
+            new JsonObject
+            {
+                ["name"] = body["name"]?.DeepClone(),
+                ["isArchived"] = body["isArchived"]?.DeepClone()
+            },
+            userName,
+            request.HttpContext.RequestAborted);
+        return Results.Json(result ?? new JsonObject { ["id"] = id });
+    }
+    catch (Exception ex)
+    {
+        return Results.Json(new { error = $"更新智能体会话失败: {ex.Message}" }, statusCode: StatusCodes.Status502BadGateway);
+    }
+});
+
+app.MapPost("/api/agentfree/chat/sessions/{id}/reset", async (string id, IHttpClientFactory httpClientFactory, HttpRequest request) =>
+{
+    var access = await RequireParentProfile(connectionString, request);
+    if (access.Error is not null) return access.Error;
+    try
+    {
+        var userName = GetUnifiedUsername(request);
+        if (await GetFamilyRewardAgentFreeSession(httpClientFactory, id, userName, request.HttpContext.RequestAborted) is null)
+        {
+            return Results.Json(new { error = "无权访问该智能体会话" }, statusCode: StatusCodes.Status403Forbidden);
+        }
+        var result = await SendAgentFreeJson(
+            httpClientFactory,
+            HttpMethod.Post,
+            $"/api/webapp/chat/sessions/{Uri.EscapeDataString(id)}/reset",
+            null,
+            userName,
+            request.HttpContext.RequestAborted);
+        return Results.Json(result ?? new JsonObject { ["id"] = id });
+    }
+    catch (Exception ex)
+    {
+        return Results.Json(new { error = $"重置智能体会话失败: {ex.Message}" }, statusCode: StatusCodes.Status502BadGateway);
+    }
+});
+
+app.MapPost("/api/agentfree/interactions/{interactionId}/respond", async (string interactionId, JsonObject body, IHttpClientFactory httpClientFactory, HttpRequest request) =>
+{
+    var access = await RequireParentProfile(connectionString, request);
+    if (access.Error is not null) return access.Error;
+    try
+    {
+        var result = await SendAgentFreeJson(
+            httpClientFactory,
+            HttpMethod.Post,
+            $"/api/webapp/interactions/{Uri.EscapeDataString(interactionId)}/respond",
+            body,
+            GetUnifiedUsername(request),
+            request.HttpContext.RequestAborted);
+        return Results.Json(result ?? new JsonObject { ["interactionId"] = interactionId });
+    }
+    catch (Exception ex)
+    {
+        return Results.Json(new { error = $"提交智能体交互结果失败: {ex.Message}" }, statusCode: StatusCodes.Status502BadGateway);
+    }
+});
+
+app.MapPost("/api/agentfree/chat/stream", async (JsonObject body, IHttpClientFactory httpClientFactory, HttpContext context) =>
 {
     var access = await RequireParentProfile(connectionString, context.Request);
     if (access.Error is not null)
@@ -1643,77 +1871,104 @@ app.MapPost("/api/agent/invoke/stream", async (JsonObject body, IHttpClientFacto
         await access.Error.ExecuteAsync(context);
         return;
     }
-
-    var config = configStore.Load();
-    var agent = config["agent"]!.AsObject();
-    if (!agent.Bool("enabled"))
+    var message = body.String("message").Trim();
+    if (string.IsNullOrWhiteSpace(message))
     {
         context.Response.StatusCode = StatusCodes.Status400BadRequest;
-        await context.Response.WriteAsJsonAsync(new { error = "智能体服务未开启" }, context.RequestAborted);
+        await context.Response.WriteAsJsonAsync(new { error = "消息不能为空" }, context.RequestAborted);
         return;
     }
 
-    var endpoint = agent.String("endpoint").Trim();
-    if (string.IsNullOrWhiteSpace(endpoint))
+    try
     {
-        context.Response.StatusCode = StatusCodes.Status400BadRequest;
-        await context.Response.WriteAsJsonAsync(new { error = "未配置智能体服务地址" }, context.RequestAborted);
-        return;
-    }
-
-    var prompt = body.String("prompt").Trim();
-    if (string.IsNullOrWhiteSpace(prompt))
-    {
-        context.Response.StatusCode = StatusCodes.Status400BadRequest;
-        await context.Response.WriteAsJsonAsync(new { error = "请输入对话内容" }, context.RequestAborted);
-        return;
-    }
-
-    if (!endpoint.EndsWith("/acp", StringComparison.OrdinalIgnoreCase))
-    {
-        context.Response.StatusCode = StatusCodes.Status400BadRequest;
-        await context.Response.WriteAsJsonAsync(new { error = "当前智能体服务不支持流式对话" }, context.RequestAborted);
-        return;
-    }
-
-    context.Response.ContentType = "text/event-stream; charset=utf-8";
-    context.Response.Headers.CacheControl = "no-cache";
-    context.Response.Headers.Connection = "keep-alive";
-    context.Response.Headers["X-Accel-Buffering"] = "no";
-    await context.Response.StartAsync(context.RequestAborted);
-    await WriteAgentStreamEvent(context.Response, "stream.start", new JsonObject(), context.RequestAborted);
-
-    var acpResult = await InvokeGoldfishAcp(
-        httpClientFactory.CreateClient(),
-        endpoint,
-        agent.String("apiKey"),
-        agent.String("profile", "happylife"),
-        agent.String("workingDirectory", "/Users/wengzhishan/Projects/family-reward-system"),
-        access.Profile!.AppUserId,
-        prompt,
-        agent.Int("timeout_seconds") ?? 90,
-        async (delta, cancellationToken) =>
+        var userName = GetUnifiedUsername(context.Request);
+        var agentId = await ResolveFamilyRewardAgentFreeAgentId(httpClientFactory, userName, context.RequestAborted);
+        if (agentId is null)
         {
-            await WriteAgentStreamEvent(
-                context.Response,
-                "stream.delta",
-                new JsonObject { ["delta"] = delta, ["channel"] = "content" },
-                cancellationToken);
-        },
-        context.RequestAborted);
+            context.Response.StatusCode = StatusCodes.Status502BadGateway;
+            await context.Response.WriteAsJsonAsync(new { error = "未找到家庭积分应用智能体" }, context.RequestAborted);
+            return;
+        }
+        var sessionId = body.String("sessionId").Trim();
+        if (string.IsNullOrWhiteSpace(sessionId)
+            || await GetFamilyRewardAgentFreeSession(httpClientFactory, sessionId, userName, context.RequestAborted) is null)
+        {
+            context.Response.StatusCode = StatusCodes.Status403Forbidden;
+            await context.Response.WriteAsJsonAsync(new { error = "无权访问该智能体会话" }, context.RequestAborted);
+            return;
+        }
+        var displayName = FirstClaim(context.Request, "name", ClaimTypes.Name) ?? userName;
+        var payload = new JsonObject
+        {
+            ["sessionId"] = sessionId,
+            ["agentId"] = agentId.Value,
+            ["AgentId"] = agentId.Value,
+            ["name"] = message.Length > 24 ? message[..24] : message,
+            ["content"] = message,
+            ["attachments"] = body["attachments"]?.DeepClone() ?? new JsonArray(),
+            ["user"] = new JsonObject
+            {
+                ["username"] = userName,
+                ["displayName"] = displayName,
+                ["role"] = "parent",
+                ["appUserId"] = access.Profile!.AppUserId
+            },
+            ["metadata"] = new JsonObject
+            {
+                ["source"] = "family-reward-web",
+                ["gatewayType"] = "WebApp",
+                ["channelType"] = "WebApp",
+                ["webAppBotId"] = "web",
+                ["agentId"] = agentId.Value,
+                ["parentAppUserId"] = access.Profile!.AppUserId
+            },
+            ["gatewayContext"] = new JsonObject
+            {
+                ["GatewayType"] = "WebApp",
+                ["GatewayBotId"] = "web",
+                ["GatewayMetadata_transport"] = "web",
+                ["GatewayMetadata_source"] = "family-reward-web",
+                ["GatewayMetadata_webAppBotId"] = "web",
+                ["GatewayMetadata_parentAppUserId"] = access.Profile!.AppUserId
+            }
+        };
+        if (body["enableThinking"] is not null) payload["enableThinking"] = body["enableThinking"]!.DeepClone();
+        if (body["messageMode"] is not null) payload["messageMode"] = body["messageMode"]!.DeepClone();
+        using var upstreamRequest = new HttpRequestMessage(HttpMethod.Post, "/api/webapp/chat/stream")
+        {
+            Content = new StringContent(payload.ToJsonString(FamilyRewardJson.CreateOptions()), Encoding.UTF8, "application/json")
+        };
+        upstreamRequest.Headers.TryAddWithoutValidation("X-User-Name", userName);
+        upstreamRequest.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("text/event-stream"));
+        var client = CreateAgentFreeClient(httpClientFactory);
+        using var upstream = await client.SendAsync(upstreamRequest, HttpCompletionOption.ResponseHeadersRead, context.RequestAborted);
+        if (!upstream.IsSuccessStatusCode)
+        {
+            var error = await upstream.Content.ReadAsStringAsync(context.RequestAborted);
+            context.Response.StatusCode = (int)upstream.StatusCode;
+            context.Response.ContentType = upstream.Content.Headers.ContentType?.ToString() ?? "application/json; charset=utf-8";
+            await context.Response.WriteAsync(error, context.RequestAborted);
+            return;
+        }
 
-    if (context.RequestAborted.IsCancellationRequested) return;
-    if (acpResult.Ok)
-    {
-        await WriteAgentStreamEvent(context.Response, "stream.done", new JsonObject(), context.RequestAborted);
-        return;
+        context.Response.ContentType = upstream.Content.Headers.ContentType?.ToString() ?? "text/event-stream; charset=utf-8";
+        context.Response.Headers.CacheControl = "no-cache";
+        context.Response.Headers.Connection = "keep-alive";
+        context.Response.Headers["X-Accel-Buffering"] = "no";
+        await using var stream = await upstream.Content.ReadAsStreamAsync(context.RequestAborted);
+        await stream.CopyToAsync(context.Response.Body, context.RequestAborted);
     }
-
-    await WriteAgentStreamEvent(
-        context.Response,
-        "stream.error",
-        new JsonObject { ["message"] = acpResult.Error },
-        context.RequestAborted);
+    catch (OperationCanceledException) when (context.RequestAborted.IsCancellationRequested)
+    {
+    }
+    catch (Exception ex)
+    {
+        if (!context.Response.HasStarted)
+        {
+            context.Response.StatusCode = StatusCodes.Status502BadGateway;
+            await context.Response.WriteAsJsonAsync(new { error = $"智能体服务响应失败: {ex.Message}" }, context.RequestAborted);
+        }
+    }
 });
 
 app.MapGet("/api/mcp", () => Results.Json(BuildMcpServiceDescriptor()));
@@ -1816,6 +2071,102 @@ app.MapPost("/api/mcp", async (JsonObject body) =>
 });
 
 app.Run();
+
+static HttpClient CreateAgentFreeClient(IHttpClientFactory httpClientFactory)
+{
+    var client = httpClientFactory.CreateClient();
+    client.BaseAddress = new Uri((Environment.GetEnvironmentVariable("AGENTFREE_BASE_URL") ?? "https://agent.ai.impx.net").TrimEnd('/'));
+    client.Timeout = TimeSpan.FromMinutes(10);
+    return client;
+}
+
+static async Task<JsonNode?> SendAgentFreeJson(
+    IHttpClientFactory httpClientFactory,
+    HttpMethod method,
+    string path,
+    JsonNode? body,
+    string userName,
+    CancellationToken cancellationToken)
+{
+    var client = CreateAgentFreeClient(httpClientFactory);
+    using var request = new HttpRequestMessage(method, path);
+    request.Headers.TryAddWithoutValidation("X-User-Name", userName);
+    if (body is not null)
+    {
+        request.Content = new StringContent(body.ToJsonString(FamilyRewardJson.CreateOptions()), Encoding.UTF8, "application/json");
+    }
+    using var response = await client.SendAsync(request, cancellationToken);
+    var text = await response.Content.ReadAsStringAsync(cancellationToken);
+    if (!response.IsSuccessStatusCode)
+    {
+        throw new InvalidOperationException(string.IsNullOrWhiteSpace(text)
+            ? $"AgentFree 返回 HTTP {(int)response.StatusCode}"
+            : text);
+    }
+    return string.IsNullOrWhiteSpace(text) ? null : JsonNode.Parse(text);
+}
+
+static async Task<JsonArray> GetFamilyRewardAgentFreeAgents(
+    IHttpClientFactory httpClientFactory,
+    string userName,
+    CancellationToken cancellationToken)
+{
+    var agents = await SendAgentFreeJson(
+        httpClientFactory,
+        HttpMethod.Get,
+        "/api/agents?authorizedOnly=true&gatewayType=WebApp&webAppBotId=web",
+        null,
+        userName,
+        cancellationToken) as JsonArray;
+    var result = new JsonArray();
+    if (agents is null) return result;
+    foreach (var item in agents.OfType<JsonObject>())
+    {
+        var active = string.Equals(item.String("status"), "Active", StringComparison.OrdinalIgnoreCase);
+        var familyAgent = string.Equals(item.String("agentCode"), "happylife", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(item.String("name"), "家庭积分应用", StringComparison.OrdinalIgnoreCase);
+        if (active && familyAgent) result.Add(item.DeepClone());
+    }
+    return result;
+}
+
+static async Task<int?> ResolveFamilyRewardAgentFreeAgentId(
+    IHttpClientFactory httpClientFactory,
+    string userName,
+    CancellationToken cancellationToken)
+{
+    var agents = await GetFamilyRewardAgentFreeAgents(httpClientFactory, userName, cancellationToken);
+    return agents.OfType<JsonObject>().Select(item => item.Int("id")).FirstOrDefault(id => id.HasValue);
+}
+
+static async Task<JsonObject?> GetFamilyRewardAgentFreeSession(
+    IHttpClientFactory httpClientFactory,
+    string sessionId,
+    string userName,
+    CancellationToken cancellationToken)
+{
+    var agentId = await ResolveFamilyRewardAgentFreeAgentId(httpClientFactory, userName, cancellationToken);
+    if (agentId is null) return null;
+    var session = await SendAgentFreeJson(
+        httpClientFactory,
+        HttpMethod.Get,
+        $"/api/webapp/sessions/{Uri.EscapeDataString(sessionId)}",
+        null,
+        userName,
+        cancellationToken) as JsonObject;
+    return session?.Int("agentId") == agentId ? session : null;
+}
+
+static JsonArray FilterFamilyRewardAgentFreeSessions(JsonNode? sessions, int agentId)
+{
+    var result = new JsonArray();
+    if (sessions is not JsonArray sessionArray) return result;
+    foreach (var item in sessionArray.OfType<JsonObject>())
+    {
+        if (item.Int("agentId") == agentId && !item.Bool("isArchived")) result.Add(item.DeepClone());
+    }
+    return result;
+}
 
 static async Task<(bool Ok, string Text, string Error)> InvokeGoldfishAcp(
     HttpClient client,
@@ -1941,21 +2292,6 @@ static async Task<(bool Ok, string Text, string Error)> InvokeGoldfishAcp(
     {
         return (false, "", $"智能体服务异常：{ex.Message}");
     }
-}
-
-static async Task WriteAgentStreamEvent(
-    HttpResponse response,
-    string type,
-    JsonObject payload,
-    CancellationToken cancellationToken)
-{
-    var envelope = new JsonObject
-    {
-        ["type"] = type,
-        ["payload"] = payload
-    };
-    await response.WriteAsync($"data: {envelope.ToJsonString(FamilyRewardJson.CreateOptions())}\n\n", cancellationToken);
-    await response.Body.FlushAsync(cancellationToken);
 }
 
 static HttpRequestMessage CreateAgentRequest(string endpoint, string apiKey, JsonObject payload)

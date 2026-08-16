@@ -7,6 +7,7 @@ import TransactionsPage from './pages/Transactions';
 import RulesPage from './pages/Rules';
 import StatsPage from './pages/Stats';
 import SettingsPage from './pages/Settings';
+import AssistantPage from './pages/Assistant';
 import IdentityPage from './pages/Identity';
 import IdentityGate from './components/IdentityGate';
 import Layout from './components/Layout';
@@ -45,6 +46,7 @@ export default function App() {
                         <Route path="/rules" element={<RulesPage />} />
                         <Route path="/stats" element={<StatsPage />} />
                         <Route path="/settings" element={<SettingsPage />} />
+                        <Route path="/assistant/*" element={<AssistantPage />} />
                       </Routes>
                     </Layout>
                   </FamilyGroupProvider>
