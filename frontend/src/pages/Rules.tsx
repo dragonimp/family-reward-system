@@ -9,6 +9,7 @@ interface RuleForm {
   description: string;
   category: string;
   score: number;
+  kind: 'reward' | 'redline';
 }
 
 interface RulePayload {
@@ -19,7 +20,7 @@ interface RulePayload {
   redlines: Array<{ id: number; rule: string; description: string; penalty_points: number }>;
 }
 
-const emptyForm: RuleForm = { name: '', description: '', category: '', score: 0 };
+const emptyForm: RuleForm = { name: '', description: '', category: '', score: 1, kind: 'reward' };
 
 export default function Rules() {
   const [payload, setPayload] = useState<RulePayload>({ publicRules: [], personalRules: [], templateRuleIds: [], hasTemplate: false, redlines: [] });
@@ -61,7 +62,13 @@ export default function Rules() {
 
   useEffect(() => { void loadRules(); }, [loadRules]);
 
-  const allRules = useMemo(() => [...payload.publicRules, ...payload.personalRules], [payload]);
+  const allRules = useMemo(() => {
+    const available = [...payload.publicRules, ...payload.personalRules];
+    const byId = new Map(available.map((rule) => [rule.id, rule]));
+    const selected = selectedIds.map((id) => byId.get(id)).filter((rule): rule is Rule => Boolean(rule));
+    const unselected = available.filter((rule) => !selectedIds.includes(rule.id));
+    return [...selected, ...unselected];
+  }, [payload, selectedIds]);
   const selectedSet = useMemo(() => new Set(selectedIds), [selectedIds]);
   const templateChanged = useMemo(() => {
     const stored = payload.hasTemplate ? payload.templateRuleIds : payload.publicRules.map((rule) => rule.id);
@@ -72,6 +79,17 @@ export default function Rules() {
     setSelectedIds((current) => current.includes(ruleId)
       ? current.filter((id) => id !== ruleId)
       : [...current, ruleId]);
+  };
+
+  const moveRule = (ruleId: number, offset: -1 | 1) => {
+    setSelectedIds((current) => {
+      const index = current.indexOf(ruleId);
+      const target = index + offset;
+      if (index < 0 || target < 0 || target >= current.length) return current;
+      const next = [...current];
+      [next[index], next[target]] = [next[target], next[index]];
+      return next;
+    });
   };
 
   const handleSaveTemplate = async () => {
@@ -95,14 +113,28 @@ export default function Rules() {
 
   const openEdit = (rule: Rule) => {
     setEditingRule(rule);
-    setFormData({ name: rule.name, description: rule.description, category: rule.category, score: rule.score });
+    setFormData({
+      name: rule.name,
+      description: rule.description,
+      category: rule.category,
+      score: Math.abs(rule.score) || 1,
+      kind: rule.score < 0 ? 'redline' : 'reward',
+    });
     setShowModal(true);
   };
 
   const handleSaveRule = async () => {
     if (!formData.name.trim()) return notify('请输入规则名称', 'error');
+    if (formData.score <= 0) return notify('积分值必须大于 0', 'error');
     try {
-      const data = { name: formData.name.trim(), category: formData.category.trim(), points: formData.score, cash_cny: 0, description: formData.description.trim() };
+      const data = {
+        name: formData.name.trim(),
+        category: formData.category.trim(),
+        points: formData.kind === 'redline' ? -Math.abs(formData.score) : Math.abs(formData.score),
+        ruleType: formData.kind,
+        cash_cny: 0,
+        description: formData.description.trim(),
+      };
       if (editingRule) await updateRule(editingRule.id, data);
       else await createRule(data);
       setShowModal(false);
@@ -149,7 +181,7 @@ export default function Rules() {
         <div className="mb-4 flex items-center justify-between gap-3">
           <div>
             <h3 className="font-semibold text-gray-900">模板规则</h3>
-            <p className="mt-1 text-xs text-gray-500">勾选公共规则或个人规则；列表顺序即手表展示顺序</p>
+            <p className="mt-1 text-xs text-gray-500">从现有公共或个人规则中选入模板；奖励规则按列表顺序在手表显示前 8 条</p>
           </div>
           <button type="button" onClick={() => void handleSaveTemplate()} disabled={!templateChanged || savingTemplate} className="btn-primary shrink-0 whitespace-nowrap disabled:cursor-not-allowed disabled:opacity-50">
             {savingTemplate ? '保存中...' : '保存模板'}
@@ -158,6 +190,8 @@ export default function Rules() {
         <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
           {allRules.map((rule) => {
             const personal = !rule.isPublic;
+            const selectedIndex = selectedIds.indexOf(rule.id);
+            const redline = rule.score < 0;
             return (
               <div key={rule.id} className={`border p-4 ${selectedSet.has(rule.id) ? 'border-green-400 bg-green-50/60' : 'border-gray-200 bg-white'}`}>
                 <div className="flex items-start gap-3">
@@ -168,9 +202,12 @@ export default function Rules() {
                       <span className={`shrink-0 text-sm font-bold ${rule.score >= 0 ? 'text-green-700' : 'text-red-600'}`}>{rule.score >= 0 ? '+' : ''}{rule.score}</span>
                     </div>
                     <p className="mt-1 min-h-5 text-sm text-gray-500">{rule.description || '无描述'}</p>
-                    <div className="mt-3 flex items-center justify-between gap-2">
-                      <div className="flex gap-2 text-xs"><span className="bg-gray-100 px-2 py-1 text-gray-600">{rule.category || '未分类'}</span><span className={personal ? 'bg-blue-100 px-2 py-1 text-blue-700' : 'bg-gray-100 px-2 py-1 text-gray-600'}>{personal ? '个人' : '公共'}</span></div>
-                      {personal && <div className="flex gap-2 text-xs"><button type="button" onClick={() => openEdit(rule)} className="text-blue-700">编辑</button><button type="button" onClick={() => setDeleteId(rule.id)} className="text-red-600">删除</button></div>}
+                    <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
+                      <div className="flex flex-wrap gap-2 text-xs"><span className="bg-gray-100 px-2 py-1 text-gray-600">{rule.category || '未分类'}</span><span className={redline ? 'bg-red-100 px-2 py-1 text-red-700' : 'bg-green-100 px-2 py-1 text-green-700'}>{redline ? '红线' : '奖励'}</span><span className={personal ? 'bg-blue-100 px-2 py-1 text-blue-700' : 'bg-gray-100 px-2 py-1 text-gray-600'}>{personal ? '个人' : '公共'}</span></div>
+                      <div className="flex items-center gap-1 text-xs">
+                        {selectedIndex >= 0 && <><button type="button" title="上移" aria-label={`上移${rule.name}`} disabled={selectedIndex === 0} onClick={() => moveRule(rule.id, -1)} className="h-8 w-8 border border-gray-200 text-base text-gray-700 disabled:opacity-30">↑</button><button type="button" title="下移" aria-label={`下移${rule.name}`} disabled={selectedIndex === selectedIds.length - 1} onClick={() => moveRule(rule.id, 1)} className="h-8 w-8 border border-gray-200 text-base text-gray-700 disabled:opacity-30">↓</button></>}
+                        {personal && <><button type="button" onClick={() => openEdit(rule)} className="px-2 text-blue-700">编辑</button><button type="button" onClick={() => setDeleteId(rule.id)} className="px-2 text-red-600">删除</button></>}
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -186,7 +223,8 @@ export default function Rules() {
         <div className="space-y-4">
           <label className="block text-sm font-medium text-gray-700">规则名称<input value={formData.name} onChange={(event) => setFormData({ ...formData, name: event.target.value })} className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2" /></label>
           <label className="block text-sm font-medium text-gray-700">描述<input value={formData.description} onChange={(event) => setFormData({ ...formData, description: event.target.value })} className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2" /></label>
-          <div className="grid grid-cols-2 gap-4"><label className="block text-sm font-medium text-gray-700">分类<input value={formData.category} onChange={(event) => setFormData({ ...formData, category: event.target.value })} className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2" /></label><label className="block text-sm font-medium text-gray-700">积分<input type="number" value={formData.score} onChange={(event) => setFormData({ ...formData, score: Number(event.target.value) })} className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2" /></label></div>
+          <fieldset><legend className="mb-2 text-sm font-medium text-gray-700">规则类型</legend><div className="grid grid-cols-2 gap-2"><button type="button" onClick={() => setFormData({ ...formData, kind: 'reward' })} className={`border px-3 py-2 text-sm font-medium ${formData.kind === 'reward' ? 'border-green-600 bg-green-50 text-green-700' : 'border-gray-300 text-gray-600'}`}>奖励规则</button><button type="button" onClick={() => setFormData({ ...formData, kind: 'redline' })} className={`border px-3 py-2 text-sm font-medium ${formData.kind === 'redline' ? 'border-red-600 bg-red-50 text-red-700' : 'border-gray-300 text-gray-600'}`}>红线规则</button></div></fieldset>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2"><label className="block text-sm font-medium text-gray-700">分类<input value={formData.category} onChange={(event) => setFormData({ ...formData, category: event.target.value })} className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2" /></label><label className="block text-sm font-medium text-gray-700">积分值<input type="number" min="1" value={formData.score} onChange={(event) => setFormData({ ...formData, score: Number(event.target.value) })} className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2" /><span className="mt-1 block text-xs font-normal text-gray-500">{formData.kind === 'redline' ? '保存后自动按减分处理' : '保存后按加分处理'}</span></label></div>
         </div>
       </Modal>
 

@@ -1349,7 +1349,7 @@ app.MapPut("/api/rules/{id:int}", async (int id, JsonObject body, HttpRequest re
     cmd.Parameters.AddWithValue("owner_app_user_id", access.Profile!.AppUserId);
     cmd.Parameters.AddWithValue("name", body.String("name"));
     cmd.Parameters.AddWithValue("category", body.String("category"));
-    cmd.Parameters.AddWithValue("points", body.Decimal("points") ?? body.Decimal("score") ?? 0);
+    cmd.Parameters.AddWithValue("points", NormalizeRulePoints(body));
     cmd.Parameters.AddWithValue("cash_cny", body.Decimal("cash_cny") ?? 0);
     cmd.Parameters.AddWithValue("description", body.String("description"));
     await using var reader = await cmd.ExecuteReaderAsync();
@@ -2217,7 +2217,8 @@ static object BuildMcpToolCatalog()
                     {
                         name = new { type = "string", description = "规则名称" },
                         category = new { type = "string", description = "分类" },
-                        points = new { type = "number", description = "积分" },
+                        points = new { type = "number", description = "积分绝对值；reward为加分，redline为减分" },
+                        rule_type = new { type = "string", @enum = new[] { "reward", "redline" }, description = "规则类型：奖励或红线" },
                         cash_cny = new { type = "number", description = "现金" },
                         description = new { type = "string", description = "描述" },
                         user_id = new { type = "string", description = "家长用户名或家长应用用户编号（必填）" }
@@ -2237,7 +2238,8 @@ static object BuildMcpToolCatalog()
                         rule_id = new { type = "integer", description = "规则ID" },
                         name = new { type = "string", description = "规则名称" },
                         category = new { type = "string", description = "分类" },
-                        points = new { type = "number", description = "积分" },
+                        points = new { type = "number", description = "积分绝对值；reward为加分，redline为减分" },
+                        rule_type = new { type = "string", @enum = new[] { "reward", "redline" }, description = "规则类型：奖励或红线" },
                         cash_cny = new { type = "number", description = "现金" },
                         description = new { type = "string", description = "描述" },
                         user_id = new { type = "string", description = "家长用户名或家长应用用户编号（必填）" }
@@ -2555,11 +2557,11 @@ static HashSet<string> GetAllowedMcpArguments(string toolName) => toolName switc
     FamilyRewardMcpQueryRulesToolName => new(StringComparer.Ordinal) { "user_id" },
     FamilyRewardMcpCreateRuleToolName => new(StringComparer.Ordinal)
     {
-        "user_id", "name", "category", "points", "cash_cny", "description"
+        "user_id", "name", "category", "points", "rule_type", "cash_cny", "description"
     },
     FamilyRewardMcpUpdateRuleToolName => new(StringComparer.Ordinal)
     {
-        "user_id", "rule_id", "name", "category", "points", "cash_cny", "description"
+        "user_id", "rule_id", "name", "category", "points", "rule_type", "cash_cny", "description"
     },
     FamilyRewardMcpDeleteRuleToolName => new(StringComparer.Ordinal)
     {
@@ -3092,7 +3094,9 @@ static async Task<object> McpUpdateRule(string connectionString, JsonObject argu
     cmd.Parameters.AddWithValue("owner_app_user_id", parentAppUserId);
     cmd.Parameters.AddWithValue("name", arguments.ContainsKey("name") ? arguments.String("name") : DBNull.Value);
     cmd.Parameters.AddWithValue("category", arguments.ContainsKey("category") ? arguments.String("category") : DBNull.Value);
-    cmd.Parameters.AddWithValue("points", arguments.ContainsKey("points") ? arguments.Decimal("points") ?? 0 : DBNull.Value);
+    cmd.Parameters.AddWithValue("points", arguments.ContainsKey("points")
+        ? NormalizeRulePoints(arguments)
+        : DBNull.Value);
     cmd.Parameters.AddWithValue("cash_cny", arguments.ContainsKey("cash_cny") ? arguments.Decimal("cash_cny") ?? 0 : DBNull.Value);
     cmd.Parameters.AddWithValue("description", arguments.ContainsKey("description") ? arguments.String("description") : DBNull.Value);
     await using var reader = await cmd.ExecuteReaderAsync();
@@ -5583,7 +5587,7 @@ static async Task<Dictionary<string, object?>> CreatePersonalRule(
         {
             insertCmd.Parameters.AddWithValue("name", name);
             insertCmd.Parameters.AddWithValue("category", body.String("category"));
-            insertCmd.Parameters.AddWithValue("points", body.Decimal("points") ?? body.Decimal("score") ?? 0);
+            insertCmd.Parameters.AddWithValue("points", NormalizeRulePoints(body));
             insertCmd.Parameters.AddWithValue("cash_cny", body.Decimal("cash_cny") ?? 0);
             insertCmd.Parameters.AddWithValue("description", body.String("description"));
             insertCmd.Parameters.AddWithValue("owner_app_user_id", parentAppUserId);
@@ -7184,7 +7188,7 @@ static Dictionary<string, object?> ReadRule(IDataRecord reader)
         ["points"] = points,
         ["cash_cny"] = reader.Decimal("cash_cny"),
         ["type"] = points >= 0 ? "positive" : "negative",
-        ["isRedLine"] = false,
+        ["isRedLine"] = points < 0,
         ["score"] = points,
         ["enabled"] = true,
         ["ownerAppUserId"] = reader.HasColumn("owner_app_user_id") && !reader.IsDBNull(reader.GetOrdinal("owner_app_user_id"))
@@ -7194,6 +7198,18 @@ static Dictionary<string, object?> ReadRule(IDataRecord reader)
         ["createdAt"] = reader.DateTime("created_at").ToString("O"),
         ["updatedAt"] = reader.HasColumn("updated_at") ? reader.DateTime("updated_at").ToString("O") : reader.DateTime("created_at").ToString("O")
     };
+}
+
+static decimal NormalizeRulePoints(JsonObject body)
+{
+    var points = body.Decimal("points") ?? body.Decimal("score") ?? 0;
+    var ruleType = body.String("rule_type");
+    if (string.IsNullOrWhiteSpace(ruleType)) ruleType = body.String("ruleType");
+    return ruleType.Trim().Equals("redline", StringComparison.OrdinalIgnoreCase)
+        ? -Math.Abs(points)
+        : ruleType.Trim().Equals("reward", StringComparison.OrdinalIgnoreCase)
+            ? Math.Abs(points)
+            : points;
 }
 
 static Dictionary<string, object?> ReadWatchRewardRequest(IDataRecord reader) => new()

@@ -47,6 +47,18 @@ mcp family_reward_query_rules "{\"user_id\":\"${PARENT_A}\"}" | jq -e --argjson 
 mcp family_reward_query_rules "{\"user_id\":\"${PARENT_B}\"}" | jq -e --argjson id "$custom_mcp_id" '.data.rules | all(.id != $id)' >/dev/null
 echo 'ok 4 - MCP强制用户入参且新增规则隔离到该用户模板'
 
+redline="$(api "$PARENT_A" -H 'Content-Type: application/json' -d "{\"name\":\"说谎红线-${SUFFIX}\",\"category\":\"红线\",\"points\":5,\"ruleType\":\"redline\"}" "$API_BASE/api/rules")"
+redline_id="$(jq -er '.id' <<<"$redline")"
+jq -e '.score == -5 and .type == "negative" and .isRedLine == true' <<<"$redline" >/dev/null
+mcp_redline="$(mcp family_reward_create_rule "{\"user_id\":\"${PARENT_A}\",\"name\":\"破坏物品-${SUFFIX}\",\"category\":\"红线\",\"points\":3,\"rule_type\":\"redline\"}")"
+jq -e '.ok == true and .rule.score == -3 and .rule.isRedLine == true' <<<"$mcp_redline" >/dev/null
+echo 'ok 5 - Web与MCP均可明确新增红线减分规则'
+
+ordered_ids="$(jq -cn --argjson mcp "$custom_mcp_id" --argjson web "$custom_web_id" --argjson redline "$redline_id" --argjson public "$first_two" '[$mcp,$web] + $public + [$redline]')"
+api "$PARENT_A" -X PUT -H 'Content-Type: application/json' -d "{\"ruleIds\":${ordered_ids}}" "$API_BASE/api/rule-template" >/dev/null
+api "$PARENT_A" "$API_BASE/api/rules" | jq -e --argjson expected "$ordered_ids" '.templateRuleIds == $expected' >/dev/null
+echo 'ok 6 - 模板规则顺序可调整并持久化'
+
 group="$(api "$PARENT_A" -H 'Content-Type: application/json' -d "{\"name\":\"REQ036-${SUFFIX}\"}" "$API_BASE/api/family-groups")"
 group_id="$(jq -er '.id' <<<"$group")"
 child="$(api "$PARENT_A" -H 'Content-Type: application/json' -d "{\"name\":\"模板孩子-${SUFFIX}\",\"familyGroupId\":${group_id}}" "$API_BASE/api/children")"
@@ -54,7 +66,7 @@ child_id="$(jq -er '.id' <<<"$child")"
 code="$(api "$PARENT_A" -H 'Content-Type: application/json' -d "{\"familyGroupId\":${group_id}}" "$API_BASE/api/children/${child_id}/auth-code" | jq -er '.code')"
 token="$(curl -fsS -H 'Content-Type: application/json' -d "{\"code\":\"${code}\",\"deviceName\":\"REQ036-watch\"}" "$API_BASE/api/watch/device-bind" | jq -er '.deviceToken')"
 watch_rules="$(curl -fsS -H "X-Watch-Device-Token: ${token}" "$API_BASE/api/watch/rules")"
-jq -e --argjson web "$custom_web_id" --argjson mcp "$custom_mcp_id" '(.rules | length) <= 8 and (.rules | any(.id == $web)) and (.rules | any(.id == $mcp))' <<<"$watch_rules" >/dev/null
-echo 'ok 5 - 手表按绑定家长模板展示前8条正向规则'
+jq -e --argjson web "$custom_web_id" --argjson mcp "$custom_mcp_id" --argjson redline "$redline_id" '(.rules | length) <= 8 and .rules[0].id == $mcp and .rules[1].id == $web and (.rules | all(.points > 0 and .id != $redline))' <<<"$watch_rules" >/dev/null
+echo 'ok 7 - 手表按模板顺序展示前8条奖励规则并排除红线'
 
-printf 'PASS REQ-036: 5/5 cases passed (%s)\n' "$PARENT_A"
+printf 'PASS REQ-039: 7/7 cases passed (%s)\n' "$PARENT_A"

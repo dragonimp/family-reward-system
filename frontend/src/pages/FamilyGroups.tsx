@@ -15,6 +15,8 @@ import { useAuth } from '../contexts/AuthContext';
 import { useFamilyGroup } from '../contexts/FamilyGroupContext';
 import type { Child, FamilyGroup, FamilyGroupInvite } from '../types';
 
+type FamilyTab = 'view' | 'create' | 'invite' | 'join';
+
 export default function FamilyGroups() {
   const { userId, appProfile } = useAuth();
   const appUserId = appProfile?.appUserId || userId;
@@ -28,6 +30,7 @@ export default function FamilyGroups() {
     refreshGroups,
   } = useFamilyGroup();
   const [searchParams, setSearchParams] = useSearchParams();
+  const [activeTab, setActiveTab] = useState<FamilyTab>(searchParams.get('inviteCode') ? 'join' : 'view');
   const [newName, setNewName] = useState('');
   const [newDescription, setNewDescription] = useState('');
   const [joinInviteCode, setJoinInviteCode] = useState(searchParams.get('inviteCode') || '');
@@ -119,6 +122,7 @@ export default function FamilyGroups() {
       selectGroup(created.id);
       setNewName('');
       setNewDescription('');
+      setActiveTab('view');
       setMessage('家庭已新增');
     } catch (err) {
       setMessage(err instanceof Error ? err.message : '新增家庭失败');
@@ -142,6 +146,7 @@ export default function FamilyGroups() {
       selectGroup(joined.familyGroupId);
       setSearchParams({});
       setJoinInviteCode('');
+      setActiveTab('view');
       setMessage(`已加入「${joined.familyGroupName}」，同步名下孩子 ${joined.linkedChildCount} 名`);
     } catch (err) {
       setMessage(err instanceof Error ? err.message : '加入家庭组失败');
@@ -257,192 +262,55 @@ export default function FamilyGroups() {
         <StatCard title="当前选择" value={selectedGroup?.name || '-'} icon="✅" color="orange" />
       </div>
 
-      <Card className="p-4 sm:p-5">
-        <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <h3 className="text-lg font-semibold text-gray-900">孩子成员</h3>
-            <p className="mt-1 text-sm text-gray-500">查看当前家庭中的孩子信息及其归属家长</p>
-          </div>
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-            <label htmlFor="family-view-select" className="sr-only">选择要查看的家庭</label>
-            <select
-              id="family-view-select"
-              value={selectedGroupId ?? ''}
-              onChange={(event) => selectGroup(Number(event.target.value))}
-              disabled={groups.length === 0}
-              className="min-w-0 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 focus:border-[#4A90D9] focus:outline-none focus:ring-2 focus:ring-[#4A90D9]/20 sm:min-w-48"
-            >
-              {groups.length === 0 && <option value="">暂无家庭</option>}
-              {groups.map((group) => (
-                <option key={group.id} value={group.id}>{group.name}</option>
-              ))}
-            </select>
-            <span className="whitespace-nowrap rounded-full bg-blue-50 px-3 py-1 text-sm font-medium text-blue-700">
-              {familyChildren.length} 名
-            </span>
-          </div>
-        </div>
-        {childrenLoading ? (
-          <div className="py-8 text-center text-sm text-gray-400">加载孩子成员中...</div>
-        ) : familyChildren.length === 0 ? (
-          <div className="py-8 text-center text-sm text-gray-400">当前家庭暂无孩子成员</div>
-        ) : (
-          <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
-            {familyChildren.map((child) => (
-              <div key={child.id} className="rounded-lg border border-gray-200 p-4">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <p className="truncate font-semibold text-gray-900">{child.name}</p>
-                    <p className="mt-1 text-sm text-gray-500">
-                      归属家长：{child.parentNames || '未关联'}
-                    </p>
-                  </div>
-                  {canManageSelectedGroup && (
-                    <button
-                      type="button"
-                      onClick={() => setChildToRemove(child)}
-                      className="shrink-0 rounded-md px-2.5 py-1.5 text-sm text-red-600 hover:bg-red-50"
-                    >
-                      移除
-                    </button>
-                  )}
-                </div>
-                <div className="mt-3 grid grid-cols-1 gap-2 text-sm sm:grid-cols-3 sm:text-center">
-                  <div className="rounded-md bg-blue-50 px-2 py-2 text-blue-700">积分 {child.score ?? 0}</div>
-                  <div className="rounded-md bg-green-50 px-2 py-2 text-green-700">现金 {child.cash ?? 0}</div>
-                  <div className="rounded-md bg-orange-50 px-2 py-2 text-orange-700">物品 {child.items ?? 0}</div>
-                </div>
-              </div>
+      <Card className="overflow-hidden p-0">
+        <div className="overflow-x-auto border-b border-gray-200 px-3 pt-3 sm:px-5 sm:pt-4">
+          <div role="tablist" aria-label="家庭管理功能" className="flex min-w-max gap-1">
+            {([
+              ['view', '查看家庭'],
+              ['create', '新增家庭'],
+              ['invite', '邀请他人加入家庭'],
+              ['join', '加入其他家庭'],
+            ] as Array<[FamilyTab, string]>).map(([tab, label]) => (
+              <button key={tab} type="button" role="tab" aria-selected={activeTab === tab} onClick={() => setActiveTab(tab)} className={`border-b-2 px-3 py-2.5 text-sm font-medium ${activeTab === tab ? 'border-[#2878c7] text-[#2369ad]' : 'border-transparent text-gray-500 hover:text-gray-800'}`}>{label}</button>
             ))}
           </div>
-        )}
+        </div>
+
+        <div className="p-4 sm:p-5">
+          {activeTab === 'view' && <div className="space-y-5">
+            <div className="flex flex-col gap-3 border-b border-gray-100 pb-5 sm:flex-row sm:items-end sm:justify-between">
+              <div className="min-w-0 flex-1">
+                <label htmlFor="family-view-select" className="mb-1.5 block text-sm font-medium text-gray-700">选择要查看的家庭</label>
+                <select id="family-view-select" value={selectedGroupId ?? ''} onChange={(event) => selectGroup(Number(event.target.value))} disabled={groups.length === 0} className="w-full rounded-md border border-gray-300 bg-white px-3 py-2.5 text-sm text-gray-700 focus:border-[#4A90D9] focus:outline-none focus:ring-2 focus:ring-[#4A90D9]/20 sm:max-w-md">
+                  {groups.length === 0 && <option value="">暂无家庭</option>}
+                  {groups.map((group) => <option key={group.id} value={group.id}>{group.name}（{group.role === 'owner' || group.createdBy === appUserId ? '我创建的' : '我加入的'}）</option>)}
+                </select>
+              </div>
+              {selectedGroup && <div className="text-sm text-gray-500">家庭 ID：{selectedGroup.id} · {canManageSelectedGroup ? '管理员' : '成员'}</div>}
+            </div>
+
+            {selectedGroup ? <>
+              <section className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <div><h3 className="text-lg font-semibold text-gray-900">{selectedGroup.name}</h3><p className="mt-1 text-sm text-gray-500">{selectedGroup.description || '暂无家庭说明'}</p></div>
+                {canManageSelectedGroup && <div className="flex gap-2"><button type="button" onClick={() => openEditFamily(selectedGroup)} className="rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50">编辑</button><button type="button" onClick={() => setFamilyToDelete({ id: selectedGroup.id, name: selectedGroup.name })} className="rounded-md border border-red-200 px-3 py-2 text-sm text-red-600 hover:bg-red-50">删除</button></div>}
+              </section>
+
+              <section aria-labelledby="family-children-title">
+                <div className="mb-3 flex items-center justify-between"><div><h3 id="family-children-title" className="font-semibold text-gray-900">孩子信息</h3><p className="mt-1 text-sm text-gray-500">孩子归属家长关系不会因切换家庭而改变</p></div><span className="text-sm font-medium text-blue-700">{familyChildren.length} 名</span></div>
+                {childrenLoading ? <div className="py-8 text-center text-sm text-gray-400">加载孩子信息中...</div> : familyChildren.length === 0 ? <div className="border-t border-gray-100 py-8 text-center text-sm text-gray-400">当前家庭暂无孩子</div> : <div className="divide-y divide-gray-100 border-y border-gray-100">{familyChildren.map((child) => <div key={child.id} className="flex flex-col gap-3 py-4 sm:flex-row sm:items-center sm:justify-between"><div className="min-w-0"><p className="font-medium text-gray-900">{child.name}</p><p className="mt-1 text-sm text-gray-500">归属家长：{child.parentNames || '未关联'}</p></div><div className="flex flex-wrap items-center gap-3 text-sm"><span className="text-blue-700">积分 {child.score ?? 0}</span><span className="text-green-700">现金 {child.cash ?? 0}</span><span className="text-orange-700">物品 {child.items ?? 0}</span>{canManageSelectedGroup && <button type="button" onClick={() => setChildToRemove(child)} className="text-red-600">移除</button>}</div></div>)}</div>}
+              </section>
+
+              <section><h3 className="mb-3 font-semibold text-gray-900">我的全部家庭</h3><div className="divide-y divide-gray-100 border-y border-gray-100">{groups.map((group) => <button key={group.id} type="button" onClick={() => selectGroup(group.id)} className="flex w-full items-center justify-between gap-3 py-3 text-left"><span className="min-w-0"><span className="block truncate text-sm font-medium text-gray-900">{group.name}</span><span className="mt-0.5 block text-xs text-gray-500">{group.role === 'owner' || group.createdBy === appUserId ? '我创建的' : '我加入的'}</span></span><span className={`text-xs font-medium ${selectedGroupId === group.id ? 'text-blue-700' : 'text-gray-400'}`}>{selectedGroupId === group.id ? '当前查看' : '查看'}</span></button>)}</div></section>
+            </> : <div className="py-12 text-center text-sm text-gray-400">暂无家庭，请先新增或加入家庭</div>}
+          </div>}
+
+          {activeTab === 'create' && <div className="mx-auto max-w-xl space-y-4"><div><h3 className="text-lg font-semibold text-gray-900">新增家庭</h3><p className="mt-1 text-sm text-gray-500">创建后，你将成为家庭管理员。</p></div><label className="block text-sm font-medium text-gray-700">家庭名称<input value={newName} onChange={(event) => setNewName(event.target.value)} className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-[#4A90D9]" /></label><label className="block text-sm font-medium text-gray-700">家庭说明<textarea value={newDescription} onChange={(event) => setNewDescription(event.target.value)} rows={3} className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-[#4A90D9]" /></label><button type="button" disabled={busy} onClick={handleCreate} className="btn-primary">{busy ? '新增中...' : '新增家庭'}</button></div>}
+
+          {activeTab === 'invite' && <div className="mx-auto max-w-xl space-y-4"><div><h3 className="text-lg font-semibold text-gray-900">邀请他人加入家庭</h3><p className="mt-1 text-sm text-gray-500">先选择你管理的家庭，再分享邀请码或二维码。</p></div><label className="block text-sm font-medium text-gray-700">邀请加入<select value={canManageSelectedGroup ? selectedGroupId ?? '' : ''} onChange={(event) => selectGroup(Number(event.target.value))} className="mt-1 w-full rounded-md border border-gray-300 bg-white px-3 py-2.5"><option value="">请选择家庭</option>{groups.filter((group) => group.role === 'owner' || group.createdBy === appUserId).map((group) => <option key={group.id} value={group.id}>{group.name}</option>)}</select></label>{canManageSelectedGroup && invite ? <div className="space-y-4"><div className="border border-blue-200 bg-blue-50 p-4 text-center"><p className="mb-1 text-xs text-blue-600">8 位家庭邀请码</p><p className="text-3xl font-bold tracking-[0.28em] text-blue-800">{invite.inviteCode}</p></div><div className="flex justify-center border border-gray-200 bg-white p-3"><img src={invite.qrImageUrl} alt="邀请二维码" className="h-40 w-40" /></div><button type="button" onClick={handleCopyInvite} className="w-full rounded-md border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">复制邀请码</button><p className="break-all text-xs text-gray-400">邀请链接：{invite.inviteUrl}</p></div> : <div className="py-8 text-center text-sm text-gray-400">请选择一个你创建的家庭</div>}</div>}
+
+          {activeTab === 'join' && <div className="mx-auto max-w-xl space-y-4"><div><h3 className="text-lg font-semibold text-gray-900">加入其他家庭</h3><p className="mt-1 text-sm text-gray-500">使用家庭管理员提供的 8 位数字邀请码。</p></div><label className="block text-sm font-medium text-gray-700">家庭邀请码<input value={joinInviteCode} onChange={(event) => setJoinInviteCode(event.target.value.replace(/\D/g, '').slice(0, 8))} inputMode="numeric" maxLength={8} placeholder="请输入 8 位数字" className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2.5 tracking-widest focus:outline-none focus:ring-2 focus:ring-[#4A90D9]" /></label><p className="text-xs text-gray-500">加入后会自动把你名下的全部孩子同步到该家庭。</p><button type="button" disabled={busy} onClick={handleJoin} className="btn-primary">{busy ? '加入中...' : '加入家庭'}</button></div>}
+        </div>
       </Card>
-
-      <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-        <Card className="xl:col-span-2 p-4 sm:p-5">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-semibold text-gray-900">家庭组列表</h3>
-          </div>
-          <div className="space-y-3">
-            {groups.map((group) => (
-              <div
-                key={group.id}
-                className={`rounded-lg border px-4 py-3 transition-colors ${
-                  selectedGroupId === group.id
-                    ? 'border-[#4A90D9] bg-[#4A90D9]/5'
-                    : 'border-gray-200 hover:bg-gray-50'
-                }`}
-              >
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                  <div className="min-w-0">
-                    <p className="font-semibold text-gray-900">{group.name}</p>
-                    <p className="text-sm text-gray-500">ID：{group.id} · 角色：{group.role || 'member'}</p>
-                  </div>
-                  <div className="flex items-center gap-2 self-start sm:self-center">
-                    {(group.role === 'owner' || group.createdBy === appUserId) && (
-                      <>
-                        <button
-                          type="button"
-                          onClick={() => openEditFamily(group)}
-                          className="rounded-md px-2.5 py-1.5 text-sm text-gray-600 hover:bg-gray-100"
-                        >
-                          改名
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setFamilyToDelete({ id: group.id, name: group.name })}
-                          className="rounded-md px-2.5 py-1.5 text-sm text-red-600 hover:bg-red-50"
-                        >
-                          删除
-                        </button>
-                      </>
-                    )}
-                    <button
-                      type="button"
-                      onClick={() => selectGroup(group.id)}
-                      className="rounded-md px-2.5 py-1.5 text-sm text-[#4A90D9] hover:bg-[#4A90D9]/10"
-                    >
-                      {selectedGroupId === group.id ? '当前' : '选择'}
-                    </button>
-                  </div>
-                </div>
-                {group.description && <p className="text-sm text-gray-500 mt-2">{group.description}</p>}
-              </div>
-            ))}
-            {groups.length === 0 && (
-              <div className="text-center py-10 text-gray-400">暂无家庭组</div>
-            )}
-          </div>
-        </Card>
-
-        <div className="space-y-6">
-          <Card className="p-4 sm:p-5">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">新增家庭</h3>
-            <div className="space-y-3">
-              <input
-                value={newName}
-                onChange={(event) => setNewName(event.target.value)}
-                placeholder="家庭名称"
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4A90D9]"
-              />
-              <textarea
-                value={newDescription}
-                onChange={(event) => setNewDescription(event.target.value)}
-                placeholder="说明，可选"
-                rows={3}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4A90D9]"
-              />
-              <button disabled={busy} onClick={handleCreate} className="btn-primary w-full">
-                新增家庭
-              </button>
-            </div>
-          </Card>
-
-          <Card className="p-4 sm:p-5">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">加入家庭组</h3>
-            <div className="space-y-3">
-              <input
-                value={joinInviteCode}
-                onChange={(event) => setJoinInviteCode(event.target.value.replace(/\D/g, '').slice(0, 8))}
-                inputMode="numeric"
-                maxLength={8}
-                placeholder="输入 8 位数字邀请码"
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4A90D9]"
-              />
-              <p className="text-xs text-gray-500">加入后会自动把你名下的全部孩子同步到该家庭组。</p>
-              <button disabled={busy} onClick={handleJoin} className="btn-primary w-full">
-                加入家庭组
-              </button>
-            </div>
-          </Card>
-
-          <Card className="p-4 sm:p-5">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">邀请</h3>
-            {selectedGroup && (selectedGroup.role === 'owner' || selectedGroup.createdBy === appUserId) && invite ? (
-              <div className="space-y-3">
-                <div className="rounded-lg border border-blue-200 bg-blue-50 p-4 text-center">
-                  <p className="text-xs text-blue-600 mb-1">8 位家庭邀请码</p>
-                  <p className="text-3xl font-bold tracking-[0.28em] text-blue-800">{invite.inviteCode}</p>
-                </div>
-                <div className="flex justify-center rounded-lg border border-gray-200 bg-white p-3">
-                  <img src={invite.qrImageUrl} alt="邀请二维码" className="h-40 w-40" />
-                </div>
-                <button
-                  onClick={handleCopyInvite}
-                  className="w-full rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
-                >
-                  复制邀请码
-                </button>
-                <p className="break-all text-xs text-gray-400">邀请链接：{invite.inviteUrl}</p>
-              </div>
-            ) : (
-              <div className="text-sm text-gray-400">
-                {selectedGroup ? '只有家庭组管理员可以生成邀请码' : '请选择一个家庭组'}
-              </div>
-            )}
-          </Card>
-        </div>
-      </div>
       <Modal
         isOpen={Boolean(childToRemove)}
         onClose={() => setChildToRemove(null)}

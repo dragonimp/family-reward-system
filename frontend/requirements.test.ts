@@ -88,3 +88,27 @@ test('REQ-036 scopes personal rule templates to a parent across web, watch and M
   assert.match(page, />我的规则模板</);
   assert.match(page, /saveRuleTemplate\(selectedIds\)/);
 });
+
+test('REQ-039 supports redline rules and ordered watch rewards', async () => {
+  const [api, page] = await Promise.all([
+    readFile(new URL('../FamilyReward.Api/Program.cs', import.meta.url), 'utf8'),
+    readFile(new URL('./src/pages/Rules.tsx', import.meta.url), 'utf8'),
+  ]);
+  assert.match(api, /NormalizeRulePoints/);
+  assert.match(api, /\["isRedLine"\] = points < 0/);
+  assert.match(api, /GetDecimal\(rule, "points"\) > 0/);
+  assert.match(api, /\.Take\(8\)/);
+  assert.match(page, />红线规则</);
+  assert.match(page, /moveRule\(rule\.id, -1\)/);
+  assert.match(page, /moveRule\(rule\.id, 1\)/);
+});
+
+test('REQ-040 organizes family management into four tabs', async () => {
+  const page = await readFile(new URL('./src/pages/FamilyGroups.tsx', import.meta.url), 'utf8');
+  assert.match(page, /role="tablist"/);
+  for (const label of ['查看家庭', '新增家庭', '邀请他人加入家庭', '加入其他家庭']) assert.match(page, new RegExp(label));
+  assert.match(page, /id="family-view-select"/);
+  assert.match(page, /我创建的/);
+  assert.match(page, /我加入的/);
+  assert.match(page, /孩子归属家长关系不会因切换家庭而改变/);
+});
