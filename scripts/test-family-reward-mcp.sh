@@ -158,7 +158,7 @@ assert_jq "operation records missing child is explicit failure with retry guidan
 bad_date="$(call_mcp family_reward_query_operation_records "{\"family_group_id\":$FAMILY_GROUP_ID,\"start_date\":\"2026/01/01\"}")"
 assert_jq "invalid dates are rejected" "$bad_date" '.ok == false and (.error | contains("日期格式无效"))'
 
-rules="$(call_mcp family_reward_query_rules '{}')"
+rules="$(call_mcp family_reward_query_rules '{"user_id":"local-admin"}')"
 assert_jq "rules can be queried" "$rules" '.ok == true and .action == "query_rules"'
 
 printf '\nMCP tests: %s passed, %s failed\n' "$pass_count" "$fail_count"

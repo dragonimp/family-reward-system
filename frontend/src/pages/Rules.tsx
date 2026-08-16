@@ -1,345 +1,196 @@
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Card } from '../components/Card';
 import { Modal } from '../components/Modal';
+import { createRule, deleteRule, getRules, saveRuleTemplate, updateRule } from '../services';
 import type { Rule } from '../types';
-import { useState, useEffect, useCallback } from 'react';
-import { getRules, createRule, updateRule, deleteRule } from '../services';
 
 interface RuleForm {
   name: string;
   description: string;
   category: string;
-  type: 'positive' | 'negative';
-  isRedLine: boolean;
   score: number;
-  enabled: boolean;
 }
 
+interface RulePayload {
+  publicRules: Rule[];
+  personalRules: Rule[];
+  templateRuleIds: number[];
+  hasTemplate: boolean;
+  redlines: Array<{ id: number; rule: string; description: string; penalty_points: number }>;
+}
+
+const emptyForm: RuleForm = { name: '', description: '', category: '', score: 0 };
+
 export default function Rules() {
-  const [rules, setRules] = useState<Rule[]>([]);
+  const [payload, setPayload] = useState<RulePayload>({ publicRules: [], personalRules: [], templateRuleIds: [], hasTemplate: false, redlines: [] });
+  const [selectedIds, setSelectedIds] = useState<number[]>([]);
   const [loading, setLoading] = useState(true);
+  const [savingTemplate, setSavingTemplate] = useState(false);
   const [showModal, setShowModal] = useState(false);
   const [editingRule, setEditingRule] = useState<Rule | null>(null);
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-  const [ruleToDelete, setRuleToDelete] = useState<number | null>(null);
-  const [filterCategory, setFilterCategory] = useState('');
-  const [filterType, setFilterType] = useState('');
-  const [toast, setToast] = useState<{ show: boolean; message: string; type: 'success' | 'error' }>({ show: false, message: '', type: 'success' });
+  const [formData, setFormData] = useState<RuleForm>(emptyForm);
+  const [deleteId, setDeleteId] = useState<number | null>(null);
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
 
-  const [formData, setFormData] = useState<RuleForm>({
-    name: '', description: '', category: '', type: 'positive', isRedLine: false, score: 0, enabled: true,
-  });
-
-  const showToast = (message: string, type: 'success' | 'error' = 'success') => {
-    setToast({ show: true, message, type });
-    setTimeout(() => setToast({ show: false, message: '', type: 'success' }), 3000);
+  const notify = (message: string, type: 'success' | 'error' = 'success') => {
+    setToast({ message, type });
+    window.setTimeout(() => setToast(null), 3000);
   };
 
   const loadRules = useCallback(async () => {
     try {
       setLoading(true);
-      const res = await getRules() as any;
-      const data = Array.isArray(res) ? res : res?.rules || [];
-      const redlines = (res && !Array.isArray(res)) ? res?.redlines || [] : [];
-      // 合并规则和红线为统一的 rules 列表用于展示
-      const merged = [...data];
-      for (const r of redlines) {
-        merged.push({
-          id: r.id,
-          name: r.rule,
-          description: r.description,
-          category: '红线',
-          type: 'negative' as const,
-          isRedLine: true,
-          score: -r.penalty_points,
-          enabled: true,
-          createdAt: '',
-          updatedAt: '',
-        });
-      }
-      setRules(merged);
+      const result = await getRules() as unknown as RulePayload;
+      const publicRules = result.publicRules || [];
+      const next = {
+        publicRules,
+        personalRules: result.personalRules || [],
+        templateRuleIds: result.templateRuleIds || [],
+        hasTemplate: Boolean(result.hasTemplate),
+        redlines: result.redlines || [],
+      };
+      setPayload(next);
+      setSelectedIds(next.hasTemplate ? next.templateRuleIds : publicRules.map((rule) => rule.id));
     } catch (error) {
-      console.error('加载失败:', error);
-      setRules([]);
-      showToast('规则加载失败', 'error');
+      console.error('规则加载失败:', error);
+      notify('规则加载失败', 'error');
     } finally {
       setLoading(false);
     }
   }, []);
 
-  useEffect(() => {
-    loadRules();
-  }, [loadRules]);
+  useEffect(() => { void loadRules(); }, [loadRules]);
 
-  const openCreateModal = () => {
-    setEditingRule(null);
-    setFormData({ name: '', description: '', category: '', type: 'positive', isRedLine: false, score: 0, enabled: true });
-    setShowModal(true);
+  const allRules = useMemo(() => [...payload.publicRules, ...payload.personalRules], [payload]);
+  const selectedSet = useMemo(() => new Set(selectedIds), [selectedIds]);
+  const templateChanged = useMemo(() => {
+    const stored = payload.hasTemplate ? payload.templateRuleIds : payload.publicRules.map((rule) => rule.id);
+    return stored.length !== selectedIds.length || stored.some((id, index) => id !== selectedIds[index]);
+  }, [payload, selectedIds]);
+
+  const toggleRule = (ruleId: number) => {
+    setSelectedIds((current) => current.includes(ruleId)
+      ? current.filter((id) => id !== ruleId)
+      : [...current, ruleId]);
   };
 
-  const openEditModal = (rule: Rule) => {
-    setEditingRule(rule);
-    setFormData({ name: rule.name, description: rule.description, category: rule.category, type: rule.type, isRedLine: rule.isRedLine, score: rule.score, enabled: rule.enabled });
-    setShowModal(true);
-  };
-
-  const handleSave = async () => {
-    if (!formData.name.trim()) {
-      showToast('请输入规则名称', 'error');
-      return;
-    }
+  const handleSaveTemplate = async () => {
     try {
-      const data = { ...formData, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
-      if (editingRule) {
-        await updateRule(editingRule.id, { name: formData.name, category: formData.category, points: formData.score, cash_cny: 0, description: formData.description });
-        showToast('更新成功');
-      } else {
-        await createRule({ name: formData.name, category: formData.category, points: formData.score, cash_cny: 0, description: formData.description });
-        showToast('创建成功');
-      }
-      setShowModal(false);
-      loadRules();
+      setSavingTemplate(true);
+      await saveRuleTemplate(selectedIds);
+      notify('个人规则模板已保存');
+      await loadRules();
     } catch (error) {
-      console.error('保存失败:', error);
-      showToast(editingRule ? '更新失败' : '创建失败', 'error');
+      notify(error instanceof Error ? error.message : '模板保存失败', 'error');
+    } finally {
+      setSavingTemplate(false);
     }
   };
 
-  const confirmDelete = (id: number) => {
-    setRuleToDelete(id);
-    setShowDeleteConfirm(true);
+  const openCreate = () => {
+    setEditingRule(null);
+    setFormData(emptyForm);
+    setShowModal(true);
+  };
+
+  const openEdit = (rule: Rule) => {
+    setEditingRule(rule);
+    setFormData({ name: rule.name, description: rule.description, category: rule.category, score: rule.score });
+    setShowModal(true);
+  };
+
+  const handleSaveRule = async () => {
+    if (!formData.name.trim()) return notify('请输入规则名称', 'error');
+    try {
+      const data = { name: formData.name.trim(), category: formData.category.trim(), points: formData.score, cash_cny: 0, description: formData.description.trim() };
+      if (editingRule) await updateRule(editingRule.id, data);
+      else await createRule(data);
+      setShowModal(false);
+      notify(editingRule ? '个人规则已更新' : '个人规则已创建并加入模板');
+      await loadRules();
+    } catch (error) {
+      notify(error instanceof Error ? error.message : '规则保存失败', 'error');
+    }
   };
 
   const handleDelete = async () => {
-    if (ruleToDelete) {
-      try {
-        await deleteRule(ruleToDelete);
-        showToast('删除成功');
-        setShowDeleteConfirm(false);
-        loadRules();
-      } catch (error) {
-        console.error('删除失败:', error);
-        showToast('删除失败', 'error');
-      }
+    if (deleteId === null) return;
+    try {
+      await deleteRule(deleteId);
+      setDeleteId(null);
+      notify('个人规则已删除');
+      await loadRules();
+    } catch (error) {
+      notify(error instanceof Error ? error.message : '删除失败', 'error');
     }
   };
 
-  const filteredRules = rules.filter((r) => {
-    if (filterCategory && r.category !== filterCategory) return false;
-    if (filterType && r.type !== filterType) return false;
-    return true;
-  });
-
-  const categories = Array.from(new Set(rules.map((r) => r.category)));
-  const positiveRules = rules.filter((r) => r.type === 'positive');
-  const negativeRules = rules.filter((r) => r.type === 'negative');
-  const redLineRules = rules.filter((r) => r.isRedLine);
-
   if (loading) {
-    return (
-      <div className="flex items-center justify-center py-20">
-        <div className="text-center">
-          <div className="inline-block animate-spin rounded-full h-10 w-10 border-4 border-[#4A90D9] border-t-transparent" />
-          <p className="mt-4 text-gray-500">加载中...</p>
-        </div>
-      </div>
-    );
+    return <div className="flex justify-center py-20"><div className="h-10 w-10 animate-spin rounded-full border-4 border-[#4A90D9] border-t-transparent" /></div>;
   }
 
   return (
-    <div className="space-y-6">
-      {/* Toast */}
-      {toast.show && (
-        <div className={`fixed top-4 right-4 z-50 px-6 py-3 rounded-lg shadow-lg text-white transition-all
-          ${toast.type === 'success' ? 'bg-green-500' : 'bg-red-500'}`}>
-          {toast.message}
-        </div>
-      )}
+    <div className="space-y-5">
+      {toast && <div className={`fixed right-4 top-4 z-50 rounded-md px-5 py-3 text-white shadow-lg ${toast.type === 'success' ? 'bg-green-600' : 'bg-red-600'}`}>{toast.message}</div>}
 
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h2 className="text-2xl font-bold text-gray-900">规则管理</h2>
-          <p className="text-gray-500 mt-1">管理积分规则和红线规则</p>
+          <h2 className="text-2xl font-bold text-gray-900">我的规则模板</h2>
+          <p className="mt-1 text-sm text-gray-500">孩子手表按下方顺序显示前 8 条正向规则</p>
         </div>
-        <button onClick={openCreateModal} className="btn-primary flex items-center gap-2">
-          <span>➕</span> 新增规则
-        </button>
+        <button type="button" onClick={openCreate} className="btn-primary self-start">新增个人规则</button>
       </div>
 
-      {/* 筛选 */}
-      <Card className="p-4">
-        <div className="flex flex-wrap gap-3">
-          <select
-            value={filterCategory}
-            onChange={(e) => setFilterCategory(e.target.value)}
-            className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#4A90D9]"
-          >
-            <option value="">全部分类</option>
-            {categories.map((cat) => (
-              <option key={cat} value={cat}>{cat}</option>
-            ))}
-          </select>
-          <select
-            value={filterType}
-            onChange={(e) => setFilterType(e.target.value)}
-            className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#4A90D9]"
-          >
-            <option value="">全部类型</option>
-            <option value="positive">正向行为</option>
-            <option value="negative">负向行为</option>
-          </select>
-        </div>
-      </Card>
+      <div className={`border-l-4 px-4 py-3 text-sm ${payload.hasTemplate ? 'border-green-500 bg-green-50 text-green-800' : 'border-blue-500 bg-blue-50 text-blue-800'}`}>
+        {payload.hasTemplate ? `个人模板已启用，共选择 ${selectedIds.length} 条规则。` : '尚未创建个人模板，当前自动复用全部公共规则。保存选择或新增规则后将启用个人模板。'}
+      </div>
 
-      {/* 红线规则 */}
-      {redLineRules.length > 0 && (
-        <Card className="p-5 border-red-200">
-          <h3 className="text-sm font-semibold text-red-600 mb-4 flex items-center gap-2">
-            <span>🚨</span> 红线规则（不可违反）
-          </h3>
-          <div className="space-y-3">
-            {redLineRules.map((rule) => (
-              <div key={rule.id} className="flex items-center justify-between p-3 bg-red-50 rounded-lg border border-red-200">
-                <div>
-                  <span className="font-medium text-red-700">{rule.name}</span>
-                  <span className="text-sm text-red-500 ml-3">{rule.description}</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="text-sm font-bold text-red-600">{rule.score} 分</span>
-                  <button onClick={() => openEditModal(rule)} className="text-[#4A90D9] text-sm hover:underline">编辑</button>
-                  <button onClick={() => confirmDelete(rule.id)} className="text-[#E74C3C] text-sm hover:underline">删除</button>
-                </div>
-              </div>
-            ))}
-          </div>
-        </Card>
-      )}
-
-      {/* 正向规则 */}
       <Card className="p-5">
-        <h3 className="text-sm font-semibold text-green-600 mb-4 flex items-center gap-2">
-          <span>👍</span> 正向行为规则 ({positiveRules.length})
-        </h3>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-          {filteredRules.filter((r) => r.type === 'positive').map((rule) => (
-            <div key={rule.id} className={`p-4 rounded-xl border transition-all ${rule.enabled ? 'border-green-200 bg-green-50/30' : 'border-gray-200 bg-gray-50 opacity-60'}`}>
-              <div className="flex items-start justify-between mb-2">
-                <span className="font-medium">{rule.name}</span>
-                <span className="text-sm font-bold text-green-600">+{rule.score}</span>
-              </div>
-              <p className="text-sm text-gray-500 mb-2">{rule.description}</p>
-              <div className="flex items-center justify-between">
-                <span className="text-xs px-2 py-0.5 bg-gray-100 rounded">{rule.category}</span>
-                <div className="flex items-center gap-2">
-                  <span className={`text-xs px-2 py-0.5 rounded ${rule.enabled ? 'bg-green-100 text-green-700' : 'bg-gray-200 text-gray-500'}`}>
-                    {rule.enabled ? '启用' : '禁用'}
-                  </span>
-                  <button onClick={() => openEditModal(rule)} className="text-xs text-[#4A90D9] hover:underline">编辑</button>
-                  <button onClick={() => confirmDelete(rule.id)} className="text-xs text-[#E74C3C] hover:underline">删除</button>
-                </div>
-              </div>
-            </div>
-          ))}
+        <div className="mb-4 flex items-center justify-between gap-3">
+          <div>
+            <h3 className="font-semibold text-gray-900">模板规则</h3>
+            <p className="mt-1 text-xs text-gray-500">勾选公共规则或个人规则；列表顺序即手表展示顺序</p>
+          </div>
+          <button type="button" onClick={() => void handleSaveTemplate()} disabled={!templateChanged || savingTemplate} className="btn-primary disabled:cursor-not-allowed disabled:opacity-50">
+            {savingTemplate ? '保存中...' : '保存模板'}
+          </button>
         </div>
-      </Card>
-
-      {/* 负向规则 */}
-      {negativeRules.length > 0 && (
-        <Card className="p-5">
-          <h3 className="text-sm font-semibold text-red-600 mb-4 flex items-center gap-2">
-            <span>👎</span> 负向行为规则 ({negativeRules.length})
-          </h3>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-            {filteredRules.filter((r) => r.type === 'negative' && !r.isRedLine).map((rule) => (
-              <div key={rule.id} className={`p-4 rounded-xl border transition-all ${rule.enabled ? 'border-red-200 bg-red-50/30' : 'border-gray-200 bg-gray-50 opacity-60'}`}>
-                <div className="flex items-start justify-between mb-2">
-                  <span className="font-medium">{rule.name}</span>
-                  <span className="text-sm font-bold text-red-600">{rule.score}</span>
-                </div>
-                <p className="text-sm text-gray-500 mb-2">{rule.description}</p>
-                <div className="flex items-center justify-between">
-                  <span className="text-xs px-2 py-0.5 bg-gray-100 rounded">{rule.category}</span>
-                  <div className="flex items-center gap-2">
-                    <span className={`text-xs px-2 py-0.5 rounded ${rule.enabled ? 'bg-red-100 text-red-700' : 'bg-gray-200 text-gray-500'}`}>
-                      {rule.enabled ? '启用' : '禁用'}
-                    </span>
-                    <button onClick={() => openEditModal(rule)} className="text-xs text-[#4A90D9] hover:underline">编辑</button>
-                    <button onClick={() => confirmDelete(rule.id)} className="text-xs text-[#E74C3C] hover:underline">删除</button>
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
+          {allRules.map((rule) => {
+            const personal = !rule.isPublic;
+            return (
+              <div key={rule.id} className={`border p-4 ${selectedSet.has(rule.id) ? 'border-green-400 bg-green-50/60' : 'border-gray-200 bg-white'}`}>
+                <div className="flex items-start gap-3">
+                  <input type="checkbox" checked={selectedSet.has(rule.id)} onChange={() => toggleRule(rule.id)} className="mt-1 h-4 w-4 accent-green-600" aria-label={`选择${rule.name}`} />
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-start justify-between gap-2">
+                      <span className="font-medium text-gray-900">{rule.name}</span>
+                      <span className={`shrink-0 text-sm font-bold ${rule.score >= 0 ? 'text-green-700' : 'text-red-600'}`}>{rule.score >= 0 ? '+' : ''}{rule.score}</span>
+                    </div>
+                    <p className="mt-1 min-h-5 text-sm text-gray-500">{rule.description || '无描述'}</p>
+                    <div className="mt-3 flex items-center justify-between gap-2">
+                      <div className="flex gap-2 text-xs"><span className="bg-gray-100 px-2 py-1 text-gray-600">{rule.category || '未分类'}</span><span className={personal ? 'bg-blue-100 px-2 py-1 text-blue-700' : 'bg-gray-100 px-2 py-1 text-gray-600'}>{personal ? '个人' : '公共'}</span></div>
+                      {personal && <div className="flex gap-2 text-xs"><button type="button" onClick={() => openEdit(rule)} className="text-blue-700">编辑</button><button type="button" onClick={() => setDeleteId(rule.id)} className="text-red-600">删除</button></div>}
+                    </div>
                   </div>
                 </div>
               </div>
-            ))}
-          </div>
-        </Card>
-      )}
+            );
+          })}
+        </div>
+      </Card>
 
-      {/* 新增/编辑模态框 */}
-      <Modal
-        isOpen={showModal}
-        onClose={() => setShowModal(false)}
-        title={editingRule ? '编辑规则' : '新增规则'}
-        footer={
-          <>
-            <button onClick={() => setShowModal(false)} className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg">取消</button>
-            <button onClick={handleSave} className="btn-primary">{editingRule ? '保存修改' : '确认创建'}</button>
-          </>
-        }
-      >
+      {payload.redlines.length > 0 && <Card className="p-5"><h3 className="mb-3 font-semibold text-red-700">公共红线规则</h3><div className="space-y-2">{payload.redlines.map((rule) => <div key={rule.id} className="flex items-center justify-between border-b border-red-100 py-2 text-sm last:border-0"><span><b>{rule.rule}</b><span className="ml-2 text-gray-500">{rule.description}</span></span><span className="font-bold text-red-600">-{rule.penalty_points}</span></div>)}</div></Card>}
+
+      <Modal isOpen={showModal} onClose={() => setShowModal(false)} title={editingRule ? '编辑个人规则' : '新增个人规则'} footer={<><button type="button" onClick={() => setShowModal(false)} className="px-4 py-2 text-gray-600">取消</button><button type="button" onClick={() => void handleSaveRule()} className="btn-primary">保存</button></>}>
         <div className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">规则名称 *</label>
-            <input type="text" value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} placeholder="如：按时完成约定任务" className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4A90D9]" />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">描述</label>
-            <input type="text" value={formData.description} onChange={(e) => setFormData({ ...formData, description: e.target.value })} placeholder="规则描述" className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4A90D9]" />
-          </div>
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">分类</label>
-              <input type="text" value={formData.category} onChange={(e) => setFormData({ ...formData, category: e.target.value })} placeholder="如：学习、生活" className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4A90D9]" />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">积分值 *</label>
-              <input type="number" value={formData.score} onChange={(e) => setFormData({ ...formData, score: parseInt(e.target.value) || 0 })} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4A90D9]" />
-            </div>
-          </div>
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">类型</label>
-              <select value={formData.type} onChange={(e) => setFormData({ ...formData, type: e.target.value as 'positive' | 'negative' })} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4A90D9]">
-                <option value="positive">正向行为</option>
-                <option value="negative">负向行为</option>
-              </select>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">状态</label>
-              <select value={formData.enabled ? '1' : '0'} onChange={(e) => setFormData({ ...formData, enabled: e.target.value === '1' })} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4A90D9]">
-                <option value="1">启用</option>
-                <option value="0">禁用</option>
-              </select>
-            </div>
-          </div>
-          <div className="flex items-center gap-2">
-            <input type="checkbox" id="redLine" checked={formData.isRedLine} onChange={(e) => setFormData({ ...formData, isRedLine: e.target.checked })} className="rounded" />
-            <label htmlFor="redLine" className="text-sm text-gray-700">⚠️ 红线规则（不可违反）</label>
-          </div>
+          <label className="block text-sm font-medium text-gray-700">规则名称<input value={formData.name} onChange={(event) => setFormData({ ...formData, name: event.target.value })} className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2" /></label>
+          <label className="block text-sm font-medium text-gray-700">描述<input value={formData.description} onChange={(event) => setFormData({ ...formData, description: event.target.value })} className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2" /></label>
+          <div className="grid grid-cols-2 gap-4"><label className="block text-sm font-medium text-gray-700">分类<input value={formData.category} onChange={(event) => setFormData({ ...formData, category: event.target.value })} className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2" /></label><label className="block text-sm font-medium text-gray-700">积分<input type="number" value={formData.score} onChange={(event) => setFormData({ ...formData, score: Number(event.target.value) })} className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2" /></label></div>
         </div>
       </Modal>
 
-      {/* 删除确认 */}
-      <Modal
-        isOpen={showDeleteConfirm}
-        onClose={() => setShowDeleteConfirm(false)}
-        title="确认删除"
-        footer={
-          <>
-            <button onClick={() => setShowDeleteConfirm(false)} className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg">取消</button>
-            <button onClick={handleDelete} className="btn-danger">确认删除</button>
-          </>
-        }
-      >
-        <p className="text-gray-600">确定要删除这个规则吗？此操作不可撤销。</p>
-      </Modal>
+      <Modal isOpen={deleteId !== null} onClose={() => setDeleteId(null)} title="删除个人规则" footer={<><button type="button" onClick={() => setDeleteId(null)} className="px-4 py-2 text-gray-600">取消</button><button type="button" onClick={() => void handleDelete()} className="btn-danger">删除</button></>}><p className="text-gray-600">删除后，该规则会同时从个人模板中移除。</p></Modal>
     </div>
   );
 }

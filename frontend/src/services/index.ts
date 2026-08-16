@@ -60,6 +60,7 @@ export const getRules = () => http.get('/api/rules');
 export const createRule = (data: any) => http.post('/api/rules', data);
 export const updateRule = (id: number, data: any) => http.put(`/api/rules/${id}`, data);
 export const deleteRule = (id: number) => http.delete(`/api/rules/${id}`);
+export const saveRuleTemplate = (ruleIds: number[]) => http.put('/api/rule-template', { ruleIds });
 
 export const getChildStats = (params?: { familyGroupId?: number }) => http.get('/api/stats/dashboard', { params });
 export const getLeaderboard = (params?: { familyGroupId?: number }) => http.get('/api/stats/leaderboard', { params });

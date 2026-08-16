@@ -350,9 +350,10 @@ app.MapGet("/api/watch/rules", async (HttpRequest request) =>
 {
     var binding = await RequireWatchDeviceBinding(connectionString, request, touch: false);
     if (binding.Error is not null) return binding.Error;
-    var rulesPayload = await GetRules(connectionString);
+    var rulesPayload = await GetRules(connectionString, binding.Binding!.ParentAppUserId);
     var rules = ((List<Dictionary<string, object?>>)rulesPayload["rules"])
         .Where(rule => GetDecimal(rule, "points") > 0)
+        .Take(8)
         .Select(rule => new
         {
             id = GetInt(rule, "id"),
@@ -591,7 +592,11 @@ app.MapGet("/watch", () =>
             .watch-face.face-world{background:linear-gradient(135deg,#e8f6e9 0 22%,#b9e0b3 22% 39%,#f6f0d3 39% 58%,#96c66d 58% 76%,#e8f6e9 76%);color:#102019}
             .watch-face.face-hellokitty{background:radial-gradient(circle at 68% 23%,#fff 0 10%,transparent 11%),linear-gradient(145deg,#ffeaf3,#fff7fb 48%,#ffd7e8);color:#2d1d24}
             .watch-face.face-starlight{background:radial-gradient(circle at 24% 22%,#ffe27a 0 2.8%,transparent 3.2%),radial-gradient(circle at 72% 34%,#8dd9ff 0 2.5%,transparent 3%),linear-gradient(145deg,#10233b,#284c72 58%,#8bd0d4);color:#f8fbff}
+            .watch-face.face-dinosaur{background:radial-gradient(circle at 72% 28%,#f5df77 0 8%,transparent 8.5%),linear-gradient(155deg,#d7f3cb,#76bd6e 58%,#3d8655);color:#153521}
+            .watch-face.face-rainbow{background:linear-gradient(145deg,#ff9cab 0 20%,#ffd56a 20% 40%,#8bd48c 40% 60%,#76c8f2 60% 80%,#bca2ee 80%);color:#30243b}
+            .watch-face.face-space{background:radial-gradient(circle at 22% 24%,#fff 0 1.2%,transparent 1.8%),radial-gradient(circle at 76% 34%,#ffe16b 0 2%,transparent 2.7%),radial-gradient(circle at 62% 74%,#8cddff 0 1.5%,transparent 2.2%),linear-gradient(145deg,#10142f,#332a68 62%,#145f7a);color:#f8fbff}
             .watch-face.face-starlight .topline,.watch-face.face-starlight .brand{color:#f8fbff}.watch-face.face-starlight .metric,.watch-face.face-starlight .rule-btn,.watch-face.face-starlight input,.watch-face.face-starlight textarea{background:rgba(255,255,255,.94)}
+            .watch-face.face-space .topline,.watch-face.face-space .brand{color:#f8fbff}.watch-face.face-space .metric,.watch-face.face-space .rule-btn,.watch-face.face-space input,.watch-face.face-space textarea{background:rgba(255,255,255,.94)}
             .screen{position:absolute;inset:clamp(14px,7vmin,24px);display:flex;align-items:center;justify-content:center;overflow:hidden;text-align:center}
             .topline{position:absolute;top:clamp(12px,6vmin,23px);left:18%;right:18%;display:flex;align-items:center;justify-content:center;gap:4px;overflow:hidden;color:#65736b;font-size:clamp(9px,3.2vmin,11px);white-space:nowrap}
             .brand{font-size:clamp(10px,3.5vmin,12px);font-weight:900;color:#245138}
@@ -608,10 +613,10 @@ app.MapGet("/watch", () =>
             .panel:not([data-panel=home]){height:100%;padding:1px 5px 4px 1px;overflow-x:hidden;overflow-y:auto;overscroll-behavior:contain;scrollbar-color:#5d7768 transparent;scrollbar-gutter:stable;scrollbar-width:thin;touch-action:pan-y}.panel:not([data-panel=home])::-webkit-scrollbar{width:4px}.panel:not([data-panel=home])::-webkit-scrollbar-thumb{border-radius:4px;background:#5d7768}.panel:not([data-panel=home])::-webkit-scrollbar-track{background:transparent}
             .panel[data-panel=menu]{height:auto;overflow:hidden;padding:0}
             .panel h1,.panel h2{margin:0 0 8px;text-align:center;font-size:18px;line-height:1.1}.bind-title{font-size:20px;font-weight:900}.bind-sub{margin:5px 0 10px;color:#65736b;font-size:12px}.rules{display:grid;gap:6px}
-            .menu-groups{display:grid;gap:7px}.menu-group-title{margin:0 0 3px;color:#526258;font-size:10px;font-weight:900}.menu-grid{display:grid;grid-template-columns:1fr 1fr;gap:5px}.menu-card{display:grid;grid-template-columns:26px 1fr;align-items:center;min-height:42px;border:1px solid #d5e0d9;border-radius:8px;background:rgba(255,255,255,.94);padding:5px;color:#17231b;text-align:left}.menu-icon{display:grid;place-items:center;width:24px;height:24px;border-radius:7px;background:#e7f2eb;font-size:15px}.menu-card span:last-child{font-size:10px;font-weight:900;line-height:1.15}.back-menu{display:inline-flex;align-items:center;gap:3px;margin:0 0 6px;border:0;background:transparent;color:#17613a;padding:2px 0;font-size:11px;font-weight:900}.rule-btn{display:grid;grid-template-columns:24px 1fr auto;align-items:center;gap:6px;width:100%;min-height:36px;border:1px solid #d3ded7;border-radius:8px;background:#fff;color:#17231b;padding:5px 7px;font-size:11px;text-align:left}.rule-icon{display:grid;place-items:center;width:22px;height:22px;border-radius:6px;background:#eef5f0}.rule-btn span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.rule-btn b{color:#0c6f3b;white-space:nowrap}.input-action{display:grid;grid-template-columns:1fr auto;gap:5px;align-items:center}.voice-btn{display:grid;place-items:center;width:34px;height:34px;border:1px solid #bfd2c5;border-radius:8px;background:#edf6f0;color:#155c37;font-size:16px}.voice-btn.listening{background:#155c37;color:#fff}.detail-metrics{display:grid;grid-template-columns:repeat(3,1fr);gap:4px;margin-bottom:8px}.detail-metric{border:1px solid #dce6df;border-radius:8px;background:rgba(255,255,255,.92);padding:6px 2px;text-align:center}.detail-metric b{display:block;color:#0c6f3b;font-size:15px}.detail-metric span{font-size:9px;color:#65736b}
+            .menu-header{display:grid;grid-template-columns:30px 1fr 30px;align-items:center;margin-bottom:7px}.menu-header h2{grid-column:2;margin:0}.home-menu{display:grid;place-items:center;width:28px;height:28px;border:1px solid #c9dbcf;border-radius:8px;background:#fff;color:#17613a;font-size:16px}.menu-groups{display:grid;gap:7px}.menu-group-title{margin:0 0 3px;color:#526258;font-size:10px;font-weight:900}.menu-grid{display:grid;grid-template-columns:1fr 1fr;gap:5px}.menu-card{display:grid;grid-template-columns:26px 1fr;align-items:center;min-height:42px;border:1px solid #d5e0d9;border-radius:8px;background:rgba(255,255,255,.94);padding:5px;color:#17231b;text-align:left}.menu-icon{display:grid;place-items:center;width:24px;height:24px;border-radius:7px;background:#e7f2eb;font-size:15px}.menu-card span:last-child{font-size:10px;font-weight:900;line-height:1.15}.back-menu{display:inline-flex;align-items:center;gap:3px;margin:0 0 6px;border:0;background:transparent;color:#17613a;padding:2px 0;font-size:11px;font-weight:900}.rule-btn{display:grid;grid-template-columns:24px 1fr auto;align-items:center;gap:6px;width:100%;min-height:36px;border:1px solid #d3ded7;border-radius:8px;background:#fff;color:#17231b;padding:5px 7px;font-size:11px;text-align:left}.rule-icon{display:grid;place-items:center;width:22px;height:22px;border-radius:6px;background:#eef5f0}.rule-btn span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.rule-btn b{color:#0c6f3b;white-space:nowrap}.input-action{display:grid;grid-template-columns:1fr auto;gap:5px;align-items:center}.voice-btn{display:grid;place-items:center;width:34px;height:34px;border:1px solid #bfd2c5;border-radius:8px;background:#edf6f0;color:#155c37;font-size:16px}.voice-btn.listening{background:#155c37;color:#fff}.detail-metrics{display:grid;grid-template-columns:repeat(3,1fr);gap:4px;margin-bottom:8px}.detail-metric{border:1px solid #dce6df;border-radius:8px;background:rgba(255,255,255,.92);padding:6px 2px;text-align:center}.detail-metric b{display:block;color:#0c6f3b;font-size:15px}.detail-metric span{font-size:9px;color:#65736b}
             label{display:block;margin:7px 0 3px;color:#44544a;font-size:11px;font-weight:700}input,textarea{width:100%;border:1px solid #cbd8cf;border-radius:8px;background:#fff;color:#17231b;padding:7px;font-size:14px}textarea{min-height:44px;resize:none}.submit,.ghost{width:100%;margin-top:8px;border:0;border-radius:8px;padding:9px;font-size:14px;font-weight:900}.submit{background:#1f7a48;color:#fff}.ghost{background:#e7efe9;color:#17462c}.msg{min-height:16px;margin:6px 0 0;text-align:center;color:#16643a;font-size:11px}
             .requests{list-style:none;margin:0;padding:0;display:grid;gap:5px}.requests li{display:grid;grid-template-columns:1fr auto;gap:6px;border-top:1px solid #e3ebe6;padding-top:5px;color:#25362c;font-size:11px}.requests span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.requests b{color:#71601b;white-space:nowrap}.empty,.empty-row{color:#64746a;text-align:center;font-size:12px}.code{text-align:center;letter-spacing:3px;font-size:22px;font-weight:900;text-transform:uppercase}.hidden{display:none!important}
-            .friend-code{margin:5px 0;border:1px solid #cfe1d4;border-radius:8px;background:#fff;padding:8px;text-align:center}.friend-code b{display:block;color:#102019;font-size:22px;letter-spacing:3px}.friend-code span{display:block;margin-top:2px;color:#637268;font-size:10px}.compact-list{list-style:none;margin:0;padding:0;display:grid;gap:5px}.compact-list li{display:grid;grid-template-columns:auto 1fr auto;gap:5px;align-items:center;border:1px solid #e0e9e3;border-radius:8px;background:rgba(255,255,255,.9);padding:5px 6px;font-size:11px}.compact-list li.empty-row{display:block;text-align:center}.compact-list em{font-style:normal;font-weight:900;color:#5e6a63}.compact-list span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.compact-list b{color:#0c6f3b;white-space:nowrap}.face-grid{display:grid;gap:6px}.face-option{display:flex;align-items:center;justify-content:space-between;width:100%;border:1px solid #d8e4dc;border-radius:8px;background:#fff;padding:7px;color:#17231b;font-size:12px;font-weight:900}.face-option.active{border-color:#1f7a48;background:#e7f5ec;color:#0c6f3b}.face-swatch{width:22px;height:22px;border-radius:50%;border:1px solid #becdc4}.swatch-world{background:linear-gradient(135deg,#b9e0b3 0 45%,#f6f0d3 45% 65%,#96c66d 65%)}.swatch-hellokitty{background:linear-gradient(145deg,#ffeaf3,#ffd7e8)}.swatch-starlight{background:linear-gradient(145deg,#10233b,#8bd0d4)}
+            .friend-code{margin:5px 0;border:1px solid #cfe1d4;border-radius:8px;background:#fff;padding:8px;text-align:center}.friend-code b{display:block;color:#102019;font-size:22px;letter-spacing:3px}.friend-code span{display:block;margin-top:2px;color:#637268;font-size:10px}.compact-list{list-style:none;margin:0;padding:0;display:grid;gap:5px}.compact-list li{display:grid;grid-template-columns:auto 1fr auto;gap:5px;align-items:center;border:1px solid #e0e9e3;border-radius:8px;background:rgba(255,255,255,.9);padding:5px 6px;font-size:11px}.compact-list li.empty-row{display:block;text-align:center}.compact-list em{font-style:normal;font-weight:900;color:#5e6a63}.compact-list span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.compact-list b{color:#0c6f3b;white-space:nowrap}.leaderboard-banner{margin:0 0 6px;border:1px solid #e6c856;border-radius:8px;background:#fff7ca;padding:6px;text-align:center;color:#765817;font-size:11px;font-weight:900}.leaderboard-list li{min-height:34px;border-color:#d8dfc2;background:#fffdf2}.leaderboard-list li:first-child{border-color:#e5b72f;background:#fff2ad}.leaderboard-list li:nth-child(2){border-color:#b9c3c7;background:#f3f6f7}.leaderboard-list li:nth-child(3){border-color:#d29b6c;background:#fff0e2}.rank-icon{display:grid;place-items:center;width:24px;height:24px;font-size:17px}.face-grid{display:grid;gap:6px}.face-option{display:flex;align-items:center;justify-content:space-between;width:100%;border:1px solid #d8e4dc;border-radius:8px;background:#fff;padding:7px;color:#17231b;font-size:12px;font-weight:900}.face-option.active{border-color:#1f7a48;background:#e7f5ec;color:#0c6f3b}.face-swatch{width:22px;height:22px;border-radius:50%;border:1px solid #becdc4}.swatch-world{background:linear-gradient(135deg,#b9e0b3 0 45%,#f6f0d3 45% 65%,#96c66d 65%)}.swatch-hellokitty{background:linear-gradient(145deg,#ffeaf3,#ffd7e8)}.swatch-starlight{background:linear-gradient(145deg,#10233b,#8bd0d4)}.swatch-dinosaur{background:linear-gradient(145deg,#d7f3cb,#3d8655)}.swatch-rainbow{background:linear-gradient(145deg,#ff9cab,#ffd56a,#76c8f2,#bca2ee)}.swatch-space{background:linear-gradient(145deg,#10142f,#145f7a)}
             @media(max-width:260px),(max-height:260px){.panel h1,.panel h2{font-size:16px}.rules{gap:4px}input,textarea{font-size:13px;padding:6px}}
             @media(prefers-reduced-motion:reduce){.panel{will-change:auto}}
           </style>
@@ -645,7 +650,7 @@ app.MapGet("/watch", () =>
                     </div>
                   </div>
                   <div class="panel" data-panel="menu">
-                    <h2>功能菜单</h2>
+                    <div class="menu-header"><button class="home-menu" id="home-menu" type="button" aria-label="返回首页">⌂</button><h2>功能菜单</h2></div>
                     <div class="menu-groups">
                       <div><p class="menu-group-title">积分</p><div class="menu-grid">
                         <button class="menu-card" type="button" data-view="request"><span class="menu-icon">⭐</span><span>积分申请</span></button>
@@ -706,7 +711,8 @@ app.MapGet("/watch", () =>
                   <div class="panel" data-panel="leaderboard">
                     <button class="back-menu" type="button">‹ 返回菜单</button>
                     <h2>好友积分榜</h2>
-                    <ul class="compact-list" id="friend-leaderboard"></ul>
+                    <div class="leaderboard-banner">🏆 一起加油，天天进步</div>
+                    <ul class="compact-list leaderboard-list" id="friend-leaderboard"></ul>
                   </div>
                   <div class="panel" data-panel="settings">
                     <button class="back-menu" type="button">‹ 返回菜单</button>
@@ -715,6 +721,9 @@ app.MapGet("/watch", () =>
                       <button class="face-option" type="button" data-face="world"><span>我的世界</span><i class="face-swatch swatch-world"></i></button>
                       <button class="face-option" type="button" data-face="hellokitty"><span>HelloKitty</span><i class="face-swatch swatch-hellokitty"></i></button>
                       <button class="face-option" type="button" data-face="starlight"><span>星光梦可</span><i class="face-swatch swatch-starlight"></i></button>
+                      <button class="face-option" type="button" data-face="dinosaur"><span>恐龙乐园</span><i class="face-swatch swatch-dinosaur"></i></button>
+                      <button class="face-option" type="button" data-face="rainbow"><span>彩虹糖果</span><i class="face-swatch swatch-rainbow"></i></button>
+                      <button class="face-option" type="button" data-face="space"><span>宇宙探险</span><i class="face-swatch swatch-space"></i></button>
                     </div>
                     <p id="settings-msg" class="msg"></p>
                   </div>
@@ -752,21 +761,14 @@ app.MapGet("/watch", () =>
                 ? points.toLocaleString('zh-CN', { useGrouping: false, minimumFractionDigits: 0, maximumFractionDigits: 1 })
                 : '0';
             };
-            const faceLabels = { world: '我的世界', hellokitty: 'HelloKitty', starlight: '星光梦可' };
-            const ruleIcon = (category = '') => {
-              const value = String(category);
-              if (/学习|阅读|作业/.test(value)) return '📚';
-              if (/家务|整理|劳动/.test(value)) return '🧹';
-              if (/运动|健康/.test(value)) return '🏃';
-              if (/礼貌|助人/.test(value)) return '🤝';
-              if (/习惯|自律/.test(value)) return '⏰';
-              return '⭐';
-            };
-            const normalizeFace = (value) => ['world', 'hellokitty', 'starlight'].includes(value) ? value : 'world';
+            const faceLabels = { world: '我的世界', hellokitty: 'HelloKitty', starlight: '星光梦可', dinosaur: '恐龙乐园', rainbow: '彩虹糖果', space: '宇宙探险' };
+            const ruleIcons = ['📚', '✏️', '🪥', '🧹', '🏃', '🤝', '⏰', '🌟'];
+            const ruleIcon = (index) => ruleIcons[index % ruleIcons.length];
+            const normalizeFace = (value) => ['world', 'hellokitty', 'starlight', 'dinosaur', 'rainbow', 'space'].includes(value) ? value : 'world';
             const applyWatchFace = (value) => {
               const face = normalizeFace(value);
               const watchFace = document.getElementById('watch-face');
-              watchFace.classList.remove('face-world', 'face-hellokitty', 'face-starlight');
+              watchFace.classList.remove('face-world', 'face-hellokitty', 'face-starlight', 'face-dinosaur', 'face-rainbow', 'face-space');
               watchFace.classList.add('face-' + face);
               document.querySelectorAll('.face-option').forEach((button) => {
                 button.classList.toggle('active', button.dataset.face === face);
@@ -780,7 +782,7 @@ app.MapGet("/watch", () =>
                 <li><em>${index + 1}</em><span>${escapeText(friend.name)}</span><b>${formatPoints(friend.score)}</b></li>
               `).join('') || '<li class="empty-row"><span>暂无好友</span></li>';
               document.getElementById('friend-leaderboard').innerHTML = leaderboard.map((item) => `
-                <li><em>#${escapeText(item.rank)}</em><span>${escapeText(item.name)}${item.isSelf ? ' · 我' : ''}</span><b>${formatPoints(item.score)}</b></li>
+                <li><em class="rank-icon">${['🏆', '🥈', '🥉'][Number(item.rank) - 1] || '⭐'}</em><span>${escapeText(item.name)}${item.isSelf ? ' · 我' : ''}</span><b>${formatPoints(item.score)}</b></li>
               `).join('') || '<li class="empty-row"><span>暂无排行</span></li>';
             };
             const calculatePanelScale = (availableWidth, availableHeight, contentWidth, contentHeight) =>
@@ -843,9 +845,9 @@ app.MapGet("/watch", () =>
                 document.getElementById('detail-cash').textContent = child.cash ?? 0;
                 document.getElementById('detail-items').textContent = child.items ?? 0;
                 document.getElementById('device-id').textContent = '#' + escapeText(score.deviceId);
-                document.getElementById('rules').innerHTML = (rulesPayload.rules || []).slice(0, 8).map((rule) => `
+                document.getElementById('rules').innerHTML = (rulesPayload.rules || []).map((rule, index) => `
                   <button type="button" class="rule-btn" data-rule-id="${rule.id}" data-points="${rule.points}" data-title="${escapeText(rule.name)}">
-                    <i class="rule-icon">${ruleIcon(rule.category)}</i><span>${escapeText(rule.name)}</span><b>+${escapeText(rule.points)}</b>
+                    <i class="rule-icon">${ruleIcon(index)}</i><span>${escapeText(rule.name)}</span><b>+${escapeText(rule.points)}</b>
                   </button>`).join('') || '<div class="empty">暂无可申请规则</div>';
                 document.querySelectorAll('.rule-btn').forEach((button) => {
                   button.addEventListener('click', () => {
@@ -974,6 +976,7 @@ app.MapGet("/watch", () =>
             document.querySelectorAll('.back-menu').forEach((button) => {
               button.addEventListener('click', () => setView('menu'));
             });
+            document.getElementById('home-menu').addEventListener('click', () => setView('home'));
             document.getElementById('menu-toggle').addEventListener('click', () => {
               setView('menu');
             });
@@ -1306,27 +1309,28 @@ app.MapGet("/api/rules", async (HttpRequest request) =>
 {
     var access = await RequireParentProfile(connectionString, request);
     if (access.Error is not null) return access.Error;
-    return Results.Json(await GetRules(connectionString));
+    return Results.Json(await GetRules(connectionString, access.Profile!.AppUserId));
 });
 
 app.MapPost("/api/rules", async (JsonObject body, HttpRequest request) =>
 {
     var access = await RequireParentProfile(connectionString, request);
     if (access.Error is not null) return access.Error;
-    await using var conn = await OpenConnection(connectionString);
-    await using var cmd = new NpgsqlCommand("""
-        INSERT INTO rules (name, category, points, cash_cny, description)
-        VALUES (@name, @category, @points, @cash_cny, @description)
-        RETURNING *
-        """, conn);
-    cmd.Parameters.AddWithValue("name", body.String("name"));
-    cmd.Parameters.AddWithValue("category", body.String("category"));
-    cmd.Parameters.AddWithValue("points", body.Decimal("points") ?? body.Decimal("score") ?? 0);
-    cmd.Parameters.AddWithValue("cash_cny", body.Decimal("cash_cny") ?? 0);
-    cmd.Parameters.AddWithValue("description", body.String("description"));
-    await using var reader = await cmd.ExecuteReaderAsync();
-    await reader.ReadAsync();
-    return Results.Created("/api/rules", ReadRule(reader));
+    var created = await CreatePersonalRule(connectionString, access.Profile!.AppUserId, body);
+    return created.ContainsKey("error")
+        ? Results.BadRequest(created)
+        : Results.Created("/api/rules", created["rule"]);
+});
+
+app.MapPut("/api/rule-template", async (JsonObject body, HttpRequest request) =>
+{
+    var access = await RequireParentProfile(connectionString, request);
+    if (access.Error is not null) return access.Error;
+    var ruleIds = body["ruleIds"] is JsonArray array
+        ? array.Select(node => node?.GetValue<int?>()).Where(id => id.HasValue).Select(id => id!.Value).Distinct().ToList()
+        : new List<int>();
+    var result = await SaveRuleTemplate(connectionString, access.Profile!.AppUserId, ruleIds);
+    return result.ContainsKey("error") ? Results.BadRequest(result) : Results.Json(result);
 });
 
 app.MapPut("/api/rules/{id:int}", async (int id, JsonObject body, HttpRequest request) =>
@@ -1337,10 +1341,11 @@ app.MapPut("/api/rules/{id:int}", async (int id, JsonObject body, HttpRequest re
     await using var cmd = new NpgsqlCommand("""
         UPDATE rules
         SET name = @name, category = @category, points = @points, cash_cny = @cash_cny, description = @description
-        WHERE id = @id
+        WHERE id = @id AND owner_app_user_id = @owner_app_user_id
         RETURNING *
         """, conn);
     cmd.Parameters.AddWithValue("id", id);
+    cmd.Parameters.AddWithValue("owner_app_user_id", access.Profile!.AppUserId);
     cmd.Parameters.AddWithValue("name", body.String("name"));
     cmd.Parameters.AddWithValue("category", body.String("category"));
     cmd.Parameters.AddWithValue("points", body.Decimal("points") ?? body.Decimal("score") ?? 0);
@@ -1349,7 +1354,7 @@ app.MapPut("/api/rules/{id:int}", async (int id, JsonObject body, HttpRequest re
     await using var reader = await cmd.ExecuteReaderAsync();
     if (!await reader.ReadAsync())
     {
-        return Results.NotFound(new { error = "不存在" });
+        return Results.NotFound(new { error = "规则不存在或无权修改公共规则" });
     }
 
     return Results.Json(ReadRule(reader));
@@ -1360,9 +1365,13 @@ app.MapDelete("/api/rules/{id:int}", async (int id, HttpRequest request) =>
     var access = await RequireParentProfile(connectionString, request);
     if (access.Error is not null) return access.Error;
     await using var conn = await OpenConnection(connectionString);
-    await using var cmd = new NpgsqlCommand("DELETE FROM rules WHERE id = @id", conn);
+    await using var cmd = new NpgsqlCommand("DELETE FROM rules WHERE id = @id AND owner_app_user_id = @owner_app_user_id", conn);
     cmd.Parameters.AddWithValue("id", id);
-    await cmd.ExecuteNonQueryAsync();
+    cmd.Parameters.AddWithValue("owner_app_user_id", access.Profile!.AppUserId);
+    if (await cmd.ExecuteNonQueryAsync() == 0)
+    {
+        return Results.NotFound(new { error = "规则不存在或无权删除公共规则" });
+    }
     return Results.Json(new { status = "ok" });
 });
 
@@ -1457,7 +1466,7 @@ app.MapPost("/api/agent/parse-reward", async (JsonObject body, IHttpClientFactor
     }
 
     var children = await GetChildren(connectionString, ownerAppUserId: access.Profile!.AppUserId);
-    var rules = await GetRules(connectionString);
+    var rules = await GetRules(connectionString, access.Profile!.AppUserId);
     var prompt = $$$"""
         你是家加分的语音纠错和结构化解析智能体。
         用户语音识别文本可能把孩子名字、规则名称识别错。请根据候选孩子和规则语义，选择最可能的孩子和操作。
@@ -1553,6 +1562,26 @@ app.MapPost("/api/agent/invoke", async (JsonObject body, IHttpClientFactory http
     }
 
     var prompt = body.String("prompt");
+    if (string.IsNullOrWhiteSpace(prompt))
+    {
+        return Results.BadRequest(new { ok = false, error = "请输入对话内容" });
+    }
+    if (endpoint.EndsWith("/acp", StringComparison.OrdinalIgnoreCase))
+    {
+        var acpResult = await InvokeGoldfishAcp(
+            httpClientFactory.CreateClient(),
+            endpoint,
+            agent.String("apiKey"),
+            agent.String("profile", "happylife"),
+            agent.String("workingDirectory", "/Users/wengzhishan/Projects/family-reward-system"),
+            access.Profile!.AppUserId,
+            prompt,
+            agent.Int("timeout_seconds") ?? 90);
+        return acpResult.Ok
+            ? Results.Json(new { ok = true, response = new { output_text = acpResult.Text } })
+            : Results.Json(new { ok = false, error = acpResult.Error }, statusCode: 502);
+    }
+
     var payload = body["payload"]?.DeepClone() as JsonObject ?? new JsonObject
     {
         ["model"] = agent.String("model", "gpt-4o-mini"),
@@ -1705,6 +1734,132 @@ app.MapPost("/api/mcp", async (JsonObject body) =>
 });
 
 app.Run();
+
+static async Task<(bool Ok, string Text, string Error)> InvokeGoldfishAcp(
+    HttpClient client,
+    string endpoint,
+    string apiKey,
+    string profile,
+    string workingDirectory,
+    string parentAppUserId,
+    string prompt,
+    int timeoutSeconds)
+{
+    client.Timeout = TimeSpan.FromSeconds(Math.Clamp(timeoutSeconds, 20, 180));
+    var sessionId = $"happylife-web-{Guid.NewGuid():N}";
+    var createPayload = new JsonObject
+    {
+        ["jsonrpc"] = "2.0",
+        ["id"] = 1,
+        ["method"] = "session/new",
+        ["params"] = new JsonObject
+        {
+            ["cwd"] = workingDirectory,
+            ["mcpServers"] = new JsonArray(),
+            ["_meta"] = new JsonObject
+            {
+                ["agentfree"] = new JsonObject { ["requestedSessionId"] = sessionId }
+            }
+        }
+    };
+
+    try
+    {
+        using (var createRequest = CreateAgentRequest(endpoint, apiKey, createPayload))
+        using (var createResponse = await client.SendAsync(createRequest))
+        {
+            var createText = await createResponse.Content.ReadAsStringAsync();
+            if (!createResponse.IsSuccessStatusCode)
+            {
+                return (false, "", $"智能体会话创建失败（{(int)createResponse.StatusCode}）");
+            }
+            var createJson = JsonNode.Parse(createText) as JsonObject;
+            var createdSessionId = createJson?["result"]?["sessionId"]?.GetValue<string>();
+            if (string.IsNullOrWhiteSpace(createdSessionId)) return (false, "", "智能体未返回有效会话");
+            sessionId = createdSessionId;
+        }
+
+        var contextualPrompt = $"当前家长用户编号：{parentAppUserId}。调用规则相关工具时必须把该编号作为 user_id。\n\n{prompt}";
+        var promptPayload = new JsonObject
+        {
+            ["jsonrpc"] = "2.0",
+            ["id"] = 2,
+            ["method"] = "session/prompt",
+            ["params"] = new JsonObject
+            {
+                ["sessionId"] = sessionId,
+                ["prompt"] = new JsonArray
+                {
+                    new JsonObject { ["type"] = "text", ["text"] = contextualPrompt }
+                },
+                ["_meta"] = new JsonObject
+                {
+                    ["agentfree"] = new JsonObject
+                    {
+                        ["agent_type"] = "Goldfish",
+                        ["Profile"] = profile,
+                        ["user_id"] = parentAppUserId
+                    }
+                }
+            }
+        };
+        using var promptRequest = CreateAgentRequest(endpoint, apiKey, promptPayload);
+        using var promptResponse = await client.SendAsync(promptRequest, HttpCompletionOption.ResponseHeadersRead);
+        if (!promptResponse.IsSuccessStatusCode)
+        {
+            return (false, "", $"智能体调用失败（{(int)promptResponse.StatusCode}）");
+        }
+
+        var answer = new StringBuilder();
+        var stopReason = "";
+        await using var stream = await promptResponse.Content.ReadAsStreamAsync();
+        using var reader = new StreamReader(stream, Encoding.UTF8);
+        while (await reader.ReadLineAsync() is { } line)
+        {
+            if (!line.StartsWith("data:", StringComparison.OrdinalIgnoreCase)) continue;
+            JsonObject? frame = null;
+            try { frame = JsonNode.Parse(line[5..].Trim()) as JsonObject; } catch { }
+            if (frame is null) continue;
+            var update = frame["params"]?["update"] as JsonObject;
+            if (string.Equals(update?.String("sessionUpdate"), "agent_message_chunk", StringComparison.OrdinalIgnoreCase))
+            {
+                answer.Append(update?["content"]?["text"]?.GetValue<string>() ?? "");
+            }
+            stopReason = frame["result"]?["stopReason"]?.GetValue<string>() ?? stopReason;
+        }
+
+        var text = answer.ToString().Trim();
+        if (!string.Equals(stopReason, "end_turn", StringComparison.OrdinalIgnoreCase))
+        {
+            return (false, "", string.IsNullOrWhiteSpace(text) ? "智能体未正常完成本次对话" : text);
+        }
+        return string.IsNullOrWhiteSpace(text)
+            ? (false, "", "智能体没有返回内容")
+            : (true, text, "");
+    }
+    catch (TaskCanceledException)
+    {
+        return (false, "", "智能体响应超时，请稍后重试");
+    }
+    catch (Exception ex)
+    {
+        return (false, "", $"智能体服务异常：{ex.Message}");
+    }
+}
+
+static HttpRequestMessage CreateAgentRequest(string endpoint, string apiKey, JsonObject payload)
+{
+    var request = new HttpRequestMessage(HttpMethod.Post, endpoint)
+    {
+        Content = new StringContent(payload.ToJsonString(FamilyRewardJson.CreateOptions()), Encoding.UTF8, "application/json")
+    };
+    if (!string.IsNullOrWhiteSpace(apiKey))
+    {
+        request.Headers.Authorization = AuthenticationHeaderValue.Parse(
+            apiKey.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase) ? apiKey : $"Bearer {apiKey}");
+    }
+    return request;
+}
 
 static JsonObject BuildWatchWebManifest(HttpRequest request)
 {
@@ -2042,13 +2197,18 @@ static object BuildMcpToolCatalog()
             new
             {
                 name = FamilyRewardMcpQueryRulesToolName,
-                description = "查询积分规则和红线规则。",
-                inputSchema = new { type = "object", properties = new { } }
+                description = "查询指定家长生效的个人规则模板；未创建模板时返回公共规则。",
+                inputSchema = new
+                {
+                    type = "object",
+                    properties = new { user_id = new { type = "string", description = "家长用户名或家长应用用户编号（必填）" } },
+                    required = new[] { "user_id" }
+                }
             },
             new
             {
                 name = FamilyRewardMcpCreateRuleToolName,
-                description = "新增积分规则。",
+                description = "为指定家长新增个人积分规则，并自动加入该家长的个人规则模板。",
                 inputSchema = new
                 {
                     type = "object",
@@ -2058,15 +2218,16 @@ static object BuildMcpToolCatalog()
                         category = new { type = "string", description = "分类" },
                         points = new { type = "number", description = "积分" },
                         cash_cny = new { type = "number", description = "现金" },
-                        description = new { type = "string", description = "描述" }
+                        description = new { type = "string", description = "描述" },
+                        user_id = new { type = "string", description = "家长用户名或家长应用用户编号（必填）" }
                     },
-                    required = new[] { "name" }
+                    required = new[] { "user_id", "name" }
                 }
             },
             new
             {
                 name = FamilyRewardMcpUpdateRuleToolName,
-                description = "修改积分规则。",
+                description = "修改指定家长自己的个人积分规则；公共规则不可修改。",
                 inputSchema = new
                 {
                     type = "object",
@@ -2077,21 +2238,25 @@ static object BuildMcpToolCatalog()
                         category = new { type = "string", description = "分类" },
                         points = new { type = "number", description = "积分" },
                         cash_cny = new { type = "number", description = "现金" },
-                        description = new { type = "string", description = "描述" }
-                    }
+                        description = new { type = "string", description = "描述" },
+                        user_id = new { type = "string", description = "家长用户名或家长应用用户编号（必填）" }
+                    },
+                    required = new[] { "user_id", "rule_id" }
                 }
             },
             new
             {
                 name = FamilyRewardMcpDeleteRuleToolName,
-                description = "删除积分规则。",
+                description = "删除指定家长自己的个人积分规则；公共规则不可删除。",
                 inputSchema = new
                 {
                     type = "object",
                     properties = new
                     {
-                        rule_id = new { type = "integer", description = "规则ID" }
-                    }
+                        rule_id = new { type = "integer", description = "规则ID" },
+                        user_id = new { type = "string", description = "家长用户名或家长应用用户编号（必填）" }
+                    },
+                    required = new[] { "user_id", "rule_id" }
                 }
             },
             new
@@ -2386,18 +2551,18 @@ static HashSet<string> GetAllowedMcpArguments(string toolName) => toolName switc
     {
         "family_group_id", "child_id", "child_name", "category", "search", "start_date", "end_date", "page", "page_size"
     },
-    FamilyRewardMcpQueryRulesToolName => new(StringComparer.Ordinal),
+    FamilyRewardMcpQueryRulesToolName => new(StringComparer.Ordinal) { "user_id" },
     FamilyRewardMcpCreateRuleToolName => new(StringComparer.Ordinal)
     {
-        "name", "category", "points", "cash_cny", "description"
+        "user_id", "name", "category", "points", "cash_cny", "description"
     },
     FamilyRewardMcpUpdateRuleToolName => new(StringComparer.Ordinal)
     {
-        "rule_id", "name", "category", "points", "cash_cny", "description"
+        "user_id", "rule_id", "name", "category", "points", "cash_cny", "description"
     },
     FamilyRewardMcpDeleteRuleToolName => new(StringComparer.Ordinal)
     {
-        "rule_id"
+        "user_id", "rule_id"
     },
     FamilyRewardMcpQueryFamilyGroupsToolName => new(StringComparer.Ordinal)
     {
@@ -2426,7 +2591,7 @@ static async Task<object> InvokeFamilyRewardMcpTool(string toolName, JsonObject 
         FamilyRewardMcpDeleteRecordToolName => await McpDeleteRecord(connectionString, arguments),
         FamilyRewardMcpLogScoreOperationToolName => await McpLogScoreOperation(connectionString, arguments),
         FamilyRewardMcpQueryScoreOperationToolName => await McpQueryScoreOperations(connectionString, arguments),
-        FamilyRewardMcpQueryRulesToolName => await McpQueryRules(connectionString),
+        FamilyRewardMcpQueryRulesToolName => await McpQueryRules(connectionString, arguments),
         FamilyRewardMcpCreateRuleToolName => await McpCreateRule(connectionString, arguments),
         FamilyRewardMcpUpdateRuleToolName => await McpUpdateRule(connectionString, arguments),
         FamilyRewardMcpDeleteRuleToolName => await McpDeleteRule(connectionString, arguments),
@@ -2878,9 +3043,12 @@ static async Task<object> McpQueryChildren(string connectionString, JsonObject? 
     };
 }
 
-static async Task<object> McpQueryRules(string connectionString)
+static async Task<object> McpQueryRules(string connectionString, JsonObject arguments)
 {
-    return new { ok = true, action = "query_rules", data = await GetRules(connectionString) };
+    var parentAppUserId = ResolveRuleParentAppUserId(arguments);
+    return parentAppUserId is null
+        ? new { ok = false, action = "query_rules", error = "缺少家长用户信息 user_id" }
+        : new { ok = true, action = "query_rules", data = await GetRules(connectionString, parentAppUserId) };
 }
 
 static async Task<object> McpCreateRule(string connectionString, JsonObject arguments)
@@ -2890,21 +3058,12 @@ static async Task<object> McpCreateRule(string connectionString, JsonObject argu
     {
         return new { ok = false, error = "规则名称不能为空" };
     }
-
-    await using var conn = await OpenConnection(connectionString);
-    await using var cmd = new NpgsqlCommand("""
-        INSERT INTO rules (name, category, points, cash_cny, description)
-        VALUES (@name, @category, @points, @cash_cny, @description)
-        RETURNING *
-        """, conn);
-    cmd.Parameters.AddWithValue("name", name);
-    cmd.Parameters.AddWithValue("category", arguments.String("category"));
-    cmd.Parameters.AddWithValue("points", arguments.Decimal("points") ?? 0);
-    cmd.Parameters.AddWithValue("cash_cny", arguments.Decimal("cash_cny") ?? 0);
-    cmd.Parameters.AddWithValue("description", arguments.String("description"));
-    await using var reader = await cmd.ExecuteReaderAsync();
-    await reader.ReadAsync();
-    return new { ok = true, action = "create_rule", rule = ReadRule(reader) };
+    var parentAppUserId = ResolveRuleParentAppUserId(arguments);
+    if (parentAppUserId is null) return new { ok = false, error = "缺少家长用户信息 user_id" };
+    var result = await CreatePersonalRule(connectionString, parentAppUserId, arguments);
+    return result.ContainsKey("error")
+        ? new { ok = false, error = Convert.ToString(result["error"], CultureInfo.InvariantCulture) }
+        : new { ok = true, action = "create_rule", rule = result["rule"], parent_app_user_id = parentAppUserId };
 }
 
 static async Task<object> McpUpdateRule(string connectionString, JsonObject arguments)
@@ -2914,6 +3073,8 @@ static async Task<object> McpUpdateRule(string connectionString, JsonObject argu
     {
         return new { ok = false, error = "缺少规则ID" };
     }
+    var parentAppUserId = ResolveRuleParentAppUserId(arguments);
+    if (parentAppUserId is null) return new { ok = false, error = "缺少家长用户信息 user_id" };
 
     await using var conn = await OpenConnection(connectionString);
     await using var cmd = new NpgsqlCommand("""
@@ -2923,10 +3084,11 @@ static async Task<object> McpUpdateRule(string connectionString, JsonObject argu
             points = COALESCE(@points, points),
             cash_cny = COALESCE(@cash_cny, cash_cny),
             description = COALESCE(@description, description)
-        WHERE id = @id
+        WHERE id = @id AND owner_app_user_id = @owner_app_user_id
         RETURNING *
         """, conn);
     cmd.Parameters.AddWithValue("id", id.Value);
+    cmd.Parameters.AddWithValue("owner_app_user_id", parentAppUserId);
     cmd.Parameters.AddWithValue("name", arguments.ContainsKey("name") ? arguments.String("name") : DBNull.Value);
     cmd.Parameters.AddWithValue("category", arguments.ContainsKey("category") ? arguments.String("category") : DBNull.Value);
     cmd.Parameters.AddWithValue("points", arguments.ContainsKey("points") ? arguments.Decimal("points") ?? 0 : DBNull.Value);
@@ -2935,7 +3097,7 @@ static async Task<object> McpUpdateRule(string connectionString, JsonObject argu
     await using var reader = await cmd.ExecuteReaderAsync();
     if (!await reader.ReadAsync())
     {
-        return new { ok = false, error = "规则不存在" };
+        return new { ok = false, error = "规则不存在或无权修改公共规则" };
     }
     return new { ok = true, action = "update_rule", rule = ReadRule(reader) };
 }
@@ -2947,16 +3109,28 @@ static async Task<object> McpDeleteRule(string connectionString, JsonObject argu
     {
         return new { ok = false, error = "缺少规则ID" };
     }
+    var parentAppUserId = ResolveRuleParentAppUserId(arguments);
+    if (parentAppUserId is null) return new { ok = false, error = "缺少家长用户信息 user_id" };
 
     await using var conn = await OpenConnection(connectionString);
-    await using var cmd = new NpgsqlCommand("DELETE FROM rules WHERE id = @id RETURNING *", conn);
+    await using var cmd = new NpgsqlCommand("DELETE FROM rules WHERE id = @id AND owner_app_user_id = @owner_app_user_id RETURNING *", conn);
     cmd.Parameters.AddWithValue("id", id.Value);
+    cmd.Parameters.AddWithValue("owner_app_user_id", parentAppUserId);
     await using var reader = await cmd.ExecuteReaderAsync();
     if (!await reader.ReadAsync())
     {
-        return new { ok = false, error = "规则不存在" };
+        return new { ok = false, error = "规则不存在或无权删除公共规则" };
     }
     return new { ok = true, action = "delete_rule", rule = ReadRule(reader) };
+}
+
+static string? ResolveRuleParentAppUserId(JsonObject arguments)
+{
+    var userId = arguments.String("user_id").Trim();
+    if (string.IsNullOrWhiteSpace(userId)) return null;
+    return userId.EndsWith("parent", StringComparison.OrdinalIgnoreCase)
+        ? NormalizeBusinessUserName(userId)
+        : MakeParentAppUserId(userId);
 }
 
 static async Task<object> McpQueryFamilyGroups(string connectionString, JsonObject arguments)
@@ -3699,7 +3873,25 @@ static async Task InitDatabase(string connectionString)
             points NUMERIC(10,2) DEFAULT 0,
             cash_cny NUMERIC(10,2) DEFAULT 0,
             description TEXT,
+            owner_app_user_id VARCHAR(100),
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+        """,
+        "ALTER TABLE rules ADD COLUMN IF NOT EXISTS owner_app_user_id VARCHAR(100)",
+        """
+        CREATE TABLE IF NOT EXISTS user_rule_templates (
+            parent_app_user_id VARCHAR(100) PRIMARY KEY,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+        """,
+        """
+        CREATE TABLE IF NOT EXISTS user_rule_template_items (
+            parent_app_user_id VARCHAR(100) NOT NULL REFERENCES user_rule_templates(parent_app_user_id) ON DELETE CASCADE,
+            rule_id INTEGER NOT NULL REFERENCES rules(id) ON DELETE CASCADE,
+            sort_order INTEGER NOT NULL DEFAULT 0,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (parent_app_user_id, rule_id)
         )
         """,
         """
@@ -3735,6 +3927,8 @@ static async Task InitDatabase(string connectionString)
         "CREATE INDEX IF NOT EXISTS idx_tx_child ON transactions(child_id)",
         "CREATE INDEX IF NOT EXISTS idx_tx_date ON transactions(date)",
         "CREATE INDEX IF NOT EXISTS idx_tx_type ON transactions(type)",
+        "CREATE INDEX IF NOT EXISTS idx_rules_owner ON rules(owner_app_user_id)",
+        "CREATE INDEX IF NOT EXISTS idx_user_rule_template_items_order ON user_rule_template_items(parent_app_user_id, sort_order)",
         "CREATE INDEX IF NOT EXISTS idx_children_family_group ON children(family_group_id)",
         "CREATE INDEX IF NOT EXISTS idx_family_groups_created_by ON family_groups(created_by)",
         "CREATE INDEX IF NOT EXISTS idx_family_group_users_user ON family_group_users(user_id)",
@@ -5262,16 +5456,37 @@ static async Task<List<Dictionary<string, object?>>> GetChildren(
     return rows;
 }
 
-static async Task<Dictionary<string, object>> GetRules(string connectionString)
+static async Task<Dictionary<string, object>> GetRules(string connectionString, string? parentAppUserId = null)
 {
     await using var conn = await OpenConnection(connectionString);
-    var rules = new List<Dictionary<string, object?>>();
-    await using (var cmd = new NpgsqlCommand("SELECT * FROM rules ORDER BY id", conn))
-    await using (var reader = await cmd.ExecuteReaderAsync())
+    var publicRules = await ReadRules(conn, "owner_app_user_id IS NULL");
+    var personalRules = string.IsNullOrWhiteSpace(parentAppUserId)
+        ? new List<Dictionary<string, object?>>()
+        : await ReadRules(conn, "owner_app_user_id = @parent_app_user_id", parentAppUserId);
+
+    var hasTemplate = false;
+    var rules = publicRules;
+    if (!string.IsNullOrWhiteSpace(parentAppUserId))
     {
-        while (await reader.ReadAsync())
+        await using (var templateCmd = new NpgsqlCommand("SELECT EXISTS (SELECT 1 FROM user_rule_templates WHERE parent_app_user_id = @parent_app_user_id)", conn))
         {
-            rules.Add(ReadRule(reader));
+            templateCmd.Parameters.AddWithValue("parent_app_user_id", parentAppUserId);
+            hasTemplate = Convert.ToBoolean(await templateCmd.ExecuteScalarAsync(), CultureInfo.InvariantCulture);
+        }
+        if (hasTemplate)
+        {
+            rules = new List<Dictionary<string, object?>>();
+            await using var cmd = new NpgsqlCommand("""
+                SELECT r.*
+                FROM user_rule_template_items item
+                JOIN rules r ON r.id = item.rule_id
+                WHERE item.parent_app_user_id = @parent_app_user_id
+                  AND (r.owner_app_user_id IS NULL OR r.owner_app_user_id = @parent_app_user_id)
+                ORDER BY item.sort_order, r.id
+                """, conn);
+            cmd.Parameters.AddWithValue("parent_app_user_id", parentAppUserId);
+            await using var reader = await cmd.ExecuteReaderAsync();
+            while (await reader.ReadAsync()) rules.Add(ReadRule(reader));
         }
     }
 
@@ -5294,7 +5509,174 @@ static async Task<Dictionary<string, object>> GetRules(string connectionString)
         }
     }
 
-    return new Dictionary<string, object> { ["rules"] = rules, ["redlines"] = redlines };
+    return new Dictionary<string, object>
+    {
+        ["rules"] = rules,
+        ["publicRules"] = publicRules,
+        ["personalRules"] = personalRules,
+        ["templateRuleIds"] = rules.Select(rule => GetInt(rule, "id")).ToList(),
+        ["hasTemplate"] = hasTemplate,
+        ["redlines"] = redlines
+    };
+}
+
+static async Task<List<Dictionary<string, object?>>> ReadRules(
+    NpgsqlConnection conn,
+    string whereSql,
+    string? parentAppUserId = null)
+{
+    var rules = new List<Dictionary<string, object?>>();
+    await using var cmd = new NpgsqlCommand($"SELECT * FROM rules WHERE {whereSql} ORDER BY id", conn);
+    if (!string.IsNullOrWhiteSpace(parentAppUserId)) cmd.Parameters.AddWithValue("parent_app_user_id", parentAppUserId);
+    await using var reader = await cmd.ExecuteReaderAsync();
+    while (await reader.ReadAsync()) rules.Add(ReadRule(reader));
+    return rules;
+}
+
+static async Task<Dictionary<string, object?>> CreatePersonalRule(
+    string connectionString,
+    string parentAppUserId,
+    JsonObject body)
+{
+    var name = body.String("name").Trim();
+    if (string.IsNullOrWhiteSpace(name)) return new Dictionary<string, object?> { ["error"] = "规则名称不能为空" };
+
+    await using var conn = await OpenConnection(connectionString);
+    await using var tx = await conn.BeginTransactionAsync();
+    try
+    {
+        var hadTemplate = false;
+        await using (var existsCmd = new NpgsqlCommand("SELECT EXISTS (SELECT 1 FROM user_rule_templates WHERE parent_app_user_id = @parent_app_user_id)", conn, tx))
+        {
+            existsCmd.Parameters.AddWithValue("parent_app_user_id", parentAppUserId);
+            hadTemplate = Convert.ToBoolean(await existsCmd.ExecuteScalarAsync(), CultureInfo.InvariantCulture);
+        }
+        await using (var templateCmd = new NpgsqlCommand("""
+            INSERT INTO user_rule_templates (parent_app_user_id)
+            VALUES (@parent_app_user_id)
+            ON CONFLICT (parent_app_user_id) DO UPDATE SET updated_at = CURRENT_TIMESTAMP
+            """, conn, tx))
+        {
+            templateCmd.Parameters.AddWithValue("parent_app_user_id", parentAppUserId);
+            await templateCmd.ExecuteNonQueryAsync();
+        }
+        if (!hadTemplate)
+        {
+            await using var seedCmd = new NpgsqlCommand("""
+                INSERT INTO user_rule_template_items (parent_app_user_id, rule_id, sort_order)
+                SELECT @parent_app_user_id, id, (ROW_NUMBER() OVER (ORDER BY id) - 1)::INTEGER
+                FROM rules
+                WHERE owner_app_user_id IS NULL
+                ORDER BY id
+                """, conn, tx);
+            seedCmd.Parameters.AddWithValue("parent_app_user_id", parentAppUserId);
+            await seedCmd.ExecuteNonQueryAsync();
+        }
+
+        Dictionary<string, object?> rule;
+        await using (var insertCmd = new NpgsqlCommand("""
+            INSERT INTO rules (name, category, points, cash_cny, description, owner_app_user_id)
+            VALUES (@name, @category, @points, @cash_cny, @description, @owner_app_user_id)
+            RETURNING *
+            """, conn, tx))
+        {
+            insertCmd.Parameters.AddWithValue("name", name);
+            insertCmd.Parameters.AddWithValue("category", body.String("category"));
+            insertCmd.Parameters.AddWithValue("points", body.Decimal("points") ?? body.Decimal("score") ?? 0);
+            insertCmd.Parameters.AddWithValue("cash_cny", body.Decimal("cash_cny") ?? 0);
+            insertCmd.Parameters.AddWithValue("description", body.String("description"));
+            insertCmd.Parameters.AddWithValue("owner_app_user_id", parentAppUserId);
+            await using var reader = await insertCmd.ExecuteReaderAsync();
+            await reader.ReadAsync();
+            rule = ReadRule(reader);
+        }
+
+        await using (var itemCmd = new NpgsqlCommand("""
+            INSERT INTO user_rule_template_items (parent_app_user_id, rule_id, sort_order)
+            SELECT @parent_app_user_id, @rule_id, COALESCE(MAX(sort_order), -1) + 1
+            FROM user_rule_template_items
+            WHERE parent_app_user_id = @parent_app_user_id
+            """, conn, tx))
+        {
+            itemCmd.Parameters.AddWithValue("parent_app_user_id", parentAppUserId);
+            itemCmd.Parameters.AddWithValue("rule_id", GetInt(rule, "id"));
+            await itemCmd.ExecuteNonQueryAsync();
+        }
+        await tx.CommitAsync();
+        return new Dictionary<string, object?> { ["rule"] = rule, ["hasTemplate"] = true };
+    }
+    catch (Exception ex)
+    {
+        await tx.RollbackAsync();
+        return new Dictionary<string, object?> { ["error"] = ex.Message };
+    }
+}
+
+static async Task<Dictionary<string, object?>> SaveRuleTemplate(
+    string connectionString,
+    string parentAppUserId,
+    IReadOnlyList<int> ruleIds)
+{
+    await using var conn = await OpenConnection(connectionString);
+    await using var tx = await conn.BeginTransactionAsync();
+    try
+    {
+        if (ruleIds.Count > 0)
+        {
+            await using var validateCmd = new NpgsqlCommand("""
+                SELECT COUNT(*)
+                FROM rules
+                WHERE id = ANY(@rule_ids)
+                  AND (owner_app_user_id IS NULL OR owner_app_user_id = @parent_app_user_id)
+                """, conn, tx);
+            validateCmd.Parameters.AddWithValue("rule_ids", NpgsqlDbType.Array | NpgsqlDbType.Integer, ruleIds.ToArray());
+            validateCmd.Parameters.AddWithValue("parent_app_user_id", parentAppUserId);
+            var allowedCount = Convert.ToInt32(await validateCmd.ExecuteScalarAsync(), CultureInfo.InvariantCulture);
+            if (allowedCount != ruleIds.Count)
+            {
+                await tx.RollbackAsync();
+                return new Dictionary<string, object?> { ["error"] = "模板包含不存在或不属于当前家长的规则" };
+            }
+        }
+
+        await using (var templateCmd = new NpgsqlCommand("""
+            INSERT INTO user_rule_templates (parent_app_user_id)
+            VALUES (@parent_app_user_id)
+            ON CONFLICT (parent_app_user_id) DO UPDATE SET updated_at = CURRENT_TIMESTAMP
+            """, conn, tx))
+        {
+            templateCmd.Parameters.AddWithValue("parent_app_user_id", parentAppUserId);
+            await templateCmd.ExecuteNonQueryAsync();
+        }
+        await using (var deleteCmd = new NpgsqlCommand("DELETE FROM user_rule_template_items WHERE parent_app_user_id = @parent_app_user_id", conn, tx))
+        {
+            deleteCmd.Parameters.AddWithValue("parent_app_user_id", parentAppUserId);
+            await deleteCmd.ExecuteNonQueryAsync();
+        }
+        for (var index = 0; index < ruleIds.Count; index++)
+        {
+            await using var itemCmd = new NpgsqlCommand("""
+                INSERT INTO user_rule_template_items (parent_app_user_id, rule_id, sort_order)
+                VALUES (@parent_app_user_id, @rule_id, @sort_order)
+                """, conn, tx);
+            itemCmd.Parameters.AddWithValue("parent_app_user_id", parentAppUserId);
+            itemCmd.Parameters.AddWithValue("rule_id", ruleIds[index]);
+            itemCmd.Parameters.AddWithValue("sort_order", index);
+            await itemCmd.ExecuteNonQueryAsync();
+        }
+        await tx.CommitAsync();
+        return new Dictionary<string, object?>
+        {
+            ["status"] = "ok",
+            ["hasTemplate"] = true,
+            ["templateRuleIds"] = ruleIds
+        };
+    }
+    catch (Exception ex)
+    {
+        await tx.RollbackAsync();
+        return new Dictionary<string, object?> { ["error"] = ex.Message };
+    }
 }
 
 static async Task<List<Dictionary<string, object?>>> GetRecentTransactions(string connectionString, int limit, int? familyGroupId = null)
@@ -6804,6 +7186,10 @@ static Dictionary<string, object?> ReadRule(IDataRecord reader)
         ["isRedLine"] = false,
         ["score"] = points,
         ["enabled"] = true,
+        ["ownerAppUserId"] = reader.HasColumn("owner_app_user_id") && !reader.IsDBNull(reader.GetOrdinal("owner_app_user_id"))
+            ? reader.String("owner_app_user_id")
+            : null,
+        ["isPublic"] = !reader.HasColumn("owner_app_user_id") || reader.IsDBNull(reader.GetOrdinal("owner_app_user_id")),
         ["createdAt"] = reader.DateTime("created_at").ToString("O"),
         ["updatedAt"] = reader.HasColumn("updated_at") ? reader.DateTime("updated_at").ToString("O") : reader.DateTime("created_at").ToString("O")
     };
@@ -6951,6 +7337,9 @@ static string NormalizeWatchFace(string value) => value.Trim().ToLowerInvariant(
     "world" or "minecraft" or "我的世界" => "world",
     "hellokitty" or "hello_kitty" or "kitty" or "hello kitty" or "hellokitty表盘" or "hello kitty表盘" => "hellokitty",
     "starlight" or "star" or "星光梦可" => "starlight",
+    "dinosaur" or "dino" or "恐龙乐园" => "dinosaur",
+    "rainbow" or "彩虹糖果" => "rainbow",
+    "space" or "宇宙探险" => "space",
     _ => "world"
 };
 
@@ -7328,6 +7717,8 @@ sealed class SystemConfigStore
             ["apiKey"] = "",
             ["model"] = "gpt-4o-mini",
             ["timeout_seconds"] = 20,
+            ["profile"] = "happylife",
+            ["workingDirectory"] = "/Users/wengzhishan/Projects/family-reward-system",
             ["systemPrompt"] = "你是家加分智能助手，输出简短可执行建议。"
         }
     };

@@ -213,6 +213,19 @@ for (const req023Requirement of [
   }
 }
 
+for (const req034Requirement of [
+  'id="home-menu"',
+  "const ruleIcons = ['📚', '✏️', '🪥', '🧹', '🏃', '🤝', '⏰', '🌟']",
+  'class="leaderboard-banner"',
+  'data-face="dinosaur"',
+  'data-face="rainbow"',
+  'data-face="space"'
+]) {
+  if (!apiSource.includes(req034Requirement)) {
+    errors.push(`REQ-034 child-friendly watch support missing: ${req034Requirement}`);
+  }
+}
+
 for (const platform of config.platforms) {
   const platformConfig = JSON.parse(read(`platforms/${platform}.json`));
   if (platformConfig.packageId !== config.packageId) {

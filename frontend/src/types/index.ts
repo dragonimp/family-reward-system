@@ -156,6 +156,8 @@ export interface Rule {
   isRedLine: boolean; // 是否红线规则
   score: number; // 积分值
   enabled: boolean; // 是否启用
+  ownerAppUserId?: string | null;
+  isPublic?: boolean;
   createdAt: string;
   updatedAt: string;
 }

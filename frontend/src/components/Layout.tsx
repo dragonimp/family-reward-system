@@ -160,7 +160,7 @@ export default function Layout({ children }: LayoutProps) {
           {children}
         </div>
       </main>
-      <MobileAssistantBar onOpenMenu={() => setMobileOpen((open) => !open)} />
+      <MobileAssistantBar />
       <PublicFeedbackWidget />
     </div>
   );

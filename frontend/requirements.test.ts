@@ -47,14 +47,43 @@ test('REQ-032 keeps service configuration usable on narrow screens', async () =>
 });
 
 test('REQ-033 replaces mobile bottom navigation with the family agent command bar', async () => {
-  const [layout, assistant] = await Promise.all([
+  const [layout, assistant, api] = await Promise.all([
     readFile(new URL('./src/components/Layout.tsx', import.meta.url), 'utf8'),
     readFile(new URL('./src/components/MobileAssistantBar.tsx', import.meta.url), 'utf8'),
+    readFile(new URL('../FamilyReward.Api/Program.cs', import.meta.url), 'utf8'),
   ]);
   assert.match(layout, /<MobileAssistantBar/);
   assert.doesNotMatch(layout, /mobileNavItems\.slice\(0, 6\)/);
   assert.match(assistant, /家庭积分应用/);
   assert.match(assistant, /startVoice/);
   assert.match(assistant, /invokeAgent/);
-  assert.match(assistant, /onOpenMenu/);
+  assert.doesNotMatch(assistant, /onOpenMenu/);
+  assert.match(assistant, /fixed inset-0/);
+  assert.doesNotMatch(assistant, /grid-cols-\[44px_1fr_44px\]/);
+  assert.match(api, /InvokeGoldfishAcp/);
+  assert.match(api, /session\/new/);
+  assert.match(api, /session\/prompt/);
+});
+
+test('REQ-034 adds child-friendly watch navigation, icons, leaderboard and faces', async () => {
+  const api = await readFile(new URL('../FamilyReward.Api/Program.cs', import.meta.url), 'utf8');
+  assert.match(api, /id="home-menu"/);
+  assert.match(api, /setView\('home'\)/);
+  assert.match(api, /const ruleIcons = \['📚', '✏️', '🪥', '🧹', '🏃', '🤝', '⏰', '🌟'\]/);
+  assert.match(api, /class="leaderboard-banner"/);
+  for (const face of ['dinosaur', 'rainbow', 'space']) assert.match(api, new RegExp(`data-face="${face}"`));
+});
+
+test('REQ-036 scopes personal rule templates to a parent across web, watch and MCP', async () => {
+  const [api, page] = await Promise.all([
+    readFile(new URL('../FamilyReward.Api/Program.cs', import.meta.url), 'utf8'),
+    readFile(new URL('./src/pages/Rules.tsx', import.meta.url), 'utf8'),
+  ]);
+  assert.match(api, /CREATE TABLE IF NOT EXISTS user_rule_templates/);
+  assert.match(api, /CREATE TABLE IF NOT EXISTS user_rule_template_items/);
+  assert.match(api, /owner_app_user_id/);
+  assert.match(api, /GetRules\(connectionString, binding\.Binding!\.ParentAppUserId\)/);
+  assert.match(api, /FamilyRewardMcpQueryRulesToolName => new\(StringComparer\.Ordinal\) \{ "user_id" \}/);
+  assert.match(page, />我的规则模板</);
+  assert.match(page, /saveRuleTemplate\(selectedIds\)/);
 });
