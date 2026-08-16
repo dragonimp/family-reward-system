@@ -1,7 +1,9 @@
 package net.impx.happylife.watch;
 
+import android.Manifest;
 import android.annotation.SuppressLint;
 import android.app.Activity;
+import android.content.pm.PackageManager;
 import android.graphics.Color;
 import android.net.ConnectivityManager;
 import android.net.NetworkInfo;
@@ -9,6 +11,8 @@ import android.os.Build;
 import android.os.Bundle;
 import android.view.View;
 import android.webkit.WebResourceRequest;
+import android.webkit.PermissionRequest;
+import android.webkit.WebChromeClient;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
@@ -16,8 +20,11 @@ import android.widget.FrameLayout;
 import android.widget.TextView;
 
 public class MainActivity extends Activity {
+    private static final int AUDIO_PERMISSION_REQUEST = 41;
+    private static final String TRUSTED_WATCH_HOST = "happylife.ai.impx.net";
     private WebView webView;
     private TextView offlineView;
+    private PermissionRequest pendingAudioRequest;
 
     @SuppressLint("SetJavaScriptEnabled")
     @Override
@@ -70,8 +77,47 @@ public class MainActivity extends Activity {
                 webView.setVisibility(View.VISIBLE);
             }
         });
+        webView.setWebChromeClient(new WebChromeClient() {
+            @Override
+            public void onPermissionRequest(PermissionRequest request) {
+                runOnUiThread(() -> handleWebPermissionRequest(request));
+            }
+        });
 
         loadWatchEntry();
+    }
+
+    private void handleWebPermissionRequest(PermissionRequest request) {
+        boolean requestsAudio = false;
+        for (String resource : request.getResources()) {
+            if (PermissionRequest.RESOURCE_AUDIO_CAPTURE.equals(resource)) {
+                requestsAudio = true;
+                break;
+            }
+        }
+        if (!requestsAudio || !TRUSTED_WATCH_HOST.equalsIgnoreCase(request.getOrigin().getHost())) {
+            request.deny();
+            return;
+        }
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M
+                || checkSelfPermission(Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) {
+            request.grant(new String[] { PermissionRequest.RESOURCE_AUDIO_CAPTURE });
+            return;
+        }
+        pendingAudioRequest = request;
+        requestPermissions(new String[] { Manifest.permission.RECORD_AUDIO }, AUDIO_PERMISSION_REQUEST);
+    }
+
+    @Override
+    public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        if (requestCode != AUDIO_PERMISSION_REQUEST || pendingAudioRequest == null) return;
+        if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+            pendingAudioRequest.grant(new String[] { PermissionRequest.RESOURCE_AUDIO_CAPTURE });
+        } else {
+            pendingAudioRequest.deny();
+        }
+        pendingAudioRequest = null;
     }
 
     private void loadWatchEntry() {

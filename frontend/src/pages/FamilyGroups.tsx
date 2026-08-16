@@ -263,9 +263,24 @@ export default function FamilyGroups() {
             <h3 className="text-lg font-semibold text-gray-900">孩子成员</h3>
             <p className="mt-1 text-sm text-gray-500">查看当前家庭中的孩子信息及其归属家长</p>
           </div>
-          <span className="rounded-full bg-blue-50 px-3 py-1 text-sm font-medium text-blue-700">
-            {familyChildren.length} 名
-          </span>
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+            <label htmlFor="family-view-select" className="sr-only">选择要查看的家庭</label>
+            <select
+              id="family-view-select"
+              value={selectedGroupId ?? ''}
+              onChange={(event) => selectGroup(Number(event.target.value))}
+              disabled={groups.length === 0}
+              className="min-w-0 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 focus:border-[#4A90D9] focus:outline-none focus:ring-2 focus:ring-[#4A90D9]/20 sm:min-w-48"
+            >
+              {groups.length === 0 && <option value="">暂无家庭</option>}
+              {groups.map((group) => (
+                <option key={group.id} value={group.id}>{group.name}</option>
+              ))}
+            </select>
+            <span className="whitespace-nowrap rounded-full bg-blue-50 px-3 py-1 text-sm font-medium text-blue-700">
+              {familyChildren.length} 名
+            </span>
+          </div>
         </div>
         {childrenLoading ? (
           <div className="py-8 text-center text-sm text-gray-400">加载孩子成员中...</div>

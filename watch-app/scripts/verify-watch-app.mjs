@@ -105,28 +105,43 @@ for (const responsiveRequirement of [
   }
 }
 for (const requestScrollRequirement of [
-  ".panel[data-panel=request],.panel[data-panel=friends],.panel[data-panel=settings]{height:100%",
+  ".panel:not([data-panel=home]){height:100%",
   "overflow-y:auto",
   "scrollbar-width:thin",
   "touch-action:pan-y",
-  `panel.matches('[data-panel="request"],[data-panel="friends"],[data-panel="settings"]')`
+  `!panel.matches('[data-panel="home"],[data-panel="menu"]')`
 ]) {
   if (!apiSource.includes(requestScrollRequirement)) {
     errors.push(`watch scrollable panel support missing: ${requestScrollRequirement}`);
   }
 }
-if (/\.panel\{[^}]*overflow:auto/.test(apiSource)) {
-  errors.push("only the watch request panel may use a scrollbar");
-}
 for (const compactMenuRequirement of [
   'id="menu-toggle"',
-  'aria-expanded="false"',
-  ".menu-dock.open .menu-items{display:grid}",
-  "menu.classList.toggle('open')",
-  "document.getElementById('menu').classList.remove('open')"
+  'data-panel="menu"',
+  'data-view="request"',
+  'data-view="points-detail"',
+  'data-view="friend-add"',
+  'data-view="leaderboard"',
+  'data-view="settings"',
+  'data-view="device"',
+  "setView('menu')"
 ]) {
   if (!apiSource.includes(compactMenuRequirement)) {
     errors.push(`watch compact menu missing: ${compactMenuRequirement}`);
+  }
+}
+for (const req030Requirement of [
+  'class="menu-icon"',
+  'class="back-menu"',
+  'data-speech-target="title"',
+  'data-speech-target="note"',
+  'window.SpeechRecognition || window.webkitSpeechRecognition',
+  'android.permission.RECORD_AUDIO',
+  'PermissionRequest.RESOURCE_AUDIO_CAPTURE',
+  'TRUSTED_WATCH_HOST'
+]) {
+  if (!apiSource.includes(req030Requirement) && !manifest.includes(req030Requirement) && !mainActivity.includes(req030Requirement)) {
+    errors.push(`REQ-030 watch navigation or voice support missing: ${req030Requirement}`);
   }
 }
 const clamp = (min, value, max) => Math.min(max, Math.max(min, value));

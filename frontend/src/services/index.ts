@@ -10,6 +10,7 @@ import type {
   WatchRewardRequestsPayload,
 } from '../types';
 import type { AgentInvokeRequest, AgentInvokeResponse, RewardParseRequest, RewardParseResponse, SystemConfig } from '../types';
+import type { FeedbackItem, FeedbackSubmission } from '../types';
 
 export const getFamilyGroups = (params?: { userId?: string }) => http.get<unknown, FamilyGroup[]>('/api/family-groups', { params });
 export const createFamilyGroup = (data: Partial<FamilyGroup>) => http.post<unknown, FamilyGroup>('/api/family-groups', data);
@@ -69,3 +70,7 @@ export const getSystemConfig = () => http.get<unknown, SystemConfig>('/api/syste
 export const updateSystemConfig = (data: SystemConfig) => http.put<unknown, SystemConfig>('/api/system/config', data);
 export const invokeAgent = (data: AgentInvokeRequest) => http.post<unknown, AgentInvokeResponse>('/api/agent/invoke', data);
 export const parseRewardVoice = (data: RewardParseRequest) => http.post<unknown, RewardParseResponse>('/api/agent/parse-reward', data);
+export const submitFeedback = (data: FeedbackSubmission) =>
+  http.post<unknown, { id?: string; Id?: string; status: string }>('/api/feedback', data);
+export const getMyFeedback = (take = 50) =>
+  http.get<unknown, FeedbackItem[]>('/api/feedback/mine', { params: { take } });

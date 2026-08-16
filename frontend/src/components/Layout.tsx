@@ -2,6 +2,8 @@ import { Link, useLocation } from 'react-router-dom';
 import { useState, type ReactNode } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import UserMenu from './UserMenu';
+import FeedbackWidget from './FeedbackWidget';
+import MobileAssistantBar from './MobileAssistantBar';
 
 const navItems = [
   { path: '/dashboard', label: '仪表盘', icon: '📊' },
@@ -158,32 +160,8 @@ export default function Layout({ children }: LayoutProps) {
           {children}
         </div>
       </main>
-      {/* 移动端底部导航 */}
-          <nav className="lg:hidden bg-white border-t border-gray-200 flex-shrink-0">
-            <div className="grid grid-cols-7 items-center gap-1 px-1 py-1">
-              {mobileNavItems.slice(0, 6).map((item) => (
-            <Link
-              key={item.path}
-              to={item.path}
-              className={`flex min-w-0 flex-col items-center gap-0.5 rounded-lg px-1 py-1.5 text-xs transition-colors
-                ${location.pathname === item.path
-                  ? 'text-[#4A90D9] bg-[#4A90D9]/10'
-                  : 'text-gray-500'}`}
-            >
-              <span className="text-base">{item.icon}</span>
-              <span className="w-full truncate text-center">{item.label}</span>
-            </Link>
-          ))}
-          {/* 查看更多 */}
-          <button
-            className="flex min-w-0 flex-col items-center gap-0.5 rounded-lg px-1 py-1.5 text-xs text-gray-400"
-            onClick={() => setMobileOpen(!mobileOpen)}
-          >
-            <span className="text-base">⋯</span>
-            <span>更多</span>
-          </button>
-        </div>
-      </nav>
+      <MobileAssistantBar onOpenMenu={() => setMobileOpen((open) => !open)} />
+      <FeedbackWidget />
     </div>
   );
 }

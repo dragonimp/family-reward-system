@@ -165,7 +165,7 @@ export default function Settings() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 pb-3 sm:space-y-6">
       {toast.show && (
         <div
           className={`fixed top-4 right-4 z-50 px-6 py-3 rounded-lg shadow-lg text-white transition-all
@@ -175,14 +175,19 @@ export default function Settings() {
         </div>
       )}
 
-      <div>
-        <h2 className="text-2xl font-bold text-gray-900">系统配置</h2>
-        <p className="text-gray-500 mt-1">统一管理语音输入与智能体服务参数</p>
+      <div className="flex items-center justify-between gap-3">
+        <div className="min-w-0">
+          <h2 className="text-xl font-bold text-gray-900 sm:text-2xl">服务配置</h2>
+          <p className="mt-1 text-sm text-gray-500">语音与智能体服务</p>
+        </div>
+        <button onClick={saveConfig} disabled={saving} className="shrink-0 rounded-lg bg-[#4A90D9] px-4 py-2 text-sm font-medium text-white disabled:opacity-60">
+          {saving ? '保存中...' : '保存'}
+        </button>
       </div>
 
       {/* 语音配置 */}
-      <section className="bg-white rounded-xl border border-gray-200 p-5">
-        <h3 className="text-lg font-semibold text-gray-800 mb-4">🎤 语音输入配置</h3>
+      <section className="rounded-lg border border-gray-200 bg-white p-4 sm:p-5">
+        <h3 className="mb-4 text-base font-semibold text-gray-800 sm:text-lg">🎤 语音输入</h3>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <label className="flex items-center gap-2">
             <input
@@ -232,8 +237,8 @@ export default function Settings() {
       </section>
 
       {/* 智能体服务 */}
-      <section className="bg-white rounded-xl border border-gray-200 p-5">
-        <h3 className="text-lg font-semibold text-gray-800 mb-4">🤖 智能体服务配置</h3>
+      <section className="rounded-lg border border-gray-200 bg-white p-4 sm:p-5">
+        <h3 className="mb-4 text-base font-semibold text-gray-800 sm:text-lg">🤖 智能体服务</h3>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <label className="flex items-center gap-2">
             <input
@@ -305,7 +310,7 @@ export default function Settings() {
           </div>
           <div className="sm:col-span-2">
             <label className="block text-sm font-medium text-gray-700 mb-1">系统提示词</label>
-            <div className="flex items-start gap-2">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-start">
               <textarea
                 value={config.agent.systemPrompt}
                 onChange={(e) => {
@@ -323,7 +328,7 @@ export default function Settings() {
                     draft.agent.systemPrompt = `${draft.agent.systemPrompt ? `${draft.agent.systemPrompt}\n` : ''}${text}`;
                   });
                 })}
-                className="px-3 py-2 border border-[#4A90D9] text-[#4A90D9] rounded-lg text-sm"
+                className="w-full rounded-lg border border-[#4A90D9] px-3 py-2 text-sm text-[#4A90D9] sm:w-auto"
               >
                 🎤 输入
               </button>
@@ -333,12 +338,12 @@ export default function Settings() {
       </section>
 
       {/* 测试调用 */}
-      <section className="bg-white rounded-xl border border-gray-200 p-5">
-        <h3 className="text-lg font-semibold text-gray-800 mb-4">🧪 智能体调试</h3>
+      <section className="rounded-lg border border-gray-200 bg-white p-4 sm:p-5">
+        <h3 className="mb-4 text-base font-semibold text-gray-800 sm:text-lg">🧪 服务测试</h3>
         <div className="space-y-3">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">测试提示词</label>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
               <textarea
                 value={testPrompt}
                 onChange={(e) => setTestPrompt(e.target.value)}
@@ -348,13 +353,13 @@ export default function Settings() {
               <button
                 type="button"
                 onClick={() => startSpeechInput(setTestPrompt)}
-                className="px-3 py-2 border border-[#4A90D9] text-[#4A90D9] rounded-lg text-sm"
+                className="w-full rounded-lg border border-[#4A90D9] px-3 py-2 text-sm text-[#4A90D9] sm:w-auto"
               >
                 🎤 输入
               </button>
             </div>
           </div>
-          <div className="flex gap-3">
+          <div className="flex flex-wrap items-center gap-2 sm:gap-3">
             <button
               onClick={() => {
                 if (!config.agent.enabled) {
@@ -382,7 +387,7 @@ export default function Settings() {
               {agentError ? (
                 <p className="text-red-500">{agentError}</p>
               ) : (
-                <pre className="whitespace-pre-wrap text-gray-700">{JSON.stringify(agentResult, null, 2)}</pre>
+                <pre className="max-w-full overflow-x-auto whitespace-pre-wrap break-words text-gray-700">{JSON.stringify(agentResult, null, 2)}</pre>
               )}
             </div>
           )}

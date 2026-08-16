@@ -482,6 +482,83 @@ app.MapPost("/api/reward-requests/{id:int}/approve", async (int id, JsonObject b
     return result.ContainsKey("error") ? Results.BadRequest(result) : Results.Json(result);
 });
 
+app.MapPost("/api/feedback", async (JsonObject body, IHttpClientFactory httpClientFactory, HttpRequest request) =>
+{
+    var access = await RequireParentProfile(connectionString, request);
+    if (access.Error is not null) return access.Error;
+
+    var feedbackType = body.String("feedbackType", "suggestion").Trim().ToLowerInvariant();
+    if (feedbackType is not ("suggestion" or "defect" or "question"))
+    {
+        return Results.BadRequest(new { error = "请选择有效的反馈类型" });
+    }
+    var title = body.String("title").Trim();
+    var content = body.String("content").Trim();
+    var contact = body.String("submitterContact").Trim();
+    if (title.Length is < 1 or > 200) return Results.BadRequest(new { error = "标题长度应为 1-200 个字符" });
+    if (content.Length is < 1 or > 5000) return Results.BadRequest(new { error = "反馈内容长度应为 1-5000 个字符" });
+    if (contact.Length > 160) return Results.BadRequest(new { error = "联系方式不能超过 160 个字符" });
+
+    var source = body["source"] as JsonObject ?? new JsonObject();
+    var sourceRecordId = body.String("sourceRecordId").Trim();
+    if (sourceRecordId.Length is < 8 or > 200) return Results.BadRequest(new { error = "反馈记录编号无效" });
+    var sourceUrl = SanitizeFeedbackUrl(source.String("url"), request);
+    var pageContext = new JsonObject
+    {
+        ["pageTitle"] = LimitText(source.String("pageTitle"), 200),
+        ["path"] = SanitizeFeedbackPath(source.String("path")),
+        ["viewport"] = LimitText(source.String("viewport"), 40),
+        ["userAgent"] = LimitText(source.String("userAgent"), 500),
+        ["capturedAt"] = LimitText(source.String("capturedAt"), 80)
+    };
+    var atlasPayload = new JsonObject
+    {
+        ["project_code"] = "family-reward",
+        ["app_code"] = "",
+        ["feedback_type"] = feedbackType,
+        ["title"] = title,
+        ["content"] = content,
+        ["submitter_name"] = string.IsNullOrWhiteSpace(access.Profile!.Username) ? access.Profile.AppUserId : access.Profile.Username,
+        ["submitter_contact"] = contact,
+        ["submitter_type"] = "external_user",
+        ["source_type"] = "user_report",
+        ["source_system"] = "family-reward-web",
+        ["source_record_id"] = sourceRecordId,
+        ["source_url"] = sourceUrl,
+        ["page_context"] = FormatFeedbackPageContext(pageContext),
+        ["source_metadata"] = new JsonObject
+        {
+            ["source"] = new JsonObject
+            {
+                ["type"] = "user_report",
+                ["system"] = "family-reward-web",
+                ["recordId"] = sourceRecordId,
+                ["url"] = sourceUrl,
+                ["pageContext"] = pageContext.DeepClone(),
+                ["projectCode"] = "family-reward"
+            }
+        }.ToJsonString(FamilyRewardJson.CreateOptions())
+    };
+
+    return await ProxyAtlasFeedback(httpClientFactory, access.Profile, HttpMethod.Post, "/api/feedback", atlasPayload);
+});
+
+app.MapGet("/api/feedback/mine", async (IHttpClientFactory httpClientFactory, HttpRequest request) =>
+{
+    var access = await RequireParentProfile(connectionString, request);
+    if (access.Error is not null) return access.Error;
+    var take = Math.Clamp(request.Query.Int("take") ?? 50, 1, 100);
+    var result = await FetchAtlasFeedback(httpClientFactory, access.Profile!, $"/api/feedback/mine?take={take}");
+    if (result.Error is not null) return result.Error;
+    var items = result.Payload as JsonArray ?? new JsonArray();
+    var filtered = new JsonArray(items
+        .OfType<JsonObject>()
+        .Where(item => string.Equals(item.String("project_code"), "family-reward", StringComparison.OrdinalIgnoreCase))
+        .Select(item => item.DeepClone())
+        .ToArray());
+    return Results.Json(filtered);
+});
+
 app.MapGet("/watch", () =>
 {
     var html = """
@@ -519,12 +596,12 @@ app.MapGet("/watch", () =>
             .metric{min-width:0;border:1px solid #d7e1da;border-radius:8px;padding:clamp(3px,1.4vmin,5px) clamp(4px,1.8vmin,6px);background:#eef5f0}
             .metric b{display:block;overflow:hidden;color:#24352b;font-size:clamp(11px,4vmin,14px);text-overflow:ellipsis;white-space:nowrap}.metric span{display:block;margin-top:1px;color:#65736b;font-size:clamp(8px,3vmin,10px)}
             .menu-dock{position:absolute;right:clamp(-4px,-1vmin,-2px);top:50%;z-index:3;transform:translateY(-50%)}
-            .menu-toggle,.menu-btn{place-items:center;width:clamp(30px,12vmin,42px);height:clamp(30px,12vmin,42px);border:2px solid #17231b;border-radius:50%;background:#fff;color:#17231b;font-size:clamp(9px,3.2vmin,11px);font-weight:900;box-shadow:0 4px 10px rgba(16,32,25,.16)}
-            .menu-toggle{display:grid;background:#17231b;color:#fff}.menu-items{display:none;gap:clamp(3px,1.8vmin,6px)}.menu-dock.open .menu-toggle{display:none}.menu-dock.open .menu-items{display:grid}.menu-btn{display:grid}.menu-btn.active{background:#1f7a48;color:#fff}
+            .menu-toggle{display:grid;place-items:center;width:clamp(34px,13vmin,44px);height:clamp(34px,13vmin,44px);border:2px solid #17231b;border-radius:50%;background:#17231b;color:#fff;font-size:clamp(9px,3.2vmin,11px);font-weight:900;box-shadow:0 4px 10px rgba(16,32,25,.16)}
             .panel{--panel-scale:1;display:none;width:min(205px,100%);max-width:100%;overflow:hidden;text-align:left;transform:scale(var(--panel-scale));transform-origin:center;will-change:transform}.panel.active{display:block}.panel[data-panel=home],#bind-panel .panel{text-align:center}.panel[data-panel=home].active{display:flex;flex-direction:column;align-items:center;justify-content:center}
-            .panel[data-panel=request],.panel[data-panel=friends],.panel[data-panel=settings]{height:100%;padding:1px 5px 4px 1px;overflow-x:hidden;overflow-y:auto;overscroll-behavior:contain;scrollbar-color:#5d7768 transparent;scrollbar-gutter:stable;scrollbar-width:thin;touch-action:pan-y}.panel[data-panel=request]::-webkit-scrollbar,.panel[data-panel=friends]::-webkit-scrollbar,.panel[data-panel=settings]::-webkit-scrollbar{width:4px}.panel[data-panel=request]::-webkit-scrollbar-thumb,.panel[data-panel=friends]::-webkit-scrollbar-thumb,.panel[data-panel=settings]::-webkit-scrollbar-thumb{border-radius:4px;background:#5d7768}.panel[data-panel=request]::-webkit-scrollbar-track,.panel[data-panel=friends]::-webkit-scrollbar-track,.panel[data-panel=settings]::-webkit-scrollbar-track{background:transparent}
+            .panel:not([data-panel=home]){height:100%;padding:1px 5px 4px 1px;overflow-x:hidden;overflow-y:auto;overscroll-behavior:contain;scrollbar-color:#5d7768 transparent;scrollbar-gutter:stable;scrollbar-width:thin;touch-action:pan-y}.panel:not([data-panel=home])::-webkit-scrollbar{width:4px}.panel:not([data-panel=home])::-webkit-scrollbar-thumb{border-radius:4px;background:#5d7768}.panel:not([data-panel=home])::-webkit-scrollbar-track{background:transparent}
+            .panel[data-panel=menu]{height:auto;overflow:hidden;padding:0}
             .panel h1,.panel h2{margin:0 0 8px;text-align:center;font-size:18px;line-height:1.1}.bind-title{font-size:20px;font-weight:900}.bind-sub{margin:5px 0 10px;color:#65736b;font-size:12px}.rules{display:grid;gap:6px}
-            .rule-btn{display:flex;align-items:center;justify-content:space-between;gap:6px;width:100%;min-height:34px;border:1px solid #d3ded7;border-radius:8px;background:#fff;color:#17231b;padding:6px 8px;font-size:12px;text-align:left}.rule-btn span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.rule-btn b{color:#0c6f3b;white-space:nowrap}
+            .menu-groups{display:grid;gap:7px}.menu-group-title{margin:0 0 3px;color:#526258;font-size:10px;font-weight:900}.menu-grid{display:grid;grid-template-columns:1fr 1fr;gap:5px}.menu-card{display:grid;grid-template-columns:26px 1fr;align-items:center;min-height:42px;border:1px solid #d5e0d9;border-radius:8px;background:rgba(255,255,255,.94);padding:5px;color:#17231b;text-align:left}.menu-icon{display:grid;place-items:center;width:24px;height:24px;border-radius:7px;background:#e7f2eb;font-size:15px}.menu-card span:last-child{font-size:10px;font-weight:900;line-height:1.15}.back-menu{display:inline-flex;align-items:center;gap:3px;margin:0 0 6px;border:0;background:transparent;color:#17613a;padding:2px 0;font-size:11px;font-weight:900}.rule-btn{display:grid;grid-template-columns:24px 1fr auto;align-items:center;gap:6px;width:100%;min-height:36px;border:1px solid #d3ded7;border-radius:8px;background:#fff;color:#17231b;padding:5px 7px;font-size:11px;text-align:left}.rule-icon{display:grid;place-items:center;width:22px;height:22px;border-radius:6px;background:#eef5f0}.rule-btn span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.rule-btn b{color:#0c6f3b;white-space:nowrap}.input-action{display:grid;grid-template-columns:1fr auto;gap:5px;align-items:center}.voice-btn{display:grid;place-items:center;width:34px;height:34px;border:1px solid #bfd2c5;border-radius:8px;background:#edf6f0;color:#155c37;font-size:16px}.voice-btn.listening{background:#155c37;color:#fff}.detail-metrics{display:grid;grid-template-columns:repeat(3,1fr);gap:4px;margin-bottom:8px}.detail-metric{border:1px solid #dce6df;border-radius:8px;background:rgba(255,255,255,.92);padding:6px 2px;text-align:center}.detail-metric b{display:block;color:#0c6f3b;font-size:15px}.detail-metric span{font-size:9px;color:#65736b}
             label{display:block;margin:7px 0 3px;color:#44544a;font-size:11px;font-weight:700}input,textarea{width:100%;border:1px solid #cbd8cf;border-radius:8px;background:#fff;color:#17231b;padding:7px;font-size:14px}textarea{min-height:44px;resize:none}.submit,.ghost{width:100%;margin-top:8px;border:0;border-radius:8px;padding:9px;font-size:14px;font-weight:900}.submit{background:#1f7a48;color:#fff}.ghost{background:#e7efe9;color:#17462c}.msg{min-height:16px;margin:6px 0 0;text-align:center;color:#16643a;font-size:11px}
             .requests{list-style:none;margin:0;padding:0;display:grid;gap:5px}.requests li{display:grid;grid-template-columns:1fr auto;gap:6px;border-top:1px solid #e3ebe6;padding-top:5px;color:#25362c;font-size:11px}.requests span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.requests b{color:#71601b;white-space:nowrap}.empty,.empty-row{color:#64746a;text-align:center;font-size:12px}.code{text-align:center;letter-spacing:3px;font-size:22px;font-weight:900;text-transform:uppercase}.hidden{display:none!important}
             .friend-code{margin:5px 0;border:1px solid #cfe1d4;border-radius:8px;background:#fff;padding:8px;text-align:center}.friend-code b{display:block;color:#102019;font-size:22px;letter-spacing:3px}.friend-code span{display:block;margin-top:2px;color:#637268;font-size:10px}.compact-list{list-style:none;margin:0;padding:0;display:grid;gap:5px}.compact-list li{display:grid;grid-template-columns:auto 1fr auto;gap:5px;align-items:center;border:1px solid #e0e9e3;border-radius:8px;background:rgba(255,255,255,.9);padding:5px 6px;font-size:11px}.compact-list li.empty-row{display:block;text-align:center}.compact-list em{font-style:normal;font-weight:900;color:#5e6a63}.compact-list span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.compact-list b{color:#0c6f3b;white-space:nowrap}.face-grid{display:grid;gap:6px}.face-option{display:flex;align-items:center;justify-content:space-between;width:100%;border:1px solid #d8e4dc;border-radius:8px;background:#fff;padding:7px;color:#17231b;font-size:12px;font-weight:900}.face-option.active{border-color:#1f7a48;background:#e7f5ec;color:#0c6f3b}.face-swatch{width:22px;height:22px;border-radius:50%;border:1px solid #becdc4}.swatch-world{background:linear-gradient(135deg,#b9e0b3 0 45%,#f6f0d3 45% 65%,#96c66d 65%)}.swatch-hellokitty{background:linear-gradient(145deg,#ffeaf3,#ffd7e8)}.swatch-starlight{background:linear-gradient(145deg,#10233b,#8bd0d4)}
@@ -560,27 +637,53 @@ app.MapGet("/watch", () =>
                       <div class="metric"><b id="items">0</b><span>物品</span></div>
                     </div>
                   </div>
+                  <div class="panel" data-panel="menu">
+                    <h2>功能菜单</h2>
+                    <div class="menu-groups">
+                      <div><p class="menu-group-title">积分</p><div class="menu-grid">
+                        <button class="menu-card" type="button" data-view="request"><span class="menu-icon">⭐</span><span>积分申请</span></button>
+                        <button class="menu-card" type="button" data-view="points-detail"><span class="menu-icon">🏅</span><span>积分详情</span></button>
+                      </div></div>
+                      <div><p class="menu-group-title">好友</p><div class="menu-grid">
+                        <button class="menu-card" type="button" data-view="friend-add"><span class="menu-icon">👥</span><span>添加好友</span></button>
+                        <button class="menu-card" type="button" data-view="leaderboard"><span class="menu-icon">🏆</span><span>排行榜</span></button>
+                      </div></div>
+                      <div><p class="menu-group-title">设置</p><div class="menu-grid">
+                        <button class="menu-card" type="button" data-view="settings"><span class="menu-icon">⌚</span><span>表盘设置</span></button>
+                        <button class="menu-card" type="button" data-view="device"><span class="menu-icon">🔗</span><span>设备绑定</span></button>
+                      </div></div>
+                    </div>
+                  </div>
                   <div class="panel" data-panel="request">
+                    <button class="back-menu" type="button">‹ 返回菜单</button>
                     <h2>申请奖励</h2>
                     <form id="request-form">
                       <input type="hidden" name="rule_id" id="rule-id">
                       <div class="rules" id="rules"></div>
                       <label for="title">申请事项</label>
-                      <input id="title" name="title" maxlength="80" placeholder="比如 好好吃饭">
+                      <div class="input-action"><input id="title" name="title" maxlength="80" placeholder="比如 好好吃饭"><button class="voice-btn" type="button" data-speech-target="title" aria-label="语音输入申请事项">🎙</button></div>
                       <label for="points">积分</label>
                       <input id="points" name="points" inputmode="decimal" placeholder="比如 5">
                       <label for="note">说明</label>
-                      <textarea id="note" name="note" maxlength="200" placeholder="可以写一句说明"></textarea>
+                      <div class="input-action"><textarea id="note" name="note" maxlength="200" placeholder="可以写一句说明"></textarea><button class="voice-btn" type="button" data-speech-target="note" aria-label="语音输入说明">🎙</button></div>
                       <button class="submit" type="submit">提交</button>
                       <p id="msg" class="msg"></p>
                     </form>
                   </div>
-                  <div class="panel" data-panel="requests">
-                    <h2>最近申请</h2>
+                  <div class="panel" data-panel="points-detail">
+                    <button class="back-menu" type="button">‹ 返回菜单</button>
+                    <h2>积分详情</h2>
+                    <div class="detail-metrics">
+                      <div class="detail-metric"><b id="detail-score">0</b><span>积分</span></div>
+                      <div class="detail-metric"><b id="detail-cash">0</b><span>现金</span></div>
+                      <div class="detail-metric"><b id="detail-items">0</b><span>物品</span></div>
+                    </div>
+                    <label>最近申请</label>
                     <ul class="requests" id="requests"></ul>
                   </div>
-                  <div class="panel" data-panel="friends">
-                    <h2>好友</h2>
+                  <div class="panel" data-panel="friend-add">
+                    <button class="back-menu" type="button">‹ 返回菜单</button>
+                    <h2>添加好友</h2>
                     <button class="submit" id="make-friend-code" type="button">生成好友码</button>
                     <div class="friend-code hidden" id="friend-code-box">
                       <b id="friend-code">--------</b>
@@ -592,10 +695,14 @@ app.MapGet("/watch", () =>
                     <p id="friend-msg" class="msg"></p>
                     <label>好友列表</label>
                     <ul class="compact-list" id="friends-list"></ul>
-                    <label>积分榜</label>
+                  </div>
+                  <div class="panel" data-panel="leaderboard">
+                    <button class="back-menu" type="button">‹ 返回菜单</button>
+                    <h2>好友积分榜</h2>
                     <ul class="compact-list" id="friend-leaderboard"></ul>
                   </div>
                   <div class="panel" data-panel="settings">
+                    <button class="back-menu" type="button">‹ 返回菜单</button>
                     <h2>表盘设置</h2>
                     <div class="face-grid">
                       <button class="face-option" type="button" data-face="world"><span>我的世界</span><i class="face-swatch swatch-world"></i></button>
@@ -605,7 +712,8 @@ app.MapGet("/watch", () =>
                     <p id="settings-msg" class="msg"></p>
                   </div>
                   <div class="panel" data-panel="device">
-                    <h2>设备</h2>
+                    <button class="back-menu" type="button">‹ 返回菜单</button>
+                    <h2>设备绑定</h2>
                     <div class="requests">
                       <li><span>绑定状态</span><b>已绑定</b></li>
                       <li><span>设备</span><b id="device-id">--</b></li>
@@ -618,15 +726,7 @@ app.MapGet("/watch", () =>
                 </section>
               </div>
               <nav class="menu-dock hidden" id="menu" aria-label="功能菜单">
-                <button class="menu-toggle" id="menu-toggle" type="button" aria-expanded="false" aria-controls="menu-items">菜单</button>
-                <div class="menu-items" id="menu-items">
-                  <button class="menu-btn active" type="button" data-view="home">积分</button>
-                  <button class="menu-btn" type="button" data-view="request">申请</button>
-                  <button class="menu-btn" type="button" data-view="requests">记录</button>
-                  <button class="menu-btn" type="button" data-view="friends">好友</button>
-                  <button class="menu-btn" type="button" data-view="settings">设置</button>
-                  <button class="menu-btn" type="button" data-view="device">设备</button>
-                </div>
+                <button class="menu-toggle" id="menu-toggle" type="button" aria-label="打开功能菜单">菜单</button>
               </nav>
             </div>
           </main>
@@ -646,6 +746,15 @@ app.MapGet("/watch", () =>
                 : '0';
             };
             const faceLabels = { world: '我的世界', hellokitty: 'HelloKitty', starlight: '星光梦可' };
+            const ruleIcon = (category = '') => {
+              const value = String(category);
+              if (/学习|阅读|作业/.test(value)) return '📚';
+              if (/家务|整理|劳动/.test(value)) return '🧹';
+              if (/运动|健康/.test(value)) return '🏃';
+              if (/礼貌|助人/.test(value)) return '🤝';
+              if (/习惯|自律/.test(value)) return '⏰';
+              return '⭐';
+            };
             const normalizeFace = (value) => ['world', 'hellokitty', 'starlight'].includes(value) ? value : 'world';
             const applyWatchFace = (value) => {
               const face = normalizeFace(value);
@@ -674,7 +783,7 @@ app.MapGet("/watch", () =>
                 const panel = screen.querySelector('.panel.active');
                 if (!panel) return;
                 panel.style.setProperty('--panel-scale', '1');
-                if (panel.matches('[data-panel="request"],[data-panel="friends"],[data-panel="settings"]')) return;
+                if (!panel.matches('[data-panel="home"],[data-panel="menu"]')) return;
                 const scale = calculatePanelScale(
                   Math.max(1, screen.clientWidth - 2),
                   Math.max(1, screen.clientHeight - 2),
@@ -690,11 +799,12 @@ app.MapGet("/watch", () =>
               document.getElementById('menu').classList.toggle('hidden', !bound);
               fitActivePanel();
             };
-            const setView = (view) => {
+            let currentView = 'home';
+            const setView = (view, push = true) => {
+              if (!document.querySelector(`[data-panel="${view}"]`)) view = 'home';
+              currentView = view;
               document.querySelectorAll('[data-panel]').forEach((panel) => panel.classList.toggle('active', panel.dataset.panel === view));
-              document.querySelectorAll('.menu-btn').forEach((button) => button.classList.toggle('active', button.dataset.view === view));
-              document.getElementById('menu').classList.remove('open');
-              document.getElementById('menu-toggle').setAttribute('aria-expanded', 'false');
+              if (push && history.state?.watchView !== view) history.pushState({ watchView: view }, '', location.href);
               fitActivePanel();
             };
             const fetchJson = async (url, options = {}) => {
@@ -722,10 +832,13 @@ app.MapGet("/watch", () =>
                 document.getElementById('score').textContent = formatPoints(child.points);
                 document.getElementById('cash').textContent = child.cash ?? 0;
                 document.getElementById('items').textContent = child.items ?? 0;
+                document.getElementById('detail-score').textContent = formatPoints(child.points);
+                document.getElementById('detail-cash').textContent = child.cash ?? 0;
+                document.getElementById('detail-items').textContent = child.items ?? 0;
                 document.getElementById('device-id').textContent = '#' + escapeText(score.deviceId);
                 document.getElementById('rules').innerHTML = (rulesPayload.rules || []).slice(0, 8).map((rule) => `
                   <button type="button" class="rule-btn" data-rule-id="${rule.id}" data-points="${rule.points}" data-title="${escapeText(rule.name)}">
-                    <span>${escapeText(rule.name)}</span><b>+${escapeText(rule.points)}</b>
+                    <i class="rule-icon">${ruleIcon(rule.category)}</i><span>${escapeText(rule.name)}</span><b>+${escapeText(rule.points)}</b>
                   </button>`).join('') || '<div class="empty">暂无可申请规则</div>';
                 document.querySelectorAll('.rule-btn').forEach((button) => {
                   button.addEventListener('click', () => {
@@ -775,7 +888,7 @@ app.MapGet("/watch", () =>
                 form.reset();
                 document.getElementById('rule-id').value = '';
                 await load();
-                setView('requests');
+                setView('points-detail');
               } catch (error) {
                 msg.textContent = error.message || '提交失败';
               }
@@ -848,13 +961,50 @@ app.MapGet("/watch", () =>
                 }
               });
             });
-            document.querySelectorAll('.menu-btn').forEach((button) => {
+            document.querySelectorAll('.menu-card').forEach((button) => {
               button.addEventListener('click', () => setView(button.dataset.view || 'home'));
             });
+            document.querySelectorAll('.back-menu').forEach((button) => {
+              button.addEventListener('click', () => setView('menu'));
+            });
             document.getElementById('menu-toggle').addEventListener('click', () => {
-              const menu = document.getElementById('menu');
-              const expanded = menu.classList.toggle('open');
-              document.getElementById('menu-toggle').setAttribute('aria-expanded', String(expanded));
+              setView('menu');
+            });
+            document.querySelectorAll('[data-speech-target]').forEach((button) => {
+              button.addEventListener('click', () => {
+                const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+                const target = document.getElementById(button.dataset.speechTarget || '');
+                if (!SpeechRecognition || !target) {
+                  msg.textContent = '当前手表不支持语音识别，请使用键盘输入';
+                  return;
+                }
+                try {
+                  const recognition = new SpeechRecognition();
+                  recognition.lang = 'zh-CN';
+                  recognition.interimResults = false;
+                  recognition.maxAlternatives = 1;
+                  recognition.onstart = () => {
+                    button.classList.add('listening');
+                    msg.textContent = '正在听，请说话...';
+                  };
+                  recognition.onresult = (event) => {
+                    const text = event.results?.[0]?.[0]?.transcript || '';
+                    target.value = target.value ? `${target.value}${text}` : text;
+                    msg.textContent = text ? '语音已转成文字，请确认后提交' : '没有识别到内容';
+                  };
+                  recognition.onerror = () => { msg.textContent = '语音识别失败，请使用键盘输入'; };
+                  recognition.onend = () => { button.classList.remove('listening'); };
+                  recognition.start();
+                } catch {
+                  button.classList.remove('listening');
+                  msg.textContent = '无法启动语音识别，请使用键盘输入';
+                }
+              });
+            });
+            history.replaceState({ watchView: 'home' }, '', location.href);
+            window.addEventListener('popstate', (event) => {
+              const next = event.state?.watchView || (currentView === 'home' ? 'home' : 'menu');
+              setView(next, false);
             });
             window.addEventListener('resize', fitActivePanel);
             window.addEventListener('orientationchange', fitActivePanel);
@@ -6981,6 +7131,129 @@ static void NormalizeRewardCommand(JsonObject command, List<Dictionary<string, o
     if (string.IsNullOrWhiteSpace(command.String("description")))
     {
         command["description"] = transcript;
+    }
+}
+
+static string LimitText(string value, int maxLength) =>
+    string.IsNullOrEmpty(value) || value.Length <= maxLength ? value : value[..maxLength];
+
+static string SanitizeFeedbackUrl(string value, HttpRequest request)
+{
+    if (!Uri.TryCreate(value, UriKind.Absolute, out var uri) || uri.Scheme is not ("http" or "https")) return "";
+    var requestHost = request.Host.Host;
+    var allowed = string.Equals(uri.Host, requestHost, StringComparison.OrdinalIgnoreCase)
+        || uri.Host is "happylife.ai.impx.net" or "localhost" or "127.0.0.1";
+    if (!allowed) return "";
+
+    var blockedKeys = new[] { "token", "code", "auth", "key", "password", "secret" };
+    var builder = new UriBuilder(uri) { Query = "" };
+    foreach (var pair in Microsoft.AspNetCore.WebUtilities.QueryHelpers.ParseQuery(uri.Query))
+    {
+        if (blockedKeys.Any(key => pair.Key.Contains(key, StringComparison.OrdinalIgnoreCase))) continue;
+        foreach (var item in pair.Value)
+        {
+            builder.Query = Microsoft.AspNetCore.WebUtilities.QueryHelpers.AddQueryString(builder.Query.TrimStart('?'), pair.Key, item ?? "");
+        }
+    }
+    return LimitText(builder.Uri.ToString(), 1000);
+}
+
+static string SanitizeFeedbackPath(string value)
+{
+    if (string.IsNullOrWhiteSpace(value) || !value.StartsWith('/')) return "";
+    if (!Uri.TryCreate($"https://feedback.invalid{value}", UriKind.Absolute, out var uri)) return "";
+
+    var blockedKeys = new[] { "token", "code", "auth", "key", "password", "secret" };
+    var builder = new UriBuilder(uri) { Query = "" };
+    foreach (var pair in Microsoft.AspNetCore.WebUtilities.QueryHelpers.ParseQuery(uri.Query))
+    {
+        if (blockedKeys.Any(key => pair.Key.Contains(key, StringComparison.OrdinalIgnoreCase))) continue;
+        foreach (var item in pair.Value)
+        {
+            builder.Query = Microsoft.AspNetCore.WebUtilities.QueryHelpers.AddQueryString(builder.Query.TrimStart('?'), pair.Key, item ?? "");
+        }
+    }
+    return LimitText($"{builder.Path}{builder.Query}{builder.Fragment}", 500);
+}
+
+static string FormatFeedbackPageContext(JsonObject source)
+{
+    var rows = new[]
+    {
+        ("页面标题", source.String("pageTitle")),
+        ("页面路径", source.String("path")),
+        ("视口", source.String("viewport")),
+        ("浏览器", source.String("userAgent")),
+        ("采集时间", source.String("capturedAt"))
+    };
+    return string.Join('\n', rows.Where(row => !string.IsNullOrWhiteSpace(row.Item2)).Select(row => $"{row.Item1}：{row.Item2}"));
+}
+
+static string GetAtlasFeedbackBaseUrl() =>
+    (Environment.GetEnvironmentVariable("FAMILY_REWARD_ATLAS_URL") ?? "https://home.ai.impx.net").TrimEnd('/');
+
+static void AddAtlasFeedbackHeaders(HttpRequestMessage message, AppUserProfile profile)
+{
+    var stableUserId = string.IsNullOrWhiteSpace(profile.UnifiedUserId) ? profile.AppUserId : profile.UnifiedUserId;
+    message.Headers.TryAddWithoutValidation("X-Atlas-User-Id", stableUserId);
+    message.Headers.TryAddWithoutValidation("X-User-Id", stableUserId);
+    message.Headers.TryAddWithoutValidation("X-User-Name", profile.Username);
+}
+
+static async Task<IResult> ProxyAtlasFeedback(
+    IHttpClientFactory httpClientFactory,
+    AppUserProfile profile,
+    HttpMethod method,
+    string path,
+    JsonNode? payload = null)
+{
+    var result = await SendAtlasFeedback(httpClientFactory, profile, method, path, payload);
+    return result.Error ?? Results.Json(result.Payload ?? new JsonObject(), statusCode: result.StatusCode);
+}
+
+static async Task<(JsonNode? Payload, IResult? Error, int StatusCode)> FetchAtlasFeedback(
+    IHttpClientFactory httpClientFactory,
+    AppUserProfile profile,
+    string path) => await SendAtlasFeedback(httpClientFactory, profile, HttpMethod.Get, path);
+
+static async Task<(JsonNode? Payload, IResult? Error, int StatusCode)> SendAtlasFeedback(
+    IHttpClientFactory httpClientFactory,
+    AppUserProfile profile,
+    HttpMethod method,
+    string path,
+    JsonNode? payload = null)
+{
+    using var message = new HttpRequestMessage(method, $"{GetAtlasFeedbackBaseUrl()}{path}");
+    AddAtlasFeedbackHeaders(message, profile);
+    if (payload is not null)
+    {
+        message.Content = new StringContent(payload.ToJsonString(FamilyRewardJson.CreateOptions()), Encoding.UTF8, "application/json");
+    }
+    var client = httpClientFactory.CreateClient();
+    client.Timeout = TimeSpan.FromSeconds(8);
+    try
+    {
+        using var response = await client.SendAsync(message);
+        var text = await response.Content.ReadAsStringAsync();
+        JsonNode? responsePayload = null;
+        try { responsePayload = JsonNode.Parse(text); } catch { }
+        if (!response.IsSuccessStatusCode)
+        {
+            var upstreamMessage = (responsePayload as JsonObject)?.String("message");
+            return (null, Results.Json(new
+            {
+                error = string.IsNullOrWhiteSpace(upstreamMessage) ? "反馈服务暂时不可用，请稍后重试" : upstreamMessage
+            }, statusCode: StatusCodes.Status502BadGateway), StatusCodes.Status502BadGateway);
+        }
+        return (responsePayload, null, (int)response.StatusCode);
+    }
+    catch (TaskCanceledException)
+    {
+        return (null, Results.Json(new { error = "反馈服务响应超时，请稍后重试" }, statusCode: StatusCodes.Status503ServiceUnavailable), StatusCodes.Status503ServiceUnavailable);
+    }
+    catch (HttpRequestException)
+    {
+        return (null, Results.Json(new { error = "反馈服务暂时无法连接，请稍后重试" }, statusCode: StatusCodes.Status503ServiceUnavailable), StatusCodes.Status503ServiceUnavailable);
     }
 }
 

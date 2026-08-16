@@ -67,7 +67,7 @@ done
 echo 'ok 1 - 手表菜单展示三款表盘、好友入口和好友积分榜'
 
 grep -Fq 'name="viewport"' <<<"$watch_page"
-grep -Fq '.panel[data-panel=friends],.panel[data-panel=settings]' <<<"$watch_page"
+grep -Fq '.panel:not([data-panel=home])' <<<"$watch_page"
 grep -Fq 'touch-action:pan-y' <<<"$watch_page"
 echo 'ok 2 - 好友与设置面板适配手表视口并支持纵向触摸滚动'
 

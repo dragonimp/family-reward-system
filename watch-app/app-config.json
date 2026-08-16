@@ -13,5 +13,5 @@
   },
   "platforms": ["xiaotiancai", "xiaomi", "huawei"],
   "screens": ["192x192", "240x240", "280x280", "320x320", "360x360"],
-  "permissions": ["android.permission.INTERNET", "android.permission.ACCESS_NETWORK_STATE"]
+  "permissions": ["android.permission.INTERNET", "android.permission.ACCESS_NETWORK_STATE", "android.permission.RECORD_AUDIO"]
 }

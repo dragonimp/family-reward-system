@@ -256,6 +256,36 @@ export interface AgentInvokeResponse {
   error?: string;
 }
 
+export interface FeedbackSource {
+  url: string;
+  pageTitle: string;
+  path: string;
+  viewport: string;
+  userAgent: string;
+  capturedAt: string;
+}
+
+export interface FeedbackSubmission {
+  feedbackType: 'suggestion' | 'defect' | 'question';
+  title: string;
+  content: string;
+  submitterContact?: string;
+  sourceRecordId: string;
+  source: FeedbackSource;
+}
+
+export interface FeedbackItem {
+  id?: string;
+  Id?: string;
+  feedback_type: string;
+  title: string;
+  content?: string;
+  status: string;
+  reply_content?: string;
+  createdat?: string;
+  updatedat?: string;
+}
+
 export interface RewardCommand {
   childId?: number | null;
   childName?: string | null;
