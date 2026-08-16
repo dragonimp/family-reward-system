@@ -1,0 +1,57 @@
+import { useEffect } from 'react';
+import { useAuth } from '../contexts/AuthContext';
+
+interface PublicFeedbackConfig {
+  projectCode: string;
+  projectName: string;
+  projectCodename: string;
+  endpoint: string;
+  sourceApp: string;
+  currentUser: {
+    id: string;
+    username: string;
+    displayName: string;
+    email: string;
+    phone: string;
+  } | null;
+}
+
+declare global {
+  interface Window {
+    AgentDashFeedback?: PublicFeedbackConfig;
+  }
+}
+
+const PUBLIC_WIDGET_ID = 'atlas-public-feedback-widget';
+const PUBLIC_WIDGET_URL = 'https://home.ai.impx.net/feedback-widget.js';
+
+export default function PublicFeedbackWidget() {
+  const { user } = useAuth();
+
+  useEffect(() => {
+    window.AgentDashFeedback = {
+      projectCode: 'family-reward',
+      projectName: '家加分',
+      projectCodename: '家加分',
+      endpoint: '/api/feedback',
+      sourceApp: '家加分',
+      currentUser: user ? {
+        id: user.userId || user.id || '',
+        username: user.username,
+        displayName: user.displayName || user.username,
+        email: user.email || '',
+        phone: user.phoneNumber || '',
+      } : null,
+    };
+
+    if (!document.getElementById(PUBLIC_WIDGET_ID)) {
+      const script = document.createElement('script');
+      script.id = PUBLIC_WIDGET_ID;
+      script.src = PUBLIC_WIDGET_URL;
+      script.async = true;
+      document.body.appendChild(script);
+    }
+  }, [user]);
+
+  return null;
+}

@@ -18,19 +18,25 @@ test('REQ-030 exposes one watch menu with six icon destinations and voice fallba
   assert.match(api, /当前手表不支持语音识别，请使用键盘输入/);
 });
 
-test('REQ-031 submits feedback through the same-origin Atlas proxy and lists current user records', async () => {
-  const [widget, services, api] = await Promise.all([
-    readFile(new URL('./src/components/FeedbackWidget.tsx', import.meta.url), 'utf8'),
-    readFile(new URL('./src/services/index.ts', import.meta.url), 'utf8'),
+test('REQ-031 directly loads the public feedback widget with current user contact details', async () => {
+  const [widget, layout, api] = await Promise.all([
+    readFile(new URL('./src/components/PublicFeedbackWidget.tsx', import.meta.url), 'utf8'),
+    readFile(new URL('./src/components/Layout.tsx', import.meta.url), 'utf8'),
     readFile(new URL('../FamilyReward.Api/Program.cs', import.meta.url), 'utf8'),
   ]);
-  assert.match(widget, /sourceRecordId: recordId/);
-  assert.match(widget, /页面信息/);
-  assert.match(services, /'\/api\/feedback'/);
-  assert.match(services, /'\/api\/feedback\/mine'/);
+  assert.match(widget, /https:\/\/home\.ai\.impx\.net\/feedback-widget\.js/);
+  assert.match(widget, /window\.AgentDashFeedback =/);
+  assert.match(widget, /email: user\.email \|\| ''/);
+  assert.match(widget, /phone: user\.phoneNumber \|\| ''/);
+  assert.match(layout, /<PublicFeedbackWidget \/>/);
   assert.match(api, /source_system"] = "family-reward-web"/);
   assert.match(api, /X-Atlas-User-Id/);
   assert.match(api, /\["path"\] = SanitizeFeedbackPath/);
+  assert.match(api, /body\.String\("feedback_type", "suggestion"\)/);
+  assert.match(api, /body\.String\("submitter_contact"\)/);
+  assert.match(api, /body\.String\("source_url"\)/);
+  assert.match(api, /feedback-\{Guid\.NewGuid\(\):N\}/);
+  assert.match(api, /GetUnifiedContact\(request\)/);
 });
 
 test('REQ-032 keeps service configuration usable on narrow screens', async () => {

@@ -2,7 +2,7 @@ import { Link, useLocation } from 'react-router-dom';
 import { useState, type ReactNode } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import UserMenu from './UserMenu';
-import FeedbackWidget from './FeedbackWidget';
+import PublicFeedbackWidget from './PublicFeedbackWidget';
 import MobileAssistantBar from './MobileAssistantBar';
 
 const navItems = [
@@ -161,7 +161,7 @@ export default function Layout({ children }: LayoutProps) {
         </div>
       </main>
       <MobileAssistantBar onOpenMenu={() => setMobileOpen((open) => !open)} />
-      <FeedbackWidget />
+      <PublicFeedbackWidget />
     </div>
   );
 }

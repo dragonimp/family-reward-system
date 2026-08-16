@@ -487,26 +487,33 @@ app.MapPost("/api/feedback", async (JsonObject body, IHttpClientFactory httpClie
     var access = await RequireParentProfile(connectionString, request);
     if (access.Error is not null) return access.Error;
 
-    var feedbackType = body.String("feedbackType", "suggestion").Trim().ToLowerInvariant();
+    var feedbackType = body.String("feedbackType", body.String("feedback_type", "suggestion")).Trim().ToLowerInvariant();
     if (feedbackType is not ("suggestion" or "defect" or "question"))
     {
         return Results.BadRequest(new { error = "请选择有效的反馈类型" });
     }
     var title = body.String("title").Trim();
     var content = body.String("content").Trim();
-    var contact = body.String("submitterContact").Trim();
+    var contact = body.String("submitterContact", body.String("submitter_contact")).Trim();
+    if (string.IsNullOrWhiteSpace(contact)) contact = GetUnifiedContact(request);
     if (title.Length is < 1 or > 200) return Results.BadRequest(new { error = "标题长度应为 1-200 个字符" });
     if (content.Length is < 1 or > 5000) return Results.BadRequest(new { error = "反馈内容长度应为 1-5000 个字符" });
     if (contact.Length > 160) return Results.BadRequest(new { error = "联系方式不能超过 160 个字符" });
 
     var source = body["source"] as JsonObject ?? new JsonObject();
-    var sourceRecordId = body.String("sourceRecordId").Trim();
+    var sourceRecordId = body.String("sourceRecordId", body.String("source_record_id")).Trim();
+    if (string.IsNullOrWhiteSpace(sourceRecordId)) sourceRecordId = $"feedback-{Guid.NewGuid():N}";
     if (sourceRecordId.Length is < 8 or > 200) return Results.BadRequest(new { error = "反馈记录编号无效" });
-    var sourceUrl = SanitizeFeedbackUrl(source.String("url"), request);
+    var sourceUrl = SanitizeFeedbackUrl(source.String("url", body.String("source_url")), request);
+    var sourcePath = source.String("path");
+    if (string.IsNullOrWhiteSpace(sourcePath) && Uri.TryCreate(sourceUrl, UriKind.Absolute, out var parsedSourceUrl))
+    {
+        sourcePath = $"{parsedSourceUrl.PathAndQuery}{parsedSourceUrl.Fragment}";
+    }
     var pageContext = new JsonObject
     {
         ["pageTitle"] = LimitText(source.String("pageTitle"), 200),
-        ["path"] = SanitizeFeedbackPath(source.String("path")),
+        ["path"] = SanitizeFeedbackPath(sourcePath),
         ["viewport"] = LimitText(source.String("viewport"), 40),
         ["userAgent"] = LimitText(source.String("userAgent"), 500),
         ["capturedAt"] = LimitText(source.String("capturedAt"), 80)
@@ -5028,6 +5035,9 @@ static string GetUnifiedUsername(HttpRequest request)
     }
     return NormalizeBusinessUserName(name);
 }
+
+static string GetUnifiedContact(HttpRequest request) =>
+    FirstClaim(request, ClaimTypes.Email, "email", ClaimTypes.MobilePhone, "phone_number", "phone") ?? "";
 
 static string? FirstClaim(HttpRequest request, params string[] types)
 {
