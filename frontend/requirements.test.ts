@@ -46,12 +46,13 @@ test('REQ-032 keeps service configuration usable on narrow screens', async () =>
   assert.match(page, /max-w-full overflow-x-auto/);
 });
 
-test('REQ-033 keeps the mobile family agent command bar interactive in production', async () => {
-  const [layout, assistant, api, services, project, deploy] = await Promise.all([
+test('REQ-033 streams mobile family agent responses without waiting for the full turn', async () => {
+  const [layout, assistant, api, streamService, streamParser, project, deploy] = await Promise.all([
     readFile(new URL('./src/components/Layout.tsx', import.meta.url), 'utf8'),
     readFile(new URL('./src/components/MobileAssistantBar.tsx', import.meta.url), 'utf8'),
     readFile(new URL('../FamilyReward.Api/Program.cs', import.meta.url), 'utf8'),
-    readFile(new URL('./src/services/index.ts', import.meta.url), 'utf8'),
+    readFile(new URL('./src/services/agentStream.ts', import.meta.url), 'utf8'),
+    readFile(new URL('./src/services/agentSse.ts', import.meta.url), 'utf8'),
     readFile(new URL('../FamilyReward.Api/FamilyReward.Api.csproj', import.meta.url), 'utf8'),
     readFile(new URL('../scripts/deploy-production.sh', import.meta.url), 'utf8'),
   ]);
@@ -59,14 +60,23 @@ test('REQ-033 keeps the mobile family agent command bar interactive in productio
   assert.doesNotMatch(layout, /mobileNavItems\.slice\(0, 6\)/);
   assert.match(assistant, /家庭积分应用/);
   assert.match(assistant, /startVoice/);
-  assert.match(assistant, /invokeAgent/);
+  assert.match(assistant, /streamAgent/);
+  assert.match(assistant, /streamedText/);
+  assert.match(assistant, /停止生成/);
   assert.doesNotMatch(assistant, /onOpenMenu/);
   assert.match(assistant, /fixed inset-0/);
   assert.doesNotMatch(assistant, /grid-cols-\[44px_1fr_44px\]/);
   assert.match(api, /InvokeGoldfishAcp/);
   assert.match(api, /session\/new/);
   assert.match(api, /session\/prompt/);
-  assert.match(services, /\/api\/agent\/invoke'[\s\S]*timeout: 120000/);
+  assert.match(api, /\/api\/agent\/invoke\/stream/);
+  assert.match(api, /text\/event-stream/);
+  assert.match(api, /X-Accel-Buffering/);
+  assert.match(api, /stream\.delta/);
+  assert.match(streamService, /consumeAgentEventStream\(response\.body/);
+  assert.match(streamParser, /stream\.getReader\(\)/);
+  assert.match(streamParser, /new TextDecoder\(\)/);
+  assert.match(streamParser, /event\.type === 'stream\.error'/);
   assert.match(project, /system_config\.json" CopyToPublishDirectory="Never"/);
   assert.match(deploy, /--exclude system_config\.json/);
 });

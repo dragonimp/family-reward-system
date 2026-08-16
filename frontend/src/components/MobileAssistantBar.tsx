@@ -1,20 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
-import { invokeAgent } from '../services';
+import { streamAgent } from '../services/agentStream';
 
 interface ChatMessage {
   role: 'user' | 'assistant';
   content: string;
-}
-
-function readAgentText(value: unknown): string {
-  if (typeof value === 'string') return value;
-  if (!value || typeof value !== 'object') return '';
-  const payload = value as Record<string, any>;
-  return payload.choices?.[0]?.message?.content
-    || payload.output?.[0]?.content?.[0]?.text
-    || payload.output_text
-    || payload.response
-    || '';
 }
 
 export default function MobileAssistantBar() {
@@ -22,15 +11,20 @@ export default function MobileAssistantBar() {
   const [input, setInput] = useState('');
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [sending, setSending] = useState(false);
+  const [streamedText, setStreamedText] = useState('');
   const [listening, setListening] = useState(false);
   const recognitionRef = useRef<any>(null);
+  const abortRef = useRef<AbortController | null>(null);
   const listRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     listRef.current?.scrollTo({ top: listRef.current.scrollHeight, behavior: 'smooth' });
-  }, [messages, sending]);
+  }, [messages, sending, streamedText]);
 
-  useEffect(() => () => recognitionRef.current?.abort?.(), []);
+  useEffect(() => () => {
+    recognitionRef.current?.abort?.();
+    abortRef.current?.abort();
+  }, []);
 
   const appendError = (content: string) => {
     setChatMode(true);
@@ -75,15 +69,25 @@ export default function MobileAssistantBar() {
     setInput('');
     setChatMode(true);
     setSending(true);
+    setStreamedText('');
+    const controller = new AbortController();
+    abortRef.current = controller;
+    let answer = '';
     try {
-      const result = await invokeAgent({ prompt });
-      if (!result.ok) throw new Error(result.error || '智能体调用失败');
-      const content = readAgentText(result.response);
-      if (!content) throw new Error('智能体没有返回内容');
-      setMessages((current) => [...current, { role: 'assistant', content }]);
+      await streamAgent({ prompt }, (event) => {
+        if (event.type !== 'stream.delta' || !event.payload?.delta) return;
+        answer += event.payload.delta;
+        setStreamedText(answer);
+      }, controller.signal);
+      if (!answer.trim()) throw new Error('智能体没有返回内容');
+      setMessages((current) => [...current, { role: 'assistant', content: answer.trim() }]);
     } catch (error) {
-      setMessages((current) => [...current, { role: 'assistant', content: error instanceof Error ? error.message : '智能体调用失败' }]);
+      const aborted = error instanceof Error && error.name === 'AbortError';
+      const content = aborted ? answer.trim() || '已停止生成' : error instanceof Error ? error.message : '智能体调用失败';
+      setMessages((current) => [...current, { role: 'assistant', content }]);
     } finally {
+      abortRef.current = null;
+      setStreamedText('');
       setSending(false);
     }
   };
@@ -101,12 +105,11 @@ export default function MobileAssistantBar() {
       />
       <button
         type="button"
-        onClick={() => input.trim() ? void send() : startVoice()}
-        disabled={sending}
-        className={`grid h-10 w-10 place-items-center rounded-full text-lg text-white disabled:opacity-60 ${listening ? 'bg-red-600' : 'bg-[#4A90D9]'}`}
-        aria-label={input.trim() ? '发送' : '语音输入'}
+        onClick={() => sending ? abortRef.current?.abort() : input.trim() ? void send() : startVoice()}
+        className={`grid h-10 w-10 place-items-center rounded-full text-lg text-white ${sending || listening ? 'bg-red-600' : 'bg-[#4A90D9]'}`}
+        aria-label={sending ? '停止生成' : input.trim() ? '发送' : '语音输入'}
       >
-        {input.trim() ? '↑' : '🎙'}
+        {sending ? '■' : input.trim() ? '↑' : '🎙'}
       </button>
     </div>
   );
@@ -125,7 +128,13 @@ export default function MobileAssistantBar() {
               <p className={`max-w-[86%] whitespace-pre-wrap rounded-md px-3 py-2 text-sm leading-6 ${message.role === 'user' ? 'bg-[#4A90D9] text-white' : 'border border-gray-200 bg-white text-gray-700'}`}>{message.content}</p>
             </div>
           ))}
-          {sending && <p className="text-sm text-gray-400">正在处理...</p>}
+          {sending && (
+            <div className="flex justify-start">
+              <p className="max-w-[86%] whitespace-pre-wrap rounded-md border border-gray-200 bg-white px-3 py-2 text-sm leading-6 text-gray-700">
+                {streamedText || '正在连接智能体...'}
+              </p>
+            </div>
+          )}
         </div>
         {composer}
       </section>

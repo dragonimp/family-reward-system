@@ -1635,6 +1635,87 @@ app.MapPost("/api/agent/invoke", async (JsonObject body, IHttpClientFactory http
     }
 });
 
+app.MapPost("/api/agent/invoke/stream", async (JsonObject body, IHttpClientFactory httpClientFactory, HttpContext context) =>
+{
+    var access = await RequireParentProfile(connectionString, context.Request);
+    if (access.Error is not null)
+    {
+        await access.Error.ExecuteAsync(context);
+        return;
+    }
+
+    var config = configStore.Load();
+    var agent = config["agent"]!.AsObject();
+    if (!agent.Bool("enabled"))
+    {
+        context.Response.StatusCode = StatusCodes.Status400BadRequest;
+        await context.Response.WriteAsJsonAsync(new { error = "智能体服务未开启" }, context.RequestAborted);
+        return;
+    }
+
+    var endpoint = agent.String("endpoint").Trim();
+    if (string.IsNullOrWhiteSpace(endpoint))
+    {
+        context.Response.StatusCode = StatusCodes.Status400BadRequest;
+        await context.Response.WriteAsJsonAsync(new { error = "未配置智能体服务地址" }, context.RequestAborted);
+        return;
+    }
+
+    var prompt = body.String("prompt").Trim();
+    if (string.IsNullOrWhiteSpace(prompt))
+    {
+        context.Response.StatusCode = StatusCodes.Status400BadRequest;
+        await context.Response.WriteAsJsonAsync(new { error = "请输入对话内容" }, context.RequestAborted);
+        return;
+    }
+
+    if (!endpoint.EndsWith("/acp", StringComparison.OrdinalIgnoreCase))
+    {
+        context.Response.StatusCode = StatusCodes.Status400BadRequest;
+        await context.Response.WriteAsJsonAsync(new { error = "当前智能体服务不支持流式对话" }, context.RequestAborted);
+        return;
+    }
+
+    context.Response.ContentType = "text/event-stream; charset=utf-8";
+    context.Response.Headers.CacheControl = "no-cache";
+    context.Response.Headers.Connection = "keep-alive";
+    context.Response.Headers["X-Accel-Buffering"] = "no";
+    await context.Response.StartAsync(context.RequestAborted);
+    await WriteAgentStreamEvent(context.Response, "stream.start", new JsonObject(), context.RequestAborted);
+
+    var acpResult = await InvokeGoldfishAcp(
+        httpClientFactory.CreateClient(),
+        endpoint,
+        agent.String("apiKey"),
+        agent.String("profile", "happylife"),
+        agent.String("workingDirectory", "/Users/wengzhishan/Projects/family-reward-system"),
+        access.Profile!.AppUserId,
+        prompt,
+        agent.Int("timeout_seconds") ?? 90,
+        async (delta, cancellationToken) =>
+        {
+            await WriteAgentStreamEvent(
+                context.Response,
+                "stream.delta",
+                new JsonObject { ["delta"] = delta, ["channel"] = "content" },
+                cancellationToken);
+        },
+        context.RequestAborted);
+
+    if (context.RequestAborted.IsCancellationRequested) return;
+    if (acpResult.Ok)
+    {
+        await WriteAgentStreamEvent(context.Response, "stream.done", new JsonObject(), context.RequestAborted);
+        return;
+    }
+
+    await WriteAgentStreamEvent(
+        context.Response,
+        "stream.error",
+        new JsonObject { ["message"] = acpResult.Error },
+        context.RequestAborted);
+});
+
 app.MapGet("/api/mcp", () => Results.Json(BuildMcpServiceDescriptor()));
 app.MapPost("/api/mcp", async (JsonObject body) =>
 {
@@ -1744,9 +1825,14 @@ static async Task<(bool Ok, string Text, string Error)> InvokeGoldfishAcp(
     string workingDirectory,
     string parentAppUserId,
     string prompt,
-    int timeoutSeconds)
+    int timeoutSeconds,
+    Func<string, CancellationToken, Task>? onDelta = null,
+    CancellationToken cancellationToken = default)
 {
-    client.Timeout = TimeSpan.FromSeconds(Math.Clamp(timeoutSeconds, 20, 180));
+    client.Timeout = Timeout.InfiniteTimeSpan;
+    using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+    timeoutCts.CancelAfter(TimeSpan.FromSeconds(Math.Clamp(timeoutSeconds, 20, 180)));
+    var operationToken = timeoutCts.Token;
     var sessionId = $"happylife-web-{Guid.NewGuid():N}";
     var createPayload = new JsonObject
     {
@@ -1767,9 +1853,9 @@ static async Task<(bool Ok, string Text, string Error)> InvokeGoldfishAcp(
     try
     {
         using (var createRequest = CreateAgentRequest(endpoint, apiKey, createPayload))
-        using (var createResponse = await client.SendAsync(createRequest))
+        using (var createResponse = await client.SendAsync(createRequest, operationToken))
         {
-            var createText = await createResponse.Content.ReadAsStringAsync();
+            var createText = await createResponse.Content.ReadAsStringAsync(operationToken);
             if (!createResponse.IsSuccessStatusCode)
             {
                 return (false, "", $"智能体会话创建失败（{(int)createResponse.StatusCode}）");
@@ -1805,7 +1891,7 @@ static async Task<(bool Ok, string Text, string Error)> InvokeGoldfishAcp(
             }
         };
         using var promptRequest = CreateAgentRequest(endpoint, apiKey, promptPayload);
-        using var promptResponse = await client.SendAsync(promptRequest, HttpCompletionOption.ResponseHeadersRead);
+        using var promptResponse = await client.SendAsync(promptRequest, HttpCompletionOption.ResponseHeadersRead, operationToken);
         if (!promptResponse.IsSuccessStatusCode)
         {
             return (false, "", $"智能体调用失败（{(int)promptResponse.StatusCode}）");
@@ -1813,9 +1899,9 @@ static async Task<(bool Ok, string Text, string Error)> InvokeGoldfishAcp(
 
         var answer = new StringBuilder();
         var stopReason = "";
-        await using var stream = await promptResponse.Content.ReadAsStreamAsync();
+        await using var stream = await promptResponse.Content.ReadAsStreamAsync(operationToken);
         using var reader = new StreamReader(stream, Encoding.UTF8);
-        while (await reader.ReadLineAsync() is { } line)
+        while (await reader.ReadLineAsync(operationToken) is { } line)
         {
             if (!line.StartsWith("data:", StringComparison.OrdinalIgnoreCase)) continue;
             JsonObject? frame = null;
@@ -1824,7 +1910,12 @@ static async Task<(bool Ok, string Text, string Error)> InvokeGoldfishAcp(
             var update = frame["params"]?["update"] as JsonObject;
             if (string.Equals(update?.String("sessionUpdate"), "agent_message_chunk", StringComparison.OrdinalIgnoreCase))
             {
-                answer.Append(update?["content"]?["text"]?.GetValue<string>() ?? "");
+                var delta = update?["content"]?["text"]?.GetValue<string>() ?? "";
+                answer.Append(delta);
+                if (!string.IsNullOrEmpty(delta) && onDelta is not null)
+                {
+                    await onDelta(delta, operationToken);
+                }
             }
             stopReason = frame["result"]?["stopReason"]?.GetValue<string>() ?? stopReason;
         }
@@ -1838,14 +1929,33 @@ static async Task<(bool Ok, string Text, string Error)> InvokeGoldfishAcp(
             ? (false, "", "智能体没有返回内容")
             : (true, text, "");
     }
-    catch (TaskCanceledException)
+    catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
     {
         return (false, "", "智能体响应超时，请稍后重试");
+    }
+    catch (OperationCanceledException)
+    {
+        return (false, "", "智能体对话已取消");
     }
     catch (Exception ex)
     {
         return (false, "", $"智能体服务异常：{ex.Message}");
     }
+}
+
+static async Task WriteAgentStreamEvent(
+    HttpResponse response,
+    string type,
+    JsonObject payload,
+    CancellationToken cancellationToken)
+{
+    var envelope = new JsonObject
+    {
+        ["type"] = type,
+        ["payload"] = payload
+    };
+    await response.WriteAsync($"data: {envelope.ToJsonString(FamilyRewardJson.CreateOptions())}\n\n", cancellationToken);
+    await response.Body.FlushAsync(cancellationToken);
 }
 
 static HttpRequestMessage CreateAgentRequest(string endpoint, string apiKey, JsonObject payload)
