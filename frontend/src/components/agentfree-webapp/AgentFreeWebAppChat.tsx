@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react'
+import React, { useState, useEffect, useMemo, useRef } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { Layout, Menu, Button, Drawer, Popconfirm, message, theme, Input, Space, Tooltip } from 'antd'
 import { PlusOutlined, InboxOutlined, MenuFoldOutlined, EditOutlined, WechatOutlined, WechatWorkOutlined, GlobalOutlined, SendOutlined } from '@ant-design/icons'
@@ -26,6 +26,11 @@ export const resolveSelectedAgent = (agents: Agent[], selectedAgentId: number | 
   || currentAgent
   || agents.find((agent) => agent.status === 'Active')
   || null
+
+export const resolveEmptySessionAgent = (agents: Agent[], sessions: Session[], routeAgentIds: Set<number>) => {
+  if (sessions.length > 0) return null
+  return agents.find(agent => agent.status === 'Active' && routeAgentIds.has(agent.id)) || null
+}
 
 export const normalizeSessionGatewayType = (session?: Pick<Session, 'gatewayType' | 'id'> | null): RoutedGatewayType => {
   const raw = String(session?.gatewayType || '').trim().toLowerCase()
@@ -105,6 +110,7 @@ export function AgentFreeWebAppChat({
     return Number.isFinite(saved) && saved >= 220 && saved <= 460 ? saved : 280
   })
   const [resizing, setResizing] = useState(false)
+  const emptySessionCreationInFlight = useRef(false)
   const currentUserName = useMemo(() => {
     return currentUser?.username || readCurrentUser()?.username || '当前用户'
   }, [currentUser?.username])
@@ -197,6 +203,32 @@ export function AgentFreeWebAppChat({
     }
   }, [agents, selectedAgentId])
 
+  const createSessionForAgent = async (agent: Agent, routeAgentIds = webAppRouteAgentIds, announce = true) => {
+    if (agent.status !== 'Active') {
+      if (announce) message.warning(`智能体“${agent.name}”当前已停止，不能创建会话`)
+      return null
+    }
+    if (!routeAgentIds.has(agent.id)) {
+      if (announce) message.warning(`智能体“${agent.name}”没有 WEBAP 路由，不能在网页对话中新建会话`)
+      return null
+    }
+    try {
+      const res = await createSession({ agentId: agent.id, name: getDefaultSessionName(), webAppBotId })
+      const newSession = res.data
+      const hydratedSession: Session = {
+        ...newSession,
+        agentName: agent.name || newSession.agentName || `智能体#${agent.id}`,
+      }
+      setSessions(prev => [hydratedSession, ...prev.filter(session => session.id !== hydratedSession.id)])
+      if (announce) message.success('创建成功')
+      if (newSession?.id) navigate(sessionPath(newSession.id), { replace: !announce })
+      return hydratedSession
+    } catch (err: any) {
+      message.error(`${announce ? '创建失败' : '自动创建首个会话失败'}: ` + (err.response?.data?.message || err.message))
+      return null
+    }
+  }
+
   const fetchData = async () => {
     setLoading(true)
     try {
@@ -207,9 +239,25 @@ export function AgentFreeWebAppChat({
       ])
       const webAppAgentIds = new Set((agentsRes.data || []).map(agent => agent.id))
       setWebAppRouteAgentIds(webAppAgentIds)
-      setSessions((sessionsRes.data || []).filter(session => webAppAgentIds.has(session.agentId)))
-      setAgents(agentsRes.data || [])
+      const nextSessions = (sessionsRes.data || []).filter(session => webAppAgentIds.has(session.agentId))
+      const nextAgents = agentsRes.data || []
+      setSessions(nextSessions)
+      setAgents(nextAgents)
       setStudioAgents(studioAgentsRes.data || [])
+      const emptySessionAgent = resolveEmptySessionAgent(nextAgents, nextSessions, webAppAgentIds)
+      if (emptySessionAgent && !emptySessionCreationInFlight.current) {
+        emptySessionCreationInFlight.current = true
+        try {
+          await createSessionForAgent(emptySessionAgent, webAppAgentIds, false)
+        } finally {
+          emptySessionCreationInFlight.current = false
+        }
+      } else if (nextSessions.length > 0 && !currentSessionId) {
+        const firstSession = nextSessions
+          .slice()
+          .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())[0]
+        if (firstSession?.id) navigate(sessionPath(firstSession.id), { replace: true })
+      }
     } catch (err: any) {
       message.error('加载失败: ' + (err.response?.data?.message || err.message))
     } finally {
@@ -234,28 +282,7 @@ export function AgentFreeWebAppChat({
   }, [agents, sessions, selectedGatewayType])
   const agentMenuOpenKeys = useMemo(() => groupedAgents.map(group => `agent-${group.agent.id}`), [groupedAgents])
   const handleCreateForAgent = async (agent: Agent) => {
-    try {
-      if (agent.status !== 'Active') {
-        message.warning(`智能体“${agent.name}”当前已停止，不能创建会话`)
-        return
-      }
-      if (!webAppRouteAgentIds.has(agent.id)) {
-        message.warning(`智能体“${agent.name}”没有 WEBAP 路由，不能在网页对话中新建会话`)
-        return
-      }
-      const res = await createSession({ agentId: agent.id, name: getDefaultSessionName(), webAppBotId })
-      const newSession = res.data
-      const hydratedSession: Session = {
-        ...newSession,
-        agentName: agent.name || newSession.agentName || `智能体#${agent.id}`,
-      }
-      message.success('创建成功')
-      setSessions(prev => [hydratedSession, ...prev])
-      await fetchData()
-      if (newSession?.id) navigate(sessionPath(newSession.id))
-    } catch (err: any) {
-      message.error('创建失败: ' + (err.response?.data?.message || err.message))
-    }
+    await createSessionForAgent(agent)
   }
 
   const openRename = (session: Session) => {
