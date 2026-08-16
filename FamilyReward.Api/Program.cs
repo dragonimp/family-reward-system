@@ -805,7 +805,7 @@ app.MapGet("/watch", () =>
             const showBound = (bound) => {
               document.getElementById('bind-panel').classList.toggle('hidden', bound);
               document.getElementById('app-panel').classList.toggle('hidden', !bound);
-              document.getElementById('menu').classList.toggle('hidden', !bound);
+              document.getElementById('menu').classList.toggle('hidden', !bound || currentView !== 'home');
               fitActivePanel();
             };
             let currentView = 'home';
@@ -813,6 +813,7 @@ app.MapGet("/watch", () =>
               if (!document.querySelector(`[data-panel="${view}"]`)) view = 'home';
               currentView = view;
               document.querySelectorAll('[data-panel]').forEach((panel) => panel.classList.toggle('active', panel.dataset.panel === view));
+              document.getElementById('menu').classList.toggle('hidden', view !== 'home');
               if (push && history.state?.watchView !== view) history.pushState({ watchView: view }, '', location.href);
               fitActivePanel();
             };

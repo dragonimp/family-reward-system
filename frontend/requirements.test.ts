@@ -69,6 +69,7 @@ test('REQ-034 adds child-friendly watch navigation, icons, leaderboard and faces
   const api = await readFile(new URL('../FamilyReward.Api/Program.cs', import.meta.url), 'utf8');
   assert.match(api, /id="home-menu"/);
   assert.match(api, /setView\('home'\)/);
+  assert.match(api, /classList\.toggle\('hidden', view !== 'home'\)/);
   assert.match(api, /const ruleIcons = \['📚', '✏️', '🪥', '🧹', '🏃', '🤝', '⏰', '🌟'\]/);
   assert.match(api, /class="leaderboard-banner"/);
   for (const face of ['dinosaur', 'rainbow', 'space']) assert.match(api, new RegExp(`data-face="${face}"`));

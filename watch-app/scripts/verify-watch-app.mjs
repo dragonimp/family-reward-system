@@ -215,6 +215,7 @@ for (const req023Requirement of [
 
 for (const req034Requirement of [
   'id="home-menu"',
+  "classList.toggle('hidden', view !== 'home')",
   "const ruleIcons = ['📚', '✏️', '🪥', '🧹', '🏃', '🤝', '⏰', '🌟']",
   'class="leaderboard-banner"',
   'data-face="dinosaur"',
