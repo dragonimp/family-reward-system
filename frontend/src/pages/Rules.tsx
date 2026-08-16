@@ -151,7 +151,7 @@ export default function Rules() {
             <h3 className="font-semibold text-gray-900">模板规则</h3>
             <p className="mt-1 text-xs text-gray-500">勾选公共规则或个人规则；列表顺序即手表展示顺序</p>
           </div>
-          <button type="button" onClick={() => void handleSaveTemplate()} disabled={!templateChanged || savingTemplate} className="btn-primary disabled:cursor-not-allowed disabled:opacity-50">
+          <button type="button" onClick={() => void handleSaveTemplate()} disabled={!templateChanged || savingTemplate} className="btn-primary shrink-0 whitespace-nowrap disabled:cursor-not-allowed disabled:opacity-50">
             {savingTemplate ? '保存中...' : '保存模板'}
           </button>
         </div>
