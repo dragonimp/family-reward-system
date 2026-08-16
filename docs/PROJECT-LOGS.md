@@ -1,5 +1,12 @@
 # 家加分 - 进展日志
 
+## [2026-08-17] family-reward-BUG-009 规则模板支持现有公共红线
+- 根因：模板候选只读取 `rules`，而页面下方的现有公共红线来自独立 `redlines`，只能查看不能勾选；之前 REQ-039 的实现只覆盖新建个人红线。
+- 修复：为现有 `redlines` 建立幂等、可追溯的统一公共规则映射，家长可在同一模板列表中勾选公共红线和个人红线；积分处理页仅使用模板已选规则，手表积分申请继续排除负分规则。
+- 验证：前端测试 18/18、ESLint、Release 构建、Vite 生产构建全部通过；临时 PostgreSQL 真实 API 回归 7/7；生产库映射 10 条、重复 0；桌面 1280px 和手机 390px 规则页公共红线可见且无横向溢出。
+- 发布：提交 `0fb482b` 已推送 `main` 并部署 `https://happylife.ai.impx.net`；资源 `index-B-NqjTk1.js` / `index-D3Eq-emd.css`，备份 `/var/backups/family-reward/20260816235353`，`/health` 返回 200。
+- Atlas：`family-reward-BUG-009` 已关闭，`TASK-135` 与 `TASK-136` 已完成，`TC-REQ039-02` 复测 passed，生产完成记录为 `family-reward-REQ-044`。
+
 ## [2026-08-16] family-reward-REQ-033 AgentFreeWebAppChat 完整公共组件复用修正
 - 修正结论：原实现只参考 BigData 的流式协议并自建移动对话框，不属于公共组件复用；现已同步 BigData 正在使用的完整 `AgentFreeWebAppChat`、`CleanChatView`、AG-UI/A2UI 渲染与会话管理模块，新增 `/assistant/*` 工作台路由，删除自建 `agentStream`/`agentSse` 链路。
 - 服务边界：ASP.NET Core 新增同源 `/api/agentfree/*` WEBAP 代理，覆盖家庭积分应用智能体列表、会话、消息、时间线、重命名/归档、上下文重置、交互响应和流式对话；只允许 `agentCode=happylife`，并校验家长身份、会话归属及可读性。
