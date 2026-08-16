@@ -20,4 +20,8 @@
     <ProjectReference Include="../../AgentIdentity/src/AgentIdentity.Sdk/AgentIdentity.Sdk.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Content Update="system_config.json" CopyToPublishDirectory="Never" />
+  </ItemGroup>
+
 </Project>
