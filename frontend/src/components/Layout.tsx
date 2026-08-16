@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'react-router-dom';
-import { useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import UserMenu from './UserMenu';
 import PublicFeedbackWidget from './PublicFeedbackWidget';
@@ -30,7 +30,19 @@ export default function Layout({ children }: LayoutProps) {
   const { logout, user, userId } = useAuth();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [manageOpen, setManageOpen] = useState(false);
+  const manageMenuRef = useRef<HTMLDivElement>(null);
   const assistantOpen = location.pathname.startsWith('/assistant');
+
+  useEffect(() => {
+    const handleDocumentPointerDown = (event: PointerEvent) => {
+      if (!manageMenuRef.current?.contains(event.target as Node)) {
+        setManageOpen(false);
+      }
+    };
+
+    document.addEventListener('pointerdown', handleDocumentPointerDown);
+    return () => document.removeEventListener('pointerdown', handleDocumentPointerDown);
+  }, []);
 
   const handleLogout = () => {
     setMobileOpen(false);
@@ -61,7 +73,7 @@ export default function Layout({ children }: LayoutProps) {
                   <span>{item.label}</span>
                 </Link>
               ))}
-              <div className="relative">
+              <div ref={manageMenuRef} className="relative">
                 <button
                   type="button"
                   onClick={() => setManageOpen((open) => !open)}

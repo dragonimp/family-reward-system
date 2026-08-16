@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { useRef } from 'react';
+import { useEffect, useRef } from 'react';
 import { getUserCenterUrl } from '../auth';
 import { useFamilyGroup } from '../contexts/FamilyGroupContext';
 import type { AuthUser } from '../types';
@@ -19,6 +19,17 @@ export default function UserMenu({ user, userId, onLogout }: UserMenuProps) {
   const closeMenu = () => {
     menuRef.current?.removeAttribute('open');
   };
+
+  useEffect(() => {
+    const handleDocumentPointerDown = (event: PointerEvent) => {
+      if (!menuRef.current?.contains(event.target as Node)) {
+        menuRef.current?.removeAttribute('open');
+      }
+    };
+
+    document.addEventListener('pointerdown', handleDocumentPointerDown);
+    return () => document.removeEventListener('pointerdown', handleDocumentPointerDown);
+  }, []);
 
   return (
     <>
