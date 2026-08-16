@@ -1,5 +1,12 @@
 # 家加分 - 进展日志
 
+## [2026-08-16] family-reward-REQ-033 AgentFreeWebAppChat 完整公共组件复用修正
+- 修正结论：原实现只参考 BigData 的流式协议并自建移动对话框，不属于公共组件复用；现已同步 BigData 正在使用的完整 `AgentFreeWebAppChat`、`CleanChatView`、AG-UI/A2UI 渲染与会话管理模块，新增 `/assistant/*` 工作台路由，删除自建 `agentStream`/`agentSse` 链路。
+- 服务边界：ASP.NET Core 新增同源 `/api/agentfree/*` WEBAP 代理，覆盖家庭积分应用智能体列表、会话、消息、时间线、重命名/归档、上下文重置、交互响应和流式对话；只允许 `agentCode=happylife`，并校验家长身份、会话归属及可读性。
+- 验证结果：前端测试 18/18、ESLint、TypeScript/Vite build、dotnet build 全部通过；真实网关冒烟收到 `stream.start`、thinking/content `stream.delta` 和 `stream.done`，正文为“公共组件流式验证通过”。
+- 发布结果：提交 `a52a775`、`508478b` 已推送 `origin/main` 并部署 `https://happylife.ai.impx.net`；最终备份 `/var/backups/family-reward/20260816211641`，资源 `index-CXra8JPK.js` / `index-D3Eq-emd.css`，`family-reward-api.service` active，线上 `/health` 返回 200。
+- 浏览器验收：390x844 家长账号打开 `/assistant`，完整公共组件会话抽屉仅显示“家庭积分应用”，对话页包含附件、思考开关、排队/补充模式、常用命令和流式发送控件；不可读历史会话已过滤，复测无新增接口错误。
+
 ## [2026-08-16] family-reward-REQ-030 手表端菜单重构需求分析
 - Orbit：`gpt_9b1f884295314ee8b3cea458658ce107`；需求：`family-reward-REQ-030`（`d34bd45e-a08c-49bd-b848-686797a54d87`）；任务：`family-reward-TASK-047`（`6382c278-699f-49d0-8723-1bc54ab02209`）；Atlas 功能点引用：`245414ae-7163-46af-82bb-1bb73cf9a63b`。
 - 基于 Git `bfa6712` 的实际 `/watch` 页面和 API 完成差距分析：当前单按钮会展开六个右侧按钮，需改为表盘内独立菜单页；现有积分申请、申请记录、好友、排行榜、表盘设置和设备解绑 API 可复用，预计无需数据迁移。
