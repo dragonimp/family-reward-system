@@ -157,6 +157,7 @@ export interface Rule {
   score: number; // 积分值
   enabled: boolean; // 是否启用
   ownerAppUserId?: string | null;
+  sourceRedlineId?: number | null;
   isPublic?: boolean;
   createdAt: string;
   updatedAt: string;

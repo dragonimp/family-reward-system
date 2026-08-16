@@ -114,9 +114,14 @@ test('REQ-039 supports redline rules and ordered watch rewards', async () => {
   ]);
   assert.match(api, /NormalizeRulePoints/);
   assert.match(api, /\["isRedLine"\] = points < 0/);
+  assert.match(api, /source_redline_id INTEGER/);
+  assert.match(api, /INSERT INTO rules \(name, category, points, cash_cny, description, source_redline_id\)/);
+  assert.match(api, /FROM redlines/);
   assert.match(api, /GetDecimal\(rule, "points"\) > 0/);
   assert.match(api, /\.Take\(8\)/);
   assert.match(page, />红线规则</);
+  assert.match(page, /奖励、红线规则中选入模板/);
+  assert.doesNotMatch(page, /公共红线规则/);
   assert.match(page, /moveRule\(rule\.id, -1\)/);
   assert.match(page, /moveRule\(rule\.id, 1\)/);
 });

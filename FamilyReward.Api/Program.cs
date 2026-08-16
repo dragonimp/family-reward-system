@@ -4366,10 +4366,12 @@ static async Task InitDatabase(string connectionString)
             cash_cny NUMERIC(10,2) DEFAULT 0,
             description TEXT,
             owner_app_user_id VARCHAR(100),
+            source_redline_id INTEGER,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
         """,
         "ALTER TABLE rules ADD COLUMN IF NOT EXISTS owner_app_user_id VARCHAR(100)",
+        "ALTER TABLE rules ADD COLUMN IF NOT EXISTS source_redline_id INTEGER",
         """
         CREATE TABLE IF NOT EXISTS user_rule_templates (
             parent_app_user_id VARCHAR(100) PRIMARY KEY,
@@ -4420,6 +4422,7 @@ static async Task InitDatabase(string connectionString)
         "CREATE INDEX IF NOT EXISTS idx_tx_date ON transactions(date)",
         "CREATE INDEX IF NOT EXISTS idx_tx_type ON transactions(type)",
         "CREATE INDEX IF NOT EXISTS idx_rules_owner ON rules(owner_app_user_id)",
+        "CREATE UNIQUE INDEX IF NOT EXISTS ux_rules_source_redline ON rules(source_redline_id) WHERE source_redline_id IS NOT NULL",
         "CREATE INDEX IF NOT EXISTS idx_user_rule_template_items_order ON user_rule_template_items(parent_app_user_id, sort_order)",
         "CREATE INDEX IF NOT EXISTS idx_children_family_group ON children(family_group_id)",
         "CREATE INDEX IF NOT EXISTS idx_family_groups_created_by ON family_groups(created_by)",
@@ -4542,6 +4545,16 @@ static async Task SeedRules(NpgsqlConnection conn)
             }
         }
     }
+
+    await using var syncCmd = new NpgsqlCommand("""
+        INSERT INTO rules (name, category, points, cash_cny, description, source_redline_id)
+        SELECT rule, '红线', -ABS(COALESCE(penalty_points, 0)), 0, description, id
+        FROM redlines
+        WHERE rule IS NOT NULL AND BTRIM(rule) <> ''
+        ORDER BY order_num, id
+        ON CONFLICT DO NOTHING
+        """, conn);
+    await syncCmd.ExecuteNonQueryAsync();
 }
 
 static async Task<int> EnsureFamilyGroup(NpgsqlConnection conn, string name, string userId, string description = "")
@@ -7680,6 +7693,9 @@ static Dictionary<string, object?> ReadRule(IDataRecord reader)
         ["enabled"] = true,
         ["ownerAppUserId"] = reader.HasColumn("owner_app_user_id") && !reader.IsDBNull(reader.GetOrdinal("owner_app_user_id"))
             ? reader.String("owner_app_user_id")
+            : null,
+        ["sourceRedlineId"] = reader.HasColumn("source_redline_id") && !reader.IsDBNull(reader.GetOrdinal("source_redline_id"))
+            ? reader.Int("source_redline_id")
             : null,
         ["isPublic"] = !reader.HasColumn("owner_app_user_id") || reader.IsDBNull(reader.GetOrdinal("owner_app_user_id")),
         ["createdAt"] = reader.DateTime("created_at").ToString("O"),

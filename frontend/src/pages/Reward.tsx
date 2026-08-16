@@ -51,20 +51,8 @@ export default function Reward() {
       const childList = Array.isArray(childrenRes) ? childrenRes : (childrenRes as any)?.data || [];
       const rulePayload = (rulesRes as any)?.data || rulesRes;
       const baseRules = Array.isArray(rulePayload) ? rulePayload : rulePayload?.rules || [];
-      const redlineRules = (rulePayload?.redlines || []).map((r: any) => ({
-        id: r.id,
-        name: r.rule,
-        description: r.description,
-        category: '红线',
-        type: 'negative' as const,
-        isRedLine: true,
-        score: -Math.abs(r.penalty_points || 0),
-        enabled: true,
-        createdAt: '',
-        updatedAt: '',
-      }));
       setChildren(childList);
-      setRules([...baseRules, ...redlineRules]);
+      setRules(baseRules);
       setPendingRequests(Array.isArray(requestRes?.requests) ? requestRes.requests : []);
     } catch (error) {
       console.error('加载失败:', error);

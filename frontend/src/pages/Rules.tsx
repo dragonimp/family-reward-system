@@ -17,13 +17,12 @@ interface RulePayload {
   personalRules: Rule[];
   templateRuleIds: number[];
   hasTemplate: boolean;
-  redlines: Array<{ id: number; rule: string; description: string; penalty_points: number }>;
 }
 
 const emptyForm: RuleForm = { name: '', description: '', category: '', score: 1, kind: 'reward' };
 
 export default function Rules() {
-  const [payload, setPayload] = useState<RulePayload>({ publicRules: [], personalRules: [], templateRuleIds: [], hasTemplate: false, redlines: [] });
+  const [payload, setPayload] = useState<RulePayload>({ publicRules: [], personalRules: [], templateRuleIds: [], hasTemplate: false });
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
   const [loading, setLoading] = useState(true);
   const [savingTemplate, setSavingTemplate] = useState(false);
@@ -48,7 +47,6 @@ export default function Rules() {
         personalRules: result.personalRules || [],
         templateRuleIds: result.templateRuleIds || [],
         hasTemplate: Boolean(result.hasTemplate),
-        redlines: result.redlines || [],
       };
       setPayload(next);
       setSelectedIds(next.hasTemplate ? next.templateRuleIds : publicRules.map((rule) => rule.id));
@@ -181,7 +179,7 @@ export default function Rules() {
         <div className="mb-4 flex items-center justify-between gap-3">
           <div>
             <h3 className="font-semibold text-gray-900">模板规则</h3>
-            <p className="mt-1 text-xs text-gray-500">从现有公共或个人规则中选入模板；奖励规则按列表顺序在手表显示前 8 条</p>
+            <p className="mt-1 text-xs text-gray-500">从现有公共或个人的奖励、红线规则中选入模板；手表只显示排序前 8 条奖励规则</p>
           </div>
           <button type="button" onClick={() => void handleSaveTemplate()} disabled={!templateChanged || savingTemplate} className="btn-primary shrink-0 whitespace-nowrap disabled:cursor-not-allowed disabled:opacity-50">
             {savingTemplate ? '保存中...' : '保存模板'}
@@ -216,8 +214,6 @@ export default function Rules() {
           })}
         </div>
       </Card>
-
-      {payload.redlines.length > 0 && <Card className="p-5"><h3 className="mb-3 font-semibold text-red-700">公共红线规则</h3><div className="space-y-2">{payload.redlines.map((rule) => <div key={rule.id} className="flex items-center justify-between border-b border-red-100 py-2 text-sm last:border-0"><span><b>{rule.rule}</b><span className="ml-2 text-gray-500">{rule.description}</span></span><span className="font-bold text-red-600">-{rule.penalty_points}</span></div>)}</div></Card>}
 
       <Modal isOpen={showModal} onClose={() => setShowModal(false)} title={editingRule ? '编辑个人规则' : '新增个人规则'} footer={<><button type="button" onClick={() => setShowModal(false)} className="px-4 py-2 text-gray-600">取消</button><button type="button" onClick={() => void handleSaveRule()} className="btn-primary">保存</button></>}>
         <div className="space-y-4">
