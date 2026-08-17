@@ -50,8 +50,8 @@ export default function Layout({ children }: LayoutProps) {
   };
 
   return (
-    <div className="h-screen flex flex-col bg-[#F7F9FC] overflow-hidden">
-      <header className="bg-white shadow-sm border-b border-gray-200 sticky top-0 z-50 flex-shrink-0">
+    <div className="app-viewport flex flex-col bg-[#F7F9FC] overflow-hidden">
+      <header className="app-safe-header bg-white shadow-sm border-b border-gray-200 sticky top-0 z-50 flex-shrink-0">
         <div className="max-w-full mx-auto px-3 sm:px-4">
           <div className="flex items-center justify-between h-14 sm:h-16">
             <div className="flex min-w-0 items-center gap-2">

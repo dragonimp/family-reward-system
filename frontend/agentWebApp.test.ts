@@ -3,12 +3,15 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 
 test('mobile assistant reuses the complete AgentFree WebApp chat surface', async () => {
-  const [page, chat, cleanChat, api, backend] = await Promise.all([
+  const [page, chat, cleanChat, api, backend, html, layout, styles] = await Promise.all([
     readFile(new URL('./src/pages/Assistant.tsx', import.meta.url), 'utf8'),
     readFile(new URL('./src/components/agentfree-webapp/AgentFreeWebAppChat.tsx', import.meta.url), 'utf8'),
     readFile(new URL('./src/components/agentfree-webapp/CleanChatView.tsx', import.meta.url), 'utf8'),
     readFile(new URL('./src/components/agentfree-webapp/api.ts', import.meta.url), 'utf8'),
     readFile(new URL('../FamilyReward.Api/Program.cs', import.meta.url), 'utf8'),
+    readFile(new URL('./index.html', import.meta.url), 'utf8'),
+    readFile(new URL('./src/components/Layout.tsx', import.meta.url), 'utf8'),
+    readFile(new URL('./src/styles/global.css', import.meta.url), 'utf8'),
   ]);
 
   assert.match(page, /<AgentFreeWebAppChat/);
@@ -29,4 +32,11 @@ test('mobile assistant reuses the complete AgentFree WebApp chat surface', async
   assert.match(backend, /OpenChatStreamAsync/);
   assert.match(backend, /gatewayBaseUrl/);
   assert.doesNotMatch(backend, /\/api\/agent\/invoke\/stream/);
+  assert.match(html, /initial-scale=1\.0, viewport-fit=cover/);
+  assert.doesNotMatch(html, /user-scalable=no|maximum-scale=1/);
+  assert.match(layout, /className="app-viewport/);
+  assert.match(layout, /className="app-safe-header/);
+  assert.match(styles, /height: 100dvh/);
+  assert.match(styles, /-webkit-text-size-adjust: 100%/);
+  assert.match(styles, /@media \(max-width: 768px\)[\s\S]*textarea,[\s\S]*font-size: 16px !important/);
 });
