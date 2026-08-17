@@ -8237,7 +8237,11 @@ sealed class SystemConfigStore
             try
             {
                 var config = JsonNode.Parse(stored) as JsonObject ?? Defaults();
-                EnsureDefaults(config);
+                var changed = EnsureDefaults(config);
+                if (changed)
+                {
+                    await UpsertAsync(conn, config);
+                }
                 AgentFreeGatewayConfiguration.Set(config["agent"]?.AsObject().String("gatewayBaseUrl"));
                 return config;
             }
@@ -8299,16 +8303,34 @@ sealed class SystemConfigStore
         }
     }
 
-    private static void EnsureDefaults(JsonObject config)
+    private static bool EnsureDefaults(JsonObject config)
     {
-        var agent = config["agent"] as JsonObject ?? new JsonObject();
-        agent["webAppBotId"] ??= "web-jiajaifen-chat";
-        agent["gatewayBaseUrl"] ??= "https://agent.ai.impx.net";
+        var changed = false;
+        var agent = config["agent"] as JsonObject;
+        if (agent is null)
+        {
+            agent = new JsonObject();
+            changed = true;
+        }
+        if (agent["webAppBotId"] is null)
+        {
+            agent["webAppBotId"] = "web-jiajaifen-chat";
+            changed = true;
+        }
+        if (agent["gatewayBaseUrl"] is null)
+        {
+            agent["gatewayBaseUrl"] = "https://agent.ai.impx.net";
+            changed = true;
+        }
         foreach (var legacyKey in new[] { "endpoint", "apiKey", "model", "timeout_seconds", "profile", "workingDirectory", "systemPrompt" })
         {
-            agent.Remove(legacyKey);
+            changed |= agent.Remove(legacyKey);
         }
-        config["agent"] = agent;
+        if (config["agent"] is not JsonObject)
+        {
+            config["agent"] = agent;
+        }
+        return changed;
     }
 
     private static JsonObject Defaults() => new()

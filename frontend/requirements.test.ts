@@ -42,8 +42,11 @@ test('REQ-031 directly loads the public feedback widget with current user contac
 test('REQ-032 keeps service configuration usable on narrow screens', async () => {
   const page = await readFile(new URL('./src/pages/Settings.tsx', import.meta.url), 'utf8');
   assert.match(page, />服务配置</);
-  assert.match(page, /flex flex-col gap-2 sm:flex-row/);
-  assert.match(page, /max-w-full overflow-x-auto/);
+  assert.match(page, /grid grid-cols-1 sm:grid-cols-2 gap-4/);
+  assert.match(page, /AgentFree 网关地址/);
+  assert.match(page, /gatewayBaseUrl/);
+  assert.doesNotMatch(page, /config\.agent\.apiKey/);
+  assert.doesNotMatch(page, /config\.agent\.endpoint/);
 });
 
 test('REQ-033 streams mobile family agent responses without waiting for the full turn', async () => {
@@ -71,10 +74,10 @@ test('REQ-033 streams mobile family agent responses without waiting for the full
   assert.doesNotMatch(cleanChat, /parseAgUiEnvelope/);
   assert.match(agentApi, /\/api\/agentfree\/chat\/stream/);
   assert.match(agentApi, /credentials: 'include'/);
-  assert.match(api, /InvokeGoldfishAcp/);
   assert.match(api, /\/api\/agentfree\/sessions/);
   assert.match(api, /\/api\/webapp\/sessions/);
-  assert.match(api, /\/api\/webapp\/chat\/stream/);
+  assert.match(api, /OpenChatStreamAsync/);
+  assert.match(api, /gatewayBaseUrl/);
   assert.match(api, /webAppBotId/);
   assert.match(api, /if \(active\) result\.Add\(item\.DeepClone\(\)\)/);
   assert.match(api, /text\/event-stream/);

@@ -9,7 +9,7 @@ import type {
   WatchDeviceUnbindCode,
   WatchRewardRequestsPayload,
 } from '../types';
-import type { AgentInvokeRequest, AgentInvokeResponse, RewardParseRequest, RewardParseResponse, SystemConfig } from '../types';
+import type { SystemConfig } from '../types';
 
 export const getFamilyGroups = (params?: { userId?: string }) => http.get<unknown, FamilyGroup[]>('/api/family-groups', { params });
 export const createFamilyGroup = (data: Partial<FamilyGroup>) => http.post<unknown, FamilyGroup>('/api/family-groups', data);
