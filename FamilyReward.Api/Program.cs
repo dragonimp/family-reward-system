@@ -1981,14 +1981,9 @@ app.MapPost("/api/agentfree/chat/stream", async (JsonObject body, IHttpClientFac
         };
         if (body["enableThinking"] is not null) payload["enableThinking"] = body["enableThinking"]!.DeepClone();
         if (body["messageMode"] is not null) payload["messageMode"] = body["messageMode"]!.DeepClone();
-        using var upstreamRequest = new HttpRequestMessage(HttpMethod.Post, "/api/webapp/chat/stream")
-        {
-            Content = new StringContent(payload.ToJsonString(FamilyRewardJson.CreateOptions()), Encoding.UTF8, "application/json")
-        };
-        upstreamRequest.Headers.TryAddWithoutValidation("X-User-Name", userName);
-        upstreamRequest.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("text/event-stream"));
-        var client = CreateAgentFreeClient(httpClientFactory);
-        using var upstream = await client.SendAsync(upstreamRequest, HttpCompletionOption.ResponseHeadersRead, context.RequestAborted);
+        using var upstreamResult = await CreateOrbitWebAppClient(httpClientFactory, webAppBotId)
+            .OpenChatStreamAsync(payload, userName, context.RequestAborted);
+        var upstream = upstreamResult.Response;
         if (!upstream.IsSuccessStatusCode)
         {
             var error = await upstream.Content.ReadAsStringAsync(context.RequestAborted);
@@ -2119,12 +2114,16 @@ app.MapPost("/api/mcp", async (JsonObject body) =>
 
 app.Run();
 
-static HttpClient CreateAgentFreeClient(IHttpClientFactory httpClientFactory)
+static OrbitWebAppClient CreateOrbitWebAppClient(IHttpClientFactory httpClientFactory, string webAppBotId = "web-jiajaifen-chat")
 {
     var client = httpClientFactory.CreateClient();
-    client.BaseAddress = new Uri((Environment.GetEnvironmentVariable("AGENTFREE_BASE_URL") ?? "https://agent.ai.impx.net").TrimEnd('/'));
     client.Timeout = TimeSpan.FromMinutes(10);
-    return client;
+    return new OrbitWebAppClient(client, new OrbitWebAppOptions
+    {
+        ApplicationId = "family-reward",
+        WebAppBotId = webAppBotId,
+        BaseAddress = new Uri((Environment.GetEnvironmentVariable("AGENTFREE_BASE_URL") ?? "https://agent.ai.impx.net").TrimEnd('/'))
+    });
 }
 
 static async Task<JsonNode?> SendAgentFreeJson(
@@ -2135,22 +2134,8 @@ static async Task<JsonNode?> SendAgentFreeJson(
     string userName,
     CancellationToken cancellationToken)
 {
-    var client = CreateAgentFreeClient(httpClientFactory);
-    using var request = new HttpRequestMessage(method, path);
-    request.Headers.TryAddWithoutValidation("X-User-Name", userName);
-    if (body is not null)
-    {
-        request.Content = new StringContent(body.ToJsonString(FamilyRewardJson.CreateOptions()), Encoding.UTF8, "application/json");
-    }
-    using var response = await client.SendAsync(request, cancellationToken);
-    var text = await response.Content.ReadAsStringAsync(cancellationToken);
-    if (!response.IsSuccessStatusCode)
-    {
-        throw new InvalidOperationException(string.IsNullOrWhiteSpace(text)
-            ? $"AgentFree 返回 HTTP {(int)response.StatusCode}"
-            : text);
-    }
-    return string.IsNullOrWhiteSpace(text) ? null : JsonNode.Parse(text);
+    return await CreateOrbitWebAppClient(httpClientFactory)
+        .SendJsonAsync(method, path, body, userName, cancellationToken);
 }
 
 static async Task<JsonArray> GetFamilyRewardAgentFreeAgents(
@@ -2159,15 +2144,8 @@ static async Task<JsonArray> GetFamilyRewardAgentFreeAgents(
     string webAppBotId,
     CancellationToken cancellationToken)
 {
-    var client = new OrbitWebAppClient(
-        CreateAgentFreeClient(httpClientFactory),
-        new OrbitWebAppOptions
-        {
-            ApplicationId = "family-reward",
-            WebAppBotId = webAppBotId,
-            BaseAddress = new Uri((Environment.GetEnvironmentVariable("AGENTFREE_BASE_URL") ?? "https://agent.ai.impx.net").TrimEnd('/'))
-        });
-    var agents = await client.GetAuthorizedAgentsAsync(userName, cancellationToken);
+    var agents = await CreateOrbitWebAppClient(httpClientFactory, webAppBotId)
+        .GetAuthorizedAgentsAsync(userName, cancellationToken);
     var result = new JsonArray();
     if (agents is null) return result;
     foreach (var item in agents.OfType<JsonObject>())
