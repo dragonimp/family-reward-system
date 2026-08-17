@@ -1,4 +1,5 @@
 using AgentIdentity.Sdk;
+using Goldfish.WebAppSdk;
 using Microsoft.AspNetCore.HttpOverrides;
 using System.Data;
 using System.Globalization;
@@ -2131,13 +2132,15 @@ static async Task<JsonArray> GetFamilyRewardAgentFreeAgents(
     string webAppBotId,
     CancellationToken cancellationToken)
 {
-    var agents = await SendAgentFreeJson(
-        httpClientFactory,
-        HttpMethod.Get,
-        $"/api/agents?authorizedOnly=true&gatewayType=WebApp&webAppBotId={Uri.EscapeDataString(webAppBotId)}",
-        null,
-        userName,
-        cancellationToken) as JsonArray;
+    var client = new OrbitWebAppClient(
+        CreateAgentFreeClient(httpClientFactory),
+        new OrbitWebAppOptions
+        {
+            ApplicationId = "family-reward",
+            WebAppBotId = webAppBotId,
+            BaseAddress = new Uri((Environment.GetEnvironmentVariable("AGENTFREE_BASE_URL") ?? "https://agent.ai.impx.net").TrimEnd('/'))
+        });
+    var agents = await client.GetAuthorizedAgentsAsync(userName, cancellationToken);
     var result = new JsonArray();
     if (agents is null) return result;
     foreach (var item in agents.OfType<JsonObject>())

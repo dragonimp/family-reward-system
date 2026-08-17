@@ -18,6 +18,7 @@
 
   <ItemGroup>
     <ProjectReference Include="../../AgentIdentity/src/AgentIdentity.Sdk/AgentIdentity.Sdk.csproj" />
+    <ProjectReference Include="../../AgentFree/src/Goldfish.WebAppSdk/Goldfish.WebAppSdk.csproj" />
   </ItemGroup>
 
   <ItemGroup>
