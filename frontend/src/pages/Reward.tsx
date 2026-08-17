@@ -9,7 +9,6 @@ import {
   getChildren,
   getRewardRequests,
   getRules,
-  parseRewardVoice,
 } from '../services';
 
 type TransactionType = 'score' | 'cash' | 'item';
@@ -28,7 +27,6 @@ export default function Reward() {
   const [customDescription, setCustomDescription] = useState('');
   const [voiceText, setVoiceText] = useState('');
   const [voiceListening, setVoiceListening] = useState(false);
-  const [voiceParsing, setVoiceParsing] = useState(false);
   const recognitionRef = useRef<any>(null);
   const [approvingRequestId, setApprovingRequestId] = useState<number | null>(null);
   const [showConfirm, setShowConfirm] = useState(false);
@@ -98,44 +96,6 @@ export default function Reward() {
     }
   };
 
-  const applyVoiceCommand = async (text: string) => {
-    try {
-      setVoiceParsing(true);
-      const result = await parseRewardVoice({ text });
-      if (!result.ok || !result.command) {
-        showToast(result.error || '智能体解析失败', 'error');
-        return;
-      }
-
-      const command = result.command;
-      const child = children.find((item) => item.id === command.childId)
-        || children.find((item) => item.name === command.childName);
-      if (!child) {
-        showToast('智能体没有匹配到孩子，请重新说一遍', 'error');
-        return;
-      }
-
-      const amount = Number(command.amount || 0);
-      if (!amount) {
-        showToast('智能体没有识别到积分数量，请重新说一遍', 'error');
-        return;
-      }
-
-      setSelectedChild(child.id);
-      setSelectedRule(null);
-      setCustomType(command.type || 'score');
-      setCustomAmount(amount);
-      setCustomCategory(command.category || (amount < 0 ? '扣分' : '奖励'));
-      setCustomDescription(command.description || text);
-      showToast(`智能体已识别：${child.name} ${amount > 0 ? '+' : ''}${amount}${command.type === 'cash' ? '元' : command.type === 'item' ? '个物品' : '分'}`);
-    } catch (error) {
-      console.error(error);
-      showToast((error as Error).message || '智能体解析失败', 'error');
-    } finally {
-      setVoiceParsing(false);
-    }
-  };
-
   const applyLocalVoiceFallback = (text: string) => {
     const normalized = text.replace(/\s+/g, '');
     const child = children.find((item) => normalized.includes(item.name));
@@ -173,7 +133,6 @@ export default function Reward() {
         setVoiceText(text);
         if (text) {
           applyLocalVoiceFallback(text);
-          applyVoiceCommand(text);
         }
       };
       rec.onerror = () => {
@@ -361,15 +320,14 @@ export default function Reward() {
               例如：给某个孩子加5分，因为主动完成任务；或扣10分，因为违反约定。
             </p>
             {voiceText && <p className="text-sm text-[#4A90D9] mt-2">浏览器识别：{voiceText}</p>}
-            {voiceParsing && <p className="text-xs text-gray-500 mt-1">正在调用智能体纠错孩子姓名和积分...</p>}
           </div>
           <button
             type="button"
             onClick={startVoiceRecord}
-            disabled={voiceListening || voiceParsing || children.length === 0}
+            disabled={voiceListening || children.length === 0}
             className="w-full px-4 py-2 bg-[#4A90D9] text-white rounded-lg text-sm font-medium disabled:opacity-60 sm:w-auto"
           >
-            {voiceListening ? '正在听...' : voiceParsing ? '智能体解析中...' : '🎤 语音记录'}
+            {voiceListening ? '正在听...' : '🎤 语音记录'}
           </button>
         </div>
       </Card>

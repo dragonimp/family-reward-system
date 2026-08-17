@@ -238,29 +238,12 @@ export interface VoiceConfig {
 export interface AgentConfig {
   enabled: boolean;
   webAppBotId: string;
-  endpoint: string;
-  apiKey: string;
-  model: string;
-  timeout_seconds: number;
-  systemPrompt: string;
+  gatewayBaseUrl: string;
 }
 
 export interface SystemConfig {
   voice: VoiceConfig;
   agent: AgentConfig;
-}
-
-export interface AgentInvokeRequest {
-  prompt: string;
-  payload?: Record<string, unknown>;
-  apiKey?: string;
-}
-
-export interface AgentInvokeResponse {
-  ok: boolean;
-  status?: number;
-  response?: unknown;
-  error?: string;
 }
 
 export interface RewardCommand {
@@ -273,17 +256,6 @@ export interface RewardCommand {
   confidence?: number;
 }
 
-export interface RewardParseRequest {
-  text: string;
-  familyGroupId?: number;
-}
-
-export interface RewardParseResponse {
-  ok: boolean;
-  command?: RewardCommand;
-  raw?: string;
-  error?: string;
-}
 
 // 分页请求参数
 export interface PaginationParams {

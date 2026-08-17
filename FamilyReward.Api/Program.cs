@@ -1428,6 +1428,7 @@ app.MapGet("/api/stats/categories", async (HttpRequest request) =>
 });
 
 var configStore = new SystemConfigStore(connectionString, app.Environment.ContentRootPath);
+await configStore.LoadAsync();
 
 app.MapGet("/api/system/config", async (HttpRequest request) =>
 {
@@ -2122,7 +2123,7 @@ static OrbitWebAppClient CreateOrbitWebAppClient(IHttpClientFactory httpClientFa
     {
         ApplicationId = "family-reward",
         WebAppBotId = webAppBotId,
-        BaseAddress = new Uri((Environment.GetEnvironmentVariable("AGENTFREE_BASE_URL") ?? "https://agent.ai.impx.net").TrimEnd('/'))
+        BaseAddress = new Uri(AgentFreeGatewayConfiguration.BaseUrl.TrimEnd('/'))
     });
 }
 
@@ -8237,6 +8238,7 @@ sealed class SystemConfigStore
             {
                 var config = JsonNode.Parse(stored) as JsonObject ?? Defaults();
                 EnsureDefaults(config);
+                AgentFreeGatewayConfiguration.Set(config["agent"]?.AsObject().String("gatewayBaseUrl"));
                 return config;
             }
             catch
@@ -8248,6 +8250,7 @@ sealed class SystemConfigStore
         var migrated = LoadLegacy();
         EnsureDefaults(migrated);
         await UpsertAsync(conn, migrated);
+        AgentFreeGatewayConfiguration.Set(migrated["agent"]?.AsObject().String("gatewayBaseUrl"));
         return migrated;
     }
 
@@ -8259,6 +8262,7 @@ sealed class SystemConfigStore
         await using var conn = new NpgsqlConnection(_connectionString);
         await conn.OpenAsync();
         await UpsertAsync(conn, current);
+        AgentFreeGatewayConfiguration.Set(current["agent"]?.AsObject().String("gatewayBaseUrl"));
         return current;
     }
 
@@ -8299,6 +8303,11 @@ sealed class SystemConfigStore
     {
         var agent = config["agent"] as JsonObject ?? new JsonObject();
         agent["webAppBotId"] ??= "web-jiajaifen-chat";
+        agent["gatewayBaseUrl"] ??= "https://agent.ai.impx.net";
+        foreach (var legacyKey in new[] { "endpoint", "apiKey", "model", "timeout_seconds", "profile", "workingDirectory", "systemPrompt" })
+        {
+            agent.Remove(legacyKey);
+        }
         config["agent"] = agent;
     }
 
@@ -8314,15 +8323,25 @@ sealed class SystemConfigStore
         {
             ["enabled"] = false,
             ["webAppBotId"] = "web-jiajaifen-chat",
-            ["endpoint"] = "",
-            ["apiKey"] = "",
-            ["model"] = "gpt-4o-mini",
-            ["timeout_seconds"] = 20,
-            ["profile"] = "happylife",
-            ["workingDirectory"] = "/Users/wengzhishan/Projects/family-reward-system",
-            ["systemPrompt"] = "你是家加分智能助手，输出简短可执行建议。"
+            ["gatewayBaseUrl"] = "https://agent.ai.impx.net"
         }
     };
+}
+
+static class AgentFreeGatewayConfiguration
+{
+    private static string _baseUrl = (Environment.GetEnvironmentVariable("AGENTFREE_BASE_URL") ?? "https://agent.ai.impx.net").TrimEnd('/');
+
+    public static string BaseUrl => Volatile.Read(ref _baseUrl);
+
+    public static void Set(string? value)
+    {
+        if (Uri.TryCreate(value?.Trim(), UriKind.Absolute, out var uri)
+            && (uri.Scheme == Uri.UriSchemeHttp || uri.Scheme == Uri.UriSchemeHttps))
+        {
+            Volatile.Write(ref _baseUrl, uri.GetLeftPart(UriPartial.Authority).TrimEnd('/'));
+        }
+    }
 }
 
 static class ReaderExtensions

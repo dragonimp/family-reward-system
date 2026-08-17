@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { getSystemConfig, updateSystemConfig, invokeAgent } from '../services';
-import type { AgentInvokeResponse, SystemConfig } from '../types';
+import { getSystemConfig, updateSystemConfig } from '../services';
+import type { SystemConfig } from '../types';
 
 type SpeechResultHandler = (value: string) => void;
 
@@ -13,22 +13,14 @@ const defaultConfig: SystemConfig = {
   agent: {
     enabled: false,
     webAppBotId: '',
-    endpoint: '',
-    apiKey: '',
-    model: 'gpt-4o-mini',
-    timeout_seconds: 20,
-    systemPrompt: '你是家加分智能助手，输出简短可执行建议。',
+    gatewayBaseUrl: 'https://agent.ai.impx.net',
   },
 };
 
 export default function Settings() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [testing, setTesting] = useState(false);
   const [config, setConfig] = useState<SystemConfig>(defaultConfig);
-  const [testPrompt, setTestPrompt] = useState('给我一个根据孩子表现自动扣分/加分的建议');
-  const [agentResult, setAgentResult] = useState<unknown>(null);
-  const [agentError, setAgentError] = useState('');
   const [speechInfo, setSpeechInfo] = useState('');
   const [toast, setToast] = useState<{ show: boolean; message: string; type: 'success' | 'error' }>(
     { show: false, message: '', type: 'success' }
@@ -121,36 +113,6 @@ export default function Settings() {
       showToast('保存失败', 'error');
     } finally {
       setSaving(false);
-    }
-  };
-
-  const runAgentTest = async () => {
-    try {
-      setTesting(true);
-      setAgentError('');
-      setAgentResult(null);
-      const result = await invokeAgent({
-        prompt: testPrompt,
-        payload: {
-          model: config.agent.model,
-          timeout_seconds: config.agent.timeout_seconds,
-          messages: [
-            { role: 'system', content: config.agent.systemPrompt },
-            { role: 'user', content: testPrompt },
-          ],
-        },
-      });
-      if (result.ok) {
-        setAgentResult(result.response);
-      } else {
-        setAgentError(result.error || '调用失败');
-      }
-    } catch (err) {
-      setAgentError((err as Error).message || '测试失败');
-      setAgentResult(null);
-      console.error(err);
-    } finally {
-      setTesting(false);
     }
   };
 
@@ -268,145 +230,21 @@ export default function Settings() {
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">服务地址（API）</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">AgentFree 网关地址</label>
             <input
               type="text"
-              value={config.agent.endpoint}
+              value={config.agent.gatewayBaseUrl}
               onChange={(e) => {
                 updateConfig((draft) => {
-                  draft.agent.endpoint = e.target.value;
+                  draft.agent.gatewayBaseUrl = e.target.value;
                 });
               }}
-              placeholder="https://api.example.com/v1/chat/completions"
+              placeholder="https://agent.ai.impx.net"
               className="w-full px-3 py-2 border border-gray-300 rounded-lg"
             />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">API Key</label>
-            <input
-              type="password"
-              value={config.agent.apiKey}
-              onChange={(e) => {
-                updateConfig((draft) => {
-                  draft.agent.apiKey = e.target.value;
-                });
-              }}
-              placeholder="sk-..."
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">模型</label>
-            <input
-              type="text"
-              value={config.agent.model}
-              onChange={(e) => {
-                updateConfig((draft) => {
-                  draft.agent.model = e.target.value;
-                });
-              }}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-              placeholder="gpt-4o-mini"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">超时（秒）</label>
-            <input
-              type="number"
-              min={5}
-              value={config.agent.timeout_seconds}
-              onChange={(e) => {
-                updateConfig((draft) => {
-                  draft.agent.timeout_seconds = parseInt(e.target.value, 10) || 20;
-                });
-              }}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-            />
-          </div>
-          <div className="sm:col-span-2">
-            <label className="block text-sm font-medium text-gray-700 mb-1">系统提示词</label>
-            <div className="flex flex-col gap-2 sm:flex-row sm:items-start">
-              <textarea
-                value={config.agent.systemPrompt}
-                onChange={(e) => {
-                  updateConfig((draft) => {
-                    draft.agent.systemPrompt = e.target.value;
-                  });
-                }}
-                rows={3}
-                className="flex-1 px-3 py-2 border border-gray-300 rounded-lg"
-              />
-              <button
-                type="button"
-                onClick={() => startSpeechInput((text) => {
-                  updateConfig((draft) => {
-                    draft.agent.systemPrompt = `${draft.agent.systemPrompt ? `${draft.agent.systemPrompt}\n` : ''}${text}`;
-                  });
-                })}
-                className="w-full rounded-lg border border-[#4A90D9] px-3 py-2 text-sm text-[#4A90D9] sm:w-auto"
-              >
-                🎤 输入
-              </button>
-            </div>
           </div>
         </div>
-      </section>
-
-      {/* 测试调用 */}
-      <section className="rounded-lg border border-gray-200 bg-white p-4 sm:p-5">
-        <h3 className="mb-4 text-base font-semibold text-gray-800 sm:text-lg">🧪 服务测试</h3>
-        <div className="space-y-3">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">测试提示词</label>
-            <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-              <textarea
-                value={testPrompt}
-                onChange={(e) => setTestPrompt(e.target.value)}
-                rows={2}
-                className="flex-1 px-3 py-2 border border-gray-300 rounded-lg"
-              />
-              <button
-                type="button"
-                onClick={() => startSpeechInput(setTestPrompt)}
-                className="w-full rounded-lg border border-[#4A90D9] px-3 py-2 text-sm text-[#4A90D9] sm:w-auto"
-              >
-                🎤 输入
-              </button>
-            </div>
-          </div>
-          <div className="flex flex-wrap items-center gap-2 sm:gap-3">
-            <button
-              onClick={() => {
-                if (!config.agent.enabled) {
-                  showToast('请先开启智能体服务', 'error');
-                  return;
-                }
-                stopSpeech();
-                runAgentTest();
-              }}
-              className="px-4 py-2 bg-[#4A90D9] text-white rounded-lg text-sm"
-            >
-              {testing ? '调用中...' : '测试调用'}
-            </button>
-            <button
-              onClick={saveConfig}
-              disabled={saving}
-              className="px-4 py-2 bg-[#F5A623] text-white rounded-lg text-sm disabled:opacity-60"
-            >
-              {saving ? '保存中...' : '保存配置'}
-            </button>
-            {speechInfo && <span className="text-sm text-gray-500 ml-2">{speechInfo}</span>}
-          </div>
-          {(agentError || agentResult !== null) && (
-            <div className="bg-gray-50 border border-gray-200 rounded-lg p-3 text-sm">
-              {agentError ? (
-                <p className="text-red-500">{agentError}</p>
-              ) : (
-                <pre className="max-w-full overflow-x-auto whitespace-pre-wrap break-words text-gray-700">{JSON.stringify(agentResult, null, 2)}</pre>
-              )}
-            </div>
-          )}
-        </div>
+        <p className="mt-3 text-xs text-gray-500">应用通过 SDK 调用网关的 WEBAP 接口；模型、API Key、工作目录和 ACP 节点均由 AgentFree 智能体配置统一管理。</p>
       </section>
     </div>
   );

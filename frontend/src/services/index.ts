@@ -68,6 +68,3 @@ export const getCategoryStats = (params?: { familyGroupId?: number }) => http.ge
 
 export const getSystemConfig = () => http.get<unknown, SystemConfig>('/api/system/config');
 export const updateSystemConfig = (data: SystemConfig) => http.put<unknown, SystemConfig>('/api/system/config', data);
-export const invokeAgent = (data: AgentInvokeRequest) =>
-  http.post<unknown, AgentInvokeResponse>('/api/agent/invoke', data, { timeout: 120000 });
-export const parseRewardVoice = (data: RewardParseRequest) => http.post<unknown, RewardParseResponse>('/api/agent/parse-reward', data);
