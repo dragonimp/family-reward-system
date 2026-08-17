@@ -661,7 +661,7 @@ app.MapGet("/watch", () =>
             .watch-face.face-starlight .topline,.watch-face.face-starlight .brand{color:#f8fbff}.watch-face.face-starlight .metric,.watch-face.face-starlight .rule-btn,.watch-face.face-starlight input,.watch-face.face-starlight textarea{background:rgba(255,255,255,.94)}
             .watch-face.face-space .topline,.watch-face.face-space .brand{color:#f8fbff}.watch-face.face-space .metric,.watch-face.face-space .rule-btn,.watch-face.face-space input,.watch-face.face-space textarea{background:rgba(255,255,255,.94)}
             .screen{position:absolute;inset:clamp(14px,7vmin,24px);display:flex;align-items:center;justify-content:center;overflow:hidden;text-align:center}
-            .topline{position:absolute;top:clamp(12px,6vmin,23px);left:18%;right:18%;display:flex;align-items:center;justify-content:center;gap:4px;overflow:hidden;color:#65736b;font-size:clamp(9px,3.2vmin,11px);white-space:nowrap}
+            .topline{position:absolute;top:clamp(7px,3vmin,11px);left:18%;right:18%;display:flex;align-items:center;justify-content:center;gap:4px;overflow:hidden;color:#65736b;font-size:clamp(9px,3.2vmin,11px);white-space:nowrap}
             .brand{font-size:clamp(10px,3.5vmin,12px);font-weight:900;color:#245138}
             .home-child{max-width:min(170px,70vmin);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:clamp(18px,7vmin,24px);font-weight:900}
             .score-ring{display:grid;place-items:center;width:clamp(76px,42vmin,150px);height:clamp(76px,42vmin,150px);margin:clamp(4px,2.8vmin,10px) 0 clamp(3px,1.8vmin,6px);border-radius:50%;border:clamp(4px,2vmin,7px) solid #1f7a48;background:#fff}
