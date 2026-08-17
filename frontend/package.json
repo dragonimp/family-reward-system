@@ -11,6 +11,7 @@
     "lint": "eslint . --report-unused-disable-directives --max-warnings 0"
   },
   "dependencies": {
+    "@agentfree/webapp-chat": "file:../../AgentFree/packages/agentfree-webapp-chat",
     "@ag-ui/client": "^0.0.57",
     "@ant-design/icons": "^5.6.1",
     "antd": "^5.29.3",

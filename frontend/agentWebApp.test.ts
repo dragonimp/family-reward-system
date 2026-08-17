@@ -15,11 +15,10 @@ test('mobile assistant reuses the complete AgentFree WebApp chat surface', async
   assert.match(page, /routeBase="\/assistant"/);
   assert.match(page, /webAppBotId=\{webAppBotId\}/);
   assert.match(page, /getSystemConfig\(\)/);
-  assert.match(chat, /import CleanChatView from '\.\/CleanChatView'/);
-  assert.match(chat, /getSessions\('WebApp'/);
-  assert.match(cleanChat, /streamChat\(/);
-  assert.match(cleanChat, /stream\.delta/);
-  assert.match(cleanChat, /parseAgUiEnvelope/);
+  assert.match(chat, /@agentfree\/webapp-chat/);
+  assert.match(chat, /apiAdapter/);
+  assert.match(cleanChat, /export \{ CleanChatView as default \} from '@agentfree\/webapp-chat'/);
+  assert.doesNotMatch(cleanChat, /streamChat\(/);
   assert.match(api, /\/api\/agentfree\/chat\/stream/);
   assert.match(backend, /webAppBotId/);
   assert.match(backend, /if \(active\) result\.Add\(item\.DeepClone\(\)\)/);

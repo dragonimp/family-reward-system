@@ -1770,6 +1770,33 @@ app.MapGet("/api/agentfree/sessions/{id}/timeline", async (string id, IHttpClien
     }
 });
 
+app.MapGet("/api/agentfree/sessions/{id}/queue", async (string id, IHttpClientFactory httpClientFactory, HttpRequest request) =>
+{
+    var access = await RequireParentProfile(connectionString, request);
+    if (access.Error is not null) return access.Error;
+    try
+    {
+        var userName = GetUnifiedUsername(request);
+        if (await GetFamilyRewardAgentFreeSession(httpClientFactory, id, userName, request.HttpContext.RequestAborted) is null)
+        {
+            return Results.Json(new { error = "无权访问该智能体会话" }, statusCode: StatusCodes.Status403Forbidden);
+        }
+        var queue = await SendAgentFreeJson(
+            httpClientFactory,
+            HttpMethod.Get,
+            $"/api/webapp/chat/sessions/{Uri.EscapeDataString(id)}/queue",
+            null,
+            userName,
+            request.HttpContext.RequestAborted);
+        return Results.Json(queue ?? new JsonObject { ["items"] = new JsonArray(), ["waitingCount"] = 0 });
+    }
+    catch (Exception ex)
+    {
+        if (IsAgentFreeAccessDenied(ex)) return Results.Json(new JsonObject { ["items"] = new JsonArray(), ["waitingCount"] = 0 });
+        return Results.Json(new { error = $"获取智能体会话队列失败: {ex.Message}" }, statusCode: StatusCodes.Status502BadGateway);
+    }
+});
+
 app.MapPost("/api/agentfree/sessions", async (JsonObject body, IHttpClientFactory httpClientFactory, HttpRequest request) =>
 {
     var access = await RequireParentProfile(connectionString, request);

@@ -2,6 +2,8 @@ import http from '../../services/api'
 import { readCurrentUser } from '../../auth'
 import type { Agent, ChatAttachment, ChatMessage, GatewayConversationEvent, Session, StudioAgent } from './types'
 
+// Host-only transport adapter. Chat behavior lives in @agentfree/webapp-chat.
+
 type AxiosLike<T> = Promise<{ data: T }>
 type AgentFreeWebAppUser = {
   username?: string
@@ -83,6 +85,9 @@ export const getSessionTimeline = (
   headers: authHeaders(),
   params,
 }))
+
+export const getSessionQueue = (sessionId: string) =>
+  wrap(http.get<unknown, unknown>(`/api/agentfree/sessions/${encodeURIComponent(sessionId)}/queue`, { headers: authHeaders() }))
 
 export const getStudioAgents = (_params?: { mine?: boolean }): AxiosLike<StudioAgent[]> => Promise.resolve({ data: [] })
 

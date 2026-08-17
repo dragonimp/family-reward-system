@@ -65,11 +65,10 @@ test('REQ-033 streams mobile family agent responses without waiting for the full
   assert.match(assistant, /currentUser=\{user\}/);
   assert.match(assistant, /webAppBotId=\{webAppBotId\}/);
   assert.match(assistant, /getSystemConfig\(\)/);
-  assert.match(chat, /import CleanChatView/);
-  assert.match(chat, /getSessions\('WebApp'/);
-  assert.match(cleanChat, /parseAgUiEnvelope/);
-  assert.match(cleanChat, /stream\.delta/);
-  assert.match(cleanChat, /stream\.done/);
+  assert.match(chat, /@agentfree\/webapp-chat/);
+  assert.match(chat, /apiAdapter/);
+  assert.match(cleanChat, /export \{ CleanChatView as default \} from '@agentfree\/webapp-chat'/);
+  assert.doesNotMatch(cleanChat, /parseAgUiEnvelope/);
   assert.match(agentApi, /\/api\/agentfree\/chat\/stream/);
   assert.match(agentApi, /credentials: 'include'/);
   assert.match(api, /InvokeGoldfishAcp/);
