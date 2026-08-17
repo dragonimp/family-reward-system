@@ -42,7 +42,7 @@ body {
     font-size: 16px !important;
   }
 
-  .assistant-mode .adfw-dock {
+  body.assistant-mode .adfw-dock {
     top: auto !important;
     right: max(0px, env(safe-area-inset-right, 0px)) !important;
     bottom: calc(132px + env(safe-area-inset-bottom, 0px)) !important;

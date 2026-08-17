@@ -35,10 +35,11 @@ test('mobile assistant reuses the complete AgentFree WebApp chat surface', async
   assert.match(html, /initial-scale=1\.0, viewport-fit=cover/);
   assert.doesNotMatch(html, /user-scalable=no|maximum-scale=1/);
   assert.match(layout, /assistantOpen \? 'assistant-mode '/);
+  assert.match(layout, /document\.body\.classList\.toggle\('assistant-mode', assistantOpen\)/);
   assert.match(layout, /app-viewport flex flex-col/);
   assert.match(layout, /className="app-safe-header/);
   assert.match(styles, /height: 100dvh/);
   assert.match(styles, /-webkit-text-size-adjust: 100%/);
   assert.match(styles, /@media \(max-width: 768px\)[\s\S]*textarea,[\s\S]*font-size: 16px !important/);
-  assert.match(styles, /\.assistant-mode \.adfw-dock[\s\S]*bottom: calc\(132px \+ env\(safe-area-inset-bottom, 0px\)\)/);
+  assert.match(styles, /body\.assistant-mode \.adfw-dock[\s\S]*bottom: calc\(132px \+ env\(safe-area-inset-bottom, 0px\)\)/);
 });

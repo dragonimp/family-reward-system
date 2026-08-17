@@ -44,6 +44,11 @@ export default function Layout({ children }: LayoutProps) {
     return () => document.removeEventListener('pointerdown', handleDocumentPointerDown);
   }, []);
 
+  useEffect(() => {
+    document.body.classList.toggle('assistant-mode', assistantOpen);
+    return () => document.body.classList.remove('assistant-mode');
+  }, [assistantOpen]);
+
   const handleLogout = () => {
     setMobileOpen(false);
     logout();
