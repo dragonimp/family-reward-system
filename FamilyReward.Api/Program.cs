@@ -2130,9 +2130,10 @@ static async Task<JsonArray> GetFamilyRewardAgentFreeAgents(
     foreach (var item in agents.OfType<JsonObject>())
     {
         var active = string.Equals(item.String("status"), "Active", StringComparison.OrdinalIgnoreCase);
-        var familyAgent = string.Equals(item.String("agentCode"), "happylife", StringComparison.OrdinalIgnoreCase)
-            || string.Equals(item.String("name"), "家庭积分应用", StringComparison.OrdinalIgnoreCase);
-        if (active && familyAgent) result.Add(item.DeepClone());
+        // AgentFree 已经通过 authorizedOnly、gatewayType 和 webAppBotId
+        // 按当前用户的实际授权及 WEBAP 路由完成筛选。这里不能再按名称或
+        // agentCode 限制，否则像“WEBAP家加分”这样的合法实例会被误过滤。
+        if (active) result.Add(item.DeepClone());
     }
     return result;
 }

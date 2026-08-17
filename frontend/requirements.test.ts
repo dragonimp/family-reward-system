@@ -75,7 +75,8 @@ test('REQ-033 streams mobile family agent responses without waiting for the full
   assert.match(api, /\/api\/agentfree\/sessions/);
   assert.match(api, /\/api\/webapp\/sessions/);
   assert.match(api, /\/api\/webapp\/chat\/stream/);
-  assert.match(api, /agentCode"\), "happylife"/);
+  assert.match(api, /authorizedOnly=true&gatewayType=WebApp&webAppBotId=web/);
+  assert.match(api, /if \(active\) result\.Add\(item\.DeepClone\(\)\)/);
   assert.match(api, /text\/event-stream/);
   assert.match(api, /X-Accel-Buffering/);
   assert.doesNotMatch(api, /\/api\/agent\/invoke\/stream/);

@@ -20,7 +20,8 @@ test('mobile assistant reuses the complete AgentFree WebApp chat surface', async
   assert.match(cleanChat, /stream\.delta/);
   assert.match(cleanChat, /parseAgUiEnvelope/);
   assert.match(api, /\/api\/agentfree\/chat\/stream/);
-  assert.match(backend, /agentCode"\), "happylife"/);
+  assert.match(backend, /authorizedOnly=true&gatewayType=WebApp&webAppBotId=web/);
+  assert.match(backend, /if \(active\) result\.Add\(item\.DeepClone\(\)\)/);
   assert.match(backend, /\/api\/webapp\/chat\/stream/);
   assert.doesNotMatch(backend, /\/api\/agent\/invoke\/stream/);
 });
