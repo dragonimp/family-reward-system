@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react'
-import { Alert, Button, Collapse, Dropdown, Input, Modal, Segmented, Spin, Switch, Tag, Tooltip, Typography, Upload, message } from 'antd'
-import { ApiOutlined, CheckCircleOutlined, CodeOutlined, CopyOutlined, DownOutlined, ExclamationCircleOutlined, LoadingOutlined, MessageOutlined, PaperClipOutlined, SendOutlined, StopOutlined, ThunderboltOutlined, ToolOutlined } from '@ant-design/icons'
+import { Alert, Button, Collapse, Dropdown, Input, Modal, Spin, Switch, Tag, Tooltip, Typography, Upload, message } from 'antd'
+import { ApiOutlined, AudioOutlined, CheckCircleOutlined, CodeOutlined, CopyOutlined, DownOutlined, EditOutlined, ExclamationCircleOutlined, LoadingOutlined, MessageOutlined, OrderedListOutlined, PaperClipOutlined, SendOutlined, StopOutlined, ThunderboltOutlined, ToolOutlined } from '@ant-design/icons'
 import ReactMarkdown from 'react-markdown'
 import remarkBreaks from 'remark-breaks'
 import remarkGfm from 'remark-gfm'
@@ -1173,6 +1173,8 @@ export default function CleanChatView({ sessionId, agentId, agentName, agentType
   const scrollRef = useRef<HTMLDivElement | null>(null)
   const inputRef = useRef<any>(null)
   const abortRef = useRef<() => void>(() => {})
+  const speechRecognitionRef = useRef<any>(null)
+  const speechInputBaseRef = useRef('')
   const composingRef = useRef(false)
   const shouldStickRef = useRef(true)
   const previousLiveA2UiCountRef = useRef(0)
@@ -1184,6 +1186,7 @@ export default function CleanChatView({ sessionId, agentId, agentName, agentType
   const isAgentActive = !currentAgentStatus || currentAgentStatus === 'Active'
   const isCodexAgent = String(agentType || '').toLowerCase() === 'codex'
   const supportsRuntimeSteer = ['codex', 'goldfish', 'openclaw'].includes(String(agentType || '').toLowerCase())
+  const [isListening, setIsListening] = useState(false)
 
   const updateLive = useCallback((updater: LiveState | ((prev: LiveState) => LiveState)) => {
     setLive(prev => {
@@ -1241,6 +1244,56 @@ export default function CleanChatView({ sessionId, agentId, agentName, agentType
     window.addEventListener('resize', onResize)
     return () => window.removeEventListener('resize', onResize)
   }, [])
+
+  useEffect(() => () => {
+    speechRecognitionRef.current?.stop?.()
+    speechRecognitionRef.current = null
+  }, [])
+
+  const toggleSpeechInput = () => {
+    if (isListening) {
+      speechRecognitionRef.current?.stop?.()
+      return
+    }
+
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition
+    if (!SpeechRecognition) {
+      message.warning('当前浏览器不支持语音识别，请使用最新版 Chrome 或 Edge。')
+      return
+    }
+
+    const recognition = new SpeechRecognition()
+    recognition.lang = 'zh-CN'
+    recognition.continuous = false
+    recognition.interimResults = true
+    speechInputBaseRef.current = input
+    recognition.onstart = () => setIsListening(true)
+    recognition.onresult = (event: any) => {
+      let transcript = ''
+      for (let index = 0; index < event.results.length; index += 1) {
+        transcript += event.results[index][0]?.transcript || ''
+      }
+      setInput(`${speechInputBaseRef.current}${transcript}`)
+    }
+    recognition.onerror = (event: any) => {
+      if (event.error !== 'aborted' && event.error !== 'no-speech') {
+        message.warning(`语音识别失败：${event.error || '未知错误'}`)
+      }
+      setIsListening(false)
+    }
+    recognition.onend = () => {
+      setIsListening(false)
+      speechRecognitionRef.current = null
+    }
+    speechRecognitionRef.current = recognition
+    try {
+      recognition.start()
+    } catch (error: any) {
+      speechRecognitionRef.current = null
+      setIsListening(false)
+      message.warning(`无法启动语音识别：${error?.message || '请检查麦克风权限'}`)
+    }
+  }
 
   const stickToBottom = useCallback((force = false) => {
     const element = scrollRef.current
@@ -1855,9 +1908,11 @@ export default function CleanChatView({ sessionId, agentId, agentName, agentType
           />
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, minWidth: 0 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0, overflow: 'hidden' }}>
-              <Upload beforeUpload={beforeUpload} showUploadList={false} multiple>
-                <Button size="small" icon={<PaperClipOutlined />}>附件</Button>
-              </Upload>
+              <Tooltip title="附件">
+                <Upload beforeUpload={beforeUpload} showUploadList={false} multiple>
+                  <Button size="small" icon={<PaperClipOutlined />} aria-label="附件" />
+                </Upload>
+              </Tooltip>
               <Tooltip title="开启后本次消息会携带 think 模式参数">
                 <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, whiteSpace: 'nowrap' }}>
                   <Switch
@@ -1873,20 +1928,28 @@ export default function CleanChatView({ sessionId, agentId, agentName, agentType
               </Tooltip>
               {supportsRuntimeSteer && (
                 <Tooltip title={codexMessageMode === 'queue' ? '当前智能体忙时，本条消息按队列策略处理' : '作为补充/修正引导当前或上一轮任务'}>
-                  <Segmented
-                    size="small"
-                    value={codexMessageMode}
-                    onChange={value => setCodexMessageMode(value as CodexMessageMode)}
-                    options={[
-                      { label: '排队', value: 'queue' },
-                      { label: '补充', value: 'steer' },
-                    ]}
-                    style={{
-                      borderRadius: 999,
-                      background: '#f2f6ff',
-                      padding: 2,
-                    }}
-                  />
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 2 }}>
+                    <Tooltip title="排队">
+                      <Button
+                        size="small"
+                        type={codexMessageMode === 'queue' ? 'primary' : 'default'}
+                        icon={<OrderedListOutlined />}
+                        aria-label="排队模式"
+                        aria-pressed={codexMessageMode === 'queue'}
+                        onClick={() => setCodexMessageMode('queue')}
+                      />
+                    </Tooltip>
+                    <Tooltip title="补充">
+                      <Button
+                        size="small"
+                        type={codexMessageMode === 'steer' ? 'primary' : 'default'}
+                        icon={<EditOutlined />}
+                        aria-label="补充模式"
+                        aria-pressed={codexMessageMode === 'steer'}
+                        onClick={() => setCodexMessageMode('steer')}
+                      />
+                    </Tooltip>
+                  </span>
                 </Tooltip>
               )}
               <Dropdown
@@ -1901,7 +1964,8 @@ export default function CleanChatView({ sessionId, agentId, agentName, agentType
               >
                 <Button
                   size="small"
-                  icon={<ToolOutlined />}
+                  icon={<><ToolOutlined /><DownOutlined /></>}
+                  aria-label="常用命令"
                   style={{
                     borderRadius: 999,
                     borderColor: '#b9d3ff',
@@ -1909,29 +1973,45 @@ export default function CleanChatView({ sessionId, agentId, agentName, agentType
                     color: '#2459a8',
                     boxShadow: '0 4px 12px rgba(58, 113, 196, 0.12)',
                   }}
-                >
-                  常用命令 <DownOutlined />
-                </Button>
+                />
               </Dropdown>
               {attachments.length > 0 && <Text type="secondary" ellipsis style={{ maxWidth: isMobile ? 110 : 260 }}>{attachments.map(item => item.name).join('、')}</Text>}
               {currentStudioAgentName && <Text type="secondary" ellipsis title={`智能体：${currentStudioAgentName}`} style={{ fontSize: 12, maxWidth: isMobile ? 120 : 220 }}>智能体：{currentStudioAgentName}</Text>}
               {agentType && <Text type="secondary" style={{ fontSize: 12 }}>{agentType}</Text>}
             </div>
-            {sending ? (
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <Tooltip title={isListening ? '停止语音输入' : '语音输入'}>
                 <Button
-                  type={supportsRuntimeSteer && codexMessageMode === 'steer' ? 'primary' : 'default'}
-                  icon={<SendOutlined />}
-                  onClick={() => send()}
-                  disabled={!input.trim() && attachments.length === 0}
-                >
-                  {supportsRuntimeSteer && codexMessageMode === 'steer' ? '引导' : '排队'}
-                </Button>
-                <Button danger icon={<StopOutlined />} onClick={stop}>停止</Button>
-              </div>
-            ) : (
-              <Button type="primary" icon={<SendOutlined />} onClick={() => send()} disabled={!input.trim() && attachments.length === 0}>发送</Button>
-            )}
+                  size="small"
+                  icon={isListening ? <StopOutlined /> : <AudioOutlined />}
+                  type={isListening ? 'primary' : 'default'}
+                  danger={isListening}
+                  aria-label={isListening ? '停止语音输入' : '语音输入'}
+                  onClick={toggleSpeechInput}
+                  disabled={sending}
+                />
+              </Tooltip>
+              {sending ? (
+                <>
+                  <Tooltip title={supportsRuntimeSteer && codexMessageMode === 'steer' ? '引导' : '排队'}>
+                    <Button
+                      type={supportsRuntimeSteer && codexMessageMode === 'steer' ? 'primary' : 'default'}
+                      icon={<SendOutlined />}
+                      aria-label={supportsRuntimeSteer && codexMessageMode === 'steer' ? '引导' : '排队'}
+                      onClick={() => send()}
+                      disabled={!input.trim() && attachments.length === 0}
+                    />
+                  </Tooltip>
+                  <Tooltip title="停止">
+                    <Button danger icon={<StopOutlined />} aria-label="停止" onClick={stop} />
+                  </Tooltip>
+                </>
+              ) : (
+                <Tooltip title="发送">
+                  <Button type="primary" icon={<SendOutlined />} aria-label="发送" onClick={() => send()} disabled={!input.trim() && attachments.length === 0} />
+                </Tooltip>
+              )}
+            </div>
           </div>
         </div>
       </div>
