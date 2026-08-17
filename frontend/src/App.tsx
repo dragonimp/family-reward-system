@@ -9,6 +9,7 @@ import StatsPage from './pages/Stats';
 import SettingsPage from './pages/Settings';
 import AssistantPage from './pages/Assistant';
 import IdentityPage from './pages/Identity';
+import VirtualWatchPage from './pages/VirtualWatch';
 import IdentityGate from './components/IdentityGate';
 import Layout from './components/Layout';
 import ProtectedRoute from './components/ProtectedRoute';
@@ -46,6 +47,7 @@ export default function App() {
                         <Route path="/rules" element={<RulesPage />} />
                         <Route path="/stats" element={<StatsPage />} />
                         <Route path="/settings" element={<SettingsPage />} />
+                        <Route path="/virtual-watch" element={<VirtualWatchPage />} />
                         <Route path="/assistant/*" element={<AssistantPage />} />
                       </Routes>
                     </Layout>

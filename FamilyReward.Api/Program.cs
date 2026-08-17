@@ -321,6 +321,68 @@ app.MapGet("/api/children/{id:int}", async (int id, HttpRequest request) =>
     return child is null ? Results.NotFound(new { error = "不存在" }) : Results.Json(child);
 });
 
+app.MapGet("/api/watch/preview/{childId:int}", async (int childId, HttpRequest request) =>
+{
+    var access = await RequireParentProfile(connectionString, request);
+    if (access.Error is not null) return access.Error;
+
+    var ownedChildren = await GetChildren(connectionString, ownerAppUserId: access.Profile!.AppUserId);
+    var child = ownedChildren.FirstOrDefault(item => GetInt(item, "id") == childId);
+    if (child is null)
+    {
+        return Results.NotFound(new { error = "孩子不存在，或不属于当前家长账号" });
+    }
+
+    var familyGroupId = GetInt(child, "familyGroupId");
+    var childProfileKey = Convert.ToString(child["profileKey"], CultureInfo.InvariantCulture) ?? "";
+    var rulesPayload = await GetRules(connectionString, access.Profile.AppUserId);
+    var rules = ((List<Dictionary<string, object?>>)rulesPayload["rules"])
+        .Where(rule => GetDecimal(rule, "points") > 0)
+        .Take(8)
+        .Select(rule => new
+        {
+            id = GetInt(rule, "id"),
+            name = Convert.ToString(rule["name"], CultureInfo.InvariantCulture) ?? "",
+            category = Convert.ToString(rule["category"], CultureInfo.InvariantCulture) ?? "",
+            points = GetDecimal(rule, "points"),
+            description = Convert.ToString(rule["description"], CultureInfo.InvariantCulture) ?? ""
+        });
+    var requests = familyGroupId > 0
+        ? await GetWatchRewardRequests(connectionString, familyGroupId, childId, 6, childProfileKey)
+        : [];
+
+    return Results.Json(new
+    {
+        preview = true,
+        score = new
+        {
+            familyGroupId,
+            familyGroupName = Convert.ToString(child["familyGroupName"], CultureInfo.InvariantCulture) ?? "",
+            deviceId = "preview",
+            updatedAt = DateTimeOffset.UtcNow.ToString("O", CultureInfo.InvariantCulture),
+            children = new[]
+            {
+                new
+                {
+                    id = childId,
+                    name = Convert.ToString(child["name"], CultureInfo.InvariantCulture) ?? "",
+                    points = GetDecimal(child, "score"),
+                    cash = GetDecimal(child, "cash"),
+                    items = GetInt(child, "items")
+                }
+            }
+        },
+        rules = new { rules },
+        requests = new { familyGroupId, requests },
+        settings = await GetWatchSettings(connectionString, childProfileKey),
+        friends = new
+        {
+            friends = await GetChildFriends(connectionString, childProfileKey),
+            leaderboard = await GetChildFriendLeaderboard(connectionString, childProfileKey)
+        }
+    });
+});
+
 app.MapGet("/api/watch/score", async (HttpRequest request) =>
 {
     var binding = await RequireWatchDeviceBinding(connectionString, request);
@@ -753,8 +815,15 @@ app.MapGet("/watch", () =>
             const bindForm = document.getElementById('bind-form');
             const bindMsg = document.getElementById('bind-msg');
             const tokenKey = 'happylife_watch_device_token';
+            const previewChildId = new URLSearchParams(location.search).get('previewChildId') || '';
+            const isPreview = /^\d+$/.test(previewChildId);
             const token = () => localStorage.getItem(tokenKey) || '';
             const authHeaders = () => ({ 'X-Watch-Device-Token': token() });
+            const blockPreviewWrite = (target) => {
+              if (!isPreview) return false;
+              target.textContent = '虚拟手表仅供预览';
+              return true;
+            };
             const escapeText = (value) => String(value || '').replace(/[&<>"']/g, (ch) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
             const formatPoints = (value) => {
               const points = Number(value);
@@ -825,15 +894,29 @@ app.MapGet("/watch", () =>
               return payload;
             };
             const load = async () => {
-              if (!token()) { showBound(false); return; }
+              if (!isPreview && !token()) { showBound(false); return; }
               try {
-                const [score, rulesPayload, requestsPayload, settingsPayload, friendsPayload] = await Promise.all([
-                  fetchJson('/api/watch/score', { headers: authHeaders() }),
-                  fetchJson('/api/watch/rules', { headers: authHeaders() }),
-                  fetchJson('/api/watch/requests?limit=6', { headers: authHeaders() }),
-                  fetchJson('/api/watch/settings', { headers: authHeaders() }),
-                  fetchJson('/api/watch/friends', { headers: authHeaders() })
-                ]);
+                let score;
+                let rulesPayload;
+                let requestsPayload;
+                let settingsPayload;
+                let friendsPayload;
+                if (isPreview) {
+                  const previewPayload = await fetchJson('/api/watch/preview/' + encodeURIComponent(previewChildId));
+                  score = previewPayload.score;
+                  rulesPayload = previewPayload.rules;
+                  requestsPayload = previewPayload.requests;
+                  settingsPayload = previewPayload.settings;
+                  friendsPayload = previewPayload.friends;
+                } else {
+                  [score, rulesPayload, requestsPayload, settingsPayload, friendsPayload] = await Promise.all([
+                    fetchJson('/api/watch/score', { headers: authHeaders() }),
+                    fetchJson('/api/watch/rules', { headers: authHeaders() }),
+                    fetchJson('/api/watch/requests?limit=6', { headers: authHeaders() }),
+                    fetchJson('/api/watch/settings', { headers: authHeaders() }),
+                    fetchJson('/api/watch/friends', { headers: authHeaders() })
+                  ]);
+                }
                 showBound(true);
                 applyWatchFace(settingsPayload.watchFace);
                 renderFriends(friendsPayload);
@@ -846,7 +929,7 @@ app.MapGet("/watch", () =>
                 document.getElementById('detail-score').textContent = formatPoints(child.points);
                 document.getElementById('detail-cash').textContent = child.cash ?? 0;
                 document.getElementById('detail-items').textContent = child.items ?? 0;
-                document.getElementById('device-id').textContent = '#' + escapeText(score.deviceId);
+                document.getElementById('device-id').textContent = isPreview ? '虚拟预览' : '#' + escapeText(score.deviceId);
                 document.getElementById('rules').innerHTML = (rulesPayload.rules || []).map((rule, index) => `
                   <button type="button" class="rule-btn" data-rule-id="${rule.id}" data-points="${rule.points}" data-title="${escapeText(rule.name)}">
                     <i class="rule-icon">${ruleIcon(index)}</i><span>${escapeText(rule.name)}</span><b>+${escapeText(rule.points)}</b>
@@ -885,6 +968,7 @@ app.MapGet("/watch", () =>
             });
             form.addEventListener('submit', async (event) => {
               event.preventDefault();
+              if (blockPreviewWrite(msg)) return;
               msg.textContent = '正在提交...';
               const data = Object.fromEntries(new FormData(form).entries());
               try {
@@ -906,6 +990,7 @@ app.MapGet("/watch", () =>
             });
             document.getElementById('unbind').addEventListener('click', async () => {
               const unbindMsg = document.getElementById('unbind-msg');
+              if (blockPreviewWrite(unbindMsg)) return;
               unbindMsg.textContent = '正在验证...';
               try {
                 await fetchJson('/api/watch/device-unbind', {
@@ -921,6 +1006,7 @@ app.MapGet("/watch", () =>
             });
             document.getElementById('make-friend-code').addEventListener('click', async () => {
               const friendMsg = document.getElementById('friend-msg');
+              if (blockPreviewWrite(friendMsg)) return;
               friendMsg.textContent = '正在生成...';
               try {
                 const payload = await fetchJson('/api/watch/friend-code', {
@@ -939,6 +1025,7 @@ app.MapGet("/watch", () =>
             });
             document.getElementById('add-friend').addEventListener('click', async () => {
               const friendMsg = document.getElementById('friend-msg');
+              if (blockPreviewWrite(friendMsg)) return;
               friendMsg.textContent = '正在添加...';
               try {
                 const payload = await fetchJson('/api/watch/friends', {
@@ -957,6 +1044,7 @@ app.MapGet("/watch", () =>
             document.querySelectorAll('.face-option').forEach((button) => {
               button.addEventListener('click', async () => {
                 const settingsMsg = document.getElementById('settings-msg');
+                if (blockPreviewWrite(settingsMsg)) return;
                 const face = normalizeFace(button.dataset.face || 'world');
                 settingsMsg.textContent = '正在保存...';
                 try {

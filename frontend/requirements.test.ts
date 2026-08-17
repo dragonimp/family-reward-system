@@ -130,6 +130,28 @@ test('REQ-039 supports redline rules and ordered watch rewards', async () => {
   assert.match(page, /moveRule\(rule\.id, 1\)/);
 });
 
+test('REQ-045 previews the real watch UI for parent-owned children on mobile', async () => {
+  const [app, page, mobileBar, backend] = await Promise.all([
+    readFile(new URL('./src/App.tsx', import.meta.url), 'utf8'),
+    readFile(new URL('./src/pages/VirtualWatch.tsx', import.meta.url), 'utf8'),
+    readFile(new URL('./src/components/MobileAssistantBar.tsx', import.meta.url), 'utf8'),
+    readFile(new URL('../FamilyReward.Api/Program.cs', import.meta.url), 'utf8'),
+  ]);
+
+  assert.match(app, /path="\/virtual-watch" element=\{<VirtualWatchPage \/>\}/);
+  assert.match(mobileBar, /navigate\('\/virtual-watch'\)/);
+  assert.match(mobileBar, /打开虚拟手表/);
+  assert.match(page, /getChildren\(\{ ownedOnly: true \}\)/);
+  assert.match(page, /ownedChildren\[0\]\?\.id/);
+  assert.match(page, /children\.map\(\(child\)/);
+  assert.match(page, /\/watch\?previewChildId=/);
+  assert.match(backend, /MapGet\("\/api\/watch\/preview\/\{childId:int\}"/);
+  assert.match(backend, /GetChildren\(connectionString, ownerAppUserId: access\.Profile!\.AppUserId\)/);
+  assert.match(backend, /孩子不存在，或不属于当前家长账号/);
+  assert.match(backend, /const isPreview = \/\^\\d\+\$\//);
+  assert.match(backend, /虚拟手表仅供预览/);
+});
+
 test('REQ-040 organizes family management into four tabs', async () => {
   const page = await readFile(new URL('./src/pages/FamilyGroups.tsx', import.meta.url), 'utf8');
   assert.match(page, /role="tablist"/);
