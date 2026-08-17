@@ -1,5 +1,5 @@
 import http from '../../services/api'
-import { readCurrentUser } from '../../auth'
+import { readCurrentAppProfile, readCurrentUser } from '../../auth'
 import type { Agent, ChatAttachment, ChatMessage, GatewayConversationEvent, Session, StudioAgent } from './types'
 
 // Host-only transport adapter. Chat behavior lives in @agentfree/webapp-chat.
@@ -36,9 +36,15 @@ function getWebAppBotId() {
 
 function authHeaders() {
   const user = getCurrentUser()
+  const authenticatedUser = readCurrentUser()
+  const userId = authenticatedUser?.userId || authenticatedUser?.id
+  const appProfile = readCurrentAppProfile()
   return {
+    ...(userId ? { 'X-User-Id': userId } : {}),
     ...(user?.username ? { 'X-User-Name': user.username } : {}),
     ...(user?.role ? { 'X-User-Role': user.role } : {}),
+    ...(appProfile?.appUserId ? { 'X-App-User-Id': appProfile.appUserId } : {}),
+    ...(appProfile?.role ? { 'X-App-User-Role': appProfile.role } : {}),
   }
 }
 
@@ -123,8 +129,7 @@ export function streamChat(streamRequest: {
     credentials: 'include',
     headers: {
       'Content-Type': 'application/json',
-      ...(user?.username ? { 'X-User-Name': user.username } : {}),
-      ...(user?.role ? { 'X-User-Role': user.role } : {}),
+      ...authHeaders(),
     },
     body: JSON.stringify({
       sessionId: streamRequest.sessionId,

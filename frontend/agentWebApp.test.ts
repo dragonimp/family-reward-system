@@ -20,6 +20,10 @@ test('mobile assistant reuses the complete AgentFree WebApp chat surface', async
   assert.match(cleanChat, /export \{ CleanChatView as default \} from '@agentfree\/webapp-chat'/);
   assert.doesNotMatch(cleanChat, /streamChat\(/);
   assert.match(api, /\/api\/agentfree\/chat\/stream/);
+  assert.match(api, /readCurrentAppProfile/);
+  assert.match(api, /'X-App-User-Id': appProfile\.appUserId/);
+  assert.match(api, /'X-App-User-Role': appProfile\.role/);
+  assert.match(api, /headers:\s*\{\s*'Content-Type': 'application\/json',\s*\.\.\.authHeaders\(\)/s);
   assert.match(backend, /webAppBotId/);
   assert.match(backend, /if \(active\) result\.Add\(item\.DeepClone\(\)\)/);
   assert.match(backend, /OpenChatStreamAsync/);
