@@ -12,6 +12,7 @@ const defaultConfig: SystemConfig = {
   },
   agent: {
     enabled: false,
+    webAppBotId: '',
     endpoint: '',
     apiKey: '',
     model: 'gpt-4o-mini',
@@ -252,6 +253,20 @@ export default function Settings() {
             />
             <span>启用智能体服务调用</span>
           </label>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">WEBAP 入口标识</label>
+            <input
+              type="text"
+              value={config.agent.webAppBotId}
+              onChange={(e) => {
+                updateConfig((draft) => {
+                  draft.agent.webAppBotId = e.target.value;
+                });
+              }}
+              placeholder="例如：web-jiajaifen-chat"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+            />
+          </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">服务地址（API）</label>
             <input

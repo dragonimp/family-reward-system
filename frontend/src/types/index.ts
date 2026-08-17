@@ -237,6 +237,7 @@ export interface VoiceConfig {
 
 export interface AgentConfig {
   enabled: boolean;
+  webAppBotId: string;
   endpoint: string;
   apiKey: string;
   model: string;

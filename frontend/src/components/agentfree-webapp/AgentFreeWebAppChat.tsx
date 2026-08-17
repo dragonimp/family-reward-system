@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo, useRef } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { Layout, Menu, Button, Drawer, Popconfirm, message, theme, Input, Space, Tooltip } from 'antd'
 import { PlusOutlined, InboxOutlined, MenuFoldOutlined, EditOutlined, WechatOutlined, WechatWorkOutlined, GlobalOutlined, SendOutlined } from '@ant-design/icons'
-import { getSessions, getAgents, getStudioAgents, createSession, updateSession, archiveSession, setAgentFreeWebAppCurrentUser } from './api'
+import { getSessions, getAgents, getStudioAgents, createSession, updateSession, archiveSession, setAgentFreeWebAppBotId, setAgentFreeWebAppCurrentUser } from './api'
 import type { Session, Agent, StudioAgent } from './types'
 import CleanChatView from './CleanChatView'
 import { readCurrentUser } from '../../auth'
@@ -122,6 +122,9 @@ export function AgentFreeWebAppChat({
   useEffect(() => {
     setAgentFreeWebAppCurrentUser(currentUser || null)
   }, [currentUser])
+  useEffect(() => {
+    if (webAppBotId) setAgentFreeWebAppBotId(webAppBotId)
+  }, [webAppBotId])
   const getDefaultSessionName = () => {
     const d = new Date()
     const yyyy = d.getFullYear()
@@ -233,7 +236,7 @@ export function AgentFreeWebAppChat({
     setLoading(true)
     try {
       const [sessionsRes, agentsRes, studioAgentsRes] = await Promise.all([
-        getSessions('WebApp', currentUserName),
+        getSessions('WebApp', currentUserName, webAppBotId),
         getAgents(true, 'WebApp', currentUserName, false, webAppBotId),
         getStudioAgents({ mine: true }),
       ])

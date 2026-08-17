@@ -1426,20 +1426,20 @@ app.MapGet("/api/stats/categories", async (HttpRequest request) =>
     return Results.Json(rows);
 });
 
-var configStore = new SystemConfigStore(app.Environment.ContentRootPath);
+var configStore = new SystemConfigStore(connectionString, app.Environment.ContentRootPath);
 
 app.MapGet("/api/system/config", async (HttpRequest request) =>
 {
     var access = await RequireParentProfile(connectionString, request);
     if (access.Error is not null) return access.Error;
-    return Results.Json(configStore.Load());
+    return Results.Json(await configStore.LoadAsync());
 });
 
 app.MapPut("/api/system/config", async (JsonObject body, HttpRequest request) =>
 {
     var access = await RequireParentProfile(connectionString, request);
     if (access.Error is not null) return access.Error;
-    var saved = configStore.Save(body);
+    var saved = await configStore.SaveAsync(body);
     return Results.Json(saved);
 });
 
@@ -1453,7 +1453,7 @@ app.MapPost("/api/agent/parse-reward", async (JsonObject body, IHttpClientFactor
         return Results.BadRequest(new { ok = false, error = "缺少语音文本" });
     }
 
-    var config = configStore.Load();
+    var config = await configStore.LoadAsync();
     var agent = config["agent"]!.AsObject();
     if (!agent.Bool("enabled"))
     {
@@ -1549,7 +1549,7 @@ app.MapPost("/api/agent/invoke", async (JsonObject body, IHttpClientFactory http
 {
     var access = await RequireParentProfile(connectionString, request);
     if (access.Error is not null) return access.Error;
-    var config = configStore.Load();
+    var config = await configStore.LoadAsync();
     var agent = config["agent"]!.AsObject();
     if (!agent.Bool("enabled"))
     {
@@ -1641,7 +1641,10 @@ app.MapGet("/api/agentfree/agents", async (IHttpClientFactory httpClientFactory,
     if (access.Error is not null) return access.Error;
     try
     {
-        return Results.Json(await GetFamilyRewardAgentFreeAgents(httpClientFactory, GetUnifiedUsername(request), request.HttpContext.RequestAborted));
+        var config = await configStore.LoadAsync();
+        var webAppBotId = request.Query.String("webAppBotId").Trim();
+        if (string.IsNullOrWhiteSpace(webAppBotId)) webAppBotId = config["agent"]?.AsObject().String("webAppBotId", "web-jiajaifen-chat") ?? "web-jiajaifen-chat";
+        return Results.Json(await GetFamilyRewardAgentFreeAgents(httpClientFactory, GetUnifiedUsername(request), webAppBotId, request.HttpContext.RequestAborted));
     }
     catch (Exception ex)
     {
@@ -1656,7 +1659,10 @@ app.MapGet("/api/agentfree/sessions", async (IHttpClientFactory httpClientFactor
     try
     {
         var userName = GetUnifiedUsername(request);
-        var agentId = await ResolveFamilyRewardAgentFreeAgentId(httpClientFactory, userName, request.HttpContext.RequestAborted);
+        var config = await configStore.LoadAsync();
+        var webAppBotId = request.Query.String("webAppBotId").Trim();
+        if (string.IsNullOrWhiteSpace(webAppBotId)) webAppBotId = config["agent"]?.AsObject().String("webAppBotId", "web-jiajaifen-chat") ?? "web-jiajaifen-chat";
+        var agentId = await ResolveFamilyRewardAgentFreeAgentIdForBot(httpClientFactory, userName, webAppBotId, request.HttpContext.RequestAborted);
         if (agentId is null) return Results.Json(new JsonArray());
         var sessions = await SendAgentFreeJson(
             httpClientFactory,
@@ -1685,7 +1691,9 @@ app.MapGet("/api/agentfree/sessions/{id}", async (string id, IHttpClientFactory 
     try
     {
         var userName = GetUnifiedUsername(request);
-        var agentId = await ResolveFamilyRewardAgentFreeAgentId(httpClientFactory, userName, request.HttpContext.RequestAborted);
+        var webAppBotId = request.Query.String("webAppBotId").Trim();
+        if (string.IsNullOrWhiteSpace(webAppBotId)) webAppBotId = "web-jiajaifen-chat";
+        var agentId = await ResolveFamilyRewardAgentFreeAgentIdForBot(httpClientFactory, userName, webAppBotId, request.HttpContext.RequestAborted);
         var session = await SendAgentFreeJson(
             httpClientFactory,
             HttpMethod.Get,
@@ -1768,7 +1776,9 @@ app.MapPost("/api/agentfree/sessions", async (JsonObject body, IHttpClientFactor
     try
     {
         var userName = GetUnifiedUsername(request);
-        var agentId = await ResolveFamilyRewardAgentFreeAgentId(httpClientFactory, userName, request.HttpContext.RequestAborted);
+        var webAppBotId = body.String("webAppBotId").Trim();
+        if (string.IsNullOrWhiteSpace(webAppBotId)) webAppBotId = "web-jiajaifen-chat";
+        var agentId = await ResolveFamilyRewardAgentFreeAgentIdForBot(httpClientFactory, userName, webAppBotId, request.HttpContext.RequestAborted);
         if (agentId is null)
         {
             return Results.Json(new { error = "未找到家庭积分应用智能体" }, statusCode: StatusCodes.Status502BadGateway);
@@ -1781,7 +1791,7 @@ app.MapPost("/api/agentfree/sessions", async (JsonObject body, IHttpClientFactor
             {
                 ["agentId"] = agentId.Value,
                 ["name"] = string.IsNullOrWhiteSpace(body.String("name")) ? "家庭积分会话" : body.String("name").Trim(),
-                ["webAppBotId"] = "web"
+                ["webAppBotId"] = webAppBotId
             },
             userName,
             request.HttpContext.RequestAborted);
@@ -1889,7 +1899,9 @@ app.MapPost("/api/agentfree/chat/stream", async (JsonObject body, IHttpClientFac
     try
     {
         var userName = GetUnifiedUsername(context.Request);
-        var agentId = await ResolveFamilyRewardAgentFreeAgentId(httpClientFactory, userName, context.RequestAborted);
+        var webAppBotId = body.String("webAppBotId").Trim();
+        if (string.IsNullOrWhiteSpace(webAppBotId)) webAppBotId = "web-jiajaifen-chat";
+        var agentId = await ResolveFamilyRewardAgentFreeAgentIdForBot(httpClientFactory, userName, webAppBotId, context.RequestAborted);
         if (agentId is null)
         {
             context.Response.StatusCode = StatusCodes.Status502BadGateway;
@@ -1898,7 +1910,7 @@ app.MapPost("/api/agentfree/chat/stream", async (JsonObject body, IHttpClientFac
         }
         var sessionId = body.String("sessionId").Trim();
         if (string.IsNullOrWhiteSpace(sessionId)
-            || await GetFamilyRewardAgentFreeSession(httpClientFactory, sessionId, userName, context.RequestAborted) is null)
+                || await GetFamilyRewardAgentFreeSessionForBot(httpClientFactory, sessionId, userName, webAppBotId, context.RequestAborted) is null)
         {
             context.Response.StatusCode = StatusCodes.Status403Forbidden;
             await context.Response.WriteAsJsonAsync(new { error = "无权访问该智能体会话" }, context.RequestAborted);
@@ -1925,17 +1937,17 @@ app.MapPost("/api/agentfree/chat/stream", async (JsonObject body, IHttpClientFac
                 ["source"] = "family-reward-web",
                 ["gatewayType"] = "WebApp",
                 ["channelType"] = "WebApp",
-                ["webAppBotId"] = "web",
+                ["webAppBotId"] = webAppBotId,
                 ["agentId"] = agentId.Value,
                 ["parentAppUserId"] = access.Profile!.AppUserId
             },
             ["gatewayContext"] = new JsonObject
             {
                 ["GatewayType"] = "WebApp",
-                ["GatewayBotId"] = "web",
-                ["GatewayMetadata_transport"] = "web",
+                ["GatewayBotId"] = webAppBotId,
+                ["GatewayMetadata_transport"] = webAppBotId,
                 ["GatewayMetadata_source"] = "family-reward-web",
-                ["GatewayMetadata_webAppBotId"] = "web",
+                ["GatewayMetadata_webAppBotId"] = webAppBotId,
                 ["GatewayMetadata_parentAppUserId"] = access.Profile!.AppUserId
             }
         };
@@ -2116,12 +2128,13 @@ static async Task<JsonNode?> SendAgentFreeJson(
 static async Task<JsonArray> GetFamilyRewardAgentFreeAgents(
     IHttpClientFactory httpClientFactory,
     string userName,
+    string webAppBotId,
     CancellationToken cancellationToken)
 {
     var agents = await SendAgentFreeJson(
         httpClientFactory,
         HttpMethod.Get,
-        "/api/agents?authorizedOnly=true&gatewayType=WebApp&webAppBotId=web",
+        $"/api/agents?authorizedOnly=true&gatewayType=WebApp&webAppBotId={Uri.EscapeDataString(webAppBotId)}",
         null,
         userName,
         cancellationToken) as JsonArray;
@@ -2138,22 +2151,24 @@ static async Task<JsonArray> GetFamilyRewardAgentFreeAgents(
     return result;
 }
 
-static async Task<int?> ResolveFamilyRewardAgentFreeAgentId(
+static async Task<int?> ResolveFamilyRewardAgentFreeAgentIdForBot(
     IHttpClientFactory httpClientFactory,
     string userName,
+    string webAppBotId,
     CancellationToken cancellationToken)
 {
-    var agents = await GetFamilyRewardAgentFreeAgents(httpClientFactory, userName, cancellationToken);
+    var agents = await GetFamilyRewardAgentFreeAgents(httpClientFactory, userName, webAppBotId, cancellationToken);
     return agents.OfType<JsonObject>().Select(item => item.Int("id")).FirstOrDefault(id => id.HasValue);
 }
 
-static async Task<JsonObject?> GetFamilyRewardAgentFreeSession(
+static async Task<JsonObject?> GetFamilyRewardAgentFreeSessionForBot(
     IHttpClientFactory httpClientFactory,
     string sessionId,
     string userName,
+    string webAppBotId,
     CancellationToken cancellationToken)
 {
-    var agentId = await ResolveFamilyRewardAgentFreeAgentId(httpClientFactory, userName, cancellationToken);
+    var agentId = await ResolveFamilyRewardAgentFreeAgentIdForBot(httpClientFactory, userName, webAppBotId, cancellationToken);
     if (agentId is null) return null;
     var session = await SendAgentFreeJson(
         httpClientFactory,
@@ -2164,6 +2179,13 @@ static async Task<JsonObject?> GetFamilyRewardAgentFreeSession(
         cancellationToken) as JsonObject;
     return session?.Int("agentId") == agentId ? session : null;
 }
+
+static Task<JsonObject?> GetFamilyRewardAgentFreeSession(
+    IHttpClientFactory httpClientFactory,
+    string sessionId,
+    string userName,
+    CancellationToken cancellationToken) =>
+    GetFamilyRewardAgentFreeSessionForBot(httpClientFactory, sessionId, userName, "web-jiajaifen-chat", cancellationToken);
 
 static JsonArray FilterFamilyRewardAgentFreeSessions(JsonNode? sessions, int agentId)
 {
@@ -4075,6 +4097,13 @@ static async Task InitDatabase(string connectionString)
     await using var conn = await OpenConnection(connectionString);
     var statements = new[]
     {
+        """
+        CREATE TABLE IF NOT EXISTS system_config (
+            id INTEGER PRIMARY KEY CHECK (id = 1),
+            config_json JSONB NOT NULL,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+        """,
         """
         CREATE TABLE IF NOT EXISTS family_groups (
             id SERIAL PRIMARY KEY,
@@ -8179,39 +8208,74 @@ static async Task<(JsonNode? Payload, IResult? Error, int StatusCode)> SendAtlas
 
 sealed class SystemConfigStore
 {
-    private readonly string _path;
+    private readonly string _connectionString;
+    private readonly string _legacyPath;
 
-    public SystemConfigStore(string contentRoot)
+    public SystemConfigStore(string connectionString, string contentRoot)
     {
-        _path = Path.Combine(contentRoot, "system_config.json");
+        _connectionString = connectionString;
+        _legacyPath = Path.Combine(contentRoot, "system_config.json");
     }
 
-    public JsonObject Load()
+    public async Task<JsonObject> LoadAsync()
     {
-        if (!File.Exists(_path))
+        await using var conn = new NpgsqlConnection(_connectionString);
+        await conn.OpenAsync();
+        await using var command = new NpgsqlCommand("SELECT config_json::text FROM system_config WHERE id = 1", conn);
+        var stored = Convert.ToString(await command.ExecuteScalarAsync(), CultureInfo.InvariantCulture);
+        if (!string.IsNullOrWhiteSpace(stored))
         {
-            var defaults = Defaults();
-            File.WriteAllText(_path, defaults.ToJsonString(FamilyRewardJson.CreateOptions(writeIndented: true)));
-            return defaults;
+            try
+            {
+                var config = JsonNode.Parse(stored) as JsonObject ?? Defaults();
+                EnsureDefaults(config);
+                return config;
+            }
+            catch
+            {
+                return Defaults();
+            }
         }
 
+        var migrated = LoadLegacy();
+        EnsureDefaults(migrated);
+        await UpsertAsync(conn, migrated);
+        return migrated;
+    }
+
+    public async Task<JsonObject> SaveAsync(JsonObject body)
+    {
+        var current = await LoadAsync();
+        Merge(current["voice"]!.AsObject(), body["voice"] as JsonObject);
+        Merge(current["agent"]!.AsObject(), body["agent"] as JsonObject);
+        await using var conn = new NpgsqlConnection(_connectionString);
+        await conn.OpenAsync();
+        await UpsertAsync(conn, current);
+        return current;
+    }
+
+    private async Task UpsertAsync(NpgsqlConnection conn, JsonObject config)
+    {
+        await using var command = new NpgsqlCommand("""
+            INSERT INTO system_config (id, config_json, updated_at)
+            VALUES (1, @config_json::jsonb, CURRENT_TIMESTAMP)
+            ON CONFLICT (id) DO UPDATE SET config_json = EXCLUDED.config_json, updated_at = CURRENT_TIMESTAMP
+            """, conn);
+        command.Parameters.AddWithValue("config_json", config.ToJsonString(FamilyRewardJson.CreateOptions()));
+        await command.ExecuteNonQueryAsync();
+    }
+
+    private JsonObject LoadLegacy()
+    {
+        if (!File.Exists(_legacyPath)) return Defaults();
         try
         {
-            return JsonNode.Parse(File.ReadAllText(_path)) as JsonObject ?? Defaults();
+            return JsonNode.Parse(File.ReadAllText(_legacyPath)) as JsonObject ?? Defaults();
         }
         catch
         {
             return Defaults();
         }
-    }
-
-    public JsonObject Save(JsonObject body)
-    {
-        var current = Load();
-        Merge(current["voice"]!.AsObject(), body["voice"] as JsonObject);
-        Merge(current["agent"]!.AsObject(), body["agent"] as JsonObject);
-        File.WriteAllText(_path, current.ToJsonString(FamilyRewardJson.CreateOptions(writeIndented: true)));
-        return current;
     }
 
     private static void Merge(JsonObject target, JsonObject? source)
@@ -8221,6 +8285,13 @@ sealed class SystemConfigStore
         {
             target[item.Key] = item.Value?.DeepClone();
         }
+    }
+
+    private static void EnsureDefaults(JsonObject config)
+    {
+        var agent = config["agent"] as JsonObject ?? new JsonObject();
+        agent["webAppBotId"] ??= "web-jiajaifen-chat";
+        config["agent"] = agent;
     }
 
     private static JsonObject Defaults() => new()
@@ -8234,6 +8305,7 @@ sealed class SystemConfigStore
         ["agent"] = new JsonObject
         {
             ["enabled"] = false,
+            ["webAppBotId"] = "web-jiajaifen-chat",
             ["endpoint"] = "",
             ["apiKey"] = "",
             ["model"] = "gpt-4o-mini",

@@ -13,14 +13,15 @@ test('mobile assistant reuses the complete AgentFree WebApp chat surface', async
 
   assert.match(page, /<AgentFreeWebAppChat/);
   assert.match(page, /routeBase="\/assistant"/);
-  assert.match(page, /webAppBotId="web"/);
+  assert.match(page, /webAppBotId=\{webAppBotId\}/);
+  assert.match(page, /getSystemConfig\(\)/);
   assert.match(chat, /import CleanChatView from '\.\/CleanChatView'/);
   assert.match(chat, /getSessions\('WebApp'/);
   assert.match(cleanChat, /streamChat\(/);
   assert.match(cleanChat, /stream\.delta/);
   assert.match(cleanChat, /parseAgUiEnvelope/);
   assert.match(api, /\/api\/agentfree\/chat\/stream/);
-  assert.match(backend, /authorizedOnly=true&gatewayType=WebApp&webAppBotId=web/);
+  assert.match(backend, /webAppBotId/);
   assert.match(backend, /if \(active\) result\.Add\(item\.DeepClone\(\)\)/);
   assert.match(backend, /\/api\/webapp\/chat\/stream/);
   assert.doesNotMatch(backend, /\/api\/agent\/invoke\/stream/);

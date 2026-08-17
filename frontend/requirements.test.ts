@@ -63,7 +63,8 @@ test('REQ-033 streams mobile family agent responses without waiting for the full
   assert.match(launcher, /navigate\('\/assistant'\)/);
   assert.match(assistant, /<AgentFreeWebAppChat/);
   assert.match(assistant, /currentUser=\{user\}/);
-  assert.match(assistant, /webAppBotId="web"/);
+  assert.match(assistant, /webAppBotId=\{webAppBotId\}/);
+  assert.match(assistant, /getSystemConfig\(\)/);
   assert.match(chat, /import CleanChatView/);
   assert.match(chat, /getSessions\('WebApp'/);
   assert.match(cleanChat, /parseAgUiEnvelope/);
@@ -75,7 +76,7 @@ test('REQ-033 streams mobile family agent responses without waiting for the full
   assert.match(api, /\/api\/agentfree\/sessions/);
   assert.match(api, /\/api\/webapp\/sessions/);
   assert.match(api, /\/api\/webapp\/chat\/stream/);
-  assert.match(api, /authorizedOnly=true&gatewayType=WebApp&webAppBotId=web/);
+  assert.match(api, /webAppBotId/);
   assert.match(api, /if \(active\) result\.Add\(item\.DeepClone\(\)\)/);
   assert.match(api, /text\/event-stream/);
   assert.match(api, /X-Accel-Buffering/);

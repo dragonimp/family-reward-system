@@ -10,8 +10,9 @@ type AgentFreeWebAppUser = {
   role?: string
 } | null
 
-const WEB_APP_BOT_ID = 'web'
+export const WEB_APP_BOT_ID = ''
 let explicitCurrentUser: AgentFreeWebAppUser = null
+let explicitWebAppBotId = ''
 
 const wrap = async <T,>(value: Promise<T>): AxiosLike<T> => ({ data: await value })
 
@@ -19,8 +20,16 @@ export function setAgentFreeWebAppCurrentUser(user: AgentFreeWebAppUser) {
   explicitCurrentUser = user
 }
 
+export function setAgentFreeWebAppBotId(botId: string) {
+  explicitWebAppBotId = botId.trim()
+}
+
 function getCurrentUser() {
   return explicitCurrentUser || readCurrentUser()
+}
+
+function getWebAppBotId() {
+  return explicitWebAppBotId || WEB_APP_BOT_ID
 }
 
 function authHeaders() {
@@ -44,16 +53,16 @@ export const getAgents = (
     gatewayType: gatewayType && gatewayType !== 'All' ? gatewayType : undefined,
     user: user || undefined,
     ownedOnly: ownedOnly || undefined,
-    webAppBotId: webAppBotId || WEB_APP_BOT_ID,
+    webAppBotId: webAppBotId || getWebAppBotId(),
   },
 }))
 
-export const getSessions = (gatewayType?: string, user?: string) => wrap(http.get<unknown, Session[]>('/api/agentfree/sessions', {
+export const getSessions = (gatewayType?: string, user?: string, webAppBotId = getWebAppBotId()) => wrap(http.get<unknown, Session[]>('/api/agentfree/sessions', {
   headers: authHeaders(),
   params: {
     gatewayType: gatewayType && gatewayType !== 'All' ? gatewayType : undefined,
     user: user || undefined,
-    webAppBotId: WEB_APP_BOT_ID,
+    webAppBotId: webAppBotId || getWebAppBotId(),
   },
 }))
 
@@ -80,7 +89,7 @@ export const getStudioAgents = (_params?: { mine?: boolean }): AxiosLike<StudioA
 export const createSession = (data: { agentId: number; name?: string; webAppBotId?: string }) =>
   wrap(http.post<unknown, Session>('/api/agentfree/sessions', {
     ...data,
-    webAppBotId: data.webAppBotId || WEB_APP_BOT_ID,
+    webAppBotId: data.webAppBotId || getWebAppBotId(),
   }, { headers: authHeaders() }))
 
 export const updateSession = (id: string, data: { name?: string; isArchived?: boolean }) =>
@@ -118,7 +127,7 @@ export function streamChat(streamRequest: {
       message: streamRequest.content,
       attachments: streamRequest.attachments || [],
       currentUser: user,
-      webAppBotId: WEB_APP_BOT_ID,
+      webAppBotId: getWebAppBotId(),
       enableThinking: streamRequest.enableThinking,
       messageMode: streamRequest.messageMode,
     }),
