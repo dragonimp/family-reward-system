@@ -23,7 +23,7 @@ declare global {
 }
 
 const PUBLIC_WIDGET_ID = 'atlas-public-feedback-widget';
-const PUBLIC_WIDGET_URL = 'https://home.ai.impx.net/feedback-widget.js';
+const PUBLIC_WIDGET_URL = 'https://auth.ai.xmkurt.com/feedback-widget.js';
 
 export default function PublicFeedbackWidget() {
   const { user } = useAuth();
