@@ -41,17 +41,17 @@ test "$status" = '404'
 jq -e '.error | contains("公共规则")' /tmp/req036-public-edit.json >/dev/null
 echo 'ok 3 - 公共规则保持只读'
 
-mcp family_reward_query_rules '{}' | jq -e '.ok == false and (.error | contains("user_id"))' >/dev/null
-custom_mcp="$(mcp family_reward_create_rule "{\"user_id\":\"${PARENT_A}\",\"name\":\"主动阅读-${SUFFIX}\",\"category\":\"学习\",\"points\":8}")"
+mcp family_reward_query_rules '{}' | jq -e '.ok == false and (.error | contains("parent_user_id"))' >/dev/null
+custom_mcp="$(mcp family_reward_create_rule "{\"parent_user_id\":\"${PARENT_A}\",\"name\":\"主动阅读-${SUFFIX}\",\"category\":\"学习\",\"points\":8}")"
 custom_mcp_id="$(jq -er '.rule.id' <<<"$custom_mcp")"
-mcp family_reward_query_rules "{\"user_id\":\"${PARENT_A}\"}" | jq -e --argjson id "$custom_mcp_id" '.ok == true and (.data.personalRules | any(.id == $id))' >/dev/null
-mcp family_reward_query_rules "{\"user_id\":\"${PARENT_B}\"}" | jq -e --argjson id "$custom_mcp_id" '.data.rules | all(.id != $id)' >/dev/null
+mcp family_reward_query_rules "{\"parent_user_id\":\"${PARENT_A}\"}" | jq -e --argjson id "$custom_mcp_id" '.ok == true and (.data.personalRules | any(.id == $id))' >/dev/null
+mcp family_reward_query_rules "{\"parent_user_id\":\"${PARENT_B}\"}" | jq -e --argjson id "$custom_mcp_id" '.data.rules | all(.id != $id)' >/dev/null
 echo 'ok 4 - MCP强制用户入参且新增规则隔离到该用户模板'
 
 redline="$(api "$PARENT_A" -H 'Content-Type: application/json' -d "{\"name\":\"说谎红线-${SUFFIX}\",\"category\":\"红线\",\"points\":5,\"ruleType\":\"redline\"}" "$API_BASE/api/rules")"
 redline_id="$(jq -er '.id' <<<"$redline")"
 jq -e '.score == -5 and .type == "negative" and .isRedLine == true' <<<"$redline" >/dev/null
-mcp_redline="$(mcp family_reward_create_rule "{\"user_id\":\"${PARENT_A}\",\"name\":\"破坏物品-${SUFFIX}\",\"category\":\"红线\",\"points\":3,\"rule_type\":\"redline\"}")"
+mcp_redline="$(mcp family_reward_create_rule "{\"parent_user_id\":\"${PARENT_A}\",\"name\":\"破坏物品-${SUFFIX}\",\"category\":\"红线\",\"points\":3,\"rule_type\":\"redline\"}")"
 jq -e '.ok == true and .rule.score == -3 and .rule.isRedLine == true' <<<"$mcp_redline" >/dev/null
 echo 'ok 5 - Web与MCP均可明确新增红线减分规则'
 
@@ -70,4 +70,4 @@ watch_rules="$(curl -fsS -H "X-Watch-Device-Token: ${token}" "$API_BASE/api/watc
 jq -e --argjson web "$custom_web_id" --argjson mcp "$custom_mcp_id" --argjson redline "$redline_id" --argjson public_redline "$public_redline_id" '(.rules | length) <= 8 and .rules[0].id == $mcp and .rules[1].id == $web and (.rules | all(.points > 0 and .id != $redline and .id != $public_redline))' <<<"$watch_rules" >/dev/null
 echo 'ok 7 - 手表按模板顺序展示前8条奖励规则并排除红线'
 
-printf 'PASS REQ-039: 7/7 cases passed (%s)\n' "$PARENT_A"
+printf 'PASS REQ-036: 7/7 cases passed (%s)\n' "$PARENT_A"
