@@ -294,14 +294,8 @@ export default function Dashboard() {
 
       {/* 最新交易 */}
       <Card className="p-5">
-        <div className="flex items-center justify-between mb-4">
+        <div className="mb-4">
           <h3 className="text-lg font-bold text-gray-800">📜 最近动态</h3>
-          <button
-            onClick={() => navigate('/transactions')}
-            className="text-sm text-[#4A90D9] hover:underline font-medium"
-          >
-            查看全部 →
-          </button>
         </div>
         
         {transactions.length === 0 ? (

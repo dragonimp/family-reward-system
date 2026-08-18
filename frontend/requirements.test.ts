@@ -106,7 +106,8 @@ test('REQ-036 scopes personal rule templates to a parent across web, watch and M
   assert.match(api, /CREATE TABLE IF NOT EXISTS user_rule_template_items/);
   assert.match(api, /owner_app_user_id/);
   assert.match(api, /GetRules\(connectionString, binding\.Binding!\.ParentAppUserId\)/);
-  assert.match(api, /FamilyRewardMcpQueryRulesToolName => new\(StringComparer\.Ordinal\) \{ "user_id" \}/);
+  assert.match(api, /allowed\.Add\("parent_user_id"\)/);
+  assert.match(api, /ResolveMcpParentAppUserId/);
   assert.match(page, />我的规则模板</);
   assert.match(page, /saveRuleTemplate\(selectedIds\)/);
 });
@@ -150,6 +151,34 @@ test('REQ-045 previews the real watch UI for parent-owned children on mobile', a
   assert.match(backend, /孩子不存在，或不属于当前家长账号/);
   assert.match(backend, /const isPreview = \/\^\\d\+\$\//);
   assert.match(backend, /虚拟手表仅供预览/);
+});
+
+test('REQ-048 requires parent scope for public MCP tools', async () => {
+  const [api, library] = await Promise.all([
+    readFile(new URL('../FamilyReward.Api/Program.cs', import.meta.url), 'utf8'),
+    readFile(new URL('../application/mcp/family-reward-mcp-tool-library-split.json', import.meta.url), 'utf8'),
+  ]);
+  assert.match(api, /缺少必填参数 parent_user_id/);
+  assert.match(api, /GetMcpVisibleFamilyChildren/);
+  assert.match(api, /IsMcpFamilyAccessible/);
+  assert.match(api, /parentAppUserId: ResolveMcpParentAppUserId\(arguments\)/);
+  assert.match(api, /当前家长权限不足/);
+  assert.match(library, /parent_user_id/);
+});
+
+test('REQ-049 removes legacy menus and manual watch request fields', async () => {
+  const [layout, dashboard, api] = await Promise.all([
+    readFile(new URL('./src/components/Layout.tsx', import.meta.url), 'utf8'),
+    readFile(new URL('./src/pages/Dashboard.tsx', import.meta.url), 'utf8'),
+    readFile(new URL('../FamilyReward.Api/Program.cs', import.meta.url), 'utf8'),
+  ]);
+  assert.doesNotMatch(layout, /label: '交易记录'/);
+  assert.doesNotMatch(layout, /label: '统计报表'/);
+  assert.doesNotMatch(dashboard, /navigate\('\/transactions'\)/);
+  assert.doesNotMatch(api, /<input id="points" name="points" inputmode="decimal"/);
+  assert.doesNotMatch(api, /<textarea id="note" name="note"/);
+  assert.match(api, /<input type="hidden" id="points" name="points">/);
+  assert.match(api, /请先选择一项奖励规则/);
 });
 
 test('REQ-040 organizes family management into four tabs', async () => {

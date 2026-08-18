@@ -97,8 +97,8 @@
 | FR-G02 | 智能体服务配置 | 可配置启用状态、地址、密钥、模型、超时和系统提示词 | 已实现 | `Settings.tsx`、`system_config.json` |
 | FR-G03 | 智能体连通测试 | 系统设置页可发起测试请求并展示成功结果或错误 | 已实现 | `invokeAgent`、`/api/agent/invoke` |
 | FR-G04 | MCP 协议服务 | 提供 initialize、ping、tools/list 和 tools/call 等 JSON-RPC 能力 | 已实现 | `/api/mcp`、`application/mcp/` |
-| FR-G05 | MCP 孩子与积分工具 | 支持孩子增删改查、积分调整/查询、操作记录增删改查 | 已实现 | `BuildMcpToolCatalog`、`scripts/test-family-reward-mcp.sh` |
-| FR-G06 | MCP 规则与家庭工具 | 支持规则增删改查、家庭组查询和创建，并拒绝未声明参数 | 已实现 | `SafeInvokeFamilyRewardMcpTool`、`application/goldfish-tool-library.json` |
+| FR-G05 | MCP 孩子与积分工具 | 所有工具要求 `parent_user_id`；孩子和积分写操作只允许操作当前家长名下孩子，积分查询覆盖该家长创建或加入的全部家庭组 | 已实现 | `BuildMcpToolCatalog`、`scripts/test-family-reward-mcp.sh`、`scripts/test-family-reward-mcp-authorization.sh` |
+| FR-G06 | MCP 规则与家庭工具 | 规则按家长隔离，家庭组只允许查询或操作当前家长创建/加入的记录，并拒绝未声明参数 | 已实现 | `SafeInvokeFamilyRewardMcpTool`、`application/goldfish-tool-library.json` |
 
 ### H. 安全、数据与运维边界
 

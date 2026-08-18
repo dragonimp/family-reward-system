@@ -737,10 +737,7 @@ app.MapGet("/watch", () =>
                       <div class="rules" id="rules"></div>
                       <label for="title">申请事项</label>
                       <div class="input-action"><input id="title" name="title" maxlength="80" placeholder="比如 好好吃饭"><button class="voice-btn" type="button" data-speech-target="title" aria-label="语音输入申请事项">🎙</button></div>
-                      <label for="points">积分</label>
-                      <input id="points" name="points" inputmode="decimal" placeholder="比如 5">
-                      <label for="note">说明</label>
-                      <div class="input-action"><textarea id="note" name="note" maxlength="200" placeholder="可以写一句说明"></textarea><button class="voice-btn" type="button" data-speech-target="note" aria-label="语音输入说明">🎙</button></div>
+                      <input type="hidden" id="points" name="points">
                       <button class="submit" type="submit">提交</button>
                       <p id="msg" class="msg"></p>
                     </form>
@@ -969,6 +966,10 @@ app.MapGet("/watch", () =>
             form.addEventListener('submit', async (event) => {
               event.preventDefault();
               if (blockPreviewWrite(msg)) return;
+              if (!document.getElementById('rule-id').value) {
+                msg.textContent = '请先选择一项奖励规则';
+                return;
+              }
               msg.textContent = '正在提交...';
               const data = Object.fromEntries(new FormData(form).entries());
               try {
@@ -2563,10 +2564,8 @@ static object BuildMcpServiceDescriptor()
 
 static object BuildMcpToolCatalog()
 {
-    return new
+    var tools = new object[]
     {
-        tools = new object[]
-        {
             new
             {
                 name = FamilyRewardMcpAddChildToolName,
@@ -2809,8 +2808,7 @@ static object BuildMcpToolCatalog()
                 inputSchema = new
                 {
                     type = "object",
-                    properties = new { user_id = new { type = "string", description = "家长用户名或家长应用用户编号（必填）" } },
-                    required = new[] { "user_id" }
+                    properties = new { }
                 }
             },
             new
@@ -2827,10 +2825,9 @@ static object BuildMcpToolCatalog()
                         points = new { type = "number", description = "积分绝对值；reward为加分，redline为减分" },
                         rule_type = new { type = "string", @enum = new[] { "reward", "redline" }, description = "规则类型：奖励或红线" },
                         cash_cny = new { type = "number", description = "现金" },
-                        description = new { type = "string", description = "描述" },
-                        user_id = new { type = "string", description = "家长用户名或家长应用用户编号（必填）" }
+                        description = new { type = "string", description = "描述" }
                     },
-                    required = new[] { "user_id", "name" }
+                    required = new[] { "name" }
                 }
             },
             new
@@ -2848,10 +2845,9 @@ static object BuildMcpToolCatalog()
                         points = new { type = "number", description = "积分绝对值；reward为加分，redline为减分" },
                         rule_type = new { type = "string", @enum = new[] { "reward", "redline" }, description = "规则类型：奖励或红线" },
                         cash_cny = new { type = "number", description = "现金" },
-                        description = new { type = "string", description = "描述" },
-                        user_id = new { type = "string", description = "家长用户名或家长应用用户编号（必填）" }
+                        description = new { type = "string", description = "描述" }
                     },
-                    required = new[] { "user_id", "rule_id" }
+                    required = new[] { "rule_id" }
                 }
             },
             new
@@ -2863,10 +2859,9 @@ static object BuildMcpToolCatalog()
                     type = "object",
                     properties = new
                     {
-                        rule_id = new { type = "integer", description = "规则ID" },
-                        user_id = new { type = "string", description = "家长用户名或家长应用用户编号（必填）" }
+                        rule_id = new { type = "integer", description = "规则ID" }
                     },
-                    required = new[] { "user_id", "rule_id" }
+                    required = new[] { "rule_id" }
                 }
             },
             new
@@ -2876,10 +2871,7 @@ static object BuildMcpToolCatalog()
                 inputSchema = new
                 {
                     type = "object",
-                    properties = new
-                    {
-                        user_id = new { type = "string", description = "用户ID（默认 local-admin）" }
-                    }
+                    properties = new { }
                 }
             },
             new
@@ -2892,14 +2884,38 @@ static object BuildMcpToolCatalog()
                     properties = new
                     {
                         name = new { type = "string", description = "家庭组名称" },
-                        description = new { type = "string", description = "描述" },
-                        user_id = new { type = "string", description = "创建用户ID（默认 local-admin）" }
+                        description = new { type = "string", description = "描述" }
                     },
                     required = new[] { "name" }
                 }
             }
-        }
     };
+
+    var toolNodes = JsonSerializer.SerializeToNode(tools, FamilyRewardJson.CreateOptions()) as JsonArray ?? [];
+    foreach (var tool in toolNodes.OfType<JsonObject>())
+    {
+        var schema = tool["inputSchema"] as JsonObject;
+        var properties = schema?["properties"] as JsonObject;
+        if (schema is null || properties is null)
+        {
+            continue;
+        }
+
+        properties["parent_user_id"] = new JsonObject
+        {
+            ["type"] = "string",
+            ["description"] = "家长用户名或家长应用用户编号（必填），用于数据范围和操作权限校验"
+        };
+        var required = schema["required"] as JsonArray ?? [];
+        if (!required.Any(item => string.Equals(item?.GetValue<string>(), "parent_user_id", StringComparison.Ordinal)))
+        {
+            required.Insert(0, "parent_user_id");
+        }
+        schema["required"] = required;
+        tool["description"] = $"{tool.String("description")} 必须传 parent_user_id；查询按该家长的可见范围返回，写操作仅允许处理该家长自己的孩子、记录或规则，越权返回权限不足。";
+    }
+
+    return new { tools = toolNodes };
 }
 
 static bool IsKnownMcpTool(string toolName) => toolName is
@@ -3095,6 +3111,16 @@ static async Task<object> SafeInvokeFamilyRewardMcpTool(string toolName, JsonObj
         };
     }
 
+    if (ResolveMcpParentAppUserId(arguments) is null)
+    {
+        return new
+        {
+            ok = false,
+            action = "validate_parent",
+            error = "缺少必填参数 parent_user_id。请传家长用户名或家长应用用户编号。"
+        };
+    }
+
     try
     {
         return await InvokeFamilyRewardMcpTool(toolName, arguments, connectionString);
@@ -3108,6 +3134,7 @@ static async Task<object> SafeInvokeFamilyRewardMcpTool(string toolName, JsonObj
 static IEnumerable<string> GetUnknownMcpArguments(string toolName, JsonObject arguments)
 {
     var allowed = GetAllowedMcpArguments(toolName);
+    allowed.Add("parent_user_id");
     return arguments.Select(item => item.Key).Where(key => !allowed.Contains(key, StringComparer.Ordinal));
 }
 
@@ -3161,26 +3188,25 @@ static HashSet<string> GetAllowedMcpArguments(string toolName) => toolName switc
     {
         "family_group_id", "child_id", "child_name", "category", "search", "start_date", "end_date", "page", "page_size"
     },
-    FamilyRewardMcpQueryRulesToolName => new(StringComparer.Ordinal) { "user_id" },
+    FamilyRewardMcpQueryRulesToolName => new(StringComparer.Ordinal),
     FamilyRewardMcpCreateRuleToolName => new(StringComparer.Ordinal)
     {
-        "user_id", "name", "category", "points", "rule_type", "cash_cny", "description"
+        "name", "category", "points", "rule_type", "cash_cny", "description"
     },
     FamilyRewardMcpUpdateRuleToolName => new(StringComparer.Ordinal)
     {
-        "user_id", "rule_id", "name", "category", "points", "rule_type", "cash_cny", "description"
+        "rule_id", "name", "category", "points", "rule_type", "cash_cny", "description"
     },
     FamilyRewardMcpDeleteRuleToolName => new(StringComparer.Ordinal)
     {
-        "user_id", "rule_id"
+        "rule_id"
     },
     FamilyRewardMcpQueryFamilyGroupsToolName => new(StringComparer.Ordinal)
     {
-        "user_id"
     },
     FamilyRewardMcpCreateFamilyGroupToolName => new(StringComparer.Ordinal)
     {
-        "name", "description", "user_id"
+        "name", "description"
     },
     _ => new(StringComparer.Ordinal)
 };
@@ -3213,7 +3239,17 @@ static async Task<object> InvokeFamilyRewardMcpTool(string toolName, JsonObject 
 
 static async Task<object> McpAddChild(string connectionString, JsonObject arguments)
 {
-    var result = await CreateChildCore(connectionString, arguments, arguments.Int("family_group_id"));
+    var parentAppUserId = ResolveMcpParentAppUserId(arguments)!;
+    var familyGroupId = arguments.Int("family_group_id");
+    if (familyGroupId is not null && !await IsMcpFamilyAccessible(connectionString, familyGroupId.Value, parentAppUserId))
+    {
+        return new { ok = false, error = "家庭组不存在或当前家长无权访问" };
+    }
+
+    var body = arguments.DeepClone().AsObject();
+    body["user_id"] = parentAppUserId;
+    body["parent_app_user_id"] = parentAppUserId;
+    var result = await CreateChildCore(connectionString, body, familyGroupId);
     if (!result.Success)
     {
         return new { ok = false, error = result.Error };
@@ -3233,7 +3269,7 @@ static async Task<object> McpAdjustScore(string connectionString, JsonObject arg
     var target = ResolveChildByReference(children, arguments);
     if (target is null)
     {
-        return new { ok = false, error = "未找到目标孩子" };
+        return new { ok = false, error = "未找到目标孩子，或当前家长权限不足" };
     }
 
     var delta = arguments.Decimal("delta");
@@ -3262,7 +3298,7 @@ static async Task<object> McpAdjustScore(string connectionString, JsonObject arg
         ["description"] = arguments.String("description", $"积分{(direction == "+" ? "增加" : "扣减")}"),
         ["date"] = arguments.String("date", DateTime.Today.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture))
     };
-    var tx = await CreateTransaction(connectionString, txBody);
+    var tx = await CreateTransaction(connectionString, txBody, parentAppUserId: ResolveMcpParentAppUserId(arguments));
     if (tx.ContainsKey("error"))
     {
         return new { ok = false, error = tx["error"] };
@@ -3278,7 +3314,7 @@ static async Task<object> McpLogScoreOperation(string connectionString, JsonObje
     var target = ResolveChildByReference(children, arguments);
     if (target is null)
     {
-        return new { ok = false, error = "未找到目标孩子" };
+        return new { ok = false, error = "未找到目标孩子，或当前家长权限不足" };
     }
 
     var delta = arguments.Decimal("delta");
@@ -3308,7 +3344,7 @@ static async Task<object> McpLogScoreOperation(string connectionString, JsonObje
         ["notes"] = arguments.String("notes"),
         ["date"] = arguments.String("date", DateTime.Today.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture))
     };
-    var tx = await CreateTransaction(connectionString, txBody);
+    var tx = await CreateTransaction(connectionString, txBody, parentAppUserId: ResolveMcpParentAppUserId(arguments));
     if (tx.ContainsKey("error"))
     {
         return new { ok = false, error = tx["error"] };
@@ -3324,7 +3360,7 @@ static async Task<object> McpUpdateChild(string connectionString, JsonObject arg
     var target = ResolveChildByReference(children, arguments);
     if (target is null)
     {
-        return new { ok = false, error = "未找到目标孩子" };
+        return new { ok = false, error = "未找到目标孩子，或当前家长权限不足" };
     }
 
     var childId = GetInt(target, "id");
@@ -3429,10 +3465,10 @@ static async Task<object> McpDeleteChild(string connectionString, JsonObject arg
     var target = ResolveChildByReference(children, arguments);
     if (target is null)
     {
-        return new { ok = false, error = "未找到目标孩子" };
+        return new { ok = false, error = "未找到目标孩子，或当前家长权限不足" };
     }
 
-    var result = await DeleteChildMembership(connectionString, GetInt(target, "id"), arguments.String("user_id", DefaultUserId));
+    var result = await DeleteChildMembership(connectionString, GetInt(target, "id"), ResolveMcpParentAppUserId(arguments)!);
     return !result.ContainsKey("error")
         ? new { ok = true, action = "delete_child", child = target }
         : new { ok = false, error = result["error"] };
@@ -3440,9 +3476,15 @@ static async Task<object> McpDeleteChild(string connectionString, JsonObject arg
 
 static async Task<object> McpQueryScore(string connectionString, JsonObject arguments)
 {
-    var children = await GetMcpChildren(connectionString, arguments);
-    var target = ResolveChildByReference(children, arguments);
     var familyGroupId = arguments.Int("family_group_id");
+    var parentAppUserId = ResolveMcpParentAppUserId(arguments)!;
+    if (familyGroupId is not null && !await IsMcpFamilyAccessible(connectionString, familyGroupId.Value, parentAppUserId))
+    {
+        return new { ok = false, error = "家庭组不存在或当前家长权限不足" };
+    }
+
+    var children = await GetMcpVisibleFamilyChildren(connectionString, arguments);
+    var target = ResolveChildByReference(children, arguments);
     if (HasChildReference(arguments) && target is null)
     {
         return ChildReferenceNotFound("query_score", familyGroupId);
@@ -3520,8 +3562,16 @@ static async Task<object> McpQueryScoreOperations(string connectionString, JsonO
     }
 
     int? childId = target is null ? null : GetInt(target, "id");
-    var where = new List<string> { "1=1", "t.type = 'points'" };
-    var parameters = new List<NpgsqlParameter>();
+    var where = new List<string>
+    {
+        "1=1",
+        "t.type = 'points'",
+        "EXISTS (SELECT 1 FROM child_user_bindings cub WHERE cub.child_profile_key = c.profile_key AND cub.parent_app_user_id = @parent_app_user_id)"
+    };
+    var parameters = new List<NpgsqlParameter>
+    {
+        new("parent_app_user_id", ResolveMcpParentAppUserId(arguments)!)
+    };
     AddFilter(where, parameters, familyGroupId is null, "c.family_group_id = @family_group_id", "family_group_id", familyGroupId ?? 0);
     AddFilter(where, parameters, childId is null, "t.child_id = @child_id", "child_id", childId ?? 0);
     AddFilter(where, parameters, string.IsNullOrWhiteSpace(category), "t.category ILIKE @category", "category", $"%{category}%");
@@ -3582,8 +3632,14 @@ static async Task<object> McpCreateRecord(string connectionString, JsonObject ar
         return new { ok = false, error = "date 日期格式无效，请使用 yyyy-MM-dd" };
     }
 
+    var ownedChildren = await GetMcpChildren(connectionString, arguments);
+    if (ResolveChildByReference(ownedChildren, arguments) is null)
+    {
+        return new { ok = false, error = "未找到目标孩子，或当前家长权限不足" };
+    }
+
     var body = await NormalizeRecordArguments(connectionString, arguments);
-    var result = await CreateTransaction(connectionString, body);
+    var result = await CreateTransaction(connectionString, body, parentAppUserId: ResolveMcpParentAppUserId(arguments));
     if (result.ContainsKey("error"))
     {
         return new { ok = false, error = result["error"] };
@@ -3604,8 +3660,17 @@ static async Task<object> McpUpdateRecord(string connectionString, JsonObject ar
         return new { ok = false, error = "date 日期格式无效，请使用 yyyy-MM-dd" };
     }
 
+    if (HasChildReference(arguments))
+    {
+        var ownedChildren = await GetMcpChildren(connectionString, arguments);
+        if (ResolveChildByReference(ownedChildren, arguments) is null)
+        {
+            return new { ok = false, error = "未找到目标孩子，或当前家长权限不足" };
+        }
+    }
+
     var body = await NormalizeRecordArguments(connectionString, arguments, allowMissingChild: true);
-    var result = await UpdateTransaction(connectionString, id.Value, body);
+    var result = await UpdateTransaction(connectionString, id.Value, body, ResolveMcpParentAppUserId(arguments));
     if (result.ContainsKey("error"))
     {
         return new { ok = false, error = result["error"] };
@@ -3622,7 +3687,7 @@ static async Task<object> McpDeleteRecord(string connectionString, JsonObject ar
         return new { ok = false, error = "缺少记录ID" };
     }
 
-    var result = await DeleteTransaction(connectionString, id.Value);
+    var result = await DeleteTransaction(connectionString, id.Value, parentAppUserId: ResolveMcpParentAppUserId(arguments));
     if (result.ContainsKey("error"))
     {
         return new { ok = false, error = result["error"] };
@@ -3655,9 +3720,9 @@ static async Task<object> McpQueryChildren(string connectionString, JsonObject? 
 
 static async Task<object> McpQueryRules(string connectionString, JsonObject arguments)
 {
-    var parentAppUserId = ResolveRuleParentAppUserId(arguments);
+    var parentAppUserId = ResolveMcpParentAppUserId(arguments);
     return parentAppUserId is null
-        ? new { ok = false, action = "query_rules", error = "缺少家长用户信息 user_id" }
+        ? new { ok = false, action = "query_rules", error = "缺少家长用户信息 parent_user_id" }
         : new { ok = true, action = "query_rules", data = await GetRules(connectionString, parentAppUserId) };
 }
 
@@ -3668,8 +3733,8 @@ static async Task<object> McpCreateRule(string connectionString, JsonObject argu
     {
         return new { ok = false, error = "规则名称不能为空" };
     }
-    var parentAppUserId = ResolveRuleParentAppUserId(arguments);
-    if (parentAppUserId is null) return new { ok = false, error = "缺少家长用户信息 user_id" };
+    var parentAppUserId = ResolveMcpParentAppUserId(arguments);
+    if (parentAppUserId is null) return new { ok = false, error = "缺少家长用户信息 parent_user_id" };
     var result = await CreatePersonalRule(connectionString, parentAppUserId, arguments);
     return result.ContainsKey("error")
         ? new { ok = false, error = Convert.ToString(result["error"], CultureInfo.InvariantCulture) }
@@ -3683,8 +3748,8 @@ static async Task<object> McpUpdateRule(string connectionString, JsonObject argu
     {
         return new { ok = false, error = "缺少规则ID" };
     }
-    var parentAppUserId = ResolveRuleParentAppUserId(arguments);
-    if (parentAppUserId is null) return new { ok = false, error = "缺少家长用户信息 user_id" };
+    var parentAppUserId = ResolveMcpParentAppUserId(arguments);
+    if (parentAppUserId is null) return new { ok = false, error = "缺少家长用户信息 parent_user_id" };
 
     await using var conn = await OpenConnection(connectionString);
     await using var cmd = new NpgsqlCommand("""
@@ -3721,8 +3786,8 @@ static async Task<object> McpDeleteRule(string connectionString, JsonObject argu
     {
         return new { ok = false, error = "缺少规则ID" };
     }
-    var parentAppUserId = ResolveRuleParentAppUserId(arguments);
-    if (parentAppUserId is null) return new { ok = false, error = "缺少家长用户信息 user_id" };
+    var parentAppUserId = ResolveMcpParentAppUserId(arguments);
+    if (parentAppUserId is null) return new { ok = false, error = "缺少家长用户信息 parent_user_id" };
 
     await using var conn = await OpenConnection(connectionString);
     await using var cmd = new NpgsqlCommand("DELETE FROM rules WHERE id = @id AND owner_app_user_id = @owner_app_user_id RETURNING *", conn);
@@ -3736,9 +3801,9 @@ static async Task<object> McpDeleteRule(string connectionString, JsonObject argu
     return new { ok = true, action = "delete_rule", rule = ReadRule(reader) };
 }
 
-static string? ResolveRuleParentAppUserId(JsonObject arguments)
+static string? ResolveMcpParentAppUserId(JsonObject arguments)
 {
-    var userId = arguments.String("user_id").Trim();
+    var userId = arguments.String("parent_user_id").Trim();
     if (string.IsNullOrWhiteSpace(userId)) return null;
     return userId.EndsWith("parent", StringComparison.OrdinalIgnoreCase)
         ? NormalizeBusinessUserName(userId)
@@ -3747,14 +3812,14 @@ static string? ResolveRuleParentAppUserId(JsonObject arguments)
 
 static async Task<object> McpQueryFamilyGroups(string connectionString, JsonObject arguments)
 {
-    var userId = arguments.String("user_id", DefaultUserId);
-    return new { ok = true, action = "query_family_groups", familyGroups = await GetFamilyGroups(connectionString, userId) };
+    var parentAppUserId = ResolveMcpParentAppUserId(arguments)!;
+    return new { ok = true, action = "query_family_groups", familyGroups = await GetFamilyGroups(connectionString, parentAppUserId) };
 }
 
 static async Task<object> McpCreateFamilyGroup(string connectionString, JsonObject arguments)
 {
-    var userId = arguments.String("user_id", DefaultUserId);
-    var result = await CreateFamilyGroup(connectionString, arguments.String("name"), userId, arguments.String("description"));
+    var parentAppUserId = ResolveMcpParentAppUserId(arguments)!;
+    var result = await CreateFamilyGroup(connectionString, arguments.String("name"), parentAppUserId, arguments.String("description"));
     return result.Success
         ? new { ok = true, action = "create_family_group", familyGroup = result.Group }
         : new { ok = false, error = result.Error };
@@ -3762,11 +3827,63 @@ static async Task<object> McpCreateFamilyGroup(string connectionString, JsonObje
 
 static async Task<List<Dictionary<string, object?>>> GetMcpChildren(string connectionString, JsonObject? arguments)
 {
-    var ownerAppUserId = arguments?.String("user_id") ?? arguments?.String("parent_app_user_id");
+    var ownerAppUserId = arguments is null ? null : ResolveMcpParentAppUserId(arguments);
     return await GetChildren(
         connectionString,
         arguments?.Int("family_group_id"),
         ownerAppUserId: string.IsNullOrWhiteSpace(ownerAppUserId) ? null : ownerAppUserId);
+}
+
+static async Task<bool> IsMcpFamilyAccessible(string connectionString, int familyGroupId, string parentAppUserId)
+{
+    var groups = await GetFamilyGroups(connectionString, parentAppUserId);
+    return groups.Any(group => GetInt(group, "id") == familyGroupId);
+}
+
+static async Task<List<Dictionary<string, object?>>> GetMcpVisibleFamilyChildren(
+    string connectionString,
+    JsonObject arguments)
+{
+    var parentAppUserId = ResolveMcpParentAppUserId(arguments)!;
+    var requestedFamilyGroupId = arguments.Int("family_group_id");
+    var groups = (await GetFamilyGroups(connectionString, parentAppUserId))
+        .Where(group => requestedFamilyGroupId is null || GetInt(group, "id") == requestedFamilyGroupId.Value)
+        .ToList();
+
+    if (requestedFamilyGroupId is not null && groups.Count == 0)
+    {
+        return [];
+    }
+
+    var memberships = new List<Dictionary<string, object?>>();
+    foreach (var group in groups)
+    {
+        memberships.AddRange(await GetChildren(connectionString, GetInt(group, "id")));
+    }
+
+    var result = new List<Dictionary<string, object?>>();
+    foreach (var profileGroup in memberships.GroupBy(child =>
+                 Convert.ToString(child["profileKey"], CultureInfo.InvariantCulture)
+                 ?? Convert.ToString(child["profile_key"], CultureInfo.InvariantCulture)
+                 ?? $"child:{GetInt(child, "id")}"))
+    {
+        var first = new Dictionary<string, object?>(profileGroup.First(), StringComparer.OrdinalIgnoreCase);
+        var familyGroups = profileGroup
+            .Select(child => new
+            {
+                id = GetInt(child, "familyGroupId"),
+                name = Convert.ToString(child["familyGroupName"], CultureInfo.InvariantCulture) ?? string.Empty
+            })
+            .GroupBy(group => group.id)
+            .Select(group => group.First())
+            .OrderBy(group => group.id)
+            .ToArray();
+        first["familyGroups"] = familyGroups;
+        first["family_groups"] = familyGroups;
+        result.Add(first);
+    }
+
+    return result.OrderBy(child => Convert.ToString(child["name"], CultureInfo.InvariantCulture)).ToList();
 }
 
 static async Task<JsonObject> NormalizeRecordArguments(string connectionString, JsonObject arguments, bool allowMissingChild = false)
@@ -3820,17 +3937,26 @@ static async Task<JsonObject> NormalizeRecordArguments(string connectionString, 
     return body;
 }
 
-static async Task<Dictionary<string, object?>> UpdateTransaction(string connectionString, int id, JsonObject body)
+static async Task<Dictionary<string, object?>> UpdateTransaction(
+    string connectionString,
+    int id,
+    JsonObject body,
+    string? parentAppUserId = null)
 {
     await using var conn = await OpenConnection(connectionString);
     await using var tx = await conn.BeginTransactionAsync();
     try
     {
-        var existing = await ReadTransactionForUpdate(conn, tx, id);
+        var existing = await ReadTransactionForUpdate(conn, tx, id, parentAppUserId: parentAppUserId);
         if (existing is null)
         {
             await tx.RollbackAsync();
-            return new Dictionary<string, object?> { ["error"] = "记录不存在" };
+            return new Dictionary<string, object?>
+            {
+                ["error"] = string.IsNullOrWhiteSpace(parentAppUserId)
+                    ? "记录不存在"
+                    : "记录不存在或当前家长权限不足"
+            };
         }
 
         await ReverseTransactionAccountEffect(conn, tx, existing);
@@ -3899,7 +4025,12 @@ static async Task<Dictionary<string, object?>> DeleteTransaction(
         if (existing is null)
         {
             await tx.RollbackAsync();
-            return new Dictionary<string, object?> { ["error"] = "记录不存在" };
+            return new Dictionary<string, object?>
+            {
+                ["error"] = string.IsNullOrWhiteSpace(parentAppUserId)
+                    ? "记录不存在"
+                    : "记录不存在或当前家长权限不足"
+            };
         }
 
         await ReverseTransactionAccountEffect(conn, tx, existing);

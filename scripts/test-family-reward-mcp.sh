@@ -3,11 +3,12 @@
 set -euo pipefail
 
 MCP_URL="${MCP_URL:-https://happylife.ai.impx.net/api/mcp}"
-FAMILY_GROUP_ID="${FAMILY_GROUP_ID:-1}"
-KNOWN_CHILD_ID="${KNOWN_CHILD_ID:-1}"
-KNOWN_CHILD_NAME="${KNOWN_CHILD_NAME:-彦谦}"
-MISSING_CHILD_ID="${MISSING_CHILD_ID:-6}"
-export FAMILY_GROUP_ID KNOWN_CHILD_ID KNOWN_CHILD_NAME MISSING_CHILD_ID
+FAMILY_GROUP_ID="${FAMILY_GROUP_ID:-}"
+KNOWN_CHILD_ID="${KNOWN_CHILD_ID:-}"
+KNOWN_CHILD_NAME="${KNOWN_CHILD_NAME:-}"
+MISSING_CHILD_ID="${MISSING_CHILD_ID:-999999999}"
+PARENT_USER_ID="${PARENT_USER_ID:-wss}"
+export FAMILY_GROUP_ID KNOWN_CHILD_ID KNOWN_CHILD_NAME MISSING_CHILD_ID PARENT_USER_ID
 
 if ! command -v jq >/dev/null 2>&1; then
   echo "jq is required." >&2
@@ -18,6 +19,14 @@ pass_count=0
 fail_count=0
 
 call_mcp() {
+  local tool_name="$1"
+  local arguments="$2"
+  jq -cn --arg name "$tool_name" --arg parent "$PARENT_USER_ID" --argjson arguments "$arguments" \
+    '{name: $name, arguments: ($arguments + {parent_user_id: $parent})}' |
+    curl -sS -X POST "$MCP_URL" -H 'Content-Type: application/json' --data-binary @-
+}
+
+call_mcp_without_parent() {
   local tool_name="$1"
   local arguments="$2"
   jq -cn --arg name "$tool_name" --argjson arguments "$arguments" \
@@ -43,11 +52,14 @@ catalog="$(curl -sS "$MCP_URL")"
 assert_jq "catalog exposes 18 tools" "$catalog" '.tools.tools | length == 18'
 assert_jq "query_children declares strict snake_case keys" "$catalog" '
   [.tools.tools[] | select(.name == "family_reward_query_children") | .inputSchema.properties | keys]
-  | .[0] == ["child_id", "child_name", "family_group_id"]
+  | .[0] == ["child_id", "child_name", "family_group_id", "parent_user_id"]
 '
-assert_jq "list_children declares family_group_id only" "$catalog" '
+assert_jq "list_children declares family group and parent only" "$catalog" '
   [.tools.tools[] | select(.name == "family_reward_list_children") | .inputSchema.properties | keys]
-  | .[0] == ["family_group_id"]
+  | .[0] == ["family_group_id", "parent_user_id"]
+'
+assert_jq "all tools require parent_user_id" "$catalog" '
+  .tools.tools | length == 18 and all(.inputSchema.required | index("parent_user_id") != null)
 '
 assert_jq "query_children documents family_group_id list query" "$catalog" '
   .tools.tools[]
@@ -61,8 +73,29 @@ assert_jq "unknown camelCase parameter is rejected" "$unknown_arg" '
   .ok == false and (.error | contains("未知参数")) and (.error | contains("childId"))
 '
 
+missing_parent="$(call_mcp_without_parent family_reward_query_children '{}')"
+assert_jq "missing parent is rejected" "$missing_parent" '
+  .ok == false and .action == "validate_parent" and (.error | contains("parent_user_id"))
+'
+
 groups="$(call_mcp family_reward_query_family_groups '{}')"
 assert_jq "family groups can be queried" "$groups" '.ok == true and (.familyGroups | type == "array")'
+
+owned_children="$(call_mcp family_reward_query_children '{}')"
+if [[ -z "$KNOWN_CHILD_ID" ]]; then
+  KNOWN_CHILD_ID="$(jq -r '.children[0].id // empty' <<<"$owned_children")"
+fi
+if [[ -z "$KNOWN_CHILD_NAME" ]]; then
+  KNOWN_CHILD_NAME="$(jq -r '.children[0].name // empty' <<<"$owned_children")"
+fi
+if [[ -z "$FAMILY_GROUP_ID" ]]; then
+  FAMILY_GROUP_ID="$(jq -r '.children[0].family_group_id // empty' <<<"$owned_children")"
+fi
+if [[ -z "$KNOWN_CHILD_ID" || -z "$KNOWN_CHILD_NAME" || -z "$FAMILY_GROUP_ID" ]]; then
+  echo "MCP test parent has no owned child in a family: $PARENT_USER_ID" >&2
+  exit 1
+fi
+export FAMILY_GROUP_ID KNOWN_CHILD_ID KNOWN_CHILD_NAME
 
 children_by_group="$(call_mcp family_reward_query_children "{\"family_group_id\":$FAMILY_GROUP_ID}")"
 assert_jq "family_group_id returns all active children in group" "$children_by_group" '
@@ -158,7 +191,7 @@ assert_jq "operation records missing child is explicit failure with retry guidan
 bad_date="$(call_mcp family_reward_query_operation_records "{\"family_group_id\":$FAMILY_GROUP_ID,\"start_date\":\"2026/01/01\"}")"
 assert_jq "invalid dates are rejected" "$bad_date" '.ok == false and (.error | contains("日期格式无效"))'
 
-rules="$(call_mcp family_reward_query_rules '{"user_id":"local-admin"}')"
+rules="$(call_mcp family_reward_query_rules '{}')"
 assert_jq "rules can be queried" "$rules" '.ok == true and .action == "query_rules"'
 
 printf '\nMCP tests: %s passed, %s failed\n' "$pass_count" "$fail_count"

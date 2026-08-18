@@ -2,15 +2,15 @@
   "services": [
     {
       "name": "family-reward-mcp",
-      "title": "家加分 MCP 服务（能力拆分）",
-      "description": "家加分 MCP：查询孩子列表时优先使用 family_reward_list_children；单孩查询未命中时必须再查完整孩子清单并比较用户输入；查询孩子积分清单使用 family_reward_query_score。",
+      "title": "家庭积分应用",
+      "description": "家庭积分应用 MCP：18 个独立工具统一要求 parent_user_id；孩子和积分写操作仅允许所属家长，积分查询覆盖家长创建或加入的全部家庭，规则按家长隔离。",
       "baseUrl": "https://happylife.ai.impx.net",
       "mcpEndpoint": "/api/mcp",
       "httpEndpoint": "https://happylife.ai.impx.net/api/mcp",
       "tools": [
         {
           "name": "family_reward_add_child",
-          "description": "新增孩子：创建孩子档案并可设置初始积分/现金/物品。",
+          "description": "新增孩子：创建孩子档案并可设置初始积分/现金/物品。 必须传 parent_user_id；查询按该家长的可见范围返回，写操作仅允许处理该家长自己的孩子、记录或规则，越权返回权限不足。",
           "inputSchema": {
             "type": "object",
             "properties": {
@@ -41,16 +41,21 @@
               "items": {
                 "type": "integer",
                 "description": "初始物品数（默认为 0）"
+              },
+              "parent_user_id": {
+                "type": "string",
+                "description": "家长用户名或家长应用用户编号（必填），用于数据范围和操作权限校验"
               }
             },
             "required": [
+              "parent_user_id",
               "name"
             ]
           }
         },
         {
           "name": "family_reward_update_child",
-          "description": "修改孩子信息：按 id 或姓名定位后更新。至少更新一个字段。",
+          "description": "修改孩子信息：按 id 或姓名定位后更新。至少更新一个字段。 必须传 parent_user_id；查询按该家长的可见范围返回，写操作仅允许处理该家长自己的孩子、记录或规则，越权返回权限不足。",
           "inputSchema": {
             "type": "object",
             "properties": {
@@ -89,13 +94,20 @@
               "items": {
                 "type": "integer",
                 "description": "更新后的物品数（覆盖，不是增量）"
+              },
+              "parent_user_id": {
+                "type": "string",
+                "description": "家长用户名或家长应用用户编号（必填），用于数据范围和操作权限校验"
               }
-            }
+            },
+            "required": [
+              "parent_user_id"
+            ]
           }
         },
         {
           "name": "family_reward_query_children",
-          "description": "查询孩子列表：传 family_group_id 返回该家庭组的全部孩子；也可继续传 child_id 或 child_name 定位单个孩子。若按某个孩子查询返回 ok:false/未找到，智能体必须再调用 family_reward_list_children（只传 family_group_id）取得完整孩子清单，并把用户输入与清单中的 ID/姓名逐一比较后再回复，避免别名、错别字或输入差异导致误判。",
+          "description": "查询孩子列表：传 family_group_id 返回该家庭组的全部孩子；也可继续传 child_id 或 child_name 定位单个孩子。若按某个孩子查询返回 ok:false/未找到，智能体必须再调用 family_reward_list_children（只传 family_group_id）取得完整孩子清单，并把用户输入与清单中的 ID/姓名逐一比较后再回复，避免别名、错别字或输入差异导致误判。 必须传 parent_user_id；查询按该家长的可见范围返回，写操作仅允许处理该家长自己的孩子、记录或规则，越权返回权限不足。",
           "inputSchema": {
             "type": "object",
             "properties": {
@@ -110,26 +122,40 @@
               "child_name": {
                 "type": "string",
                 "description": "孩子姓名（可选）。未找到时不要直接结束，应再查完整孩子清单进行对比"
+              },
+              "parent_user_id": {
+                "type": "string",
+                "description": "家长用户名或家长应用用户编号（必填），用于数据范围和操作权限校验"
               }
-            }
+            },
+            "required": [
+              "parent_user_id"
+            ]
           }
         },
         {
           "name": "family_reward_list_children",
-          "description": "列出孩子清单：当用户说“查询孩子列表 / 列出孩子 / 有哪些孩子 / 全部孩子”时优先调用。传 family_group_id 返回该家庭组全部 active 孩子；不传则返回全部 active 孩子。不要传 child_id 或 child_name。",
+          "description": "列出孩子清单：当用户说“查询孩子列表 / 列出孩子 / 有哪些孩子 / 全部孩子”时优先调用。传 family_group_id 返回该家庭组全部 active 孩子；不传则返回全部 active 孩子。不要传 child_id 或 child_name。 必须传 parent_user_id；查询按该家长的可见范围返回，写操作仅允许处理该家长自己的孩子、记录或规则，越权返回权限不足。",
           "inputSchema": {
             "type": "object",
             "properties": {
               "family_group_id": {
                 "type": "integer",
                 "description": "家庭组ID；可选。只传此字段时返回该家庭组全部孩子"
+              },
+              "parent_user_id": {
+                "type": "string",
+                "description": "家长用户名或家长应用用户编号（必填），用于数据范围和操作权限校验"
               }
-            }
+            },
+            "required": [
+              "parent_user_id"
+            ]
           }
         },
         {
           "name": "family_reward_delete_child",
-          "description": "删除孩子：按 id 或姓名定位后删除孩子及其账户/记录。",
+          "description": "删除孩子：按 id 或姓名定位后删除孩子及其账户/记录。 必须传 parent_user_id；查询按该家长的可见范围返回，写操作仅允许处理该家长自己的孩子、记录或规则，越权返回权限不足。",
           "inputSchema": {
             "type": "object",
             "properties": {
@@ -144,13 +170,20 @@
               "child_name": {
                 "type": "string",
                 "description": "孩子姓名（用于定位）"
+              },
+              "parent_user_id": {
+                "type": "string",
+                "description": "家长用户名或家长应用用户编号（必填），用于数据范围和操作权限校验"
               }
-            }
+            },
+            "required": [
+              "parent_user_id"
+            ]
           }
         },
         {
           "name": "family_reward_adjust_score",
-          "description": "积分增减：按孩子 +/ - 积分（支持负数）",
+          "description": "积分增减：按孩子 +/ - 积分（支持负数） 必须传 parent_user_id；查询按该家长的可见范围返回，写操作仅允许处理该家长自己的孩子、记录或规则，越权返回权限不足。",
           "inputSchema": {
             "type": "object",
             "properties": {
@@ -185,16 +218,21 @@
               "description": {
                 "type": "string",
                 "description": "交易描述（adjust_score）"
+              },
+              "parent_user_id": {
+                "type": "string",
+                "description": "家长用户名或家长应用用户编号（必填），用于数据范围和操作权限校验"
               }
             },
             "required": [
+              "parent_user_id",
               "delta"
             ]
           }
         },
         {
           "name": "family_reward_query_score",
-          "description": "积分查询：不传 child_id/child_name 时返回孩子积分清单；传 family_group_id 时返回该家庭组全部孩子的积分清单；传具体孩子时返回单个孩子积分，可选返回最近交易明细。若指定孩子返回未找到，必须再调用 family_reward_list_children（只传 family_group_id）获取完整孩子清单，比较用户输入与全部孩子 ID/姓名后再说明最可能的匹配或请用户确认。",
+          "description": "积分查询：不传 child_id/child_name 时返回孩子积分清单；传 family_group_id 时返回该家庭组全部孩子的积分清单；传具体孩子时返回单个孩子积分，可选返回最近交易明细。若指定孩子返回未找到，必须再调用 family_reward_list_children（只传 family_group_id）获取完整孩子清单，比较用户输入与全部孩子 ID/姓名后再说明最可能的匹配或请用户确认。 必须传 parent_user_id；查询按该家长的可见范围返回，写操作仅允许处理该家长自己的孩子、记录或规则，越权返回权限不足。",
           "inputSchema": {
             "type": "object",
             "properties": {
@@ -225,13 +263,20 @@
               "end_date": {
                 "type": "string",
                 "description": "交易结束日期 YYYY-MM-DD（可选）"
+              },
+              "parent_user_id": {
+                "type": "string",
+                "description": "家长用户名或家长应用用户编号（必填），用于数据范围和操作权限校验"
               }
-            }
+            },
+            "required": [
+              "parent_user_id"
+            ]
           }
         },
         {
           "name": "family_reward_log_score_record",
-          "description": "写入积分明细（加/减分记录），并同步更新账户积分。",
+          "description": "写入积分明细（加/减分记录），并同步更新账户积分。 必须传 parent_user_id；查询按该家长的可见范围返回，写操作仅允许处理该家长自己的孩子、记录或规则，越权返回权限不足。",
           "inputSchema": {
             "type": "object",
             "properties": {
@@ -270,16 +315,21 @@
               "notes": {
                 "type": "string",
                 "description": "备注"
+              },
+              "parent_user_id": {
+                "type": "string",
+                "description": "家长用户名或家长应用用户编号（必填），用于数据范围和操作权限校验"
               }
             },
             "required": [
+              "parent_user_id",
               "delta"
             ]
           }
         },
         {
           "name": "family_reward_create_record",
-          "description": "新增记录/交易：支持积分、现金、物品记录，并同步更新孩子账户。",
+          "description": "新增记录/交易：支持积分、现金、物品记录，并同步更新孩子账户。 必须传 parent_user_id；查询按该家长的可见范围返回，写操作仅允许处理该家长自己的孩子、记录或规则，越权返回权限不足。",
           "inputSchema": {
             "type": "object",
             "properties": {
@@ -334,13 +384,20 @@
               "notes": {
                 "type": "string",
                 "description": "备注"
+              },
+              "parent_user_id": {
+                "type": "string",
+                "description": "家长用户名或家长应用用户编号（必填），用于数据范围和操作权限校验"
               }
-            }
+            },
+            "required": [
+              "parent_user_id"
+            ]
           }
         },
         {
           "name": "family_reward_update_record",
-          "description": "修改记录/交易：按记录ID更新，并自动回滚旧记录影响后重新应用新记录。",
+          "description": "修改记录/交易：按记录ID更新，并自动回滚旧记录影响后重新应用新记录。 必须传 parent_user_id；查询按该家长的可见范围返回，写操作仅允许处理该家长自己的孩子、记录或规则，越权返回权限不足。",
           "inputSchema": {
             "type": "object",
             "properties": {
@@ -399,26 +456,40 @@
               "notes": {
                 "type": "string",
                 "description": "备注"
+              },
+              "parent_user_id": {
+                "type": "string",
+                "description": "家长用户名或家长应用用户编号（必填），用于数据范围和操作权限校验"
               }
-            }
+            },
+            "required": [
+              "parent_user_id"
+            ]
           }
         },
         {
           "name": "family_reward_delete_record",
-          "description": "删除记录/交易：按记录ID删除，并自动回滚该记录对孩子账户的影响。",
+          "description": "删除记录/交易：按记录ID删除，并自动回滚该记录对孩子账户的影响。 必须传 parent_user_id；查询按该家长的可见范围返回，写操作仅允许处理该家长自己的孩子、记录或规则，越权返回权限不足。",
           "inputSchema": {
             "type": "object",
             "properties": {
               "transaction_id": {
                 "type": "integer",
                 "description": "记录ID"
+              },
+              "parent_user_id": {
+                "type": "string",
+                "description": "家长用户名或家长应用用户编号（必填），用于数据范围和操作权限校验"
               }
-            }
+            },
+            "required": [
+              "parent_user_id"
+            ]
           }
         },
         {
           "name": "family_reward_query_operation_records",
-          "description": "查询积分加减明细记录（交易日志），支持按孩子、日期、分类、分页筛选。若指定孩子返回未找到，必须再调用 family_reward_list_children（只传 family_group_id）获取完整孩子清单，比较用户输入与全部孩子 ID/姓名后再回复，不能直接说不存在。",
+          "description": "查询积分加减明细记录（交易日志），支持按孩子、日期、分类、分页筛选。若指定孩子返回未找到，必须再调用 family_reward_list_children（只传 family_group_id）获取完整孩子清单，比较用户输入与全部孩子 ID/姓名后再回复，不能直接说不存在。 必须传 parent_user_id；查询按该家长的可见范围返回，写操作仅允许处理该家长自己的孩子、记录或规则，越权返回权限不足。",
           "inputSchema": {
             "type": "object",
             "properties": {
@@ -457,21 +528,36 @@
               "page_size": {
                 "type": "integer",
                 "description": "每页数量，默认 20，最大 200"
+              },
+              "parent_user_id": {
+                "type": "string",
+                "description": "家长用户名或家长应用用户编号（必填），用于数据范围和操作权限校验"
               }
-            }
+            },
+            "required": [
+              "parent_user_id"
+            ]
           }
         },
         {
           "name": "family_reward_query_rules",
-          "description": "查询积分规则和红线规则。",
+          "description": "查询指定家长生效的个人规则模板；未创建模板时返回公共规则。 必须传 parent_user_id；查询按该家长的可见范围返回，写操作仅允许处理该家长自己的孩子、记录或规则，越权返回权限不足。",
           "inputSchema": {
             "type": "object",
-            "properties": {}
+            "properties": {
+              "parent_user_id": {
+                "type": "string",
+                "description": "家长用户名或家长应用用户编号（必填），用于数据范围和操作权限校验"
+              }
+            },
+            "required": [
+              "parent_user_id"
+            ]
           }
         },
         {
           "name": "family_reward_create_rule",
-          "description": "新增积分规则。",
+          "description": "为指定家长新增个人积分规则，并自动加入该家长的个人规则模板。 必须传 parent_user_id；查询按该家长的可见范围返回，写操作仅允许处理该家长自己的孩子、记录或规则，越权返回权限不足。",
           "inputSchema": {
             "type": "object",
             "properties": {
@@ -485,7 +571,15 @@
               },
               "points": {
                 "type": "number",
-                "description": "积分"
+                "description": "积分绝对值；reward为加分，redline为减分"
+              },
+              "rule_type": {
+                "type": "string",
+                "enum": [
+                  "reward",
+                  "redline"
+                ],
+                "description": "规则类型：奖励或红线"
               },
               "cash_cny": {
                 "type": "number",
@@ -494,16 +588,21 @@
               "description": {
                 "type": "string",
                 "description": "描述"
+              },
+              "parent_user_id": {
+                "type": "string",
+                "description": "家长用户名或家长应用用户编号（必填），用于数据范围和操作权限校验"
               }
             },
             "required": [
+              "parent_user_id",
               "name"
             ]
           }
         },
         {
           "name": "family_reward_update_rule",
-          "description": "修改积分规则。",
+          "description": "修改指定家长自己的个人积分规则；公共规则不可修改。 必须传 parent_user_id；查询按该家长的可见范围返回，写操作仅允许处理该家长自己的孩子、记录或规则，越权返回权限不足。",
           "inputSchema": {
             "type": "object",
             "properties": {
@@ -521,7 +620,15 @@
               },
               "points": {
                 "type": "number",
-                "description": "积分"
+                "description": "积分绝对值；reward为加分，redline为减分"
+              },
+              "rule_type": {
+                "type": "string",
+                "enum": [
+                  "reward",
+                  "redline"
+                ],
+                "description": "规则类型：奖励或红线"
               },
               "cash_cny": {
                 "type": "number",
@@ -530,39 +637,58 @@
               "description": {
                 "type": "string",
                 "description": "描述"
+              },
+              "parent_user_id": {
+                "type": "string",
+                "description": "家长用户名或家长应用用户编号（必填），用于数据范围和操作权限校验"
               }
-            }
+            },
+            "required": [
+              "parent_user_id",
+              "rule_id"
+            ]
           }
         },
         {
           "name": "family_reward_delete_rule",
-          "description": "删除积分规则。",
+          "description": "删除指定家长自己的个人积分规则；公共规则不可删除。 必须传 parent_user_id；查询按该家长的可见范围返回，写操作仅允许处理该家长自己的孩子、记录或规则，越权返回权限不足。",
           "inputSchema": {
             "type": "object",
             "properties": {
               "rule_id": {
                 "type": "integer",
                 "description": "规则ID"
+              },
+              "parent_user_id": {
+                "type": "string",
+                "description": "家长用户名或家长应用用户编号（必填），用于数据范围和操作权限校验"
               }
-            }
+            },
+            "required": [
+              "parent_user_id",
+              "rule_id"
+            ]
           }
         },
         {
           "name": "family_reward_query_family_groups",
-          "description": "查询家庭组列表。",
+          "description": "查询家庭组列表。 必须传 parent_user_id；查询按该家长的可见范围返回，写操作仅允许处理该家长自己的孩子、记录或规则，越权返回权限不足。",
           "inputSchema": {
             "type": "object",
             "properties": {
-              "user_id": {
+              "parent_user_id": {
                 "type": "string",
-                "description": "用户ID（默认 local-admin）"
+                "description": "家长用户名或家长应用用户编号（必填），用于数据范围和操作权限校验"
               }
-            }
+            },
+            "required": [
+              "parent_user_id"
+            ]
           }
         },
         {
           "name": "family_reward_create_family_group",
-          "description": "新增家庭组。",
+          "description": "新增家庭组。 必须传 parent_user_id；查询按该家长的可见范围返回，写操作仅允许处理该家长自己的孩子、记录或规则，越权返回权限不足。",
           "inputSchema": {
             "type": "object",
             "properties": {
@@ -574,12 +700,13 @@
                 "type": "string",
                 "description": "描述"
               },
-              "user_id": {
+              "parent_user_id": {
                 "type": "string",
-                "description": "创建用户ID（默认 local-admin）"
+                "description": "家长用户名或家长应用用户编号（必填），用于数据范围和操作权限校验"
               }
             },
             "required": [
+              "parent_user_id",
               "name"
             ]
           }

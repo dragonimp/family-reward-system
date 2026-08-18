@@ -134,7 +134,6 @@ for (const req030Requirement of [
   'class="menu-icon"',
   'class="back-menu"',
   'data-speech-target="title"',
-  'data-speech-target="note"',
   'window.SpeechRecognition || window.webkitSpeechRecognition',
   'android.permission.RECORD_AUDIO',
   'PermissionRequest.RESOURCE_AUDIO_CAPTURE',
@@ -142,6 +141,22 @@ for (const req030Requirement of [
 ]) {
   if (!apiSource.includes(req030Requirement) && !manifest.includes(req030Requirement) && !mainActivity.includes(req030Requirement)) {
     errors.push(`REQ-030 watch navigation or voice support missing: ${req030Requirement}`);
+  }
+}
+for (const removedManualField of [
+  '<input id="points" name="points" inputmode="decimal"',
+  '<textarea id="note" name="note"'
+]) {
+  if (apiSource.includes(removedManualField)) {
+    errors.push(`REQ-049 watch request still exposes manual field: ${removedManualField}`);
+  }
+}
+for (const req049Requirement of [
+  '<input type="hidden" id="points" name="points">',
+  '请先选择一项奖励规则'
+]) {
+  if (!apiSource.includes(req049Requirement)) {
+    errors.push(`REQ-049 watch request simplification missing: ${req049Requirement}`);
   }
 }
 const clamp = (min, value, max) => Math.min(max, Math.max(min, value));
