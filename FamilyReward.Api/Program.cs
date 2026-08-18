@@ -657,7 +657,7 @@ app.MapPost("/api/reward-requests/{id:int}/approve", async (int id, JsonObject b
 
 app.MapPost("/api/feedback", async (JsonObject body, IHttpClientFactory httpClientFactory, HttpRequest request) =>
 {
-    return Results.StatusCode(StatusCodes.Status410Gone);
+    if (LegacyFeedbackEndpointsRetired()) return Results.StatusCode(StatusCodes.Status410Gone);
 
     var access = await RequireParentProfile(connectionString, request);
     if (access.Error is not null) return access.Error;
@@ -727,7 +727,7 @@ app.MapPost("/api/feedback", async (JsonObject body, IHttpClientFactory httpClie
 
 app.MapGet("/api/feedback/mine", async (IHttpClientFactory httpClientFactory, HttpRequest request) =>
 {
-    return Results.StatusCode(StatusCodes.Status410Gone);
+    if (LegacyFeedbackEndpointsRetired()) return Results.StatusCode(StatusCodes.Status410Gone);
 
     var access = await RequireParentProfile(connectionString, request);
     if (access.Error is not null) return access.Error;
@@ -8538,6 +8538,8 @@ static void AddAtlasFeedbackHeaders(HttpRequestMessage message, AppUserProfile p
     message.Headers.TryAddWithoutValidation("X-User-Id", stableUserId);
     message.Headers.TryAddWithoutValidation("X-User-Name", profile.Username);
 }
+
+static bool LegacyFeedbackEndpointsRetired() => true;
 
 static async Task<IResult> ProxyAtlasFeedback(
     IHttpClientFactory httpClientFactory,
