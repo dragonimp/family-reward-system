@@ -657,6 +657,8 @@ app.MapPost("/api/reward-requests/{id:int}/approve", async (int id, JsonObject b
 
 app.MapPost("/api/feedback", async (JsonObject body, IHttpClientFactory httpClientFactory, HttpRequest request) =>
 {
+    return Results.StatusCode(StatusCodes.Status410Gone);
+
     var access = await RequireParentProfile(connectionString, request);
     if (access.Error is not null) return access.Error;
 
@@ -725,6 +727,8 @@ app.MapPost("/api/feedback", async (JsonObject body, IHttpClientFactory httpClie
 
 app.MapGet("/api/feedback/mine", async (IHttpClientFactory httpClientFactory, HttpRequest request) =>
 {
+    return Results.StatusCode(StatusCodes.Status410Gone);
+
     var access = await RequireParentProfile(connectionString, request);
     if (access.Error is not null) return access.Error;
     var take = Math.Clamp(request.Query.Int("take") ?? 50, 1, 100);
