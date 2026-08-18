@@ -10,6 +10,11 @@ test('REQ-028 offers an explicit family selector and scoped child view', async (
   assert.match(page, /getFamilyGroupChildren\(selectedGroupId\)/);
 });
 
+test('family groups page does not repeat the all-groups list below the selected group', async () => {
+  const page = await readFile(new URL('./src/pages/FamilyGroups.tsx', import.meta.url), 'utf8');
+  assert.doesNotMatch(page, /我的全部(?:家庭|圈子)/);
+});
+
 test('REQ-030 exposes one watch menu with six icon destinations and voice fallback', async () => {
   const api = await readFile(new URL('../FamilyReward.Api/Program.cs', import.meta.url), 'utf8');
   const views = ['request', 'points-detail', 'friend-add', 'leaderboard', 'settings', 'device'];
