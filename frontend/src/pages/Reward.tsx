@@ -262,7 +262,7 @@ export default function Reward() {
 
       <div>
         <h2 className="text-2xl font-bold text-gray-900">积分操作</h2>
-        <p className="text-gray-500 mt-1">只操作当前家长账号名下的孩子，积分在各家庭中同步</p>
+        <p className="text-gray-500 mt-1">只操作当前家长账号名下的孩子，积分在各圈子中同步</p>
       </div>
 
       <Card className="p-4 sm:p-5">

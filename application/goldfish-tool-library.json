@@ -20,7 +20,7 @@
               },
               "family_group_id": {
                 "type": "integer",
-                "description": "家庭组ID；不传则使用默认家庭组"
+                "description": "圈子ID；不传则使用默认圈子"
               },
               "note": {
                 "type": "string",
@@ -61,7 +61,7 @@
             "properties": {
               "family_group_id": {
                 "type": "integer",
-                "description": "家庭组ID；用于缩小孩子姓名定位范围"
+                "description": "圈子ID；用于缩小孩子姓名定位范围"
               },
               "child_id": {
                 "type": "integer",
@@ -107,13 +107,13 @@
         },
         {
           "name": "family_reward_query_children",
-          "description": "查询孩子列表：传 family_group_id 返回该家庭组的全部孩子；也可继续传 child_id 或 child_name 定位单个孩子。若按某个孩子查询返回 ok:false/未找到，智能体必须再调用 family_reward_list_children（只传 family_group_id）取得完整孩子清单，并把用户输入与清单中的 ID/姓名逐一比较后再回复，避免别名、错别字或输入差异导致误判。 必须传 parent_user_id；查询按该家长的可见范围返回，写操作仅允许处理该家长自己的孩子、记录或规则，越权返回权限不足。",
+          "description": "查询孩子列表：传 family_group_id 返回该圈子的全部孩子；也可继续传 child_id 或 child_name 定位单个孩子。若按某个孩子查询返回 ok:false/未找到，智能体必须再调用 family_reward_list_children（只传 family_group_id）取得完整孩子清单，并把用户输入与清单中的 ID/姓名逐一比较后再回复，避免别名、错别字或输入差异导致误判。 必须传 parent_user_id；查询按该家长的可见范围返回，写操作仅允许处理该家长自己的孩子、记录或规则，越权返回权限不足。",
           "inputSchema": {
             "type": "object",
             "properties": {
               "family_group_id": {
                 "type": "integer",
-                "description": "家庭组ID；可选。只传此字段时返回该家庭组全部孩子"
+                "description": "圈子ID；可选。只传此字段时返回该圈子全部孩子"
               },
               "child_id": {
                 "type": "integer",
@@ -135,13 +135,13 @@
         },
         {
           "name": "family_reward_list_children",
-          "description": "列出孩子清单：当用户说“查询孩子列表 / 列出孩子 / 有哪些孩子 / 全部孩子”时优先调用。传 family_group_id 返回该家庭组全部 active 孩子；不传则返回全部 active 孩子。不要传 child_id 或 child_name。 必须传 parent_user_id；查询按该家长的可见范围返回，写操作仅允许处理该家长自己的孩子、记录或规则，越权返回权限不足。",
+          "description": "列出孩子清单：当用户说“查询孩子列表 / 列出孩子 / 有哪些孩子 / 全部孩子”时优先调用。传 family_group_id 返回该圈子全部 active 孩子；不传则返回全部 active 孩子。不要传 child_id 或 child_name。 必须传 parent_user_id；查询按该家长的可见范围返回，写操作仅允许处理该家长自己的孩子、记录或规则，越权返回权限不足。",
           "inputSchema": {
             "type": "object",
             "properties": {
               "family_group_id": {
                 "type": "integer",
-                "description": "家庭组ID；可选。只传此字段时返回该家庭组全部孩子"
+                "description": "圈子ID；可选。只传此字段时返回该圈子全部孩子"
               },
               "parent_user_id": {
                 "type": "string",
@@ -161,7 +161,7 @@
             "properties": {
               "family_group_id": {
                 "type": "integer",
-                "description": "家庭组ID；用于缩小孩子姓名定位范围"
+                "description": "圈子ID；用于缩小孩子姓名定位范围"
               },
               "child_id": {
                 "type": "integer",
@@ -189,7 +189,7 @@
             "properties": {
               "family_group_id": {
                 "type": "integer",
-                "description": "家庭组ID；用于缩小孩子姓名定位范围"
+                "description": "圈子ID；用于缩小孩子姓名定位范围"
               },
               "child_id": {
                 "type": "integer",
@@ -232,13 +232,13 @@
         },
         {
           "name": "family_reward_query_score",
-          "description": "积分查询：不传 child_id/child_name 时返回孩子积分清单；传 family_group_id 时返回该家庭组全部孩子的积分清单；传具体孩子时返回单个孩子积分，可选返回最近交易明细。若指定孩子返回未找到，必须再调用 family_reward_list_children（只传 family_group_id）获取完整孩子清单，比较用户输入与全部孩子 ID/姓名后再说明最可能的匹配或请用户确认。 必须传 parent_user_id；查询按该家长的可见范围返回，写操作仅允许处理该家长自己的孩子、记录或规则，越权返回权限不足。",
+          "description": "积分查询：不传 child_id/child_name 时返回孩子积分清单；传 family_group_id 时返回该圈子全部孩子的积分清单；传具体孩子时返回单个孩子积分，可选返回最近交易明细。若指定孩子返回未找到，必须再调用 family_reward_list_children（只传 family_group_id）获取完整孩子清单，比较用户输入与全部孩子 ID/姓名后再说明最可能的匹配或请用户确认。 必须传 parent_user_id；查询按该家长的可见范围返回，写操作仅允许处理该家长自己的孩子、记录或规则，越权返回权限不足。",
           "inputSchema": {
             "type": "object",
             "properties": {
               "family_group_id": {
                 "type": "integer",
-                "description": "家庭组ID；可选。只传此字段时返回该家庭组全部孩子的积分清单"
+                "description": "圈子ID；可选。只传此字段时返回该圈子全部孩子的积分清单"
               },
               "child_id": {
                 "type": "integer",
@@ -282,7 +282,7 @@
             "properties": {
               "family_group_id": {
                 "type": "integer",
-                "description": "家庭组ID；用于缩小孩子姓名定位范围"
+                "description": "圈子ID；用于缩小孩子姓名定位范围"
               },
               "child_id": {
                 "type": "integer",
@@ -335,7 +335,7 @@
             "properties": {
               "family_group_id": {
                 "type": "integer",
-                "description": "家庭组ID；用于缩小孩子姓名定位范围"
+                "description": "圈子ID；用于缩小孩子姓名定位范围"
               },
               "child_id": {
                 "type": "integer",
@@ -407,7 +407,7 @@
               },
               "family_group_id": {
                 "type": "integer",
-                "description": "家庭组ID；用于缩小孩子姓名定位范围"
+                "description": "圈子ID；用于缩小孩子姓名定位范围"
               },
               "child_id": {
                 "type": "integer",
@@ -495,7 +495,7 @@
             "properties": {
               "family_group_id": {
                 "type": "integer",
-                "description": "家庭组ID；用于缩小孩子姓名定位范围"
+                "description": "圈子ID；用于缩小孩子姓名定位范围"
               },
               "child_id": {
                 "type": "integer",
@@ -672,7 +672,7 @@
         },
         {
           "name": "family_reward_query_family_groups",
-          "description": "查询家庭组列表。 必须传 parent_user_id；查询按该家长的可见范围返回，写操作仅允许处理该家长自己的孩子、记录或规则，越权返回权限不足。",
+          "description": "查询圈子列表。 必须传 parent_user_id；查询按该家长的可见范围返回，写操作仅允许处理该家长自己的孩子、记录或规则，越权返回权限不足。",
           "inputSchema": {
             "type": "object",
             "properties": {
@@ -688,13 +688,13 @@
         },
         {
           "name": "family_reward_create_family_group",
-          "description": "新增家庭组。 必须传 parent_user_id；查询按该家长的可见范围返回，写操作仅允许处理该家长自己的孩子、记录或规则，越权返回权限不足。",
+          "description": "新增圈子。 必须传 parent_user_id；查询按该家长的可见范围返回，写操作仅允许处理该家长自己的孩子、记录或规则，越权返回权限不足。",
           "inputSchema": {
             "type": "object",
             "properties": {
               "name": {
                 "type": "string",
-                "description": "家庭组名称"
+                "description": "圈子名称"
               },
               "description": {
                 "type": "string",

@@ -246,7 +246,7 @@ export default function Dashboard() {
 
       {/* 综合统计 */}
       <div>
-        <h3 className="text-lg font-bold text-gray-800 mb-3">📊 家庭统计</h3>
+        <h3 className="text-lg font-bold text-gray-800 mb-3">📊 圈子统计</h3>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
           <StatWidget icon="⭐" label="总积分" value={totalPoints} color="text-blue-600" />
           <StatWidget icon="💰" label="总现金" value={`¥${totalCash}`} color="text-emerald-600" />

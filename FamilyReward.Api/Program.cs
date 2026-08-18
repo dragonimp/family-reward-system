@@ -298,6 +298,115 @@ app.MapDelete("/api/family-groups/{id:int}/children/{childId:int}", async (int i
     return result.Success ? Results.Json(new { status = "ok" }) : Results.NotFound(new { error = result.Error });
 });
 
+app.MapGet("/api/family-members", async (HttpRequest request) =>
+{
+    var access = await RequireParentProfile(connectionString, request);
+    if (access.Error is not null) return access.Error;
+
+    await using var conn = await OpenConnection(connectionString);
+    await using (var ensureCmd = new NpgsqlCommand("""
+        INSERT INTO household_members (owner_parent_app_user_id, display_name, role, is_current_user)
+        VALUES (@owner_parent_app_user_id, @display_name, 'guardian', TRUE)
+        ON CONFLICT DO NOTHING
+        """, conn))
+    {
+        ensureCmd.Parameters.AddWithValue("owner_parent_app_user_id", access.Profile!.AppUserId);
+        ensureCmd.Parameters.AddWithValue("display_name", access.Profile.Username);
+        await ensureCmd.ExecuteNonQueryAsync();
+    }
+
+    return Results.Json(await GetHouseholdMembers(conn, access.Profile!.AppUserId));
+});
+
+app.MapPost("/api/family-members", async (JsonObject body, HttpRequest request) =>
+{
+    var access = await RequireParentProfile(connectionString, request);
+    if (access.Error is not null) return access.Error;
+    var displayName = body.String("displayName").Trim();
+    var role = NormalizeHouseholdRole(body.String("role"));
+    var note = body.String("note").Trim();
+    if (string.IsNullOrWhiteSpace(displayName)) return Results.BadRequest(new { error = "请输入家庭成员姓名" });
+    if (displayName.Length > 50) return Results.BadRequest(new { error = "家庭成员姓名不能超过 50 个字符" });
+    if (string.IsNullOrWhiteSpace(role)) return Results.BadRequest(new { error = "请选择有效的家庭角色" });
+
+    await using var conn = await OpenConnection(connectionString);
+    await using var cmd = new NpgsqlCommand("""
+        INSERT INTO household_members (owner_parent_app_user_id, display_name, role, note, is_current_user)
+        VALUES (@owner_parent_app_user_id, @display_name, @role, @note, FALSE)
+        RETURNING id, display_name, role, note, is_current_user, created_at, updated_at
+        """, conn);
+    cmd.Parameters.AddWithValue("owner_parent_app_user_id", access.Profile!.AppUserId);
+    cmd.Parameters.AddWithValue("display_name", displayName);
+    cmd.Parameters.AddWithValue("role", role);
+    cmd.Parameters.AddWithValue("note", string.IsNullOrWhiteSpace(note) ? DBNull.Value : note);
+    await using var reader = await cmd.ExecuteReaderAsync();
+    await reader.ReadAsync();
+    return Results.Created($"/api/family-members/{reader.GetInt32(reader.GetOrdinal("id"))}", ReadHouseholdMember(reader));
+});
+
+app.MapPut("/api/family-members/{id:int}", async (int id, JsonObject body, HttpRequest request) =>
+{
+    var access = await RequireParentProfile(connectionString, request);
+    if (access.Error is not null) return access.Error;
+    var displayName = body.String("displayName").Trim();
+    var role = NormalizeHouseholdRole(body.String("role"));
+    var note = body.String("note").Trim();
+    if (string.IsNullOrWhiteSpace(displayName)) return Results.BadRequest(new { error = "请输入家庭成员姓名" });
+    if (displayName.Length > 50) return Results.BadRequest(new { error = "家庭成员姓名不能超过 50 个字符" });
+    if (string.IsNullOrWhiteSpace(role)) return Results.BadRequest(new { error = "请选择有效的家庭角色" });
+
+    await using var conn = await OpenConnection(connectionString);
+    await using var cmd = new NpgsqlCommand("""
+        UPDATE household_members
+        SET display_name = @display_name,
+            role = @role,
+            note = @note,
+            updated_at = CURRENT_TIMESTAMP
+        WHERE id = @id AND owner_parent_app_user_id = @owner_parent_app_user_id
+        RETURNING id, display_name, role, note, is_current_user, created_at, updated_at
+        """, conn);
+    cmd.Parameters.AddWithValue("id", id);
+    cmd.Parameters.AddWithValue("owner_parent_app_user_id", access.Profile!.AppUserId);
+    cmd.Parameters.AddWithValue("display_name", displayName);
+    cmd.Parameters.AddWithValue("role", role);
+    cmd.Parameters.AddWithValue("note", string.IsNullOrWhiteSpace(note) ? DBNull.Value : note);
+    await using var reader = await cmd.ExecuteReaderAsync();
+    return await reader.ReadAsync()
+        ? Results.Json(ReadHouseholdMember(reader))
+        : Results.NotFound(new { error = "家庭成员不存在" });
+});
+
+app.MapDelete("/api/family-members/{id:int}", async (int id, HttpRequest request) =>
+{
+    var access = await RequireParentProfile(connectionString, request);
+    if (access.Error is not null) return access.Error;
+
+    await using var conn = await OpenConnection(connectionString);
+    await using (var cmd = new NpgsqlCommand("""
+        DELETE FROM household_members
+        WHERE id = @id
+          AND owner_parent_app_user_id = @owner_parent_app_user_id
+          AND is_current_user = FALSE
+        """, conn))
+    {
+        cmd.Parameters.AddWithValue("id", id);
+        cmd.Parameters.AddWithValue("owner_parent_app_user_id", access.Profile!.AppUserId);
+        if (await cmd.ExecuteNonQueryAsync() > 0) return Results.Json(new { status = "ok" });
+    }
+
+    await using var existsCmd = new NpgsqlCommand("""
+        SELECT is_current_user
+        FROM household_members
+        WHERE id = @id AND owner_parent_app_user_id = @owner_parent_app_user_id
+        """, conn);
+    existsCmd.Parameters.AddWithValue("id", id);
+    existsCmd.Parameters.AddWithValue("owner_parent_app_user_id", access.Profile!.AppUserId);
+    var isCurrentUser = await existsCmd.ExecuteScalarAsync();
+    return isCurrentUser is true
+        ? Results.Conflict(new { error = "当前用户不能从家庭成员中删除" })
+        : Results.NotFound(new { error = "家庭成员不存在" });
+});
+
 app.MapGet("/api/children", async (HttpRequest request) =>
 {
     var access = await RequireParentProfile(connectionString, request);
@@ -2580,7 +2689,7 @@ static object BuildMcpToolCatalog()
                             type = "string",
                             description = "孩子姓名（必填）"
                         },
-                        family_group_id = new { type = "integer", description = "家庭组ID；不传则使用默认家庭组" },
+                        family_group_id = new { type = "integer", description = "圈子ID；不传则使用默认圈子" },
                         note = new { type = "string", description = "备注" },
                         status = new { type = "string", description = "状态：active / inactive" },
                         score = new { type = "number", description = "初始积分（默认为 0）" },
@@ -2599,7 +2708,7 @@ static object BuildMcpToolCatalog()
                     type = "object",
                     properties = new
                     {
-                        family_group_id = new { type = "integer", description = "家庭组ID；用于缩小孩子姓名定位范围" },
+                        family_group_id = new { type = "integer", description = "圈子ID；用于缩小孩子姓名定位范围" },
                         child_id = new { type = "integer", description = "孩子ID" },
                         child_name = new { type = "string", description = "孩子姓名（用于定位）" },
                         name = new { type = "string", description = "更新后的姓名" },
@@ -2614,13 +2723,13 @@ static object BuildMcpToolCatalog()
             new
             {
                 name = FamilyRewardMcpQueryChildrenToolName,
-                description = "查询孩子列表：传 family_group_id 返回该家庭组的全部孩子；也可继续传 child_id 或 child_name 定位单个孩子。若按某个孩子查询返回 ok:false/未找到，智能体必须再调用 family_reward_list_children（只传 family_group_id）取得完整孩子清单，并把用户输入与清单中的 ID/姓名逐一比较后再回复，避免别名、错别字或输入差异导致误判。",
+                description = "查询孩子列表：传 family_group_id 返回该圈子的全部孩子；也可继续传 child_id 或 child_name 定位单个孩子。若按某个孩子查询返回 ok:false/未找到，智能体必须再调用 family_reward_list_children（只传 family_group_id）取得完整孩子清单，并把用户输入与清单中的 ID/姓名逐一比较后再回复，避免别名、错别字或输入差异导致误判。",
                 inputSchema = new
                 {
                     type = "object",
                     properties = new
                     {
-                        family_group_id = new { type = "integer", description = "家庭组ID；可选。只传此字段时返回该家庭组全部孩子" },
+                        family_group_id = new { type = "integer", description = "圈子ID；可选。只传此字段时返回该圈子全部孩子" },
                         child_id = new { type = "integer", description = "孩子ID（可选）。未找到时不要直接结束，应再查完整孩子清单进行对比" },
                         child_name = new { type = "string", description = "孩子姓名（可选）。未找到时不要直接结束，应再查完整孩子清单进行对比" }
                     }
@@ -2629,13 +2738,13 @@ static object BuildMcpToolCatalog()
             new
             {
                 name = FamilyRewardMcpListChildrenToolName,
-                description = "列出孩子清单：当用户说“查询孩子列表 / 列出孩子 / 有哪些孩子 / 全部孩子”时优先调用。传 family_group_id 返回该家庭组全部 active 孩子；不传则返回全部 active 孩子。不要传 child_id 或 child_name。",
+                description = "列出孩子清单：当用户说“查询孩子列表 / 列出孩子 / 有哪些孩子 / 全部孩子”时优先调用。传 family_group_id 返回该圈子全部 active 孩子；不传则返回全部 active 孩子。不要传 child_id 或 child_name。",
                 inputSchema = new
                 {
                     type = "object",
                     properties = new
                     {
-                        family_group_id = new { type = "integer", description = "家庭组ID；可选。只传此字段时返回该家庭组全部孩子" }
+                        family_group_id = new { type = "integer", description = "圈子ID；可选。只传此字段时返回该圈子全部孩子" }
                     }
                 }
             },
@@ -2648,7 +2757,7 @@ static object BuildMcpToolCatalog()
                     type = "object",
                     properties = new
                     {
-                        family_group_id = new { type = "integer", description = "家庭组ID；用于缩小孩子姓名定位范围" },
+                        family_group_id = new { type = "integer", description = "圈子ID；用于缩小孩子姓名定位范围" },
                         child_id = new { type = "integer", description = "孩子ID" },
                         child_name = new { type = "string", description = "孩子姓名（用于定位）" },
                     }
@@ -2663,7 +2772,7 @@ static object BuildMcpToolCatalog()
                     type = "object",
                     properties = new
                     {
-                        family_group_id = new { type = "integer", description = "家庭组ID；用于缩小孩子姓名定位范围" },
+                        family_group_id = new { type = "integer", description = "圈子ID；用于缩小孩子姓名定位范围" },
                         child_id = new { type = "integer", description = "孩子ID" },
                         child_name = new { type = "string", description = "孩子姓名（用于定位）" },
                         delta = new { type = "number", description = "积分变更量；正数加分、负数减分" },
@@ -2678,13 +2787,13 @@ static object BuildMcpToolCatalog()
             new
             {
                 name = FamilyRewardMcpQueryScoreToolName,
-                description = "积分查询：不传 child_id/child_name 时返回孩子积分清单；传 family_group_id 时返回该家庭组全部孩子的积分清单；传具体孩子时返回单个孩子积分，可选返回最近交易明细。若指定孩子返回未找到，必须再调用 family_reward_list_children（只传 family_group_id）获取完整孩子清单，比较用户输入与全部孩子 ID/姓名后再说明最可能的匹配或请用户确认。",
+                description = "积分查询：不传 child_id/child_name 时返回孩子积分清单；传 family_group_id 时返回该圈子全部孩子的积分清单；传具体孩子时返回单个孩子积分，可选返回最近交易明细。若指定孩子返回未找到，必须再调用 family_reward_list_children（只传 family_group_id）获取完整孩子清单，比较用户输入与全部孩子 ID/姓名后再说明最可能的匹配或请用户确认。",
                 inputSchema = new
                 {
                     type = "object",
                     properties = new
                     {
-                        family_group_id = new { type = "integer", description = "家庭组ID；可选。只传此字段时返回该家庭组全部孩子的积分清单" },
+                        family_group_id = new { type = "integer", description = "圈子ID；可选。只传此字段时返回该圈子全部孩子的积分清单" },
                         child_id = new { type = "integer", description = "孩子ID；可选。传入时返回单个孩子积分；未找到时必须再查完整孩子清单对比" },
                         child_name = new { type = "string", description = "孩子姓名；可选。传入时返回单个孩子积分；未找到时必须再查完整孩子清单对比" },
                         include_transactions = new { type = "boolean", description = "是否返回最近交易明细，默认 false" },
@@ -2703,7 +2812,7 @@ static object BuildMcpToolCatalog()
                     type = "object",
                     properties = new
                     {
-                        family_group_id = new { type = "integer", description = "家庭组ID；用于缩小孩子姓名定位范围" },
+                        family_group_id = new { type = "integer", description = "圈子ID；用于缩小孩子姓名定位范围" },
                         child_id = new { type = "integer", description = "孩子ID" },
                         child_name = new { type = "string", description = "孩子姓名（用于定位）" },
                         delta = new { type = "number", description = "积分增减量；正数加分，负数减分" },
@@ -2725,7 +2834,7 @@ static object BuildMcpToolCatalog()
                     type = "object",
                     properties = new
                     {
-                        family_group_id = new { type = "integer", description = "家庭组ID；用于缩小孩子姓名定位范围" },
+                        family_group_id = new { type = "integer", description = "圈子ID；用于缩小孩子姓名定位范围" },
                         child_id = new { type = "integer", description = "孩子ID" },
                         child_name = new { type = "string", description = "孩子姓名（用于定位）" },
                         type = new { type = "string", description = "记录类型：points、cash、items" },
@@ -2751,7 +2860,7 @@ static object BuildMcpToolCatalog()
                     properties = new
                     {
                         transaction_id = new { type = "integer", description = "记录ID" },
-                        family_group_id = new { type = "integer", description = "家庭组ID；用于缩小孩子姓名定位范围" },
+                        family_group_id = new { type = "integer", description = "圈子ID；用于缩小孩子姓名定位范围" },
                         child_id = new { type = "integer", description = "孩子ID（可选）" },
                         child_name = new { type = "string", description = "孩子姓名（可选）" },
                         type = new { type = "string", description = "记录类型：points、cash、items" },
@@ -2789,7 +2898,7 @@ static object BuildMcpToolCatalog()
                     type = "object",
                     properties = new
                     {
-                        family_group_id = new { type = "integer", description = "家庭组ID；用于缩小孩子姓名定位范围" },
+                        family_group_id = new { type = "integer", description = "圈子ID；用于缩小孩子姓名定位范围" },
                         child_id = new { type = "integer", description = "孩子ID；未找到时必须再查完整孩子清单对比" },
                         child_name = new { type = "string", description = "孩子姓名（用于定位）；未找到时必须再查完整孩子清单对比" },
                         category = new { type = "string", description = "分类模糊匹配（可选）" },
@@ -2867,7 +2976,7 @@ static object BuildMcpToolCatalog()
             new
             {
                 name = FamilyRewardMcpQueryFamilyGroupsToolName,
-                description = "查询家庭组列表。",
+                description = "查询圈子列表。",
                 inputSchema = new
                 {
                     type = "object",
@@ -2877,13 +2986,13 @@ static object BuildMcpToolCatalog()
             new
             {
                 name = FamilyRewardMcpCreateFamilyGroupToolName,
-                description = "新增家庭组。",
+                description = "新增圈子。",
                 inputSchema = new
                 {
                     type = "object",
                     properties = new
                     {
-                        name = new { type = "string", description = "家庭组名称" },
+                        name = new { type = "string", description = "圈子名称" },
                         description = new { type = "string", description = "描述" }
                     },
                     required = new[] { "name" }
@@ -3243,7 +3352,7 @@ static async Task<object> McpAddChild(string connectionString, JsonObject argume
     var familyGroupId = arguments.Int("family_group_id");
     if (familyGroupId is not null && !await IsMcpFamilyAccessible(connectionString, familyGroupId.Value, parentAppUserId))
     {
-        return new { ok = false, error = "家庭组不存在或当前家长无权访问" };
+        return new { ok = false, error = "圈子不存在或当前家长无权访问" };
     }
 
     var body = arguments.DeepClone().AsObject();
@@ -3480,7 +3589,7 @@ static async Task<object> McpQueryScore(string connectionString, JsonObject argu
     var parentAppUserId = ResolveMcpParentAppUserId(arguments)!;
     if (familyGroupId is not null && !await IsMcpFamilyAccessible(connectionString, familyGroupId.Value, parentAppUserId))
     {
-        return new { ok = false, error = "家庭组不存在或当前家长权限不足" };
+        return new { ok = false, error = "圈子不存在或当前家长权限不足" };
     }
 
     var children = await GetMcpVisibleFamilyChildren(connectionString, arguments);
@@ -4391,6 +4500,18 @@ static async Task InitDatabase(string connectionString)
         )
         """,
         """
+        CREATE TABLE IF NOT EXISTS household_members (
+            id SERIAL PRIMARY KEY,
+            owner_parent_app_user_id VARCHAR(180) NOT NULL,
+            display_name VARCHAR(50) NOT NULL,
+            role VARCHAR(30) NOT NULL DEFAULT 'guardian',
+            note TEXT,
+            is_current_user BOOLEAN NOT NULL DEFAULT FALSE,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+        """,
+        """
         CREATE TABLE IF NOT EXISTS child_profiles (
             profile_key VARCHAR(180) PRIMARY KEY,
             name VARCHAR(50) NOT NULL,
@@ -4689,6 +4810,8 @@ static async Task InitDatabase(string connectionString)
         "CREATE INDEX IF NOT EXISTS idx_app_user_profiles_unified ON app_user_profiles(unified_user_id)",
         "CREATE INDEX IF NOT EXISTS idx_child_user_bindings_parent ON child_user_bindings(parent_app_user_id)",
         "CREATE INDEX IF NOT EXISTS idx_child_user_bindings_child ON child_user_bindings(child_profile_key)",
+        "CREATE INDEX IF NOT EXISTS idx_household_members_owner ON household_members(owner_parent_app_user_id, created_at)",
+        "CREATE UNIQUE INDEX IF NOT EXISTS ux_household_members_current_user ON household_members(owner_parent_app_user_id) WHERE is_current_user",
         "CREATE INDEX IF NOT EXISTS idx_child_auth_codes_child ON child_auth_codes(child_id, expires_at DESC)",
         "CREATE INDEX IF NOT EXISTS idx_watch_device_bindings_child ON watch_device_bindings(child_id, revoked_at)",
         "CREATE INDEX IF NOT EXISTS idx_watch_device_bindings_parent ON watch_device_bindings(parent_app_user_id)",
@@ -4880,7 +5003,7 @@ static async Task<(bool Success, Dictionary<string, object?>? Group, string? Err
     name = name.Trim();
     if (string.IsNullOrWhiteSpace(name))
     {
-        return (false, null, "家庭组名称不能为空");
+        return (false, null, "圈子名称不能为空");
     }
 
     await using var conn = await OpenConnection(connectionString);
@@ -4917,7 +5040,7 @@ static async Task<(bool Success, bool Forbidden, bool NotFound, Dictionary<strin
     name = name.Trim();
     if (string.IsNullOrWhiteSpace(name))
     {
-        return (false, false, false, null, "家庭组名称不能为空");
+        return (false, false, false, null, "圈子名称不能为空");
     }
 
     await using var conn = await OpenConnection(connectionString);
@@ -4951,12 +5074,12 @@ static async Task<(bool Success, bool Forbidden, bool NotFound, Dictionary<strin
         if (canManage is null)
         {
             await tx.RollbackAsync();
-            return (false, false, true, null, "家庭不存在");
+            return (false, false, true, null, "圈子不存在");
         }
         if (canManage is false)
         {
             await tx.RollbackAsync();
-            return (false, true, false, null, "只有家庭创建者或管理员可以修改家庭");
+            return (false, true, false, null, "只有圈子创建者或管理员可以修改圈子");
         }
 
         await using (var updateCmd = new NpgsqlCommand("""
@@ -4994,7 +5117,7 @@ static async Task<(bool Success, bool Forbidden, bool NotFound, Dictionary<strin
     catch (PostgresException ex) when (ex.SqlState == PostgresErrorCodes.UniqueViolation)
     {
         await tx.RollbackAsync();
-        return (false, false, false, null, "你已经有同名家庭组");
+        return (false, false, false, null, "你已经有同名圈子");
     }
     catch (Exception ex)
     {
@@ -5041,12 +5164,12 @@ static async Task<(bool Success, bool Forbidden, string FamilyGroupName, int Rem
         if (canManage is null)
         {
             await tx.RollbackAsync();
-            return (false, false, "", 0, "家庭不存在");
+            return (false, false, "", 0, "圈子不存在");
         }
         if (canManage is false)
         {
             await tx.RollbackAsync();
-            return (false, true, familyGroupName, 0, "只有家庭创建者或管理员可以删除家庭");
+            return (false, true, familyGroupName, 0, "只有圈子创建者或管理员可以删除圈子");
         }
 
         await using (var codeCmd = new NpgsqlCommand("""
@@ -5182,11 +5305,11 @@ static async Task<(bool Success, bool Forbidden, string Error)> UpsertFamilyGrou
         await using var reader = await accessCmd.ExecuteReaderAsync();
         if (!await reader.ReadAsync())
         {
-            return (false, false, "家庭组不存在");
+            return (false, false, "圈子不存在");
         }
         if (!reader.GetBoolean(reader.GetOrdinal("can_manage")))
         {
-            return (false, true, "只有家庭组创建者或管理员可以管理成员");
+            return (false, true, "只有圈子创建者或管理员可以管理成员");
         }
     }
 
@@ -5199,7 +5322,7 @@ static async Task<(bool Success, bool Forbidden, string Error)> UpsertFamilyGrou
     cmd.Parameters.AddWithValue("user_id", userId.Trim());
     cmd.Parameters.AddWithValue("role", string.IsNullOrWhiteSpace(role) ? "member" : role.Trim());
     await cmd.ExecuteNonQueryAsync();
-    await SyncOwnedChildrenToFamilyGroup(conn, familyGroupId, userId.Trim(), $"由 {operatorAppUserId} 加入家庭组");
+    await SyncOwnedChildrenToFamilyGroup(conn, familyGroupId, userId.Trim(), $"由 {operatorAppUserId} 加入圈子");
     return (true, false, "");
 }
 
@@ -5227,7 +5350,7 @@ static async Task<(bool Success, bool Forbidden, List<Dictionary<string, object?
             await using var existsCmd = new NpgsqlCommand("SELECT COUNT(*) FROM family_groups WHERE id = @id", conn);
             existsCmd.Parameters.AddWithValue("id", familyGroupId);
             var exists = Convert.ToInt32(await existsCmd.ExecuteScalarAsync(), CultureInfo.InvariantCulture) > 0;
-            return (false, exists, [], exists ? "你不是该家庭成员" : "家庭不存在");
+            return (false, exists, [], exists ? "你不是该圈子成员" : "圈子不存在");
         }
     }
 
@@ -5310,7 +5433,7 @@ static async Task<(bool Success, bool Forbidden, string Error)> RemoveChildFromF
             existsCmd.Parameters.AddWithValue("id", familyGroupId);
             var exists = Convert.ToInt32(await existsCmd.ExecuteScalarAsync(), CultureInfo.InvariantCulture) > 0;
             await tx.RollbackAsync();
-            return (false, exists, exists ? "只有家庭管理员可以移除孩子成员" : "家庭不存在");
+            return (false, exists, exists ? "只有圈子管理员可以移除孩子成员" : "圈子不存在");
         }
     }
 
@@ -5328,7 +5451,7 @@ static async Task<(bool Success, bool Forbidden, string Error)> RemoveChildFromF
         if (value is null || value is DBNull)
         {
             await tx.RollbackAsync();
-            return (false, false, "该孩子不在当前家庭中");
+            return (false, false, "该孩子不在当前圈子中");
         }
         profileKey = Convert.ToString(value, CultureInfo.InvariantCulture) ?? "";
     }
@@ -5424,7 +5547,7 @@ static async Task<(bool Success, bool Forbidden, string FamilyGroupName, string 
             await using var existsCmd = new NpgsqlCommand("SELECT COUNT(*) FROM family_groups WHERE id = @id", conn);
             existsCmd.Parameters.AddWithValue("id", familyGroupId);
             var exists = Convert.ToInt32(await existsCmd.ExecuteScalarAsync(), CultureInfo.InvariantCulture) > 0;
-            return (false, exists, "", "", exists ? "只有家庭组管理员可以生成邀请码" : "家庭组不存在");
+            return (false, exists, "", "", exists ? "只有圈子管理员可以生成邀请码" : "圈子不存在");
         }
         familyGroupName = Convert.ToString(result, CultureInfo.InvariantCulture) ?? "";
     }
@@ -5553,6 +5676,41 @@ static async Task<int> SyncOwnedChildrenToFamilyGroup(NpgsqlConnection conn, int
     }
     return ownedChildren.Count;
 }
+
+static string NormalizeHouseholdRole(string? role)
+{
+    var normalized = (role ?? "").Trim().ToLowerInvariant();
+    return normalized is "father" or "mother" or "grandfather" or "grandmother"
+        or "maternal_grandfather" or "maternal_grandmother" or "guardian" or "other"
+        ? normalized
+        : "";
+}
+
+static async Task<List<Dictionary<string, object?>>> GetHouseholdMembers(NpgsqlConnection conn, string parentAppUserId)
+{
+    var members = new List<Dictionary<string, object?>>();
+    await using var cmd = new NpgsqlCommand("""
+        SELECT id, display_name, role, note, is_current_user, created_at, updated_at
+        FROM household_members
+        WHERE owner_parent_app_user_id = @owner_parent_app_user_id
+        ORDER BY is_current_user DESC, created_at, id
+        """, conn);
+    cmd.Parameters.AddWithValue("owner_parent_app_user_id", parentAppUserId);
+    await using var reader = await cmd.ExecuteReaderAsync();
+    while (await reader.ReadAsync()) members.Add(ReadHouseholdMember(reader));
+    return members;
+}
+
+static Dictionary<string, object?> ReadHouseholdMember(NpgsqlDataReader reader) => new()
+{
+    ["id"] = reader.GetInt32(reader.GetOrdinal("id")),
+    ["displayName"] = reader.String("display_name"),
+    ["role"] = reader.String("role"),
+    ["note"] = reader.IsDBNull(reader.GetOrdinal("note")) ? "" : reader.String("note"),
+    ["isCurrentUser"] = reader.GetBoolean(reader.GetOrdinal("is_current_user")),
+    ["createdAt"] = reader.GetDateTime(reader.GetOrdinal("created_at")),
+    ["updatedAt"] = reader.GetDateTime(reader.GetOrdinal("updated_at"))
+};
 
 static async Task<(AppUserProfile? Profile, IResult? Error)> RequireParentProfile(string connectionString, HttpRequest request)
 {
@@ -5697,7 +5855,7 @@ static async Task<AppUserProfile> EnsureChildAppUserProfile(NpgsqlConnection con
     var babyNumber = ExtractBabyNumber(childProfileKey) ?? await NextBabyNumber(conn, username);
     var appUserId = MakeChildAppUserId(username, babyNumber);
     var parentAppUserId = MakeParentAppUserId(username);
-    var familyGroupId = await EnsureFamilyGroup(conn, $"{username}的家庭", parentAppUserId);
+    var familyGroupId = await EnsureFamilyGroup(conn, $"{username}的圈子", parentAppUserId);
     var childId = existingChildId ?? await EnsureChildInFamilyGroup(conn, familyGroupId, childProfileKey, childName, "");
 
     await UpsertChildBinding(conn, parentAppUserId, childProfileKey, childId);
@@ -6510,7 +6668,7 @@ static async Task<Dictionary<string, object?>> CreateTransaction(
             if (Convert.ToInt32(await childCmd.ExecuteScalarAsync(), CultureInfo.InvariantCulture) == 0)
             {
                 await tx.RollbackAsync();
-                return new Dictionary<string, object?> { ["error"] = "孩子不属于当前家庭组" };
+                return new Dictionary<string, object?> { ["error"] = "孩子不属于当前圈子" };
             }
         }
 
@@ -7107,7 +7265,7 @@ static async Task<Dictionary<string, object?>> CreateChildAuthCode(string connec
         if (child is null)
         {
             await tx.RollbackAsync();
-            return new Dictionary<string, object?> { ["error"] = "孩子不属于当前家庭组，或只有孩子的所属账号可以生成认证码" };
+            return new Dictionary<string, object?> { ["error"] = "孩子不属于当前圈子，或只有孩子的所属账号可以生成认证码" };
         }
 
         await using (var expireCmd = new NpgsqlCommand("""
@@ -7163,7 +7321,7 @@ static async Task<Dictionary<string, object?>> GetChildWatchDevices(string conne
     var child = await GetChildForFamily(conn, null, childId, familyGroupId, parentAppUserId);
     if (child is null)
     {
-        return new Dictionary<string, object?> { ["error"] = "孩子不属于当前家庭组，或只有孩子的所属账号可以查看设备" };
+        return new Dictionary<string, object?> { ["error"] = "孩子不属于当前圈子，或只有孩子的所属账号可以查看设备" };
     }
 
     var devices = new List<Dictionary<string, object?>>();
@@ -7191,7 +7349,7 @@ static async Task<Dictionary<string, object?>> RevokeChildWatchDevice(string con
     var child = await GetChildForFamily(conn, null, childId, familyGroupId, parentAppUserId);
     if (child is null)
     {
-        return new Dictionary<string, object?> { ["error"] = "孩子不属于当前家庭组，或只有孩子的所属账号可以解绑设备" };
+        return new Dictionary<string, object?> { ["error"] = "孩子不属于当前圈子，或只有孩子的所属账号可以解绑设备" };
     }
     await using var cmd = new NpgsqlCommand("""
         UPDATE watch_device_bindings
@@ -7226,7 +7384,7 @@ static async Task<Dictionary<string, object?>> CreateWatchDeviceUnbindCode(
         if (child is null)
         {
             await tx.RollbackAsync();
-            return new Dictionary<string, object?> { ["error"] = "孩子不属于当前家庭组，或只有孩子的所属账号可以生成解绑码" };
+            return new Dictionary<string, object?> { ["error"] = "孩子不属于当前圈子，或只有孩子的所属账号可以生成解绑码" };
         }
 
         var bindingChildId = 0;
@@ -7660,7 +7818,7 @@ static async Task<Dictionary<string, object?>> GetParentWatchRewardRequests(
         accessCmd.Parameters.AddWithValue("default_user_id", DefaultUserId);
         if (Convert.ToInt32(await accessCmd.ExecuteScalarAsync(), CultureInfo.InvariantCulture) == 0)
         {
-            return new Dictionary<string, object?> { ["error"] = "你不是该家庭成员" };
+            return new Dictionary<string, object?> { ["error"] = "你不是该圈子成员" };
         }
     }
 
@@ -7716,7 +7874,7 @@ static async Task<Dictionary<string, object?>> CreateWatchRewardRequest(string c
     await using var conn = await OpenConnection(connectionString);
     if (!await ChildBelongsToFamily(conn, childId, familyGroupId))
     {
-        return new Dictionary<string, object?> { ["error"] = "孩子不属于当前家庭组" };
+        return new Dictionary<string, object?> { ["error"] = "孩子不属于当前圈子" };
     }
     if (!string.IsNullOrWhiteSpace(childProfileKey))
     {

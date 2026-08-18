@@ -9,7 +9,7 @@
 - `FAMILY_POINTS_MCP_TOKEN`（可选）：MCP 访问令牌。
 - `FAMILY_POINTS_MCP_TOOL_KEY`（可选）：默认 `family-reward-mcp`。
 - `FAMILY_POINTS_MCP_NAME`（可选）：默认 `家庭积分应用`。
-- `FAMILY_POINTS_MCP_DESC`（可选）：工具描述，默认说明所有工具必须传入 `parent_user_id`，孩子和规则写操作按家长归属校验，积分查询覆盖该家长创建或加入的全部家庭组。
+- `FAMILY_POINTS_MCP_DESC`（可选）：工具描述，默认说明所有工具必须传入 `parent_user_id`，孩子和规则写操作按家长归属校验，积分查询覆盖该家长创建或加入的全部圈子。
 - `FAMILY_POINTS_MCP_SERVERS`（可选）：服务拆分后使用。每行一条，格式：
   `url|toolKey|name|description|token`
   - `url`：必填
@@ -30,7 +30,7 @@ bash scripts/install-family-rewards-mcp-tool.sh
 
 ```bash
 # 手工多服务（当你不想走库文件时）
-export FAMILY_POINTS_MCP_SERVERS=$'https://happylife.ai.impx.net/api/mcp|family-reward-mcp|家庭积分应用|家庭积分应用 MCP：所有工具必须传入 parent_user_id，并按家长归属校验孩子、积分、规则和家庭组权限。|'
+export FAMILY_POINTS_MCP_SERVERS=$'https://happylife.ai.impx.net/api/mcp|family-reward-mcp|家庭积分应用|家庭积分应用 MCP：所有工具必须传入 parent_user_id，并按家长归属校验孩子、积分、规则和圈子权限。|'
 bash scripts/install-family-rewards-mcp-tool.sh
 ```
 

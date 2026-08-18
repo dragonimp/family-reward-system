@@ -1,6 +1,6 @@
 import http from './api';
 import type { Child } from '../types';
-import type { FamilyGroup, FamilyGroupInvite, JoinFamilyGroupResult } from '../types';
+import type { FamilyGroup, FamilyGroupInvite, HouseholdMember, JoinFamilyGroupResult } from '../types';
 import type {
   ChildAuthCode,
   ChildFriendNotificationsPayload,
@@ -24,6 +24,13 @@ export const getFamilyGroupChildren = (id: number) =>
   http.get<unknown, Child[]>(`/api/family-groups/${id}/children`);
 export const removeFamilyGroupChild = (id: number, childId: number) =>
   http.delete(`/api/family-groups/${id}/children/${childId}`);
+
+export const getHouseholdMembers = () => http.get<unknown, HouseholdMember[]>('/api/family-members');
+export const createHouseholdMember = (data: Pick<HouseholdMember, 'displayName' | 'role' | 'note'>) =>
+  http.post<unknown, HouseholdMember>('/api/family-members', data);
+export const updateHouseholdMember = (id: number, data: Pick<HouseholdMember, 'displayName' | 'role' | 'note'>) =>
+  http.put<unknown, HouseholdMember>(`/api/family-members/${id}`, data);
+export const deleteHouseholdMember = (id: number) => http.delete(`/api/family-members/${id}`);
 
 export const getChildren = (params?: { familyGroupId?: number; ownedOnly?: boolean }) => http.get('/api/children', { params });
 export const getChild = (id: number) => http.get(`/api/children/${id}`);

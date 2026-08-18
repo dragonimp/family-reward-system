@@ -1,18 +1,22 @@
 import { Card } from '../components/Card';
 import { Modal } from '../components/Modal';
-import type { Child, ChildFriend, ChildFriendNotification, WatchDeviceBinding } from '../types';
+import type { Child, ChildFriend, ChildFriendNotification, HouseholdMember, HouseholdRole, WatchDeviceBinding } from '../types';
 import { useState, useEffect, useCallback } from 'react';
 import {
   getChildren,
   createChild,
   updateChild,
   deleteChild,
+  createHouseholdMember,
+  deleteHouseholdMember,
   generateChildAuthCode,
   getChildFriendNotifications,
   getChildFriends,
   getChildWatchDevices,
+  getHouseholdMembers,
   markChildFriendNotificationRead,
   revokeChildWatchDevice,
+  updateHouseholdMember,
   generateWatchDeviceUnbindCode,
 } from '../services';
 
@@ -23,8 +27,35 @@ interface ChildForm {
   items: number;
 }
 
+interface HouseholdMemberForm {
+  displayName: string;
+  role: HouseholdRole;
+  note: string;
+}
+
+const householdRoleOptions: Array<{ value: HouseholdRole; label: string }> = [
+  { value: 'father', label: '爸爸' },
+  { value: 'mother', label: '妈妈' },
+  { value: 'grandfather', label: '爷爷' },
+  { value: 'grandmother', label: '奶奶' },
+  { value: 'maternal_grandfather', label: '外公' },
+  { value: 'maternal_grandmother', label: '外婆' },
+  { value: 'guardian', label: '监护人' },
+  { value: 'other', label: '其他' },
+];
+
+const householdRoleLabel = (role: HouseholdRole) =>
+  householdRoleOptions.find((item) => item.value === role)?.label || '其他';
+
 export default function Children() {
+  const [activeSection, setActiveSection] = useState<'children' | 'members'>('children');
   const [children, setChildren] = useState<Child[]>([]);
+  const [householdMembers, setHouseholdMembers] = useState<HouseholdMember[]>([]);
+  const [membersLoading, setMembersLoading] = useState(true);
+  const [showMemberModal, setShowMemberModal] = useState(false);
+  const [editingMember, setEditingMember] = useState<HouseholdMember | null>(null);
+  const [memberToDelete, setMemberToDelete] = useState<HouseholdMember | null>(null);
+  const [memberForm, setMemberForm] = useState<HouseholdMemberForm>({ displayName: '', role: 'guardian', note: '' });
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [editingChild, setEditingChild] = useState<Child | null>(null);
@@ -72,10 +103,25 @@ export default function Children() {
     }
   }, []);
 
+  const loadHouseholdMembers = useCallback(async () => {
+    try {
+      setMembersLoading(true);
+      const result = await getHouseholdMembers();
+      setHouseholdMembers(Array.isArray(result) ? result : []);
+    } catch (error) {
+      console.error('家庭成员加载失败:', error);
+      setHouseholdMembers([]);
+      showToast('家庭成员加载失败', 'error');
+    } finally {
+      setMembersLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
     loadChildren();
     loadFriendNotifications();
-  }, [loadChildren, loadFriendNotifications]);
+    loadHouseholdMembers();
+  }, [loadChildren, loadFriendNotifications, loadHouseholdMembers]);
 
   useEffect(() => {
     const interval = window.setInterval(() => {
@@ -99,6 +145,53 @@ export default function Children() {
     setEditingChild(null);
     setFormData({ name: '', score: 0, cash: 0, items: 0 });
     setShowModal(true);
+  };
+
+  const openCreateMemberModal = () => {
+    setEditingMember(null);
+    setMemberForm({ displayName: '', role: 'guardian', note: '' });
+    setShowMemberModal(true);
+  };
+
+  const openEditMemberModal = (member: HouseholdMember) => {
+    setEditingMember(member);
+    setMemberForm({ displayName: member.displayName, role: member.role, note: member.note || '' });
+    setShowMemberModal(true);
+  };
+
+  const handleSaveMember = async () => {
+    if (!memberForm.displayName.trim()) {
+      showToast('请输入家庭成员姓名', 'error');
+      return;
+    }
+    try {
+      const payload = { ...memberForm, displayName: memberForm.displayName.trim(), note: memberForm.note.trim() };
+      if (editingMember) {
+        await updateHouseholdMember(editingMember.id, payload);
+        showToast(editingMember.isCurrentUser ? '当前用户角色已更新' : '家庭成员已更新');
+      } else {
+        await createHouseholdMember(payload);
+        showToast('家庭成员已新增');
+      }
+      setShowMemberModal(false);
+      await loadHouseholdMembers();
+    } catch (error) {
+      console.error('家庭成员保存失败:', error);
+      showToast('家庭成员保存失败', 'error');
+    }
+  };
+
+  const handleDeleteMember = async () => {
+    if (!memberToDelete) return;
+    try {
+      await deleteHouseholdMember(memberToDelete.id);
+      setMemberToDelete(null);
+      showToast('家庭成员已删除');
+      await loadHouseholdMembers();
+    } catch (error) {
+      console.error('家庭成员删除失败:', error);
+      showToast('家庭成员删除失败', 'error');
+    }
   };
 
   const openEditModal = (child: Child) => {
@@ -266,18 +359,43 @@ export default function Children() {
         </div>
       )}
 
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h2 className="text-2xl font-bold text-gray-900">孩子管理</h2>
+          <h2 className="text-2xl font-bold text-gray-900">家庭管理</h2>
           <p className="text-sm text-gray-500 mt-1">
-            管理当前家长账号下的孩子，可将同一组家长和孩子加入多个家庭组
+            管理当前家长账号下固定的孩子和其他家庭成员，不随圈子切换而改变
           </p>
         </div>
-        <button onClick={openCreateModal} className="btn-primary flex items-center gap-2">
-          <span>➕</span> 新增孩子
+        <button
+          onClick={activeSection === 'children' ? openCreateModal : openCreateMemberModal}
+          className="btn-primary flex items-center gap-2"
+        >
+          <span>➕</span> {activeSection === 'children' ? '新增孩子' : '新增家庭成员'}
         </button>
       </div>
 
+      <div role="tablist" aria-label="家庭成员类型" className="flex w-fit rounded-lg border border-gray-200 bg-white p-1">
+        <button
+          type="button"
+          role="tab"
+          aria-selected={activeSection === 'children'}
+          onClick={() => setActiveSection('children')}
+          className={`rounded-md px-4 py-2 text-sm font-medium ${activeSection === 'children' ? 'bg-[#4A90D9] text-white' : 'text-gray-600 hover:bg-gray-50'}`}
+        >
+          孩子成员
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={activeSection === 'members'}
+          onClick={() => setActiveSection('members')}
+          className={`rounded-md px-4 py-2 text-sm font-medium ${activeSection === 'members' ? 'bg-[#4A90D9] text-white' : 'text-gray-600 hover:bg-gray-50'}`}
+        >
+          其他家庭成员
+        </button>
+      </div>
+
+      {activeSection === 'children' && <>
       {friendNotifications.length > 0 && (
         <Card>
           <div className="flex flex-col gap-3">
@@ -375,6 +493,102 @@ export default function Children() {
           )}
         </div>
       </Card>
+      </>}
+
+      {activeSection === 'members' && (
+        <Card>
+          {membersLoading ? (
+            <div className="py-12 text-center text-sm text-gray-400">家庭成员加载中...</div>
+          ) : householdMembers.length === 0 ? (
+            <div className="py-12 text-center text-sm text-gray-400">暂无家庭成员</div>
+          ) : (
+            <div className="divide-y divide-gray-100">
+              {householdMembers.map((member) => (
+                <div key={member.id} className="flex flex-col gap-3 py-4 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="font-medium text-gray-900">{member.displayName}</span>
+                      <span className="rounded-full bg-blue-100 px-2.5 py-1 text-xs font-medium text-blue-700">
+                        {householdRoleLabel(member.role)}
+                      </span>
+                      {member.isCurrentUser && (
+                        <span className="rounded-full bg-green-100 px-2.5 py-1 text-xs font-medium text-green-700">当前用户</span>
+                      )}
+                    </div>
+                    <p className="mt-1 text-sm text-gray-500">{member.note || (member.isCurrentUser ? '可编辑姓名并定义当前用户的家庭角色' : '未填写备注')}</p>
+                  </div>
+                  <div className="flex shrink-0 items-center gap-3">
+                    <button type="button" onClick={() => openEditMemberModal(member)} className="text-sm font-medium text-[#4A90D9] hover:text-[#3A7BC8]">编辑</button>
+                    {!member.isCurrentUser && (
+                      <button type="button" onClick={() => setMemberToDelete(member)} className="text-sm font-medium text-[#E74C3C] hover:text-red-700">删除</button>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </Card>
+      )}
+
+      <Modal
+        isOpen={showMemberModal}
+        onClose={() => setShowMemberModal(false)}
+        title={editingMember?.isCurrentUser ? '定义当前用户角色' : editingMember ? '编辑家庭成员' : '新增家庭成员'}
+        footer={
+          <>
+            <button type="button" onClick={() => setShowMemberModal(false)} className="rounded-lg px-4 py-2 text-gray-600 hover:bg-gray-100">取消</button>
+            <button type="button" onClick={handleSaveMember} className="btn-primary">保存</button>
+          </>
+        }
+      >
+        <div className="space-y-4">
+          <label className="block text-sm font-medium text-gray-700">
+            姓名 *
+            <input
+              type="text"
+              maxLength={50}
+              value={memberForm.displayName}
+              onChange={(event) => setMemberForm({ ...memberForm, displayName: event.target.value })}
+              placeholder="请输入家庭成员姓名"
+              className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#4A90D9]"
+            />
+          </label>
+          <label className="block text-sm font-medium text-gray-700">
+            家庭角色 *
+            <select
+              value={memberForm.role}
+              onChange={(event) => setMemberForm({ ...memberForm, role: event.target.value as HouseholdRole })}
+              className="mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#4A90D9]"
+            >
+              {householdRoleOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+            </select>
+          </label>
+          <label className="block text-sm font-medium text-gray-700">
+            备注
+            <textarea
+              rows={3}
+              value={memberForm.note}
+              onChange={(event) => setMemberForm({ ...memberForm, note: event.target.value })}
+              placeholder="可填写称呼或说明"
+              className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#4A90D9]"
+            />
+          </label>
+        </div>
+      </Modal>
+
+      <Modal
+        isOpen={Boolean(memberToDelete)}
+        onClose={() => setMemberToDelete(null)}
+        title="删除家庭成员"
+        footer={
+          <>
+            <button type="button" onClick={() => setMemberToDelete(null)} className="rounded-lg px-4 py-2 text-gray-600 hover:bg-gray-100">取消</button>
+            <button type="button" onClick={handleDeleteMember} className="btn-danger">确认删除</button>
+          </>
+        }
+      >
+        <p className="text-gray-600">确定要删除家庭成员「{memberToDelete?.displayName}」吗？</p>
+      </Modal>
 
       {/* 新增/编辑模态框 */}
       <Modal

@@ -54,7 +54,7 @@ if [ -z "$FAMILY_POINTS_MCP_SERVERS" ] && [ -z "$FAMILY_POINTS_MCP_URL" ]; then
   bash scripts/install-family-rewards-mcp-tool.sh
 
 示例（服务拆分后手工多服务）：
-  export FAMILY_POINTS_MCP_SERVERS=$'https://happylife.ai.impx.net/api/mcp|family-reward-mcp|家加分 MCP 服务（按工具拆分）|家加分 MCP：提供孩子、积分、记录、规则、家庭组等独立工具（family_reward_*）。|'
+  export FAMILY_POINTS_MCP_SERVERS=$'https://happylife.ai.impx.net/api/mcp|family-reward-mcp|家加分 MCP 服务（按工具拆分）|家加分 MCP：提供孩子、积分、记录、规则、圈子等独立工具（family_reward_*）。|'
   bash scripts/install-family-rewards-mcp-tool.sh
 EOF
   exit 1

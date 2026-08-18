@@ -53,7 +53,7 @@ export default function Identity() {
             </div>
             <h2 className="text-lg font-semibold text-gray-900">家长</h2>
             <p className="mt-2 text-sm leading-6 text-gray-500">
-              管理家庭组、孩子、积分、规则、统计和系统配置。
+              管理圈子、家庭成员、积分、规则、统计和系统配置。
             </p>
             <span className="mt-5 inline-flex rounded-lg bg-[#4A90D9] px-4 py-2 text-sm font-medium text-white">
               {busyRole === 'parent' ? '保存中...' : '以家长身份进入'}

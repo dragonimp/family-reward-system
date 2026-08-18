@@ -133,6 +133,26 @@ export interface JoinFamilyGroupResult {
   linkedChildCount: number;
 }
 
+export type HouseholdRole =
+  | 'father'
+  | 'mother'
+  | 'grandfather'
+  | 'grandmother'
+  | 'maternal_grandfather'
+  | 'maternal_grandmother'
+  | 'guardian'
+  | 'other';
+
+export interface HouseholdMember {
+  id: number;
+  displayName: string;
+  role: HouseholdRole;
+  note?: string;
+  isCurrentUser: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
 // 交易记录类型
 export interface Transaction {
   id: number;

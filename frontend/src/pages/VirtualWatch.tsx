@@ -33,7 +33,7 @@ export default function VirtualWatchPage() {
   }
 
   if (!selectedChild) {
-    return <div className="flex min-h-[320px] items-center justify-center text-sm text-gray-500">请先在孩子管理中添加孩子</div>;
+    return <div className="flex min-h-[320px] items-center justify-center text-sm text-gray-500">请先在家庭管理中添加孩子</div>;
   }
 
   return (

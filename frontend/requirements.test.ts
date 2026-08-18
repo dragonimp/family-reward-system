@@ -181,12 +181,35 @@ test('REQ-049 removes legacy menus and manual watch request fields', async () =>
   assert.match(api, /请先选择一项奖励规则/);
 });
 
-test('REQ-040 organizes family management into four tabs', async () => {
+test('REQ-040 organizes circle management into four tabs', async () => {
   const page = await readFile(new URL('./src/pages/FamilyGroups.tsx', import.meta.url), 'utf8');
   assert.match(page, /role="tablist"/);
-  for (const label of ['查看家庭', '新增家庭', '邀请他人加入家庭', '加入其他家庭']) assert.match(page, new RegExp(label));
+  for (const label of ['查看圈子', '新增圈子', '邀请他人加入圈子', '加入其他圈子']) assert.match(page, new RegExp(label));
   assert.match(page, /id="family-view-select"/);
   assert.match(page, /我创建的/);
   assert.match(page, /我加入的/);
-  assert.match(page, /孩子归属家长关系不会因切换家庭而改变/);
+  assert.match(page, /孩子归属家长关系不会因切换圈子而改变/);
+});
+
+test('REQ-050/051/052 separates circle and household member management', async () => {
+  const [layout, familyPage, services, types, api] = await Promise.all([
+    readFile(new URL('./src/components/Layout.tsx', import.meta.url), 'utf8'),
+    readFile(new URL('./src/pages/Children.tsx', import.meta.url), 'utf8'),
+    readFile(new URL('./src/services/index.ts', import.meta.url), 'utf8'),
+    readFile(new URL('./src/types/index.ts', import.meta.url), 'utf8'),
+    readFile(new URL('../FamilyReward.Api/Program.cs', import.meta.url), 'utf8'),
+  ]);
+  assert.match(layout, /label: '圈子管理'/);
+  assert.match(layout, /label: '家庭管理'/);
+  assert.match(familyPage, /孩子成员/);
+  assert.match(familyPage, /其他家庭成员/);
+  assert.match(familyPage, /定义当前用户角色/);
+  for (const role of ['爸爸', '妈妈', '爷爷', '奶奶', '外公', '外婆', '监护人', '其他']) {
+    assert.match(familyPage, new RegExp(role));
+  }
+  assert.match(types, /interface HouseholdMember/);
+  assert.match(services, /api\/family-members/);
+  assert.match(api, /CREATE TABLE IF NOT EXISTS household_members/);
+  assert.match(api, /owner_parent_app_user_id/);
+  assert.match(api, /当前用户不能从家庭成员中删除/);
 });

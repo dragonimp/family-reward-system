@@ -34,10 +34,10 @@ export function FamilyGroupProvider({ children }: { children: ReactNode }) {
         return nextGroups[0]?.id ?? null;
       });
     } catch (err) {
-      console.error('家庭组加载失败:', err);
+      console.error('圈子加载失败:', err);
       setGroups([]);
       setSelectedGroupId(null);
-      setError('家庭组加载失败');
+      setError('圈子加载失败');
     } finally {
       setLoading(false);
     }
@@ -54,7 +54,7 @@ export function FamilyGroupProvider({ children }: { children: ReactNode }) {
   const createGroup = useCallback(async (name: string) => {
     const trimmed = name.trim();
     if (!trimmed) {
-      throw new Error('请输入家庭组名称');
+      throw new Error('请输入圈子名称');
     }
     const created = await createFamilyGroup({ name: trimmed });
     setGroups((current) => [...current, created]);
