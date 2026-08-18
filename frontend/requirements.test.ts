@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
+import { sanitizeFeedbackLocation } from './src/utils/feedbackPrivacy.ts';
 
 test('REQ-028 offers an explicit family selector and scoped child view', async () => {
   const page = await readFile(new URL('./src/pages/FamilyGroups.tsx', import.meta.url), 'utf8');
@@ -28,6 +29,8 @@ test('REQ-031 directly loads the public feedback widget with current user contac
   assert.match(widget, /window\.AgentDashFeedback =/);
   assert.match(widget, /email: user\.email \|\| ''/);
   assert.match(widget, /phone: user\.phoneNumber \|\| ''/);
+  assert.match(widget, /sanitizeFeedbackLocation\(window\.location\.href\)/);
+  assert.match(widget, /window\.history\.replaceState/);
   assert.match(layout, /<PublicFeedbackWidget \/>/);
   assert.match(api, /source_system"] = "family-reward-web"/);
   assert.match(api, /X-Atlas-User-Id/);
@@ -37,6 +40,26 @@ test('REQ-031 directly loads the public feedback widget with current user contac
   assert.match(api, /body\.String\("source_url"\)/);
   assert.match(api, /feedback-\{Guid\.NewGuid\(\):N\}/);
   assert.match(api, /GetUnifiedContact\(request\)/);
+});
+
+test('TC-014 removes feedback secrets from URL and hash context', () => {
+  const sanitized = sanitizeFeedbackLocation(
+    'https://happylife.ai.impx.net/parents/rewards?token=tc014-sensitive&authorization_code=tc014-code&client-secret=tc014-secret&safe=keep#/detail?access_token=nested&tab=summary',
+  );
+
+  assert.equal(
+    sanitized,
+    'https://happylife.ai.impx.net/parents/rewards?safe=keep#/detail?tab=summary',
+  );
+  assert.doesNotMatch(sanitized, /tc014-sensitive|tc014-code|tc014-secret|access_token/);
+});
+
+test('TC-014 detects case-insensitive secret parameter variants', () => {
+  const sanitized = sanitizeFeedbackLocation(
+    'https://happylife.ai.impx.net/parents/rewards?Session_Token=session-sensitive&API-KEY=key-sensitive&safe_code=code-sensitive&locale=zh-CN',
+  );
+
+  assert.equal(sanitized, 'https://happylife.ai.impx.net/parents/rewards?locale=zh-CN');
 });
 
 test('REQ-032 keeps service configuration usable on narrow screens', async () => {
