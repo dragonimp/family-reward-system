@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
+import { sanitizeFeedbackLocation } from '../utils/feedbackPrivacy';
 
 interface PublicFeedbackConfig {
   projectCode: string;
@@ -29,6 +30,11 @@ export default function PublicFeedbackWidget() {
   const { user } = useAuth();
 
   useEffect(() => {
+    const sanitizedLocation = sanitizeFeedbackLocation(window.location.href);
+    if (sanitizedLocation !== window.location.href) {
+      window.history.replaceState(window.history.state, '', sanitizedLocation);
+    }
+
     window.AgentDashFeedback = {
       projectCode: 'family-reward',
       projectName: '家加分',
