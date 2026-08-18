@@ -24,7 +24,7 @@ test('REQ-031 directly loads the public feedback widget with current user contac
     readFile(new URL('./src/components/Layout.tsx', import.meta.url), 'utf8'),
     readFile(new URL('../FamilyReward.Api/Program.cs', import.meta.url), 'utf8'),
   ]);
-  assert.match(widget, /https:\/\/home\.ai\.impx\.net\/feedback-widget\.js/);
+  assert.match(widget, /https:\/\/auth\.ai\.xmkurt\.com\/feedback-widget\.js/);
   assert.match(widget, /window\.AgentDashFeedback =/);
   assert.match(widget, /email: user\.email \|\| ''/);
   assert.match(widget, /phone: user\.phoneNumber \|\| ''/);

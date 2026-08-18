@@ -10,8 +10,11 @@ import {
   getRewardRequests,
   getRules,
 } from '../services';
-
-type TransactionType = 'score' | 'cash' | 'item';
+import {
+  buildRewardTransactionPayload,
+  type RewardTransactionPreview,
+  type RewardTransactionType,
+} from './rewardTransaction';
 
 export default function Reward() {
   const navigate = useNavigate();
@@ -22,7 +25,7 @@ export default function Reward() {
   const [selectedChild, setSelectedChild] = useState<number | null>(null);
   const [selectedRule, setSelectedRule] = useState<number | null>(null);
   const [customAmount, setCustomAmount] = useState<number>(0);
-  const [customType, setCustomType] = useState<TransactionType>('score');
+  const [customType, setCustomType] = useState<RewardTransactionType>('score');
   const [customCategory, setCustomCategory] = useState('');
   const [customDescription, setCustomDescription] = useState('');
   const [voiceText, setVoiceText] = useState('');
@@ -30,7 +33,7 @@ export default function Reward() {
   const recognitionRef = useRef<any>(null);
   const [approvingRequestId, setApprovingRequestId] = useState<number | null>(null);
   const [showConfirm, setShowConfirm] = useState(false);
-  const [transactionPreview, setTransactionPreview] = useState<any>(null);
+  const [transactionPreview, setTransactionPreview] = useState<RewardTransactionPreview | null>(null);
   const [toast, setToast] = useState<{ show: boolean; message: string; type: 'success' | 'error' }>({ show: false, message: '', type: 'success' });
 
   const showToast = (message: string, type: 'success' | 'error' = 'success') => {
@@ -153,6 +156,10 @@ export default function Reward() {
       return;
     }
     const child = children.find((c) => c.id === selectedChild);
+    if (!child) {
+      showToast('所选孩子不存在，请重新选择', 'error');
+      return;
+    }
     const rule = rules.find((r) => r.id === selectedRule);
     const amount = selectedRule && rule ? rule.score : customAmount;
 
@@ -169,29 +176,7 @@ export default function Reward() {
 
   const handleConfirm = async () => {
     if (!transactionPreview || !selectedChild) return;
-    const { child, rule, amount, type, category, description } = transactionPreview;
-
-    const txData: any = {
-      child_id: child.id,
-      child_name: child.name,
-      category: category || '其他',
-      description: description || (rule?.name || '自定义操作'),
-    };
-
-    // 根据类型设置不同字段
-    if (type === 'score') {
-      txData.type = 'points';
-      txData.direction = amount >= 0 ? '+' : '-';
-      txData.points = Math.abs(amount);
-    } else if (type === 'cash') {
-      txData.type = 'cash';
-      txData.direction = amount >= 0 ? '+' : '-';
-      txData.cash_cny = Math.abs(amount);
-    } else if (type === 'item') {
-      txData.type = 'items';
-      txData.direction = amount >= 0 ? '+' : '-';
-      txData.items = description || (rule?.name || '物品');
-    }
+    const txData = buildRewardTransactionPayload(transactionPreview);
 
     try {
       await createTransaction(txData);
@@ -408,7 +393,7 @@ export default function Reward() {
               <label className="block text-sm font-medium text-gray-700 mb-1">操作类型</label>
               <select
                 value={customType}
-                onChange={(e) => setCustomType(e.target.value as TransactionType)}
+                onChange={(e) => setCustomType(e.target.value as RewardTransactionType)}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4A90D9]"
               >
                 <option value="score">积分</option>
