@@ -6,6 +6,8 @@ interface PublicFeedbackConfig {
   projectCode: string;
   projectName: string;
   projectCodename: string;
+  appCode: string;
+  clientId: string;
   endpoint: string;
   sourceApp: string;
   currentUser: {
@@ -39,6 +41,8 @@ export default function PublicFeedbackWidget() {
       projectCode: 'family-reward',
       projectName: '家加分',
       projectCodename: '家加分',
+      appCode: '家加分',
+      clientId: 'happylife.ai',
       endpoint: '/api/feedback',
       sourceApp: '家加分',
       currentUser: user ? {
