@@ -1846,8 +1846,7 @@ app.MapGet("/api/agentfree/agents", async (IHttpClientFactory httpClientFactory,
     try
     {
         var config = await configStore.LoadAsync();
-        var webAppBotId = request.Query.String("webAppBotId").Trim();
-        if (string.IsNullOrWhiteSpace(webAppBotId)) webAppBotId = config["agent"]?.AsObject().String("webAppBotId", "web-jiajaifen-chat") ?? "web-jiajaifen-chat";
+        var webAppBotId = ResolveFamilyRewardWebAppBotId(config, request.Query.String("webAppBotId"));
         return Results.Json(await GetFamilyRewardAgentFreeAgents(httpClientFactory, GetUnifiedUsername(request), webAppBotId, request.HttpContext.RequestAborted));
     }
     catch (Exception ex)
@@ -1864,8 +1863,7 @@ app.MapGet("/api/agentfree/sessions", async (IHttpClientFactory httpClientFactor
     {
         var userName = GetUnifiedUsername(request);
         var config = await configStore.LoadAsync();
-        var webAppBotId = request.Query.String("webAppBotId").Trim();
-        if (string.IsNullOrWhiteSpace(webAppBotId)) webAppBotId = config["agent"]?.AsObject().String("webAppBotId", "web-jiajaifen-chat") ?? "web-jiajaifen-chat";
+        var webAppBotId = ResolveFamilyRewardWebAppBotId(config, request.Query.String("webAppBotId"));
         var agentId = await ResolveFamilyRewardAgentFreeAgentIdForBot(httpClientFactory, userName, webAppBotId, request.HttpContext.RequestAborted);
         if (agentId is null) return Results.Json(new JsonArray());
         var sessions = await SendAgentFreeJson(
@@ -1895,8 +1893,8 @@ app.MapGet("/api/agentfree/sessions/{id}", async (string id, IHttpClientFactory 
     try
     {
         var userName = GetUnifiedUsername(request);
-        var webAppBotId = request.Query.String("webAppBotId").Trim();
-        if (string.IsNullOrWhiteSpace(webAppBotId)) webAppBotId = "web-jiajaifen-chat";
+        var config = await configStore.LoadAsync();
+        var webAppBotId = ResolveFamilyRewardWebAppBotId(config, request.Query.String("webAppBotId"));
         var agentId = await ResolveFamilyRewardAgentFreeAgentIdForBot(httpClientFactory, userName, webAppBotId, request.HttpContext.RequestAborted);
         var session = await SendAgentFreeJson(
             httpClientFactory,
@@ -2007,8 +2005,8 @@ app.MapPost("/api/agentfree/sessions", async (JsonObject body, IHttpClientFactor
     try
     {
         var userName = GetUnifiedUsername(request);
-        var webAppBotId = body.String("webAppBotId").Trim();
-        if (string.IsNullOrWhiteSpace(webAppBotId)) webAppBotId = "web-jiajaifen-chat";
+        var config = await configStore.LoadAsync();
+        var webAppBotId = ResolveFamilyRewardWebAppBotId(config, body.String("webAppBotId"));
         var agentId = await ResolveFamilyRewardAgentFreeAgentIdForBot(httpClientFactory, userName, webAppBotId, request.HttpContext.RequestAborted);
         if (agentId is null)
         {
@@ -2130,8 +2128,8 @@ app.MapPost("/api/agentfree/chat/stream", async (JsonObject body, IHttpClientFac
     try
     {
         var userName = GetUnifiedUsername(context.Request);
-        var webAppBotId = body.String("webAppBotId").Trim();
-        if (string.IsNullOrWhiteSpace(webAppBotId)) webAppBotId = "web-jiajaifen-chat";
+        var config = await configStore.LoadAsync();
+        var webAppBotId = ResolveFamilyRewardWebAppBotId(config, body.String("webAppBotId"));
         var agentId = await ResolveFamilyRewardAgentFreeAgentIdForBot(httpClientFactory, userName, webAppBotId, context.RequestAborted);
         if (agentId is null)
         {
@@ -2317,7 +2315,15 @@ app.MapPost("/api/mcp", async (JsonObject body) =>
 
 app.Run();
 
-static OrbitWebAppClient CreateOrbitWebAppClient(IHttpClientFactory httpClientFactory, string webAppBotId = "web-jiajaifen-chat")
+static string ResolveFamilyRewardWebAppBotId(JsonObject config, string? requestedBotId)
+{
+    if (!string.IsNullOrWhiteSpace(requestedBotId)) return requestedBotId.Trim();
+    var configured = config["agent"]?.AsObject().String("webAppBotId");
+    if (string.IsNullOrWhiteSpace(configured)) throw new InvalidOperationException("未配置家庭积分 WEBAP 通道入口标识");
+    return configured.Trim();
+}
+
+static OrbitWebAppClient CreateOrbitWebAppClient(IHttpClientFactory httpClientFactory, string webAppBotId = "")
 {
     var client = httpClientFactory.CreateClient();
     client.Timeout = TimeSpan.FromMinutes(10);
