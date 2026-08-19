@@ -18,10 +18,12 @@ const apiAdapter: AgentFreeWebAppChatApiAdapter = {
   archiveSession: api.archiveSession,
   resetSessionContext: api.resetSessionContext,
   respondInteraction: api.respondInteraction,
-  // The family gateway currently supports its established queue/steer wire values.
-  streamChat: request => api.streamChat({
+  // A normal WebApp message must be sent without a queue mode.  Mapping every
+  // message to "queue" makes the Gateway legitimately emit a queue card for
+  // every single turn.  Preserve the explicit steer action only.
+  streamChat: ({ messageMode, ...request }) => api.streamChat({
     ...request,
-    messageMode: request.messageMode === 'steer' ? 'steer' : 'queue',
+    messageMode: messageMode === 'steer' ? 'steer' : undefined,
   }),
 }
 

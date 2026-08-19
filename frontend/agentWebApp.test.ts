@@ -20,6 +20,8 @@ test('mobile assistant reuses the complete AgentFree WebApp chat surface', async
   assert.match(page, /getSystemConfig\(\)/);
   assert.match(chat, /@agentfree\/webapp-chat/);
   assert.match(chat, /apiAdapter/);
+  assert.match(chat, /messageMode === 'steer' \? 'steer' : undefined/);
+  assert.doesNotMatch(chat, /messageMode: request\.messageMode === 'steer' \? 'steer' : 'queue'/);
   assert.match(cleanChat, /export \{ CleanChatView as default \} from '@agentfree\/webapp-chat'/);
   assert.doesNotMatch(cleanChat, /streamChat\(/);
   assert.match(api, /\/api\/agentfree\/chat\/stream/);
