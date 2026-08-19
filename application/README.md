@@ -5,31 +5,14 @@
 ## MCP 服务信息
 
 - 服务名称：`family-reward-mcp`
-- 服务说明：`家加分 MCP 服务（按工具拆分）`
+- 服务说明：`家加分 MCP：家庭是当前家长自己的成员和孩子；圈子是多个家庭协作查看孩子积分的空间`
 - MCP 接口地址：`https://happylife.ai.impx.net/api/mcp`
 - 支持方法：`initialize`、`initialized`、`notifications/initialized`、`ping`、`tools/list`、`tools/call`
-- 独立工具名（可直接用于 `tools/call`）：
-  - `family_reward_add_child`
-  - `family_reward_update_child`
-  - `family_reward_query_children`
-  - `family_reward_delete_child`
-  - `family_reward_adjust_score`
-  - `family_reward_query_score`
-  - `family_reward_log_score_record`
-  - `family_reward_create_record`
-  - `family_reward_update_record`
-  - `family_reward_delete_record`
-  - `family_reward_query_operation_records`
-  - `family_reward_query_rules`
-  - `family_reward_create_rule`
-  - `family_reward_update_rule`
-  - `family_reward_delete_rule`
-  - `family_reward_query_family_groups`
-  - `family_reward_create_family_group`
+- 独立工具：40 个，完整名称、描述和权限见 `docs/FAMILY-REWARD-MCP-TOOLS.md`。
 
 ## 可直接导入文件
 
-- `goldfish-tool-library.json`
+- `goldfish-tool-library.json`（40 个工具及完整 `inputSchema`）
 
 ## 建议接入方式
 

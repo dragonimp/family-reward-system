@@ -34,6 +34,28 @@ const string FamilyRewardMcpUpdateRuleToolName = "family_reward_update_rule";
 const string FamilyRewardMcpDeleteRuleToolName = "family_reward_delete_rule";
 const string FamilyRewardMcpQueryFamilyGroupsToolName = "family_reward_query_family_groups";
 const string FamilyRewardMcpCreateFamilyGroupToolName = "family_reward_create_family_group";
+const string FamilyRewardMcpUpdateFamilyGroupToolName = "family_reward_update_family_group";
+const string FamilyRewardMcpDeleteFamilyGroupToolName = "family_reward_delete_family_group";
+const string FamilyRewardMcpGetFamilyGroupInviteToolName = "family_reward_get_family_group_invite";
+const string FamilyRewardMcpJoinFamilyGroupToolName = "family_reward_join_family_group";
+const string FamilyRewardMcpRemoveFamilyGroupChildToolName = "family_reward_remove_family_group_child";
+const string FamilyRewardMcpQueryFamilyMembersToolName = "family_reward_query_family_members";
+const string FamilyRewardMcpCreateFamilyMemberToolName = "family_reward_create_family_member";
+const string FamilyRewardMcpUpdateFamilyMemberToolName = "family_reward_update_family_member";
+const string FamilyRewardMcpDeleteFamilyMemberToolName = "family_reward_delete_family_member";
+const string FamilyRewardMcpUpdateRuleTemplateToolName = "family_reward_update_rule_template";
+const string FamilyRewardMcpGenerateChildAuthCodeToolName = "family_reward_generate_child_auth_code";
+const string FamilyRewardMcpQueryChildDevicesToolName = "family_reward_query_child_devices";
+const string FamilyRewardMcpRevokeChildDeviceToolName = "family_reward_revoke_child_device";
+const string FamilyRewardMcpGenerateDeviceUnbindCodeToolName = "family_reward_generate_device_unbind_code";
+const string FamilyRewardMcpQueryChildFriendsToolName = "family_reward_query_child_friends";
+const string FamilyRewardMcpQueryFriendNotificationsToolName = "family_reward_query_friend_notifications";
+const string FamilyRewardMcpMarkFriendNotificationReadToolName = "family_reward_mark_friend_notification_read";
+const string FamilyRewardMcpQueryRewardRequestsToolName = "family_reward_query_reward_requests";
+const string FamilyRewardMcpApproveRewardRequestToolName = "family_reward_approve_reward_request";
+const string FamilyRewardMcpQueryCircleDashboardToolName = "family_reward_query_circle_dashboard";
+const string FamilyRewardMcpQueryCircleLeaderboardToolName = "family_reward_query_circle_leaderboard";
+const string FamilyRewardMcpQueryCircleCategoriesToolName = "family_reward_query_circle_categories";
 const string FamilyRewardMcpServiceName = "family-reward-mcp";
 const string DefaultFamilyGroupName = "WWXYhome";
 const string DefaultUserId = "local-admin";
@@ -92,7 +114,7 @@ await InitDatabase(connectionString);
 app.MapGet("/health", () => Results.Json(new
 {
     status = "ok",
-    version = "3.0.0",
+    version = "3.1.0",
     stack = "aspnet-core",
     db = "postgresql"
 }));
@@ -2671,9 +2693,9 @@ static object BuildMcpServiceDescriptor()
         service = new
         {
             name = FamilyRewardMcpServiceName,
-            version = "3.0.0",
-            title = "家加分 MCP 服务（能力拆分）",
-            description = "按能力提供独立工具：新增孩子、修改孩子、积分增减、积分查询、积分明细写入与查询。"
+            version = "3.1.0",
+            title = "家加分 MCP 业务工具服务",
+            description = "提供家庭成员、孩子、圈子、积分记录、规则、设备、好友、申请审批和圈子统计工具；家庭是当前家长自己的成员清单，圈子是多个家庭协作共享孩子积分的空间。"
         },
         endpoint = "/api/mcp",
         protocols = new[] { "initialize", "initialized", "notifications/initialized", "ping", "tools/list", "tools/call" },
@@ -2688,7 +2710,7 @@ static object BuildMcpToolCatalog()
             new
             {
                 name = FamilyRewardMcpAddChildToolName,
-                description = "新增孩子：创建孩子档案并可设置初始积分/现金/物品。",
+                description = "家庭管理/新增孩子：为当前家长创建全局孩子档案并建立所属关系，可设置初始积分、现金和物品。新孩子会同步进入该家长已创建或加入的圈子；family_group_id 只用于指定初始圈子且必须是当前家长可访问的圈子。",
                 inputSchema = new
                 {
                     type = "object",
@@ -2712,7 +2734,7 @@ static object BuildMcpToolCatalog()
             new
             {
                 name = FamilyRewardMcpUpdateChildToolName,
-                description = "修改孩子信息：按 id 或姓名定位后更新。至少更新一个字段。",
+                description = "家庭管理/修改孩子：仅允许修改当前家长名下孩子的姓名、备注、状态和账户余额；加入同一圈子的其他家庭只能查看，不能修改。按 child_id 或 child_name 定位，至少更新一个字段。",
                 inputSchema = new
                 {
                     type = "object",
@@ -2733,7 +2755,7 @@ static object BuildMcpToolCatalog()
             new
             {
                 name = FamilyRewardMcpQueryChildrenToolName,
-                description = "查询孩子列表：传 family_group_id 返回该圈子的全部孩子；也可继续传 child_id 或 child_name 定位单个孩子。若按某个孩子查询返回 ok:false/未找到，智能体必须再调用 family_reward_list_children（只传 family_group_id）取得完整孩子清单，并把用户输入与清单中的 ID/姓名逐一比较后再回复，避免别名、错别字或输入差异导致误判。",
+                description = "查询孩子：不传 family_group_id 时只返回当前家长名下孩子；传 family_group_id 时先校验当前家长已创建或加入该圈子，再返回圈子内全部孩子（包括其他家庭的孩子，只读）。可用 child_id 或 child_name 定位单个孩子。未命中时必须调用 family_reward_list_children 在相同范围内复核完整清单。",
                 inputSchema = new
                 {
                     type = "object",
@@ -2748,7 +2770,7 @@ static object BuildMcpToolCatalog()
             new
             {
                 name = FamilyRewardMcpListChildrenToolName,
-                description = "列出孩子清单：当用户说“查询孩子列表 / 列出孩子 / 有哪些孩子 / 全部孩子”时优先调用。传 family_group_id 返回该圈子全部 active 孩子；不传则返回全部 active 孩子。不要传 child_id 或 child_name。",
+                description = "列出孩子清单：不传 family_group_id 时只列出当前家长名下有效孩子；传入时仅在当前家长可访问的指定圈子中列出全部有效孩子。该工具是清单查询，不接受 child_id 或 child_name。",
                 inputSchema = new
                 {
                     type = "object",
@@ -2761,7 +2783,7 @@ static object BuildMcpToolCatalog()
             new
             {
                 name = FamilyRewardMcpDeleteChildToolName,
-                description = "删除孩子：按 id 或姓名定位后删除孩子及其账户/记录。",
+                description = "家庭管理/删除孩子所属关系：仅允许当前家长删除自己名下的孩子；不会因为圈子成员身份获得删除权。删除最后一个所属关系时才清理该孩子全局档案及相关数据。按 child_id 或 child_name 定位。",
                 inputSchema = new
                 {
                     type = "object",
@@ -2776,7 +2798,7 @@ static object BuildMcpToolCatalog()
             new
             {
                 name = FamilyRewardMcpAdjustScoreToolName,
-                description = "积分增减：按孩子 +/ - 积分（支持负数）",
+                description = "调整积分：仅允许给当前家长名下孩子加分或减分；即使可以在圈子中查看其他家庭孩子积分，也不能修改。delta 正数加分、负数减分。",
                 inputSchema = new
                 {
                     type = "object",
@@ -2797,7 +2819,7 @@ static object BuildMcpToolCatalog()
             new
             {
                 name = FamilyRewardMcpQueryScoreToolName,
-                description = "积分查询：不传 child_id/child_name 时返回孩子积分清单；传 family_group_id 时返回该圈子全部孩子的积分清单；传具体孩子时返回单个孩子积分，可选返回最近交易明细。若指定孩子返回未找到，必须再调用 family_reward_list_children（只传 family_group_id）获取完整孩子清单，比较用户输入与全部孩子 ID/姓名后再说明最可能的匹配或请用户确认。",
+                description = "查询积分余额：不传 family_group_id 时仅查询当前家长名下孩子；传 family_group_id 时先校验圈子成员身份，再查询该圈子全部孩子余额。圈子成员可以看余额，但只有孩子所属家长可以通过 include_transactions 查看该孩子明细。未命中时必须在相同范围调用 family_reward_list_children 复核。",
                 inputSchema = new
                 {
                     type = "object",
@@ -2816,7 +2838,7 @@ static object BuildMcpToolCatalog()
             new
             {
                 name = FamilyRewardMcpLogScoreOperationToolName,
-                description = "写入积分明细（加/减分记录），并同步更新账户积分。",
+                description = "写入积分明细并同步余额：仅允许操作当前家长名下孩子；圈子可见但不属于当前家长的孩子不可写。",
                 inputSchema = new
                 {
                     type = "object",
@@ -2838,7 +2860,7 @@ static object BuildMcpToolCatalog()
             new
             {
                 name = FamilyRewardMcpCreateRecordToolName,
-                description = "新增记录/交易：支持积分、现金、物品记录，并同步更新孩子账户。",
+                description = "新增账户记录：仅允许为当前家长名下孩子新增积分、现金或物品记录，并同步更新全局孩子账户。",
                 inputSchema = new
                 {
                     type = "object",
@@ -2863,7 +2885,7 @@ static object BuildMcpToolCatalog()
             new
             {
                 name = FamilyRewardMcpUpdateRecordToolName,
-                description = "修改记录/交易：按记录ID更新，并自动回滚旧记录影响后重新应用新记录。",
+                description = "修改账户记录：仅允许修改当前家长名下孩子的记录；按记录ID回滚旧影响后应用新记录，圈子成员身份不授予修改权。",
                 inputSchema = new
                 {
                     type = "object",
@@ -2889,7 +2911,7 @@ static object BuildMcpToolCatalog()
             new
             {
                 name = FamilyRewardMcpDeleteRecordToolName,
-                description = "删除记录/交易：按记录ID删除，并自动回滚该记录对孩子账户的影响。",
+                description = "删除账户记录：仅允许删除当前家长名下孩子的记录，并自动回滚该记录对账户的影响。",
                 inputSchema = new
                 {
                     type = "object",
@@ -2902,7 +2924,7 @@ static object BuildMcpToolCatalog()
             new
             {
                 name = FamilyRewardMcpQueryScoreOperationToolName,
-                description = "查询积分加减明细记录（交易日志），支持按孩子、日期、分类、分页筛选。若指定孩子返回未找到，必须再调用 family_reward_list_children（只传 family_group_id）获取完整孩子清单，比较用户输入与全部孩子 ID/姓名后再回复，不能直接说不存在。",
+                description = "查询积分明细：仅查询当前家长名下孩子的积分交易，不因加入圈子而开放其他家庭孩子的行为明细。支持按孩子、日期、分类和分页筛选；未命中时在当前家长名下孩子范围复核。",
                 inputSchema = new
                 {
                     type = "object",
@@ -2923,7 +2945,7 @@ static object BuildMcpToolCatalog()
             new
             {
                 name = FamilyRewardMcpQueryRulesToolName,
-                description = "查询指定家长生效的个人规则模板；未创建模板时返回公共规则。",
+                description = "查询规则：返回公共规则、当前家长自己的个人规则和当前生效模板。其他家长的个人规则不可见。",
                 inputSchema = new
                 {
                     type = "object",
@@ -2986,7 +3008,7 @@ static object BuildMcpToolCatalog()
             new
             {
                 name = FamilyRewardMcpQueryFamilyGroupsToolName,
-                description = "查询圈子列表。",
+                description = "圈子管理/查询圈子：只返回当前家长创建或已经加入的圈子，并标明 owner/member 角色。圈子是多个家庭协作查看孩子积分的空间，不等同于当前家长自己的家庭成员清单。",
                 inputSchema = new
                 {
                     type = "object",
@@ -2996,7 +3018,7 @@ static object BuildMcpToolCatalog()
             new
             {
                 name = FamilyRewardMcpCreateFamilyGroupToolName,
-                description = "新增圈子。",
+                description = "圈子管理/新增圈子：当前家长成为圈子管理员，并自动把自己名下有效孩子同步到新圈子。",
                 inputSchema = new
                 {
                     type = "object",
@@ -3006,6 +3028,318 @@ static object BuildMcpToolCatalog()
                         description = new { type = "string", description = "描述" }
                     },
                     required = new[] { "name" }
+                }
+            },
+            new
+            {
+                name = FamilyRewardMcpUpdateFamilyGroupToolName,
+                description = "圈子管理/修改圈子：仅圈子创建者或 owner 管理员可修改圈子名称和说明；普通圈子成员只能查看。",
+                inputSchema = new
+                {
+                    type = "object",
+                    properties = new
+                    {
+                        family_group_id = new { type = "integer", description = "圈子ID" },
+                        name = new { type = "string", description = "新的圈子名称" },
+                        description = new { type = "string", description = "新的圈子说明" }
+                    },
+                    required = new[] { "family_group_id", "name" }
+                }
+            },
+            new
+            {
+                name = FamilyRewardMcpDeleteFamilyGroupToolName,
+                description = "圈子管理/删除圈子：仅圈子创建者或 owner 管理员可删除。删除圈子不会删除孩子全局档案和所属家庭关系。",
+                inputSchema = new
+                {
+                    type = "object",
+                    properties = new
+                    {
+                        family_group_id = new { type = "integer", description = "圈子ID" }
+                    },
+                    required = new[] { "family_group_id" }
+                }
+            },
+            new
+            {
+                name = FamilyRewardMcpGetFamilyGroupInviteToolName,
+                description = "圈子管理/获取邀请码：仅圈子创建者或 owner 管理员可生成或查看 8 位圈子邀请码。",
+                inputSchema = new
+                {
+                    type = "object",
+                    properties = new
+                    {
+                        family_group_id = new { type = "integer", description = "圈子ID" }
+                    },
+                    required = new[] { "family_group_id" }
+                }
+            },
+            new
+            {
+                name = FamilyRewardMcpJoinFamilyGroupToolName,
+                description = "圈子管理/加入圈子：当前家长使用 8 位邀请码加入圈子，并自动把自己名下有效孩子同步到该圈子。",
+                inputSchema = new
+                {
+                    type = "object",
+                    properties = new
+                    {
+                        invite_code = new { type = "string", description = "8 位数字圈子邀请码" }
+                    },
+                    required = new[] { "invite_code" }
+                }
+            },
+            new
+            {
+                name = FamilyRewardMcpRemoveFamilyGroupChildToolName,
+                description = "圈子管理/移除孩子：仅圈子创建者或 owner 管理员可把孩子从该圈子移除；不会删除孩子的家庭所属关系或全局积分账户。",
+                inputSchema = new
+                {
+                    type = "object",
+                    properties = new
+                    {
+                        family_group_id = new { type = "integer", description = "圈子ID" },
+                        child_id = new { type = "integer", description = "该圈子中的孩子ID" }
+                    },
+                    required = new[] { "family_group_id", "child_id" }
+                }
+            },
+            new
+            {
+                name = FamilyRewardMcpQueryFamilyMembersToolName,
+                description = "家庭管理/查询家庭成员：只返回当前家长自己的家庭成员清单，包括当前用户以及爸爸、妈妈、爷爷、奶奶等成员；家庭成员不随圈子切换而改变。",
+                inputSchema = new { type = "object", properties = new { } }
+            },
+            new
+            {
+                name = FamilyRewardMcpCreateFamilyMemberToolName,
+                description = "家庭管理/新增家庭成员：只在当前家长自己的家庭清单中新增成员，不会把该成员加入任何圈子。",
+                inputSchema = new
+                {
+                    type = "object",
+                    properties = new
+                    {
+                        display_name = new { type = "string", description = "家庭成员姓名，最多 50 个字符" },
+                        role = new { type = "string", @enum = new[] { "father", "mother", "grandfather", "grandmother", "maternal_grandfather", "maternal_grandmother", "guardian", "other" }, description = "家庭角色" },
+                        note = new { type = "string", description = "备注" }
+                    },
+                    required = new[] { "display_name", "role" }
+                }
+            },
+            new
+            {
+                name = FamilyRewardMcpUpdateFamilyMemberToolName,
+                description = "家庭管理/修改家庭成员：仅允许修改当前家长自己的家庭成员；可修改当前用户角色，但不能改变成员所属家庭。",
+                inputSchema = new
+                {
+                    type = "object",
+                    properties = new
+                    {
+                        member_id = new { type = "integer", description = "家庭成员ID" },
+                        display_name = new { type = "string", description = "家庭成员姓名，最多 50 个字符" },
+                        role = new { type = "string", @enum = new[] { "father", "mother", "grandfather", "grandmother", "maternal_grandfather", "maternal_grandmother", "guardian", "other" }, description = "家庭角色" },
+                        note = new { type = "string", description = "备注" }
+                    },
+                    required = new[] { "member_id", "display_name", "role" }
+                }
+            },
+            new
+            {
+                name = FamilyRewardMcpDeleteFamilyMemberToolName,
+                description = "家庭管理/删除家庭成员：仅允许删除当前家长自己的非当前用户成员；当前用户不能从自己的家庭清单删除。",
+                inputSchema = new
+                {
+                    type = "object",
+                    properties = new
+                    {
+                        member_id = new { type = "integer", description = "家庭成员ID" }
+                    },
+                    required = new[] { "member_id" }
+                }
+            },
+            new
+            {
+                name = FamilyRewardMcpUpdateRuleTemplateToolName,
+                description = "规则管理/更新规则模板：为当前家长保存有序规则ID清单；只能选择公共规则或当前家长自己的个人规则，顺序用于手表端展示。",
+                inputSchema = new
+                {
+                    type = "object",
+                    properties = new
+                    {
+                        rule_ids = new { type = "array", items = new { type = "integer" }, description = "按展示顺序排列的规则ID数组，可为空数组" }
+                    },
+                    required = new[] { "rule_ids" }
+                }
+            },
+            new
+            {
+                name = FamilyRewardMcpGenerateChildAuthCodeToolName,
+                description = "家庭管理/生成儿童认证码：仅孩子所属家长可为自己名下孩子生成手表绑定认证码。",
+                inputSchema = new
+                {
+                    type = "object",
+                    properties = new
+                    {
+                        child_id = new { type = "integer", description = "孩子ID" },
+                        child_name = new { type = "string", description = "孩子姓名（与 child_id 二选一）" },
+                        family_group_id = new { type = "integer", description = "孩子所在圈子ID，可选" },
+                        expires_in_minutes = new { type = "integer", description = "有效分钟数，10 到 1440，默认 1440" }
+                    }
+                }
+            },
+            new
+            {
+                name = FamilyRewardMcpQueryChildDevicesToolName,
+                description = "家庭管理/查询孩子手表设备：仅孩子所属家长可查看自己名下孩子的设备绑定。",
+                inputSchema = new
+                {
+                    type = "object",
+                    properties = new
+                    {
+                        child_id = new { type = "integer", description = "孩子ID" },
+                        child_name = new { type = "string", description = "孩子姓名（与 child_id 二选一）" },
+                        family_group_id = new { type = "integer", description = "孩子所在圈子ID，可选" }
+                    }
+                }
+            },
+            new
+            {
+                name = FamilyRewardMcpRevokeChildDeviceToolName,
+                description = "家庭管理/解绑孩子手表：仅孩子所属家长可撤销自己名下孩子的指定设备绑定。",
+                inputSchema = new
+                {
+                    type = "object",
+                    properties = new
+                    {
+                        child_id = new { type = "integer", description = "孩子ID" },
+                        child_name = new { type = "string", description = "孩子姓名（与 child_id 二选一）" },
+                        family_group_id = new { type = "integer", description = "孩子所在圈子ID，可选" },
+                        device_id = new { type = "integer", description = "设备绑定ID" }
+                    },
+                    required = new[] { "device_id" }
+                }
+            },
+            new
+            {
+                name = FamilyRewardMcpGenerateDeviceUnbindCodeToolName,
+                description = "家庭管理/生成设备解绑码：仅孩子所属家长可为自己名下孩子的指定设备生成短期解绑码。",
+                inputSchema = new
+                {
+                    type = "object",
+                    properties = new
+                    {
+                        child_id = new { type = "integer", description = "孩子ID" },
+                        child_name = new { type = "string", description = "孩子姓名（与 child_id 二选一）" },
+                        family_group_id = new { type = "integer", description = "孩子所在圈子ID，可选" },
+                        device_id = new { type = "integer", description = "设备绑定ID" },
+                        expires_in_minutes = new { type = "integer", description = "有效分钟数，5 到 30，默认 10" }
+                    },
+                    required = new[] { "device_id" }
+                }
+            },
+            new
+            {
+                name = FamilyRewardMcpQueryChildFriendsToolName,
+                description = "家庭管理/查询孩子好友：仅孩子所属家长可查看自己名下孩子的好友列表和好友积分榜。",
+                inputSchema = new
+                {
+                    type = "object",
+                    properties = new
+                    {
+                        child_id = new { type = "integer", description = "孩子ID" },
+                        child_name = new { type = "string", description = "孩子姓名（与 child_id 二选一）" },
+                        family_group_id = new { type = "integer", description = "孩子所在圈子ID，可选" }
+                    }
+                }
+            },
+            new
+            {
+                name = FamilyRewardMcpQueryFriendNotificationsToolName,
+                description = "家庭管理/查询好友通知：只返回当前家长名下孩子收到的好友关系通知。",
+                inputSchema = new
+                {
+                    type = "object",
+                    properties = new
+                    {
+                        unread_only = new { type = "boolean", description = "是否只返回未读通知，默认 false" }
+                    }
+                }
+            },
+            new
+            {
+                name = FamilyRewardMcpMarkFriendNotificationReadToolName,
+                description = "家庭管理/标记好友通知已读：仅允许处理当前家长名下孩子的通知。",
+                inputSchema = new
+                {
+                    type = "object",
+                    properties = new
+                    {
+                        notification_id = new { type = "integer", description = "好友通知ID" }
+                    },
+                    required = new[] { "notification_id" }
+                }
+            },
+            new
+            {
+                name = FamilyRewardMcpQueryRewardRequestsToolName,
+                description = "积分申请/查询待确认申请：只返回当前家长名下孩子在当前家长可访问圈子中提交的申请；可按圈子和状态筛选。",
+                inputSchema = new
+                {
+                    type = "object",
+                    properties = new
+                    {
+                        family_group_id = new { type = "integer", description = "圈子ID，可选；传入时必须是当前家长可访问圈子" },
+                        status = new { type = "string", description = "申请状态，可选，例如 pending、completed" },
+                        limit = new { type = "integer", description = "返回数量，默认 100，最大 200" }
+                    }
+                }
+            },
+            new
+            {
+                name = FamilyRewardMcpApproveRewardRequestToolName,
+                description = "积分申请/确认领取：仅孩子所属家长可确认自己名下孩子的待处理申请，并生成积分流水。",
+                inputSchema = new
+                {
+                    type = "object",
+                    properties = new
+                    {
+                        request_id = new { type = "integer", description = "积分申请ID" },
+                        family_group_id = new { type = "integer", description = "申请所在圈子ID，可选" },
+                        review_note = new { type = "string", description = "家长确认备注" }
+                    },
+                    required = new[] { "request_id" }
+                }
+            },
+            new
+            {
+                name = FamilyRewardMcpQueryCircleDashboardToolName,
+                description = "圈子统计/查询总览：仅圈子成员可查看指定圈子的孩子余额和最近记录汇总。",
+                inputSchema = new
+                {
+                    type = "object",
+                    properties = new { family_group_id = new { type = "integer", description = "圈子ID" } },
+                    required = new[] { "family_group_id" }
+                }
+            },
+            new
+            {
+                name = FamilyRewardMcpQueryCircleLeaderboardToolName,
+                description = "圈子统计/查询积分榜：仅圈子成员可查看指定圈子孩子的积分排名。",
+                inputSchema = new
+                {
+                    type = "object",
+                    properties = new { family_group_id = new { type = "integer", description = "圈子ID" } },
+                    required = new[] { "family_group_id" }
+                }
+            },
+            new
+            {
+                name = FamilyRewardMcpQueryCircleCategoriesToolName,
+                description = "圈子统计/查询分类汇总：仅圈子成员可查看指定圈子的积分记录分类汇总。",
+                inputSchema = new
+                {
+                    type = "object",
+                    properties = new { family_group_id = new { type = "integer", description = "圈子ID" } },
+                    required = new[] { "family_group_id" }
                 }
             }
     };
@@ -3023,7 +3357,7 @@ static object BuildMcpToolCatalog()
         properties["parent_user_id"] = new JsonObject
         {
             ["type"] = "string",
-            ["description"] = "家长用户名或家长应用用户编号（必填），用于数据范围和操作权限校验"
+            ["description"] = "当前操作家长的统一用户名或家长应用用户编号（必填）。服务端据此计算本人家庭、孩子所属关系和圈子成员权限，不能用它指定或冒充被操作对象。"
         };
         var required = schema["required"] as JsonArray ?? [];
         if (!required.Any(item => string.Equals(item?.GetValue<string>(), "parent_user_id", StringComparison.Ordinal)))
@@ -3031,7 +3365,7 @@ static object BuildMcpToolCatalog()
             required.Insert(0, "parent_user_id");
         }
         schema["required"] = required;
-        tool["description"] = $"{tool.String("description")} 必须传 parent_user_id；查询按该家长的可见范围返回，写操作仅允许处理该家长自己的孩子、记录或规则，越权返回权限不足。";
+        tool["description"] = $"{tool.String("description")} 所有调用必须传 parent_user_id，服务端会执行真实数据权限校验，越权返回权限不足。";
     }
 
     return new { tools = toolNodes };
@@ -3054,8 +3388,30 @@ static bool IsKnownMcpTool(string toolName) => toolName is
     FamilyRewardMcpCreateRuleToolName or
     FamilyRewardMcpUpdateRuleToolName or
     FamilyRewardMcpDeleteRuleToolName or
+    FamilyRewardMcpUpdateRuleTemplateToolName or
     FamilyRewardMcpQueryFamilyGroupsToolName or
-    FamilyRewardMcpCreateFamilyGroupToolName;
+    FamilyRewardMcpCreateFamilyGroupToolName or
+    FamilyRewardMcpUpdateFamilyGroupToolName or
+    FamilyRewardMcpDeleteFamilyGroupToolName or
+    FamilyRewardMcpGetFamilyGroupInviteToolName or
+    FamilyRewardMcpJoinFamilyGroupToolName or
+    FamilyRewardMcpRemoveFamilyGroupChildToolName or
+    FamilyRewardMcpQueryFamilyMembersToolName or
+    FamilyRewardMcpCreateFamilyMemberToolName or
+    FamilyRewardMcpUpdateFamilyMemberToolName or
+    FamilyRewardMcpDeleteFamilyMemberToolName or
+    FamilyRewardMcpGenerateChildAuthCodeToolName or
+    FamilyRewardMcpQueryChildDevicesToolName or
+    FamilyRewardMcpRevokeChildDeviceToolName or
+    FamilyRewardMcpGenerateDeviceUnbindCodeToolName or
+    FamilyRewardMcpQueryChildFriendsToolName or
+    FamilyRewardMcpQueryFriendNotificationsToolName or
+    FamilyRewardMcpMarkFriendNotificationReadToolName or
+    FamilyRewardMcpQueryRewardRequestsToolName or
+    FamilyRewardMcpApproveRewardRequestToolName or
+    FamilyRewardMcpQueryCircleDashboardToolName or
+    FamilyRewardMcpQueryCircleLeaderboardToolName or
+    FamilyRewardMcpQueryCircleCategoriesToolName;
 
 static object BuildMcpRpcResponse(JsonNode? id, object? result = null, string? error = null, int code = -32602)
 {
@@ -3181,6 +3537,11 @@ static string BuildMcpReadableText(object toolResult)
                 parts.Add("明细：" + string.Join("；", itemLines));
             }
         }
+    }
+
+    if (parts.Count == 1)
+    {
+        parts.Add($"结果 {node.ToJsonString(FamilyRewardJson.CreateOptions())}");
     }
 
     return string.Join("，", parts);
@@ -3320,12 +3681,82 @@ static HashSet<string> GetAllowedMcpArguments(string toolName) => toolName switc
     {
         "rule_id"
     },
+    FamilyRewardMcpUpdateRuleTemplateToolName => new(StringComparer.Ordinal)
+    {
+        "rule_ids"
+    },
     FamilyRewardMcpQueryFamilyGroupsToolName => new(StringComparer.Ordinal)
     {
     },
     FamilyRewardMcpCreateFamilyGroupToolName => new(StringComparer.Ordinal)
     {
         "name", "description"
+    },
+    FamilyRewardMcpUpdateFamilyGroupToolName => new(StringComparer.Ordinal)
+    {
+        "family_group_id", "name", "description"
+    },
+    FamilyRewardMcpDeleteFamilyGroupToolName or
+    FamilyRewardMcpGetFamilyGroupInviteToolName or
+    FamilyRewardMcpQueryCircleDashboardToolName or
+    FamilyRewardMcpQueryCircleLeaderboardToolName or
+    FamilyRewardMcpQueryCircleCategoriesToolName => new(StringComparer.Ordinal)
+    {
+        "family_group_id"
+    },
+    FamilyRewardMcpJoinFamilyGroupToolName => new(StringComparer.Ordinal)
+    {
+        "invite_code"
+    },
+    FamilyRewardMcpRemoveFamilyGroupChildToolName => new(StringComparer.Ordinal)
+    {
+        "family_group_id", "child_id"
+    },
+    FamilyRewardMcpQueryFamilyMembersToolName => new(StringComparer.Ordinal),
+    FamilyRewardMcpCreateFamilyMemberToolName => new(StringComparer.Ordinal)
+    {
+        "display_name", "role", "note"
+    },
+    FamilyRewardMcpUpdateFamilyMemberToolName => new(StringComparer.Ordinal)
+    {
+        "member_id", "display_name", "role", "note"
+    },
+    FamilyRewardMcpDeleteFamilyMemberToolName => new(StringComparer.Ordinal)
+    {
+        "member_id"
+    },
+    FamilyRewardMcpGenerateChildAuthCodeToolName => new(StringComparer.Ordinal)
+    {
+        "family_group_id", "child_id", "child_name", "expires_in_minutes"
+    },
+    FamilyRewardMcpQueryChildDevicesToolName or
+    FamilyRewardMcpQueryChildFriendsToolName => new(StringComparer.Ordinal)
+    {
+        "family_group_id", "child_id", "child_name"
+    },
+    FamilyRewardMcpRevokeChildDeviceToolName => new(StringComparer.Ordinal)
+    {
+        "family_group_id", "child_id", "child_name", "device_id"
+    },
+    FamilyRewardMcpGenerateDeviceUnbindCodeToolName => new(StringComparer.Ordinal)
+    {
+        "family_group_id", "child_id", "child_name", "device_id", "expires_in_minutes"
+    },
+    FamilyRewardMcpQueryFriendNotificationsToolName => new(StringComparer.Ordinal)
+    {
+        "unread_only"
+    },
+    FamilyRewardMcpMarkFriendNotificationReadToolName => new(StringComparer.Ordinal)
+    {
+        "notification_id"
+    },
+    FamilyRewardMcpQueryRewardRequestsToolName => new(StringComparer.Ordinal)
+    {
+        "family_group_id", "status", "limit"
+    },
+    FamilyRewardMcpApproveRewardRequestToolName => new(StringComparer.Ordinal)
+    {
+        "request_id", "family_group_id", "review_note"
     },
     _ => new(StringComparer.Ordinal)
 };
@@ -3350,8 +3781,30 @@ static async Task<object> InvokeFamilyRewardMcpTool(string toolName, JsonObject 
         FamilyRewardMcpCreateRuleToolName => await McpCreateRule(connectionString, arguments),
         FamilyRewardMcpUpdateRuleToolName => await McpUpdateRule(connectionString, arguments),
         FamilyRewardMcpDeleteRuleToolName => await McpDeleteRule(connectionString, arguments),
+        FamilyRewardMcpUpdateRuleTemplateToolName => await McpUpdateRuleTemplate(connectionString, arguments),
         FamilyRewardMcpQueryFamilyGroupsToolName => await McpQueryFamilyGroups(connectionString, arguments),
         FamilyRewardMcpCreateFamilyGroupToolName => await McpCreateFamilyGroup(connectionString, arguments),
+        FamilyRewardMcpUpdateFamilyGroupToolName => await McpUpdateFamilyGroup(connectionString, arguments),
+        FamilyRewardMcpDeleteFamilyGroupToolName => await McpDeleteFamilyGroup(connectionString, arguments),
+        FamilyRewardMcpGetFamilyGroupInviteToolName => await McpGetFamilyGroupInvite(connectionString, arguments),
+        FamilyRewardMcpJoinFamilyGroupToolName => await McpJoinFamilyGroup(connectionString, arguments),
+        FamilyRewardMcpRemoveFamilyGroupChildToolName => await McpRemoveFamilyGroupChild(connectionString, arguments),
+        FamilyRewardMcpQueryFamilyMembersToolName => await McpQueryFamilyMembers(connectionString, arguments),
+        FamilyRewardMcpCreateFamilyMemberToolName => await McpCreateFamilyMember(connectionString, arguments),
+        FamilyRewardMcpUpdateFamilyMemberToolName => await McpUpdateFamilyMember(connectionString, arguments),
+        FamilyRewardMcpDeleteFamilyMemberToolName => await McpDeleteFamilyMember(connectionString, arguments),
+        FamilyRewardMcpGenerateChildAuthCodeToolName => await McpGenerateChildAuthCode(connectionString, arguments),
+        FamilyRewardMcpQueryChildDevicesToolName => await McpQueryChildDevices(connectionString, arguments),
+        FamilyRewardMcpRevokeChildDeviceToolName => await McpRevokeChildDevice(connectionString, arguments),
+        FamilyRewardMcpGenerateDeviceUnbindCodeToolName => await McpGenerateDeviceUnbindCode(connectionString, arguments),
+        FamilyRewardMcpQueryChildFriendsToolName => await McpQueryChildFriends(connectionString, arguments),
+        FamilyRewardMcpQueryFriendNotificationsToolName => await McpQueryFriendNotifications(connectionString, arguments),
+        FamilyRewardMcpMarkFriendNotificationReadToolName => await McpMarkFriendNotificationRead(connectionString, arguments),
+        FamilyRewardMcpQueryRewardRequestsToolName => await McpQueryRewardRequests(connectionString, arguments),
+        FamilyRewardMcpApproveRewardRequestToolName => await McpApproveRewardRequest(connectionString, arguments),
+        FamilyRewardMcpQueryCircleDashboardToolName => await McpQueryCircleDashboard(connectionString, arguments),
+        FamilyRewardMcpQueryCircleLeaderboardToolName => await McpQueryCircleLeaderboard(connectionString, arguments),
+        FamilyRewardMcpQueryCircleCategoriesToolName => await McpQueryCircleCategories(connectionString, arguments),
         _ => new { ok = false, error = $"Tool '{toolName}' 不存在" }
     };
 }
@@ -3524,28 +3977,43 @@ static async Task<object> McpUpdateChild(string connectionString, JsonObject arg
     await using var tx = await conn.BeginTransactionAsync();
     try
     {
+        var profileKey = Convert.ToString(target["profileKey"], CultureInfo.InvariantCulture)
+            ?? Convert.ToString(target["profile_key"], CultureInfo.InvariantCulture)
+            ?? "";
+        await using (var profileCmd = new NpgsqlCommand("""
+            UPDATE child_profiles
+            SET name = COALESCE(@name, name),
+                note = COALESCE(@note, note),
+                status = COALESCE(@status, status),
+                updated_at = CURRENT_TIMESTAMP
+            WHERE profile_key = @profile_key
+            """, conn, tx))
+        {
+            profileCmd.Parameters.AddWithValue("profile_key", profileKey);
+            profileCmd.Parameters.AddWithValue("name", hasName ? name : DBNull.Value);
+            profileCmd.Parameters.AddWithValue("note", hasNote ? arguments["note"]!.ToString() : DBNull.Value);
+            profileCmd.Parameters.AddWithValue("status", hasStatus ? arguments.String("status") : DBNull.Value);
+            if (await profileCmd.ExecuteNonQueryAsync() == 0)
+            {
+                await tx.RollbackAsync();
+                return new { ok = false, error = "孩子不存在" };
+            }
+        }
+
         await using (var cmd = new NpgsqlCommand("""
             UPDATE children
             SET name = COALESCE(@name, name),
                 note = COALESCE(@note, note),
                 status = COALESCE(@status, status),
                 updated_at = CURRENT_TIMESTAMP
-            WHERE id = @id
-            RETURNING id, name, status, note, profile_key, created_at, updated_at
+            WHERE profile_key = @profile_key
             """, conn, tx))
         {
-            cmd.Parameters.AddWithValue("id", childId);
+            cmd.Parameters.AddWithValue("profile_key", profileKey);
             cmd.Parameters.AddWithValue("name", hasName ? name : DBNull.Value);
             cmd.Parameters.AddWithValue("note", hasNote ? arguments["note"]!.ToString() : DBNull.Value);
             cmd.Parameters.AddWithValue("status", hasStatus ? arguments.String("status") : DBNull.Value);
-
-            await using var reader = await cmd.ExecuteReaderAsync();
-            if (!await reader.ReadAsync())
-            {
-                await tx.RollbackAsync();
-                return new { ok = false, error = "孩子不存在" };
-            }
-            await reader.CloseAsync();
+            await cmd.ExecuteNonQueryAsync();
         }
 
         await using (var accountCmd = new NpgsqlCommand("""
@@ -3634,11 +4102,16 @@ static async Task<object> McpQueryScore(string connectionString, JsonObject argu
         };
     }
 
-    var records = (await GetRecentTransactions(connectionString, Math.Clamp(limit, 1, 200)))
-        .Where(tx => GetInt(tx, "child_id") == GetInt(target, "id"))
-        .Where(tx => string.IsNullOrWhiteSpace(startDate) || string.Compare(Convert.ToString(tx["date"], CultureInfo.InvariantCulture), startDate, StringComparison.Ordinal) >= 0)
-        .Where(tx => string.IsNullOrWhiteSpace(endDate) || string.Compare(Convert.ToString(tx["date"], CultureInfo.InvariantCulture), endDate, StringComparison.Ordinal) <= 0)
-        .ToList();
+    var profileKey = Convert.ToString(target["profileKey"], CultureInfo.InvariantCulture)
+        ?? Convert.ToString(target["profile_key"], CultureInfo.InvariantCulture)
+        ?? "";
+    if (includeTransactions && !await IsMcpChildOwnedByParent(connectionString, profileKey, parentAppUserId))
+    {
+        return new { ok = false, error = "圈子成员只能查看其他家庭孩子的积分余额；积分明细仅孩子所属家长可查" };
+    }
+    var records = includeTransactions
+        ? await GetMcpOwnedChildTransactions(connectionString, profileKey, parentAppUserId, Math.Clamp(limit, 1, 200), startDate, endDate)
+        : [];
     return new
     {
         ok = true,
@@ -3651,6 +4124,12 @@ static async Task<object> McpQueryScore(string connectionString, JsonObject argu
 
 static async Task<object> McpQueryScoreOperations(string connectionString, JsonObject arguments)
 {
+    var requestedFamilyGroupId = arguments.Int("family_group_id");
+    if (requestedFamilyGroupId is not null &&
+        !await IsMcpFamilyAccessible(connectionString, requestedFamilyGroupId.Value, ResolveMcpParentAppUserId(arguments)!))
+    {
+        return new { ok = false, error = "圈子不存在或当前家长无权访问" };
+    }
     var children = await GetMcpChildren(connectionString, arguments);
     var target = ResolveChildByReference(children, arguments);
     if (HasChildReference(arguments) && target is null)
@@ -3817,9 +4296,16 @@ static async Task<object> McpDeleteRecord(string connectionString, JsonObject ar
 
 static async Task<object> McpQueryChildren(string connectionString, JsonObject? arguments = null)
 {
-    var children = await GetMcpChildren(connectionString, arguments);
-    var target = arguments is null ? null : ResolveChildByReference(children, arguments);
     var familyGroupId = arguments?.Int("family_group_id");
+    if (arguments is not null && familyGroupId is not null &&
+        !await IsMcpFamilyAccessible(connectionString, familyGroupId.Value, ResolveMcpParentAppUserId(arguments)!))
+    {
+        return new { ok = false, error = "圈子不存在或当前家长无权访问" };
+    }
+    var children = arguments is null
+        ? await GetMcpChildren(connectionString, arguments)
+        : await GetMcpVisibleFamilyChildren(connectionString, arguments);
+    var target = arguments is null ? null : ResolveChildByReference(children, arguments);
     var hasChildReference = HasChildReference(arguments);
     if (hasChildReference && target is null)
     {
@@ -3944,6 +4430,412 @@ static async Task<object> McpCreateFamilyGroup(string connectionString, JsonObje
         : new { ok = false, error = result.Error };
 }
 
+static async Task<object> McpUpdateFamilyGroup(string connectionString, JsonObject arguments)
+{
+    var familyGroupId = arguments.Int("family_group_id");
+    if (familyGroupId is null) return new { ok = false, error = "缺少圈子ID family_group_id" };
+
+    var result = await UpdateFamilyGroup(
+        connectionString,
+        familyGroupId.Value,
+        arguments.String("name"),
+        ResolveMcpParentAppUserId(arguments)!,
+        arguments.String("description"));
+    return result.Success
+        ? new { ok = true, action = "update_family_group", familyGroup = result.Group }
+        : new { ok = false, error = result.Error };
+}
+
+static async Task<object> McpDeleteFamilyGroup(string connectionString, JsonObject arguments)
+{
+    var familyGroupId = arguments.Int("family_group_id");
+    if (familyGroupId is null) return new { ok = false, error = "缺少圈子ID family_group_id" };
+
+    var result = await DeleteFamilyGroup(connectionString, familyGroupId.Value, ResolveMcpParentAppUserId(arguments)!);
+    return result.Success
+        ? new
+        {
+            ok = true,
+            action = "delete_family_group",
+            family_group_id = familyGroupId,
+            family_group_name = result.FamilyGroupName,
+            removed_children = result.RemovedChildren
+        }
+        : new { ok = false, error = result.Error };
+}
+
+static async Task<object> McpGetFamilyGroupInvite(string connectionString, JsonObject arguments)
+{
+    var familyGroupId = arguments.Int("family_group_id");
+    if (familyGroupId is null) return new { ok = false, error = "缺少圈子ID family_group_id" };
+
+    var result = await GetOrCreateFamilyGroupInvite(connectionString, familyGroupId.Value, ResolveMcpParentAppUserId(arguments)!);
+    return result.Success
+        ? new
+        {
+            ok = true,
+            action = "get_family_group_invite",
+            family_group_id = familyGroupId,
+            family_group_name = result.FamilyGroupName,
+            invite_code = result.InviteCode
+        }
+        : new { ok = false, error = result.Error };
+}
+
+static async Task<object> McpJoinFamilyGroup(string connectionString, JsonObject arguments)
+{
+    var inviteCode = NormalizeFamilyGroupInviteCode(arguments.String("invite_code"));
+    if (inviteCode.Length != 8 || inviteCode.Any(ch => !char.IsAsciiDigit(ch)))
+    {
+        return new { ok = false, error = "invite_code 必须是 8 位数字圈子邀请码" };
+    }
+
+    var result = await JoinFamilyGroupByInviteCode(connectionString, inviteCode, ResolveMcpParentAppUserId(arguments)!);
+    return result.Success
+        ? new
+        {
+            ok = true,
+            action = "join_family_group",
+            family_group_id = result.FamilyGroupId,
+            family_group_name = result.FamilyGroupName,
+            linked_child_count = result.LinkedChildCount
+        }
+        : new { ok = false, error = result.Error };
+}
+
+static async Task<object> McpRemoveFamilyGroupChild(string connectionString, JsonObject arguments)
+{
+    var familyGroupId = arguments.Int("family_group_id");
+    var childId = arguments.Int("child_id");
+    if (familyGroupId is null || childId is null)
+    {
+        return new { ok = false, error = "缺少圈子ID family_group_id 或孩子ID child_id" };
+    }
+
+    var result = await RemoveChildFromFamilyGroup(
+        connectionString,
+        familyGroupId.Value,
+        childId.Value,
+        ResolveMcpParentAppUserId(arguments)!);
+    return result.Success
+        ? new { ok = true, action = "remove_family_group_child", family_group_id = familyGroupId, child_id = childId }
+        : new { ok = false, error = result.Error };
+}
+
+static async Task EnsureMcpCurrentFamilyMember(NpgsqlConnection conn, string parentAppUserId)
+{
+    var displayName = parentAppUserId;
+    await using (var profileCmd = new NpgsqlCommand("SELECT COALESCE(NULLIF(username, ''), app_user_id) FROM app_user_profiles WHERE app_user_id = @app_user_id AND role = 'parent' ORDER BY id LIMIT 1", conn))
+    {
+        profileCmd.Parameters.AddWithValue("app_user_id", parentAppUserId);
+        var value = await profileCmd.ExecuteScalarAsync();
+        if (value is not null && value is not DBNull)
+        {
+            displayName = Convert.ToString(value, CultureInfo.InvariantCulture) ?? parentAppUserId;
+        }
+    }
+
+    await using var cmd = new NpgsqlCommand("""
+        INSERT INTO household_members (owner_parent_app_user_id, display_name, role, is_current_user)
+        VALUES (@owner_parent_app_user_id, @display_name, 'guardian', TRUE)
+        ON CONFLICT DO NOTHING
+        """, conn);
+    cmd.Parameters.AddWithValue("owner_parent_app_user_id", parentAppUserId);
+    cmd.Parameters.AddWithValue("display_name", displayName);
+    await cmd.ExecuteNonQueryAsync();
+}
+
+static async Task<object> McpQueryFamilyMembers(string connectionString, JsonObject arguments)
+{
+    var parentAppUserId = ResolveMcpParentAppUserId(arguments)!;
+    await using var conn = await OpenConnection(connectionString);
+    await EnsureMcpCurrentFamilyMember(conn, parentAppUserId);
+    var members = await GetHouseholdMembers(conn, parentAppUserId);
+    return new { ok = true, action = "query_family_members", count = members.Count, familyMembers = members };
+}
+
+static async Task<object> McpCreateFamilyMember(string connectionString, JsonObject arguments)
+{
+    var displayName = arguments.String("display_name").Trim();
+    var role = NormalizeHouseholdRole(arguments.String("role"));
+    if (string.IsNullOrWhiteSpace(displayName)) return new { ok = false, error = "家庭成员姓名不能为空" };
+    if (displayName.Length > 50) return new { ok = false, error = "家庭成员姓名不能超过 50 个字符" };
+    if (string.IsNullOrWhiteSpace(role)) return new { ok = false, error = "家庭角色无效" };
+
+    await using var conn = await OpenConnection(connectionString);
+    await using var cmd = new NpgsqlCommand("""
+        INSERT INTO household_members (owner_parent_app_user_id, display_name, role, note, is_current_user)
+        VALUES (@owner_parent_app_user_id, @display_name, @role, @note, FALSE)
+        RETURNING id, display_name, role, note, is_current_user, created_at, updated_at
+        """, conn);
+    cmd.Parameters.AddWithValue("owner_parent_app_user_id", ResolveMcpParentAppUserId(arguments)!);
+    cmd.Parameters.AddWithValue("display_name", displayName);
+    cmd.Parameters.AddWithValue("role", role);
+    cmd.Parameters.AddWithValue("note", string.IsNullOrWhiteSpace(arguments.String("note")) ? DBNull.Value : arguments.String("note").Trim());
+    await using var reader = await cmd.ExecuteReaderAsync();
+    await reader.ReadAsync();
+    return new { ok = true, action = "create_family_member", familyMember = ReadHouseholdMember(reader) };
+}
+
+static async Task<object> McpUpdateFamilyMember(string connectionString, JsonObject arguments)
+{
+    var memberId = arguments.Int("member_id");
+    var displayName = arguments.String("display_name").Trim();
+    var role = NormalizeHouseholdRole(arguments.String("role"));
+    if (memberId is null) return new { ok = false, error = "缺少家庭成员ID member_id" };
+    if (string.IsNullOrWhiteSpace(displayName)) return new { ok = false, error = "家庭成员姓名不能为空" };
+    if (displayName.Length > 50) return new { ok = false, error = "家庭成员姓名不能超过 50 个字符" };
+    if (string.IsNullOrWhiteSpace(role)) return new { ok = false, error = "家庭角色无效" };
+
+    await using var conn = await OpenConnection(connectionString);
+    await using var cmd = new NpgsqlCommand("""
+        UPDATE household_members
+        SET display_name = @display_name, role = @role, note = @note, updated_at = CURRENT_TIMESTAMP
+        WHERE id = @id AND owner_parent_app_user_id = @owner_parent_app_user_id
+        RETURNING id, display_name, role, note, is_current_user, created_at, updated_at
+        """, conn);
+    cmd.Parameters.AddWithValue("id", memberId.Value);
+    cmd.Parameters.AddWithValue("owner_parent_app_user_id", ResolveMcpParentAppUserId(arguments)!);
+    cmd.Parameters.AddWithValue("display_name", displayName);
+    cmd.Parameters.AddWithValue("role", role);
+    cmd.Parameters.AddWithValue("note", string.IsNullOrWhiteSpace(arguments.String("note")) ? DBNull.Value : arguments.String("note").Trim());
+    await using var reader = await cmd.ExecuteReaderAsync();
+    return await reader.ReadAsync()
+        ? new { ok = true, action = "update_family_member", familyMember = ReadHouseholdMember(reader) }
+        : new { ok = false, action = "update_family_member", familyMember = (object?)null, error = "家庭成员不存在或当前家长权限不足" };
+}
+
+static async Task<object> McpDeleteFamilyMember(string connectionString, JsonObject arguments)
+{
+    var memberId = arguments.Int("member_id");
+    if (memberId is null) return new { ok = false, error = "缺少家庭成员ID member_id" };
+    var parentAppUserId = ResolveMcpParentAppUserId(arguments)!;
+
+    await using var conn = await OpenConnection(connectionString);
+    await using (var deleteCmd = new NpgsqlCommand("DELETE FROM household_members WHERE id = @id AND owner_parent_app_user_id = @owner_parent_app_user_id AND is_current_user = FALSE", conn))
+    {
+        deleteCmd.Parameters.AddWithValue("id", memberId.Value);
+        deleteCmd.Parameters.AddWithValue("owner_parent_app_user_id", parentAppUserId);
+        if (await deleteCmd.ExecuteNonQueryAsync() > 0)
+        {
+            return new { ok = true, action = "delete_family_member", member_id = memberId };
+        }
+    }
+
+    await using var existsCmd = new NpgsqlCommand("SELECT is_current_user FROM household_members WHERE id = @id AND owner_parent_app_user_id = @owner_parent_app_user_id", conn);
+    existsCmd.Parameters.AddWithValue("id", memberId.Value);
+    existsCmd.Parameters.AddWithValue("owner_parent_app_user_id", parentAppUserId);
+    var isCurrentUser = await existsCmd.ExecuteScalarAsync();
+    return isCurrentUser is true
+        ? new { ok = false, action = "delete_family_member", member_id = memberId, error = "当前用户不能从家庭成员中删除" }
+        : new { ok = false, action = "delete_family_member", member_id = memberId, error = "家庭成员不存在或当前家长权限不足" };
+}
+
+static async Task<object> McpUpdateRuleTemplate(string connectionString, JsonObject arguments)
+{
+    if (arguments["rule_ids"] is not JsonArray ruleIdNodes)
+    {
+        return new { ok = false, error = "rule_ids 必须是规则ID数组" };
+    }
+    var ruleIds = ruleIdNodes
+        .Select(node => node is null ? null : int.TryParse(node.ToString(), out var id) ? id : (int?)null)
+        .Where(id => id.HasValue)
+        .Select(id => id!.Value)
+        .Distinct()
+        .ToList();
+    if (ruleIds.Count != ruleIdNodes.Count)
+    {
+        return new { ok = false, error = "rule_ids 包含无效规则ID" };
+    }
+
+    var result = await SaveRuleTemplate(connectionString, ResolveMcpParentAppUserId(arguments)!, ruleIds);
+    return result.ContainsKey("error")
+        ? new { ok = false, action = "update_rule_template", error = Convert.ToString(result["error"], CultureInfo.InvariantCulture) }
+        : new { ok = true, action = "update_rule_template", rule_ids = ruleIds };
+}
+
+static async Task<(Dictionary<string, object?>? Child, int FamilyGroupId)> ResolveMcpOwnedChildTarget(
+    string connectionString,
+    JsonObject arguments)
+{
+    var requestedFamilyGroupId = arguments.Int("family_group_id");
+    var parentAppUserId = ResolveMcpParentAppUserId(arguments)!;
+    if (requestedFamilyGroupId is not null && !await IsMcpFamilyAccessible(connectionString, requestedFamilyGroupId.Value, parentAppUserId))
+    {
+        return (null, 0);
+    }
+
+    var child = ResolveChildByReference(await GetMcpChildren(connectionString, arguments), arguments);
+    return child is null ? (null, 0) : (child, GetInt(child, "familyGroupId"));
+}
+
+static async Task<object> McpGenerateChildAuthCode(string connectionString, JsonObject arguments)
+{
+    var target = await ResolveMcpOwnedChildTarget(connectionString, arguments);
+    if (target.Child is null || target.FamilyGroupId <= 0) return new { ok = false, error = "未找到目标孩子，或当前家长权限不足" };
+    var result = await CreateChildAuthCode(
+        connectionString,
+        GetInt(target.Child, "id"),
+        target.FamilyGroupId,
+        ResolveMcpParentAppUserId(arguments)!,
+        Math.Clamp(arguments.Int("expires_in_minutes") ?? 24 * 60, 10, 24 * 60));
+    return result.ContainsKey("error")
+        ? new { ok = false, action = "generate_child_auth_code", error = Convert.ToString(result["error"], CultureInfo.InvariantCulture) }
+        : new { ok = true, action = "generate_child_auth_code", data = result };
+}
+
+static async Task<object> McpQueryChildDevices(string connectionString, JsonObject arguments)
+{
+    var target = await ResolveMcpOwnedChildTarget(connectionString, arguments);
+    if (target.Child is null || target.FamilyGroupId <= 0) return new { ok = false, error = "未找到目标孩子，或当前家长权限不足" };
+    var result = await GetChildWatchDevices(connectionString, GetInt(target.Child, "id"), target.FamilyGroupId, ResolveMcpParentAppUserId(arguments)!);
+    return result.ContainsKey("error")
+        ? new { ok = false, action = "query_child_devices", error = Convert.ToString(result["error"], CultureInfo.InvariantCulture) }
+        : new { ok = true, action = "query_child_devices", data = result };
+}
+
+static async Task<object> McpRevokeChildDevice(string connectionString, JsonObject arguments)
+{
+    var deviceId = arguments.Int("device_id");
+    if (deviceId is null) return new { ok = false, error = "缺少设备ID device_id" };
+    var target = await ResolveMcpOwnedChildTarget(connectionString, arguments);
+    if (target.Child is null || target.FamilyGroupId <= 0) return new { ok = false, error = "未找到目标孩子，或当前家长权限不足" };
+    var result = await RevokeChildWatchDevice(connectionString, GetInt(target.Child, "id"), deviceId.Value, target.FamilyGroupId, ResolveMcpParentAppUserId(arguments)!);
+    return result.ContainsKey("error")
+        ? new { ok = false, action = "revoke_child_device", error = Convert.ToString(result["error"], CultureInfo.InvariantCulture) }
+        : new { ok = true, action = "revoke_child_device", data = result };
+}
+
+static async Task<object> McpGenerateDeviceUnbindCode(string connectionString, JsonObject arguments)
+{
+    var deviceId = arguments.Int("device_id");
+    if (deviceId is null) return new { ok = false, error = "缺少设备ID device_id" };
+    var target = await ResolveMcpOwnedChildTarget(connectionString, arguments);
+    if (target.Child is null || target.FamilyGroupId <= 0) return new { ok = false, error = "未找到目标孩子，或当前家长权限不足" };
+    var result = await CreateWatchDeviceUnbindCode(
+        connectionString,
+        GetInt(target.Child, "id"),
+        deviceId.Value,
+        target.FamilyGroupId,
+        ResolveMcpParentAppUserId(arguments)!,
+        Math.Clamp(arguments.Int("expires_in_minutes") ?? 10, 5, 30));
+    return result.ContainsKey("error")
+        ? new { ok = false, action = "generate_device_unbind_code", error = Convert.ToString(result["error"], CultureInfo.InvariantCulture) }
+        : new { ok = true, action = "generate_device_unbind_code", data = result };
+}
+
+static async Task<object> McpQueryChildFriends(string connectionString, JsonObject arguments)
+{
+    var target = await ResolveMcpOwnedChildTarget(connectionString, arguments);
+    if (target.Child is null) return new { ok = false, error = "未找到目标孩子，或当前家长权限不足" };
+    var profileKey = Convert.ToString(target.Child["profileKey"], CultureInfo.InvariantCulture) ?? "";
+    return new
+    {
+        ok = true,
+        action = "query_child_friends",
+        child = target.Child,
+        friends = await GetChildFriends(connectionString, profileKey),
+        leaderboard = await GetChildFriendLeaderboard(connectionString, profileKey)
+    };
+}
+
+static async Task<object> McpQueryFriendNotifications(string connectionString, JsonObject arguments)
+{
+    var notifications = await GetChildFriendNotifications(connectionString, ResolveMcpParentAppUserId(arguments)!, arguments.Bool("unread_only"));
+    return new { ok = true, action = "query_friend_notifications", count = notifications.Count, notifications };
+}
+
+static async Task<object> McpMarkFriendNotificationRead(string connectionString, JsonObject arguments)
+{
+    var notificationId = arguments.Int("notification_id");
+    if (notificationId is null) return new { ok = false, error = "缺少通知ID notification_id" };
+    var result = await MarkChildFriendNotificationRead(connectionString, notificationId.Value, ResolveMcpParentAppUserId(arguments)!);
+    return result.ContainsKey("error")
+        ? new { ok = false, action = "mark_friend_notification_read", error = Convert.ToString(result["error"], CultureInfo.InvariantCulture) }
+        : new { ok = true, action = "mark_friend_notification_read", data = result };
+}
+
+static async Task<object> McpQueryRewardRequests(string connectionString, JsonObject arguments)
+{
+    var result = await GetParentWatchRewardRequests(
+        connectionString,
+        arguments.Int("family_group_id"),
+        ResolveMcpParentAppUserId(arguments)!,
+        arguments.String("status"),
+        Math.Clamp(arguments.Int("limit") ?? 100, 1, 200));
+    return result.ContainsKey("error")
+        ? new { ok = false, action = "query_reward_requests", error = Convert.ToString(result["error"], CultureInfo.InvariantCulture) }
+        : new { ok = true, action = "query_reward_requests", data = result };
+}
+
+static async Task<object> McpApproveRewardRequest(string connectionString, JsonObject arguments)
+{
+    var requestId = arguments.Int("request_id");
+    if (requestId is null) return new { ok = false, error = "缺少申请ID request_id" };
+    var result = await ApproveWatchRewardRequest(
+        connectionString,
+        requestId.Value,
+        arguments.Int("family_group_id"),
+        ResolveMcpParentAppUserId(arguments)!,
+        arguments.String("review_note"));
+    return result.ContainsKey("error")
+        ? new { ok = false, action = "approve_reward_request", error = Convert.ToString(result["error"], CultureInfo.InvariantCulture) }
+        : new { ok = true, action = "approve_reward_request", data = result };
+}
+
+static async Task<object> McpQueryCircleDashboard(string connectionString, JsonObject arguments)
+{
+    var familyGroupId = arguments.Int("family_group_id");
+    if (familyGroupId is null || !await IsMcpFamilyAccessible(connectionString, familyGroupId.Value, ResolveMcpParentAppUserId(arguments)!))
+    {
+        return new { ok = false, error = "圈子不存在或当前家长无权访问" };
+    }
+    var children = await GetChildren(connectionString, familyGroupId.Value);
+    var recent = await GetRecentTransactions(connectionString, 20, familyGroupId.Value);
+    return new { ok = true, action = "query_circle_dashboard", family_group_id = familyGroupId, children, recent };
+}
+
+static async Task<object> McpQueryCircleLeaderboard(string connectionString, JsonObject arguments)
+{
+    var familyGroupId = arguments.Int("family_group_id");
+    if (familyGroupId is null || !await IsMcpFamilyAccessible(connectionString, familyGroupId.Value, ResolveMcpParentAppUserId(arguments)!))
+    {
+        return new { ok = false, error = "圈子不存在或当前家长无权访问" };
+    }
+    var leaderboard = (await GetChildren(connectionString, familyGroupId.Value))
+        .Select(child => new { id = GetInt(child, "id"), name = child["name"], points = GetDecimal(child, "score") })
+        .OrderByDescending(child => child.points)
+        .ToList();
+    return new { ok = true, action = "query_circle_leaderboard", family_group_id = familyGroupId, leaderboard };
+}
+
+static async Task<object> McpQueryCircleCategories(string connectionString, JsonObject arguments)
+{
+    var familyGroupId = arguments.Int("family_group_id");
+    if (familyGroupId is null || !await IsMcpFamilyAccessible(connectionString, familyGroupId.Value, ResolveMcpParentAppUserId(arguments)!))
+    {
+        return new { ok = false, error = "圈子不存在或当前家长无权访问" };
+    }
+
+    await using var conn = await OpenConnection(connectionString);
+    await using var cmd = new NpgsqlCommand("""
+        SELECT category, COALESCE(SUM(CASE WHEN direction = '-' THEN -points ELSE points END), 0) AS total
+        FROM transactions t
+        JOIN children c ON c.id = t.child_id
+        WHERE c.family_group_id = @family_group_id AND t.type = 'points'
+        GROUP BY category
+        ORDER BY category
+        """, conn);
+    cmd.Parameters.AddWithValue("family_group_id", familyGroupId.Value);
+    var categories = new List<object>();
+    await using var reader = await cmd.ExecuteReaderAsync();
+    while (await reader.ReadAsync())
+    {
+        categories.Add(new { category = reader.String("category"), total = reader.Decimal("total") });
+    }
+    return new { ok = true, action = "query_circle_categories", family_group_id = familyGroupId, categories };
+}
+
 static async Task<List<Dictionary<string, object?>>> GetMcpChildren(string connectionString, JsonObject? arguments)
 {
     var ownerAppUserId = arguments is null ? null : ResolveMcpParentAppUserId(arguments);
@@ -3963,46 +4855,81 @@ static async Task<List<Dictionary<string, object?>>> GetMcpVisibleFamilyChildren
     string connectionString,
     JsonObject arguments)
 {
-    var parentAppUserId = ResolveMcpParentAppUserId(arguments)!;
     var requestedFamilyGroupId = arguments.Int("family_group_id");
-    var groups = (await GetFamilyGroups(connectionString, parentAppUserId))
-        .Where(group => requestedFamilyGroupId is null || GetInt(group, "id") == requestedFamilyGroupId.Value)
-        .ToList();
-
-    if (requestedFamilyGroupId is not null && groups.Count == 0)
+    if (requestedFamilyGroupId is null)
     {
-        return [];
+        return await GetMcpChildren(connectionString, arguments);
     }
 
-    var memberships = new List<Dictionary<string, object?>>();
-    foreach (var group in groups)
-    {
-        memberships.AddRange(await GetChildren(connectionString, GetInt(group, "id")));
-    }
+    var result = await GetFamilyGroupChildren(
+        connectionString,
+        requestedFamilyGroupId.Value,
+        ResolveMcpParentAppUserId(arguments)!);
+    return result.Success ? result.Children : [];
+}
 
-    var result = new List<Dictionary<string, object?>>();
-    foreach (var profileGroup in memberships.GroupBy(child =>
-                 Convert.ToString(child["profileKey"], CultureInfo.InvariantCulture)
-                 ?? Convert.ToString(child["profile_key"], CultureInfo.InvariantCulture)
-                 ?? $"child:{GetInt(child, "id")}"))
-    {
-        var first = new Dictionary<string, object?>(profileGroup.First(), StringComparer.OrdinalIgnoreCase);
-        var familyGroups = profileGroup
-            .Select(child => new
-            {
-                id = GetInt(child, "familyGroupId"),
-                name = Convert.ToString(child["familyGroupName"], CultureInfo.InvariantCulture) ?? string.Empty
-            })
-            .GroupBy(group => group.id)
-            .Select(group => group.First())
-            .OrderBy(group => group.id)
-            .ToArray();
-        first["familyGroups"] = familyGroups;
-        first["family_groups"] = familyGroups;
-        result.Add(first);
-    }
+static async Task<bool> IsMcpChildOwnedByParent(
+    string connectionString,
+    string profileKey,
+    string parentAppUserId)
+{
+    await using var conn = await OpenConnection(connectionString);
+    await using var cmd = new NpgsqlCommand("""
+        SELECT EXISTS (
+            SELECT 1
+            FROM child_user_bindings
+            WHERE child_profile_key = @profile_key
+              AND parent_app_user_id = @parent_app_user_id
+        )
+        """, conn);
+    cmd.Parameters.AddWithValue("profile_key", profileKey);
+    cmd.Parameters.AddWithValue("parent_app_user_id", parentAppUserId);
+    return Convert.ToBoolean(await cmd.ExecuteScalarAsync(), CultureInfo.InvariantCulture);
+}
 
-    return result.OrderBy(child => Convert.ToString(child["name"], CultureInfo.InvariantCulture)).ToList();
+static async Task<List<Dictionary<string, object?>>> GetMcpOwnedChildTransactions(
+    string connectionString,
+    string profileKey,
+    string parentAppUserId,
+    int limit,
+    string startDate,
+    string endDate)
+{
+    TryParseDateFilter(startDate, out var startDateValue);
+    TryParseDateFilter(endDate, out var endDateValue);
+    await using var conn = await OpenConnection(connectionString);
+    await using var cmd = new NpgsqlCommand("""
+        SELECT t.*, COALESCE(cp.name, c.name) AS child_name
+        FROM transactions t
+        JOIN children c ON c.id = t.child_id
+        LEFT JOIN child_profiles cp ON cp.profile_key = c.profile_key
+        WHERE c.profile_key = @profile_key
+          AND EXISTS (
+              SELECT 1
+              FROM child_user_bindings cub
+              WHERE cub.child_profile_key = c.profile_key
+                AND cub.parent_app_user_id = @parent_app_user_id
+          )
+          AND (@start_date IS NULL OR t.date >= @start_date)
+          AND (@end_date IS NULL OR t.date <= @end_date)
+        ORDER BY t.date DESC, t.id DESC
+        LIMIT @limit
+        """, conn);
+    cmd.Parameters.AddWithValue("profile_key", profileKey);
+    cmd.Parameters.AddWithValue("parent_app_user_id", parentAppUserId);
+    cmd.Parameters.Add(new NpgsqlParameter("start_date", NpgsqlDbType.Date)
+    {
+        Value = startDateValue is null ? DBNull.Value : startDateValue.Value
+    });
+    cmd.Parameters.Add(new NpgsqlParameter("end_date", NpgsqlDbType.Date)
+    {
+        Value = endDateValue is null ? DBNull.Value : endDateValue.Value
+    });
+    cmd.Parameters.AddWithValue("limit", limit);
+    var rows = new List<Dictionary<string, object?>>();
+    await using var reader = await cmd.ExecuteReaderAsync();
+    while (await reader.ReadAsync()) rows.Add(ReadTransaction(reader));
+    return rows;
 }
 
 static async Task<JsonObject> NormalizeRecordArguments(string connectionString, JsonObject arguments, bool allowMissingChild = false)
@@ -5401,7 +6328,9 @@ static async Task<(bool Success, bool Forbidden, List<Dictionary<string, object?
         {
             ["id"] = reader.Int("id"),
             ["familyGroupId"] = reader.Int("family_group_id"),
+            ["family_group_id"] = reader.Int("family_group_id"),
             ["profileKey"] = reader.String("profile_key"),
+            ["profile_key"] = reader.String("profile_key"),
             ["name"] = reader.String("name"),
             ["status"] = reader.String("status"),
             ["note"] = reader.String("note"),
@@ -5410,7 +6339,8 @@ static async Task<(bool Success, bool Forbidden, List<Dictionary<string, object?
             ["score"] = reader.Decimal("score"),
             ["cash"] = reader.Decimal("cash"),
             ["items"] = reader.Int("items"),
-            ["parentNames"] = reader.String("parent_names")
+            ["parentNames"] = reader.String("parent_names"),
+            ["parent_names"] = reader.String("parent_names")
         });
     }
     return (true, false, children, "");

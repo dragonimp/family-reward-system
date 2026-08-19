@@ -10,6 +10,7 @@ GROUP_B_ID=""
 CHILD_A_ID=""
 CHILD_B_ID=""
 RULE_A_ID=""
+MEMBER_A_ID=""
 
 api() {
   local parent="$1"
@@ -32,6 +33,9 @@ mcp() {
 
 cleanup() {
   set +e
+  if [[ -n "$MEMBER_A_ID" ]]; then
+    mcp family_reward_delete_family_member "$PARENT_A" "{\"member_id\":$MEMBER_A_ID}" >/dev/null
+  fi
   if [[ -n "$RULE_A_ID" ]]; then
     mcp family_reward_delete_rule "$PARENT_A" "{\"rule_id\":$RULE_A_ID}" >/dev/null
   fi
@@ -62,8 +66,12 @@ CHILD_B_ID="$(jq -r '.id' <<<"$child_b")"
 CHILD_A_NAME="$(jq -r '.name' <<<"$child_a")"
 CHILD_B_NAME="$(jq -r '.name' <<<"$child_b")"
 
-invite_code="$(api "$PARENT_B" "$API_BASE/api/family-groups/$GROUP_B_ID/invite" | jq -r '.inviteCode')"
-api "$PARENT_A" -H 'Content-Type: application/json' -d "{\"inviteCode\":\"$invite_code\"}" "$API_BASE/api/family-groups/join" >/dev/null
+prejoin_denied="$(mcp family_reward_query_children "$PARENT_A" "{\"family_group_id\":$GROUP_B_ID}")"
+jq -e '.ok == false and (.error | contains("无权访问"))' <<<"$prejoin_denied" >/dev/null
+
+invite_code="$(mcp family_reward_get_family_group_invite "$PARENT_B" "{\"family_group_id\":$GROUP_B_ID}" | jq -r '.invite_code')"
+mcp family_reward_join_family_group "$PARENT_A" "{\"invite_code\":\"$invite_code\"}" |
+  jq -e '.ok == true and .action == "join_family_group"' >/dev/null
 
 owned_children="$(mcp family_reward_query_children "$PARENT_A" '{}')"
 jq -e --arg own "$CHILD_A_NAME" --arg other "$CHILD_B_NAME" '
@@ -72,13 +80,38 @@ jq -e --arg own "$CHILD_A_NAME" --arg other "$CHILD_B_NAME" '
   and ([.children[].name] | index($other) == null)
 ' <<<"$owned_children" >/dev/null
 
-visible_scores="$(mcp family_reward_query_score "$PARENT_A" '{}')"
+owned_scores="$(mcp family_reward_query_score "$PARENT_A" '{}')"
 jq -e --arg own "$CHILD_A_NAME" --arg other "$CHILD_B_NAME" '
   .ok == true
   and ([.children[].name] | index($own) != null)
+  and ([.children[].name] | index($other) == null)
+' <<<"$owned_scores" >/dev/null
+
+circle_children="$(mcp family_reward_query_children "$PARENT_A" "{\"family_group_id\":$GROUP_B_ID}")"
+jq -e --arg own "$CHILD_A_NAME" --arg other "$CHILD_B_NAME" --argjson group "$GROUP_B_ID" '
+  .ok == true
+  and ([.children[].name] | index($own) != null)
   and ([.children[].name] | index($other) != null)
-  and (.children | all(.family_groups | type == "array"))
-' <<<"$visible_scores" >/dev/null
+  and (.children | all(.family_group_id == $group))
+' <<<"$circle_children" >/dev/null
+
+circle_scores="$(mcp family_reward_query_score "$PARENT_A" "{\"family_group_id\":$GROUP_B_ID}")"
+jq -e --arg other "$CHILD_B_NAME" '
+  .ok == true
+  and ([.children[].name] | index($other) != null)
+' <<<"$circle_scores" >/dev/null
+
+detail_denied="$(mcp family_reward_query_score "$PARENT_A" "{\"family_group_id\":$GROUP_B_ID,\"child_id\":$CHILD_B_ID,\"include_transactions\":true}")"
+jq -e '.ok == false and (.error | contains("明细"))' <<<"$detail_denied" >/dev/null
+
+dashboard="$(mcp family_reward_query_circle_dashboard "$PARENT_A" "{\"family_group_id\":$GROUP_B_ID}")"
+jq -e '.ok == true and .action == "query_circle_dashboard"' <<<"$dashboard" >/dev/null
+
+group_update_denied="$(mcp family_reward_update_family_group "$PARENT_A" "{\"family_group_id\":$GROUP_B_ID,\"name\":\"越权修改\"}")"
+jq -e '.ok == false and (.error | contains("管理员"))' <<<"$group_update_denied" >/dev/null
+
+group_update_allowed="$(mcp family_reward_update_family_group "$PARENT_B" "{\"family_group_id\":$GROUP_B_ID,\"name\":\"REQ048-B-更新-${SUFFIX}\"}")"
+jq -e '.ok == true and .action == "update_family_group"' <<<"$group_update_allowed" >/dev/null
 
 denied="$(mcp family_reward_adjust_score "$PARENT_A" "{\"child_id\":$CHILD_B_ID,\"delta\":9}")"
 jq -e '.ok == false and (.error | contains("权限不足"))' <<<"$denied" >/dev/null
@@ -86,10 +119,27 @@ jq -e '.ok == false and (.error | contains("权限不足"))' <<<"$denied" >/dev/
 allowed="$(mcp family_reward_adjust_score "$PARENT_A" "{\"child_id\":$CHILD_A_ID,\"delta\":3,\"description\":\"REQ-048 authorization test\"}")"
 jq -e '.ok == true and .action == "adjust_score"' <<<"$allowed" >/dev/null
 
+member_a="$(mcp family_reward_create_family_member "$PARENT_A" "{\"display_name\":\"测试爷爷-${SUFFIX}\",\"role\":\"grandfather\"}")"
+MEMBER_A_ID="$(jq -r '.familyMember.id' <<<"$member_a")"
+jq -e '.ok == true and .action == "create_family_member"' <<<"$member_a" >/dev/null
+
+mcp family_reward_query_family_members "$PARENT_B" '{}' |
+  jq -e --arg name "测试爷爷-${SUFFIX}" '.ok == true and ([.familyMembers[].displayName] | index($name) == null)' >/dev/null
+
+member_update="$(mcp family_reward_update_family_member "$PARENT_A" "{\"member_id\":$MEMBER_A_ID,\"display_name\":\"测试外公-${SUFFIX}\",\"role\":\"grandfather\"}")"
+jq -e '.ok == true and .action == "update_family_member"' <<<"$member_update" >/dev/null
+
+family_a="$(mcp family_reward_query_family_members "$PARENT_A" '{}')"
+CURRENT_MEMBER_A_ID="$(jq -r '.familyMembers[] | select(.isCurrentUser == true) | .id' <<<"$family_a")"
+current_member_delete_denied="$(mcp family_reward_delete_family_member "$PARENT_A" "{\"member_id\":$CURRENT_MEMBER_A_ID}")"
+jq -e '.ok == false and (.error | contains("当前用户不能"))' <<<"$current_member_delete_denied" >/dev/null
+
 rule_a="$(mcp family_reward_create_rule "$PARENT_A" "{\"name\":\"REQ048规则-${SUFFIX}\",\"points\":5,\"rule_type\":\"reward\"}")"
 RULE_A_ID="$(jq -r '.rule.id' <<<"$rule_a")"
 jq -e '.ok == true and .action == "create_rule"' <<<"$rule_a" >/dev/null
+mcp family_reward_update_rule_template "$PARENT_A" "{\"rule_ids\":[$RULE_A_ID]}" |
+  jq -e --argjson id "$RULE_A_ID" '.ok == true and (.rule_ids | index($id) != null)' >/dev/null
 mcp family_reward_query_rules "$PARENT_B" '{}' |
   jq -e --arg name "REQ048规则-${SUFFIX}" '.ok == true and ([.data.rules[].name] | index($name) == null)' >/dev/null
 
-printf 'REQ-048 MCP authorization verification passed: owned writes, cross-family score reads, rule isolation.\n'
+printf 'MCP authorization verification passed: household isolation, circle balance visibility, owned details/writes, and rule isolation.\n'

@@ -10,15 +10,15 @@
 
 ## 产品范围与角色
 
-家加分用于多个家长围绕孩子共同管理积分、现金和物品奖励。当前产品包含家长 Web、儿童手表端、ASP.NET Core API、PostgreSQL 数据层以及供智能体调用的 MCP 接口。
+家加分用于家长管理自己的家庭成员和孩子，并通过圈子与其他家庭协作查看孩子积分。当前产品包含家长 Web、儿童手表端、ASP.NET Core API、PostgreSQL 数据层以及供智能体调用的 MCP 接口。
 
 | 角色/调用方 | 主要权限边界 |
 | --- | --- |
-| 家长 | 管理自己名下的全局孩子档案、账户、交易和手表设备；访问自己创建或已加入的家庭组 |
-| 家庭管理员 | 创建/删除家庭组、查看邀请码、管理当前家庭中的孩子成员 |
-| 家庭成员 | 查看已加入家庭中的协作数据；不能执行管理员限定操作 |
+| 家长 | 管理自己不随圈子切换的家庭成员、孩子档案、账户、交易和手表设备；访问自己创建或已加入的圈子 |
+| 圈子管理员 | 创建/删除圈子、查看邀请码、管理圈子中的孩子成员 |
+| 圈子成员 | 查看已加入圈子中的孩子余额和协作数据；不能执行管理员限定操作 |
 | 儿童手表 | 通过一次性儿童认证码绑定单一孩子；使用设备令牌查询积分、规则和申请状态 |
-| 智能体/MCP 客户端 | 通过 JSON-RPC 工具目录执行孩子、积分记录、规则和家庭组操作 |
+| 智能体/MCP 客户端 | 通过 JSON-RPC 工具目录执行家庭、孩子、积分、规则、圈子、设备和申请操作 |
 
 ## 功能点清单
 
@@ -31,17 +31,17 @@
 | FR-A03 | 账号菜单 | 用户名菜单支持家庭切换、系统设置、修改资料、修改密码和退出；操作后菜单关闭 | 已实现 | `frontend/src/components/UserMenu.tsx`、`frontend/userMenu.test.ts` |
 | FR-A04 | 前端访问保护 | 未登录用户进入业务路由时转到统一登录，身份未就绪时进入身份选择 | 已实现 | `frontend/src/components/ProtectedRoute.tsx`、`IdentityGate.tsx` |
 
-### B. 家庭协作
+### B. 圈子协作
 
 | 编号 | 功能点 | 验收口径 | 状态 | 实现证据 |
 | --- | --- | --- | --- | --- |
-| FR-B01 | 家庭组创建与切换 | 家长可创建家庭组，只看到自己创建或已加入的组，并在 Web 中切换当前家庭 | 已实现 | `frontend/src/contexts/FamilyGroupContext.tsx`、`FamilyGroups.tsx`、`/api/family-groups` |
-| FR-B02 | 家庭邀请码 | 管理员可获得 8 位邀请码、邀请链接和二维码；无效邀请码不能入组 | 已实现 | `/api/family-groups/{id}/invite`、`/api/family-groups/join`、`scripts/test-family-group-invites.sh` |
-| FR-B03 | 入组自动同步孩子 | 家长按邀请码加入后，其名下有效孩子自动加入目标家庭，重复加入保持幂等 | 已实现 | `JoinFamilyGroup` 相关后端逻辑、`scripts/test-family-group-invites.sh` |
-| FR-B04 | 家庭孩子成员视图 | 当前家庭展示孩子姓名、积分、现金、物品及归属家长 | 已实现 | `frontend/src/pages/FamilyGroups.tsx`、`/api/family-groups/{id}/children` |
-| FR-B05 | 家庭孩子成员移除 | 仅管理员可从当前家庭移除孩子；保留孩子全局档案、家长归属和其他家庭关系 | 已实现 | `/api/family-groups/{id}/children/{childId}`、`scripts/test-family-group-children.sh` |
-| FR-B06 | 家庭删除 | 仅有权限的家长可删除家庭；孩子档案、积分账户和归属家长不随家庭误删 | 已实现 | `deleteFamilyGroup`、`frontend/userMenu.test.ts` |
-| FR-B07 | 家庭访问隔离 | 查询、成员维护和业务数据操作校验当前用户是否属于目标家庭或具备管理员权限 | 已实现 | `EnsureFamilyGroupAccess` 相关后端逻辑 |
+| FR-B01 | 圈子创建与切换 | 家长可创建圈子，只看到自己创建或已加入的圈子，并在 Web 中切换当前圈子 | 已实现 | `frontend/src/contexts/FamilyGroupContext.tsx`、`FamilyGroups.tsx`、`/api/family-groups` |
+| FR-B02 | 圈子邀请码 | 管理员可获得 8 位邀请码、邀请链接和二维码；无效邀请码不能加入圈子 | 已实现 | `/api/family-groups/{id}/invite`、`/api/family-groups/join`、`scripts/test-family-group-invites.sh` |
+| FR-B03 | 加圈自动同步孩子 | 家长按邀请码加入后，其名下有效孩子自动加入目标圈子，重复加入保持幂等 | 已实现 | `JoinFamilyGroup` 相关后端逻辑、`scripts/test-family-group-invites.sh` |
+| FR-B04 | 圈子孩子成员视图 | 当前圈子展示孩子姓名、积分、现金、物品及归属家长 | 已实现 | `frontend/src/pages/FamilyGroups.tsx`、`/api/family-groups/{id}/children` |
+| FR-B05 | 圈子孩子成员移除 | 仅管理员可从当前圈子移除孩子；保留孩子全局档案、家庭归属和其他圈子关系 | 已实现 | `/api/family-groups/{id}/children/{childId}`、`scripts/test-family-group-children.sh` |
+| FR-B06 | 圈子删除 | 仅管理员可删除圈子；孩子档案、积分账户和家庭归属不随圈子误删 | 已实现 | `deleteFamilyGroup`、`frontend/userMenu.test.ts` |
+| FR-B07 | 圈子访问隔离 | 查询、成员维护和统计操作校验当前用户是否属于目标圈子或具备管理员权限 | 已实现 | `EnsureFamilyGroupAccess` 相关后端逻辑 |
 
 ### C. 孩子档案与账户
 
@@ -49,7 +49,7 @@
 | --- | --- | --- | --- | --- |
 | FR-C01 | 全局孩子档案 | 孩子以 `profile_key` 跨家庭唯一存在，改名和状态变更在各家庭一致 | 已实现 | `child_profiles`、`child_user_bindings`、`scripts/test-global-child-management.sh` |
 | FR-C02 | 孩子新增、编辑、删除 | 家长可管理自己名下孩子；不能通过手工 childId 管理其他家长的孩子 | 已实现 | `frontend/src/pages/Children.tsx`、`/api/children`、所有权校验逻辑 |
-| FR-C03 | 跨家庭自动成员关系 | 新建孩子自动加入所属家长已创建或加入的家庭组 | 已实现 | `CreateChildCore`、`EnsureChildInFamilyGroup` |
+| FR-C03 | 跨圈子自动成员关系 | 新建孩子自动加入所属家长已创建或加入的圈子 | 已实现 | `CreateChildCore`、`EnsureChildInFamilyGroup` |
 | FR-C04 | 全局共享账户 | 同一孩子的积分、现金、物品在不同家庭中读取同一账户余额 | 已实现 | `accounts`、`scripts/test-global-child-management.sh` |
 | FR-C05 | 孩子归属边界 | 孩子管理、积分操作和交易查询按当前家长名下孩子过滤，不随家庭切换丢失 | 已实现 | `ownedOnly=true`、`frontend/userMenu.test.ts` |
 
@@ -97,24 +97,25 @@
 | FR-G02 | 智能体服务配置 | 可配置启用状态、地址、密钥、模型、超时和系统提示词 | 已实现 | `Settings.tsx`、`system_config.json` |
 | FR-G03 | 智能体连通测试 | 系统设置页可发起测试请求并展示成功结果或错误 | 已实现 | `invokeAgent`、`/api/agent/invoke` |
 | FR-G04 | MCP 协议服务 | 提供 initialize、ping、tools/list 和 tools/call 等 JSON-RPC 能力 | 已实现 | `/api/mcp`、`application/mcp/` |
-| FR-G05 | MCP 孩子与积分工具 | 所有工具要求 `parent_user_id`；孩子和积分写操作只允许操作当前家长名下孩子，积分查询覆盖该家长创建或加入的全部家庭组 | 已实现 | `BuildMcpToolCatalog`、`scripts/test-family-reward-mcp.sh`、`scripts/test-family-reward-mcp-authorization.sh` |
-| FR-G06 | MCP 规则与家庭工具 | 规则按家长隔离，家庭组只允许查询或操作当前家长创建/加入的记录，并拒绝未声明参数 | 已实现 | `SafeInvokeFamilyRewardMcpTool`、`application/goldfish-tool-library.json` |
+| FR-G05 | MCP 孩子与积分工具 | 所有工具要求 `parent_user_id`；默认仅查询本人孩子，指定圈子可查看圈内孩子余额，明细和写操作仍限孩子所属家长 | 已实现 | `BuildMcpToolCatalog`、`scripts/test-family-reward-mcp.sh`、`scripts/test-family-reward-mcp-authorization.sh` |
+| FR-G06 | MCP 家庭、规则与圈子工具 | 家庭成员不随圈子切换；规则按家长隔离；圈子只允许成员查询、管理员维护，并拒绝未声明参数 | 已实现 | `SafeInvokeFamilyRewardMcpTool`、`application/goldfish-tool-library.json` |
+| FR-G07 | MCP 全业务工具目录 | 40 个工具覆盖孩子、账户记录、规则模板、家庭成员、圈子、设备、好友、积分申请和圈子统计 | 已实现 | `docs/FAMILY-REWARD-MCP-TOOLS.md`、`application/mcp/family-reward-mcp-tool-library-split.json` |
 
 ### H. 安全、数据与运维边界
 
 | 编号 | 功能点 | 验收口径 | 状态 | 实现证据 |
 | --- | --- | --- | --- | --- |
 | FR-H01 | PostgreSQL 持久化与迁移 | 启动时幂等创建/升级家庭、孩子、账户、交易、规则和设备相关结构 | 已实现 | `EnsureDatabase` 相关后端逻辑 |
-| FR-H02 | 事务一致性 | 加入家庭、创建孩子、记账、删交易、移除成员等多表操作使用事务保持一致 | 已实现 | `Program.cs` 中对应 Core 方法 |
+| FR-H02 | 事务一致性 | 加入圈子、创建孩子、记账、删交易、移除成员等多表操作使用事务保持一致 | 已实现 | `Program.cs` 中对应 Core 方法 |
 | FR-H03 | 凭据与认证码保护 | 系统配置读写仅允许已建立家长资料的用户；绑定码和解绑码仅持久化哈希并具有失效/消费状态 | 已实现 | `/api/system/config` 的家长校验、认证码后端逻辑 |
 | FR-H04 | 健康检查与配置化运行 | 提供 `/health`；数据库和监听地址可通过环境配置 | 已实现 | `/health`、`appsettings*.json`、`README.md` |
 | FR-H05 | 自动化回归入口 | 提供前端登录/菜单测试、家庭邀请/成员/全局孩子/设备解绑脚本和手表静态校验 | 已实现 | `frontend/*.test.ts`、`scripts/test-*.sh`、`verify-watch-app.mjs` |
 
 ## 数据与权限边界摘要
 
-1. `child_profiles.profile_key` 是跨家庭的孩子身份，`children` 是孩子在具体家庭中的成员关系，`accounts` 保存共享余额。
+1. `child_profiles.profile_key` 是全局孩子身份，`children` 是孩子在具体圈子中的成员关系，`accounts` 保存共享余额。
 2. `child_user_bindings` 决定家长能否全局管理某个孩子；家庭成员身份不能替代孩子所有权。
-3. 家庭组用于协作可见范围；孩子管理、积分操作和交易记录以当前家长所有权为主，仪表盘和统计按所选家庭聚合。
+3. 圈子用于协作可见范围；家庭和孩子归属不随圈子切换，孩子管理、积分操作和交易明细以当前家长所有权为主，圈子统计按所选圈子聚合。
 4. 管理员操作、孩子所有权操作和手表设备操作都由服务端校验，不能依赖前端隐藏按钮作为权限控制。
 5. 手表设备令牌、绑定认证码和解绑认证码是三种不同凭据；解绑必须绑定到具体设备。
 
@@ -124,7 +125,3 @@
 - REQ-024 的验收证据应包含：功能目录提交、前后端构建、现有自动化测试、手表校验以及 Atlas 回写记录。
 - 真实三平台上架应保持为独立发布事项，不应把“工程准备完成”等同于“商店审核完成”。
 - 历史 `server/`、`backend/` 仅用于行为对比，不纳入现行能力验收。
-
-## 已知外部阻塞
-
-当前任务运行时未暴露 Atlas 项目管理 MCP，且 `codex mcp list` 显示未配置 MCP server。因此本目录已形成可回写内容，但无法在本次执行中读取 Atlas 的真实公约、环境、关联缺陷及功能点详情，也无法更新 `family-reward-REQ-024`、`family-reward-TASK-038` 和功能点 `4b179f4c-0585-4c66-ac31-8461fca54284` 的状态或证据。连接恢复后应以本目录为基线完成同步。

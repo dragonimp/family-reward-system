@@ -9,7 +9,7 @@ DEFAULT_LIBRARY_JSON="$SCRIPT_DIR/../application/mcp/family-reward-mcp-tool-libr
 FAMILY_POINTS_MCP_TOKEN="${FAMILY_POINTS_MCP_TOKEN:-}"
 FAMILY_POINTS_MCP_TOOL_KEY="${FAMILY_POINTS_MCP_TOOL_KEY:-family-reward-mcp}"
 FAMILY_POINTS_MCP_NAME="${FAMILY_POINTS_MCP_NAME:-家庭积分应用}"
-FAMILY_POINTS_MCP_DESC="${FAMILY_POINTS_MCP_DESC:-家庭积分应用 MCP：所有工具要求 parent_user_id；写操作仅允许所属家长，积分查询覆盖家长可访问的全部家庭。}"
+FAMILY_POINTS_MCP_DESC="${FAMILY_POINTS_MCP_DESC:-家加分 MCP：家庭是当前家长自己的成员和孩子，圈子是多个家庭协作空间；默认只查本人孩子，指定圈子可查圈内余额，明细和写操作仍限孩子所属家长。}"
 
 FAMILY_POINTS_MCP_URL="${FAMILY_POINTS_MCP_URL:-}"
 FAMILY_POINTS_MCP_SERVERS="${FAMILY_POINTS_MCP_SERVERS:-}"
@@ -54,7 +54,7 @@ if [ -z "$FAMILY_POINTS_MCP_SERVERS" ] && [ -z "$FAMILY_POINTS_MCP_URL" ]; then
   bash scripts/install-family-rewards-mcp-tool.sh
 
 示例（服务拆分后手工多服务）：
-  export FAMILY_POINTS_MCP_SERVERS=$'https://happylife.ai.impx.net/api/mcp|family-reward-mcp|家加分 MCP 服务（按工具拆分）|家加分 MCP：提供孩子、积分、记录、规则、圈子等独立工具（family_reward_*）。|'
+  export FAMILY_POINTS_MCP_SERVERS=$'https://happylife.ai.impx.net/api/mcp|family-reward-mcp|家加分 MCP 服务（按工具拆分）|家加分 MCP：家庭是当前家长自己的成员和孩子，圈子是多个家庭协作空间；默认只查本人孩子，指定圈子可查圈内余额，明细和写操作仍限孩子所属家长。|'
   bash scripts/install-family-rewards-mcp-tool.sh
 EOF
   exit 1
