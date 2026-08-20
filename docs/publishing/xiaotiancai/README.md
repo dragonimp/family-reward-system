@@ -13,10 +13,11 @@
 - 用户协议草案：`05-user-agreement-draft.md`
 - 首次提交免责函草案：`06-disclaimer-draft.md`
 - 提审邮件模板：`07-release-email-template.md`
-- 必须由发布主体提供的材料：`08-user-provided-materials.md`
+- 材料来源与外部动作边界：`08-user-provided-materials.md`
 - 官方要求核对笔记：`09-official-requirements-notes.md`
 - 项目管理外部市场平台模块审计：`10-external-market-platform-module-audit.md`
 - REQ-053 静态测试用例与追踪矩阵：`11-req-053-static-test-cases.md`
+- REQ-055 材料补齐纠正分析：`../../REQ-055-ANALYSIS.md`
 
 ## 当前产品信息
 
@@ -35,7 +36,7 @@
 
 ## 完成边界
 
-仓库可准备文案、说明、测试模板、隐私/协议草案和资料清单；真实提审前仍需要发布主体提供企业证照、法人证件、软著、盖章免责函、最终联系方式、测试账号/认证码、真机截图和签名 APK。
+上架任务应先从用户中心、图灵软件主体资料和历史发布资产查询复用已有证照、凭证与账号，再由项目从源码、受控构建和真实环境生成、验证、上传并登记签名 APK、图标、介绍图、协议和报告。只有系统中缺失的外部机构证件/资质、平台本人验证码或签署/盖章动作，以及平台强制要求的物理真机证据，才保留为外部待办；详见 `08-user-provided-materials.md` 和 `../../REQ-055-ANALYSIS.md`。
 
 官方小天才版本材料要求见：
 

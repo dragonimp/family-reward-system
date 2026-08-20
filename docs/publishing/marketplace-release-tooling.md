@@ -44,6 +44,17 @@
 | `record_marketplace_rectification` | 记录驳回/投诉/整改要求和截止日期 |
 | `archive_marketplace_release_evidence` | 归档签名哈希、截图、提交回执、审核结果和上线证据 |
 
+REQ-055 要求在“校验缺项”之前先主动发现和补齐材料，还需要以下编排能力：
+
+| 工具 | 用途 |
+| --- | --- |
+| `resolve_marketplace_material_sources` | 从用户中心个人凭证、图灵软件主体资料和历史发布资产中查找可复用引用 |
+| `generate_marketplace_assets` | 触发签名构建、图像导出、协议生成/发布和真实测试报告任务 |
+| `verify_marketplace_asset` | 校验授权、有效期、主体、包名、版本、签名、文件规格、URL 与来源证据 |
+| `list_marketplace_external_actions` | 仅列出外部机构、本人验证码/签署/盖章或物理真机才能完成的事项及原因 |
+
+这些工具必须通过应用接口工作，不得直接修改 Atlas 生产数据库；个人证件、密码、签名密钥和验证码只传递受控引用或短时输入，不复制明文到发布包。
+
 ## 平台自动化策略
 
 | 平台 | 推荐实现 | 人工边界 |
