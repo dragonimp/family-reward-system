@@ -2655,12 +2655,16 @@ static JsonObject BuildWatchAppInfo(HttpRequest request)
         ["supportedPlatforms"] = new JsonArray { "xiaotiancai", "xiaomi", "huawei" },
         ["supportedScreens"] = new JsonArray { "192x192", "240x240", "280x280", "320x320", "360x360" },
         ["watchFeatures"] = new JsonArray { "积分查询", "积分申请", "最近申请状态", "儿童认证码设备绑定", "家长解绑认证码校验" },
-        ["requiredPermissions"] = new JsonArray { "INTERNET", "ACCESS_NETWORK_STATE" },
+        ["requiredPermissions"] = new JsonArray { "INTERNET", "ACCESS_NETWORK_STATE", "RECORD_AUDIO" },
+        ["privacyPolicyUrl"] = $"{baseUrl}/legal/privacy.html",
+        ["termsUrl"] = $"{baseUrl}/legal/terms.html",
         ["privacy"] = new JsonObject
         {
             ["collectsPreciseLocation"] = false,
             ["collectsContacts"] = false,
-            ["collectsMicrophone"] = false,
+            ["usesMicrophoneOnDemand"] = true,
+            ["storesRawAudio"] = false,
+            ["microphonePurpose"] = "仅在用户主动点击语音输入时将申请事项转换为文字，可拒绝并改用键盘输入",
             ["collectsCamera"] = false,
             ["childAccountOnly"] = true
         },
@@ -2669,7 +2673,7 @@ static JsonObject BuildWatchAppInfo(HttpRequest request)
             ["webEntry"] = "ready",
             ["androidWrapper"] = "ready_for_sdk_build",
             ["storeListingAssets"] = "prepared",
-            ["blockedBy"] = "平台开发者账号、签名证书、真机截图和平台后台提交"
+            ["blockedBy"] = "小天才准入、软著、APP备案、法人证件、公司签章和物理真机验收"
         }
     };
 }

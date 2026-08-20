@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="320" height="360" viewBox="0 0 320 360">
+  <rect width="320" height="360" fill="#eef5ef"/>
+  <rect width="320" height="72" fill="#6f4f8b"/>
+  <text x="20" y="31" font-family="'PingFang SC','Microsoft YaHei',sans-serif" font-size="20" font-weight="700" fill="#ffffff" text-anchor="start">最近申请</text>
+  <text x="20" y="54" font-family="'PingFang SC','Microsoft YaHei',sans-serif" font-size="12" font-weight="500" fill="#eaf4ec" text-anchor="start">处理进度及时可见</text>
+
+      <rect x="16" y="92" width="288" height="72" rx="12" fill="#ffffff" stroke="none"/>
+      <text x="32" y="119" font-family="'PingFang SC','Microsoft YaHei',sans-serif" font-size="15" font-weight="700" fill="#193425" text-anchor="start">阅读 30 分钟</text>
+      <text x="32" y="143" font-family="'PingFang SC','Microsoft YaHei',sans-serif" font-size="12" font-weight="500" fill="#637367" text-anchor="start">今天 18:20 · +8 积分</text>
+      <rect x="226" y="110" width="60" height="30" rx="15" fill="#fff0c9" stroke="none"/><text x="256" y="130" font-family="'PingFang SC','Microsoft YaHei',sans-serif" font-size="12" font-weight="700" fill="#835b00" text-anchor="middle">待审核</text>
+      <rect x="16" y="176" width="288" height="72" rx="12" fill="#ffffff" stroke="none"/>
+      <text x="32" y="203" font-family="'PingFang SC','Microsoft YaHei',sans-serif" font-size="15" font-weight="700" fill="#193425" text-anchor="start">整理书包</text>
+      <text x="32" y="227" font-family="'PingFang SC','Microsoft YaHei',sans-serif" font-size="12" font-weight="500" fill="#637367" text-anchor="start">昨天 20:05 · +5 积分</text>
+      <rect x="226" y="194" width="60" height="30" rx="15" fill="#dff0e3" stroke="none"/><text x="256" y="214" font-family="'PingFang SC','Microsoft YaHei',sans-serif" font-size="12" font-weight="700" fill="#16643a" text-anchor="middle">已通过</text>
+      <rect x="16" y="260" width="288" height="72" rx="12" fill="#ffffff" stroke="none"/>
+      <text x="32" y="287" font-family="'PingFang SC','Microsoft YaHei',sans-serif" font-size="15" font-weight="700" fill="#193425" text-anchor="start">早睡早起</text>
+      <text x="32" y="311" font-family="'PingFang SC','Microsoft YaHei',sans-serif" font-size="12" font-weight="500" fill="#637367" text-anchor="start">8月18日 · +10 积分</text>
+      <rect x="226" y="278" width="60" height="30" rx="15" fill="#f0f2f0" stroke="none"/><text x="256" y="298" font-family="'PingFang SC','Microsoft YaHei',sans-serif" font-size="12" font-weight="700" fill="#526157" text-anchor="middle">已处理</text>
+
+</svg>

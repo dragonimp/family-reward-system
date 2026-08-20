@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="320" height="360" viewBox="0 0 320 360">
+  <rect width="320" height="360" fill="#eef5ef"/>
+  <rect width="320" height="72" fill="#315c9b"/>
+  <text x="20" y="31" font-family="'PingFang SC','Microsoft YaHei',sans-serif" font-size="20" font-weight="700" fill="#ffffff" text-anchor="start">语音输入申请</text>
+  <text x="20" y="54" font-family="'PingFang SC','Microsoft YaHei',sans-serif" font-size="12" font-weight="500" fill="#eaf4ec" text-anchor="start">也可以随时改用键盘</text>
+
+      <rect x="18" y="92" width="284" height="218" rx="16" fill="#ffffff" stroke="none"/>
+      <circle cx="160" cy="153" r="48" fill="#e4efff"/>
+      <rect x="148" y="121" width="24" height="48" rx="12" fill="#315c9b"/>
+      <path d="M137 153c0 15 10 27 23 27s23-12 23-27M160 180v18M145 198h30" fill="none" stroke="#315c9b" stroke-width="5" stroke-linecap="round"/>
+      <text x="160" y="229" font-family="'PingFang SC','Microsoft YaHei',sans-serif" font-size="17" font-weight="700" fill="#193425" text-anchor="middle">“今天完成了阅读”</text>
+      <text x="160" y="255" font-family="'PingFang SC','Microsoft YaHei',sans-serif" font-size="13" font-weight="500" fill="#637367" text-anchor="middle">识别结果可确认后再提交</text>
+      <rect x="56" y="270" width="208" height="34" rx="8" fill="#315c9b" stroke="none"/><text x="160" y="292" font-family="'PingFang SC','Microsoft YaHei',sans-serif" font-size="14" font-weight="700" fill="#ffffff" text-anchor="middle">确认文字</text>
+      <text x="160" y="338" font-family="'PingFang SC','Microsoft YaHei',sans-serif" font-size="11" font-weight="500" fill="#5b7161" text-anchor="middle">仅主动点击时使用麦克风 · 不保存录音</text>
+
+</svg>

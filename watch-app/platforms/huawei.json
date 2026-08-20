@@ -5,10 +5,10 @@
   "entryUrl": "https://happylife.ai.impx.net/watch?source=watch-app&platform=huawei",
   "distributionType": "android_webview_wrapper",
   "targetAudience": "child",
-  "permissions": ["INTERNET", "ACCESS_NETWORK_STATE"],
+  "permissions": ["INTERNET", "ACCESS_NETWORK_STATE", "RECORD_AUDIO"],
   "reviewNotes": [
     "应用只提供孩子积分查询、积分申请、最近申请状态查看。",
-    "不申请定位、通讯录、相机、麦克风等敏感权限。",
+    "麦克风仅在主动语音输入时申请，服务端不保存原始录音；不申请定位、通讯录、相机等权限。",
     "登录后手表端默认孩子身份。"
   ],
   "submitBlockers": ["华为开发者账号", "应用签名证书", "手表真机截图", "平台后台隐私资料"]

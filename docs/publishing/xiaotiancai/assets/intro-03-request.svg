@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="320" height="360" viewBox="0 0 320 360">
+  <rect width="320" height="360" fill="#eef5ef"/>
+  <rect width="320" height="72" fill="#a34828"/>
+  <text x="20" y="31" font-family="'PingFang SC','Microsoft YaHei',sans-serif" font-size="20" font-weight="700" fill="#ffffff" text-anchor="start">申请积分</text>
+  <text x="20" y="54" font-family="'PingFang SC','Microsoft YaHei',sans-serif" font-size="12" font-weight="500" fill="#eaf4ec" text-anchor="start">选择家长设置的奖励规则</text>
+
+      <rect x="16" y="88" width="288" height="62" rx="12" fill="#ffffff" stroke="none"/>
+      <circle cx="45" cy="119" r="18" fill="#fff0bd"/><text x="45" y="125" font-family="'PingFang SC','Microsoft YaHei',sans-serif" font-size="18" font-weight="700" fill="#a26b00" text-anchor="middle">☀</text>
+      <text x="75" y="113" font-family="'PingFang SC','Microsoft YaHei',sans-serif" font-size="15" font-weight="700" fill="#193425" text-anchor="start">早睡早起</text><text x="75" y="135" font-family="'PingFang SC','Microsoft YaHei',sans-serif" font-size="12" font-weight="500" fill="#637367" text-anchor="start">按时作息</text>
+      <text x="278" y="125" font-family="'PingFang SC','Microsoft YaHei',sans-serif" font-size="18" font-weight="800" fill="#16643a" text-anchor="end">+10</text>
+      <rect x="16" y="160" width="288" height="62" rx="12" fill="#ffffff" stroke="none"/>
+      <circle cx="45" cy="191" r="18" fill="#dcecff"/><text x="45" y="197" font-family="'PingFang SC','Microsoft YaHei',sans-serif" font-size="13" font-weight="700" fill="#315c9b" text-anchor="middle">书</text>
+      <text x="75" y="185" font-family="'PingFang SC','Microsoft YaHei',sans-serif" font-size="15" font-weight="700" fill="#193425" text-anchor="start">阅读 30 分钟</text><text x="75" y="207" font-family="'PingFang SC','Microsoft YaHei',sans-serif" font-size="12" font-weight="500" fill="#637367" text-anchor="start">养成阅读习惯</text>
+      <text x="278" y="197" font-family="'PingFang SC','Microsoft YaHei',sans-serif" font-size="18" font-weight="800" fill="#16643a" text-anchor="end">+8</text>
+      <rect x="16" y="232" width="288" height="62" rx="12" fill="#ffffff" stroke="none"/>
+      <circle cx="45" cy="263" r="18" fill="#ffe2d7"/><text x="45" y="269" font-family="'PingFang SC','Microsoft YaHei',sans-serif" font-size="13" font-weight="700" fill="#a34828" text-anchor="middle">包</text>
+      <text x="75" y="257" font-family="'PingFang SC','Microsoft YaHei',sans-serif" font-size="15" font-weight="700" fill="#193425" text-anchor="start">整理书包</text><text x="75" y="279" font-family="'PingFang SC','Microsoft YaHei',sans-serif" font-size="12" font-weight="500" fill="#637367" text-anchor="start">自己的事情自己做</text>
+      <text x="278" y="269" font-family="'PingFang SC','Microsoft YaHei',sans-serif" font-size="18" font-weight="800" fill="#16643a" text-anchor="end">+5</text>
+      <rect x="52" y="308" width="216" height="38" rx="8" fill="#16643a" stroke="none"/><text x="160" y="333" font-family="'PingFang SC','Microsoft YaHei',sans-serif" font-size="15" font-weight="700" fill="#ffffff" text-anchor="middle">提交申请</text>
+
+</svg>

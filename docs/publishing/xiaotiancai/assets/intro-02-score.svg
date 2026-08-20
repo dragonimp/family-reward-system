@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="320" height="360" viewBox="0 0 320 360">
+  <rect width="320" height="360" fill="#eef5ef"/>
+  <rect width="320" height="72" fill="#315c9b"/>
+  <text x="20" y="31" font-family="'PingFang SC','Microsoft YaHei',sans-serif" font-size="20" font-weight="700" fill="#ffffff" text-anchor="start">测试儿童的积分</text>
+  <text x="20" y="54" font-family="'PingFang SC','Microsoft YaHei',sans-serif" font-size="12" font-weight="500" fill="#eaf4ec" text-anchor="start">家庭奖励一目了然</text>
+
+      <rect x="16" y="90" width="288" height="120" rx="16" fill="#ffffff" stroke="none"/>
+      <circle cx="82" cy="150" r="43" fill="#fff4d6" stroke="#f3bd42" stroke-width="8"/>
+      <text x="82" y="147" font-family="'PingFang SC','Microsoft YaHei',sans-serif" font-size="28" font-weight="800" fill="#7a5100" text-anchor="middle">128</text>
+      <text x="82" y="168" font-family="'PingFang SC','Microsoft YaHei',sans-serif" font-size="12" font-weight="600" fill="#7a5100" text-anchor="middle">积分</text>
+      <text x="146" y="129" font-family="'PingFang SC','Microsoft YaHei',sans-serif" font-size="17" font-weight="700" fill="#193425" text-anchor="start">今天也在进步</text>
+      <text x="146" y="155" font-family="'PingFang SC','Microsoft YaHei',sans-serif" font-size="14" font-weight="600" fill="#44604b" text-anchor="start">现金奖励  ¥20</text>
+      <text x="146" y="181" font-family="'PingFang SC','Microsoft YaHei',sans-serif" font-size="14" font-weight="600" fill="#44604b" text-anchor="start">物品奖励  3 件</text>
+      <rect x="16" y="225" width="138" height="72" rx="12" fill="#e4efff" stroke="none"/>
+      <text x="85" y="255" font-family="'PingFang SC','Microsoft YaHei',sans-serif" font-size="16" font-weight="700" fill="#1f538b" text-anchor="middle">积分申请</text>
+      <text x="85" y="278" font-family="'PingFang SC','Microsoft YaHei',sans-serif" font-size="12" font-weight="500" fill="#42698f" text-anchor="middle">选择规则提交</text>
+      <rect x="166" y="225" width="138" height="72" rx="12" fill="#ffe9e0" stroke="none"/>
+      <text x="235" y="255" font-family="'PingFang SC','Microsoft YaHei',sans-serif" font-size="16" font-weight="700" fill="#963f24" text-anchor="middle">最近申请</text>
+      <text x="235" y="278" font-family="'PingFang SC','Microsoft YaHei',sans-serif" font-size="12" font-weight="500" fill="#975c48" text-anchor="middle">查看审核状态</text>
+      <text x="160" y="333" font-family="'PingFang SC','Microsoft YaHei',sans-serif" font-size="12" font-weight="500" fill="#5b7161" text-anchor="middle">仅展示当前孩子自己的奖励</text>
+
+</svg>

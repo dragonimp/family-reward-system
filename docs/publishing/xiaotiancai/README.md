@@ -1,6 +1,6 @@
 # 家加分小天才上架资料包
 
-整理日期：2026-08-13
+整理日期：2026-08-20
 
 本目录只面向小天才手表应用市场真实提审。通用手表端工程、三平台上架手册和发布签名边界仍以 `watch-app/` 为准；本目录把小天才官方当前公开要求拆成可提交材料、待补附件和审核说明。
 
@@ -8,10 +8,12 @@
 
 - 应用基础资料：`01-app-basic-info.md`
 - 客服/审核使用说明：`02-review-user-guide.md`
-- 测试用例与报告模板：`03-test-cases-and-report.md`
-- 隐私政策草案：`04-privacy-policy-draft.md`
-- 用户协议草案：`05-user-agreement-draft.md`
-- 首次提交免责函草案：`06-disclaimer-draft.md`
+- 测试用例与实测报告：`03-test-cases-and-report.md`
+- 隐私政策定稿：`04-privacy-policy-draft.md`（历史文件名保留）
+- 用户协议定稿：`05-user-agreement-draft.md`（历史文件名保留）
+- 首次提交免责函定稿：`06-disclaimer-draft.md`（待公司盖章）
+- 服务器性能实测报告：`12-server-performance-report.md`
+- 已校验图标及介绍图：`assets/`
 - 提审邮件模板：`07-release-email-template.md`
 - 材料来源与外部动作边界：`08-user-provided-materials.md`
 - 官方要求核对笔记：`09-official-requirements-notes.md`
@@ -32,7 +34,7 @@
 | 应用信息接口 | `https://happylife.ai.impx.net/api/watch/app-info` |
 | 后端健康检查 | `https://happylife.ai.impx.net/health` |
 | 功能范围 | 儿童认证码绑定、积分查询、积分申请、最近申请状态、设备解绑码 |
-| 权限范围 | 网络访问、网络状态检测 |
+| 权限范围 | 网络访问、网络状态检测；主动语音输入时使用麦克风，不保存原始录音 |
 
 ## 完成边界
 

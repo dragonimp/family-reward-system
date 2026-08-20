@@ -1,0 +1,49 @@
+{
+  "appName": "家加分手表积分",
+  "packageId": "net.impx.happylife.watch",
+  "versionName": "1.0.0",
+  "versionCode": 100,
+  "generatedAt": "2026-08-21T00:15:00+08:00",
+  "androidSourceCommit": "6b25120",
+  "apk": {
+    "file": "家加分手表积分_1.0.0_100_signed.apk",
+    "sizeBytes": 14677,
+    "sha256": "8775bcfe19f9085e0077eab01fc98e9dace4bba873603150f46f591a1f9c4f95",
+    "debuggable": false,
+    "signatureSchemes": ["v1", "v2"]
+  },
+  "signingCertificate": {
+    "file": "happylife-watch-signing-certificate.pem",
+    "subject": "CN=厦门图灵软件有限公司, OU=研发部, O=厦门图灵软件有限公司, L=厦门市, ST=福建省, C=CN",
+    "algorithm": "RSA 4096",
+    "sha256": "61a9f7a203b3a0ab71b89691850b2d646e405ba4ba0dc496363ce6ad62d814b9"
+  },
+  "permissions": [
+    "android.permission.INTERNET",
+    "android.permission.ACCESS_NETWORK_STATE",
+    "android.permission.RECORD_AUDIO"
+  ],
+  "publicBaseUrl": "https://happylife.ai.impx.net/releases/xiaotiancai/1.0.0/",
+  "files": [
+    {"name": "app-icon-148x148.png", "sha256": "233fd9f43b6931c7f198ac2457477e20c435269a656044d1ab473f95c2565416"},
+    {"name": "intro-01-bind.png", "sha256": "0ba4efa50019ebeb1e265e758de1750b068064c2e34702e3b04fa800085f3cd4"},
+    {"name": "intro-02-score.png", "sha256": "d7daedbe7c787aa959be0d735d9db9eba6881800b18a0630b064e42ecb21e3b6"},
+    {"name": "intro-03-request.png", "sha256": "43269bfc62c3d84be6d170a88525b8a824cfde01edd1d19a4cbb5a48ac9359c0"},
+    {"name": "intro-04-status.png", "sha256": "af12da203a507fffecd4d4019cd1dc05d127fbb813a52febed5219319fa65a7d"},
+    {"name": "intro-05-voice.png", "sha256": "03039c97467c59e220eaef3484fae64a3cb62c77d528d4194e685eb627f0a765"},
+    {"name": "家加分手表积分_隐私政策.pdf", "sha256": "f2db784db71068b14cb2297074c0886534a59db2659e15ccc8656b6145e513ab"},
+    {"name": "家加分手表积分_用户协议.pdf", "sha256": "d016e0c4274cdf8905bf417f917832c9e3be2e200bbef4d78d0bc48bec4f7338"},
+    {"name": "家加分手表积分_首次提交免责函_待盖章.pdf", "sha256": "97e95053007fc3e063e29f75b14e7a8051b09b126f82c9fb1e3eb599d86de7ef"},
+    {"name": "家加分手表积分_测试报告.pdf", "sha256": "7354e100ff25a367a2e4cab064edbadfd9ba13add7f32c30c39497548742027c"},
+    {"name": "家加分手表积分_服务器性能报告.pdf", "sha256": "e288634e333c6ef7a3b8e2b3e93673c2bac2abb8b1384b1d330cf2dbd7cbec96"},
+    {"name": "家加分手表积分_客服审核使用说明.pdf", "sha256": "a20c39374e84d81a992f04d958c6b726a469e42d4b80a76da3b2d5adb5fc29c8"}
+  ],
+  "externalEvidenceStillRequired": [
+    "法定代表人翁志海身份证正反面",
+    "软件著作权登记证书",
+    "APP备案证明",
+    "公司盖章或签署后的免责函和版权承诺函",
+    "小天才平台准入及版本验收回执",
+    "目标小天才物理真机兼容测试与原始截图"
+  ]
+}

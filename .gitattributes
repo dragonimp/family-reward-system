@@ -1,0 +1,5 @@
+*.apk binary
+*.jar binary
+*.pdf binary
+*.bat binary
+*.pem text eol=lf

@@ -8,7 +8,7 @@
 - 清单：`https://happylife.ai.impx.net/watch/manifest.json`
 - 应用包名：`net.impx.happylife.watch`
 - 手表端身份：输入家长生成的儿童认证码完成设备绑定
-- 权限范围：仅网络访问和网络状态检测
+- 权限范围：网络访问、网络状态检测；主动语音输入时按需使用麦克风，服务端不保存原始录音
 
 ## 设备绑定流程
 
@@ -36,7 +36,7 @@ dotnet build FamilyReward.slnx
 
 ## 打包边界
 
-本仓库已准备可构建的 Android 工程和上架材料。真正生成签名包还需要平台开发者账号和签名证书：
+本仓库已准备可构建的 Android 工程和上架材料。正式 1.0.0 签名包已在受控发布环境生成；后续版本继续通过以下环境变量使用同一签名：
 
 - `HAPPYLIFE_WATCH_KEYSTORE`
 - `HAPPYLIFE_WATCH_KEY_ALIAS`
@@ -49,4 +49,4 @@ dotnet build FamilyReward.slnx
 ./gradlew :app:assembleRelease
 ```
 
-工程会从上述四个环境变量读取 release 签名配置；缺少任一项时 release 构建会直接报错，避免误交未签名产物。仓库不提交 Gradle wrapper 二进制、真实证书或密码，发布环境需提供受控 Gradle/JDK/Android SDK 工具链。
+工程会从上述四个环境变量读取 release 签名配置；缺少任一项时 release 构建会直接报错，避免误交未签名产物。仓库不提交真实证书或密码，发布环境需提供受控 JDK/Android SDK/Gradle 工具链。

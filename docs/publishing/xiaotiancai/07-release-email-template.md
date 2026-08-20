@@ -34,11 +34,12 @@ Version Code：100
 儿童认证码：见附件或平台安全字段，审核后作废
 
 三、联系方式
-公司名称：待填写
-联系人：待填写
-联系电话：待填写
-联系邮箱：待填写
-客服邮箱/电话：待填写
+公司名称：厦门图灵软件有限公司
+统一社会信用代码：91350206699925225K
+联系人：翁志海
+联系电话：18950102822
+联系邮箱：wengzhihai@xmkurt.com
+客服邮箱/电话：wengzhihai@xmkurt.com / 18950102822
 
 四、附件清单
 1. 签名 APK
@@ -53,6 +54,9 @@ Version Code：100
 10. 测试报告
 11. 首次提交服务器负载/性能报告，或无独立报告原因说明
 12. 客服使用说明
+
+隐私政策：https://happylife.ai.impx.net/legal/privacy.html
+用户协议：https://happylife.ai.impx.net/legal/terms.html
 
 请查收，谢谢。
 ```

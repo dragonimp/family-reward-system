@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="320" height="360" viewBox="0 0 320 360">
+  <rect width="320" height="360" fill="#eef5ef"/>
+  <rect width="320" height="72" fill="#16643a"/>
+  <text x="20" y="31" font-family="'PingFang SC','Microsoft YaHei',sans-serif" font-size="20" font-weight="700" fill="#ffffff" text-anchor="start">绑定孩子手表</text>
+  <text x="20" y="54" font-family="'PingFang SC','Microsoft YaHei',sans-serif" font-size="12" font-weight="500" fill="#eaf4ec" text-anchor="start">家长生成一次性认证码</text>
+
+      <rect x="18" y="92" width="284" height="226" rx="16" fill="#ffffff" stroke="none"/>
+      <circle cx="160" cy="132" r="28" fill="#dff0e3"/>
+      <path d="M145 133l10 10 22-25" fill="none" stroke="#16643a" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>
+      <text x="160" y="177" font-family="'PingFang SC','Microsoft YaHei',sans-serif" font-size="17" font-weight="700" fill="#193425" text-anchor="middle">输入 6 位儿童认证码</text>
+      <rect x="42" y="194" width="236" height="46" rx="8" fill="#f4f7f4" stroke="#b9cdbd"/>
+      <text x="160" y="223" font-family="'PingFang SC','Microsoft YaHei',sans-serif" font-size="18" font-weight="600" fill="#75877a" text-anchor="middle">•  •  •  •  •  •</text>
+      <rect x="42" y="254" width="236" height="44" rx="8" fill="#16643a" stroke="none"/>
+      <text x="160" y="282" font-family="'PingFang SC','Microsoft YaHei',sans-serif" font-size="16" font-weight="700" fill="#ffffff" text-anchor="middle">绑定手表</text>
+      <text x="160" y="340" font-family="'PingFang SC','Microsoft YaHei',sans-serif" font-size="12" font-weight="500" fill="#5b7161" text-anchor="middle">认证码一次有效 · 由家长管理</text>
+
+</svg>
