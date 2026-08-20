@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { sanitizeFeedbackLocation } from './src/utils/feedbackPrivacy.ts';
+import { calculateReleaseReadiness, xiaotiancaiReleaseMaterials } from './src/utils/releaseReadiness.ts';
 
 test('REQ-028 offers an explicit family selector and scoped child view', async () => {
   const page = await readFile(new URL('./src/pages/FamilyGroups.tsx', import.meta.url), 'utf8');
@@ -179,6 +180,51 @@ test('REQ-045 previews the real watch UI for parent-owned children on mobile', a
   assert.match(backend, /孩子不存在，或不属于当前家长账号/);
   assert.match(backend, /const isPreview = \/\^\\d\+\$\//);
   assert.match(backend, /虚拟手表仅供预览/);
+});
+
+test('TC-032 references User Center credentials without collecting secret values', async () => {
+  const page = await readFile(new URL('./src/pages/WatchRelease.tsx', import.meta.url), 'utf8');
+
+  assert.match(page, /用户中心 → 个人信息管理 → 凭证管理/);
+  assert.match(page, /不接收密码、验证码、证件号码或密钥原文/);
+  assert.match(page, /本页“凭证管理已配置”不等于材料已验证/);
+  assert.doesNotMatch(page, /type="password"/);
+});
+
+test('TC-033 exposes the Xiaotiancai release workspace and full critical material set', async () => {
+  const [app, layout, page, readiness] = await Promise.all([
+    readFile(new URL('./src/App.tsx', import.meta.url), 'utf8'),
+    readFile(new URL('./src/components/Layout.tsx', import.meta.url), 'utf8'),
+    readFile(new URL('./src/pages/WatchRelease.tsx', import.meta.url), 'utf8'),
+    readFile(new URL('./src/utils/releaseReadiness.ts', import.meta.url), 'utf8'),
+  ]);
+
+  assert.match(app, /path="\/watch-release" element=\{<WatchReleasePage \/>\}/);
+  assert.match(layout, /上架准备/);
+  assert.match(page, /calculateReleaseReadiness/);
+  for (const material of ['正式签名 APK', '软件著作权', '应用备案', '首次提交免责函', '真机测试结果']) {
+    assert.match(readiness, new RegExp(material));
+  }
+  assert.match(readiness, /credential_configured/);
+  assert.match(readiness, /一次性儿童认证码/);
+});
+
+test('TC-031 calculates Xiaotiancai gaps without treating configured credentials as verified', () => {
+  const initial = calculateReleaseReadiness(xiaotiancaiReleaseMaterials, {});
+  const configured = calculateReleaseReadiness(xiaotiancaiReleaseMaterials, {
+    developer_access: 'credential_configured',
+    contact: 'credential_configured',
+  });
+  const verified = calculateReleaseReadiness(xiaotiancaiReleaseMaterials, {
+    developer_access: 'verified',
+    contact: 'verified',
+  });
+
+  assert.equal(configured.ready, initial.ready);
+  assert.equal(configured.missing, initial.missing);
+  assert.equal(configured.credentialConfigured, 2);
+  assert.equal(verified.ready, initial.ready + 2);
+  assert.equal(verified.missing, initial.missing - 2);
 });
 
 test('REQ-048 scopes public MCP tools by User Center username', async () => {
