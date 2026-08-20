@@ -7,8 +7,8 @@ FAMILY_GROUP_ID="${FAMILY_GROUP_ID:-}"
 KNOWN_CHILD_ID="${KNOWN_CHILD_ID:-}"
 KNOWN_CHILD_NAME="${KNOWN_CHILD_NAME:-}"
 MISSING_CHILD_ID="${MISSING_CHILD_ID:-999999999}"
-PARENT_USER_ID="${PARENT_USER_ID:-wss}"
-export FAMILY_GROUP_ID KNOWN_CHILD_ID KNOWN_CHILD_NAME MISSING_CHILD_ID PARENT_USER_ID
+USER_CENTER_USERNAME="${USER_CENTER_USERNAME:-wss}"
+export FAMILY_GROUP_ID KNOWN_CHILD_ID KNOWN_CHILD_NAME MISSING_CHILD_ID USER_CENTER_USERNAME
 
 if ! command -v jq >/dev/null 2>&1; then
   echo "jq is required." >&2
@@ -21,12 +21,12 @@ fail_count=0
 call_mcp() {
   local tool_name="$1"
   local arguments="$2"
-  jq -cn --arg name "$tool_name" --arg parent "$PARENT_USER_ID" --argjson arguments "$arguments" \
-    '{name: $name, arguments: ($arguments + {parent_user_id: $parent})}' |
+  jq -cn --arg name "$tool_name" --arg username "$USER_CENTER_USERNAME" --argjson arguments "$arguments" \
+    '{name: $name, arguments: ($arguments + {username: $username})}' |
     curl -sS -X POST "$MCP_URL" -H 'Content-Type: application/json' --data-binary @-
 }
 
-call_mcp_without_parent() {
+call_mcp_without_username() {
   local tool_name="$1"
   local arguments="$2"
   jq -cn --arg name "$tool_name" --argjson arguments "$arguments" \
@@ -52,14 +52,14 @@ catalog="$(curl -sS "$MCP_URL")"
 assert_jq "catalog exposes 40 tools" "$catalog" '.tools.tools | length == 40'
 assert_jq "query_children declares strict snake_case keys" "$catalog" '
   [.tools.tools[] | select(.name == "family_reward_query_children") | .inputSchema.properties | keys]
-  | .[0] == ["child_id", "child_name", "family_group_id", "parent_user_id"]
+  | .[0] == ["child_id", "child_name", "family_group_id", "username"]
 '
-assert_jq "list_children declares family group and parent only" "$catalog" '
+assert_jq "list_children declares family group and username only" "$catalog" '
   [.tools.tools[] | select(.name == "family_reward_list_children") | .inputSchema.properties | keys]
-  | .[0] == ["family_group_id", "parent_user_id"]
+  | .[0] == ["family_group_id", "username"]
 '
-assert_jq "all tools require parent_user_id" "$catalog" '
-  .tools.tools | length == 40 and all(.inputSchema.required | index("parent_user_id") != null)
+assert_jq "all tools require username" "$catalog" '
+  .tools.tools | length == 40 and all(.inputSchema.required | index("username") != null)
 '
 assert_jq "catalog covers current parent business UI" "$catalog" '
   [.tools.tools[].name] as $names
@@ -109,9 +109,9 @@ assert_jq "unknown camelCase parameter is rejected" "$unknown_arg" '
   .ok == false and (.error | contains("未知参数")) and (.error | contains("childId"))
 '
 
-missing_parent="$(call_mcp_without_parent family_reward_query_children '{}')"
-assert_jq "missing parent is rejected" "$missing_parent" '
-  .ok == false and .action == "validate_parent" and (.error | contains("parent_user_id"))
+missing_username="$(call_mcp_without_username family_reward_query_children '{}')"
+assert_jq "missing username is rejected" "$missing_username" '
+  .ok == false and .action == "validate_parent" and (.error | contains("username"))
 '
 
 groups="$(call_mcp family_reward_query_family_groups '{}')"
@@ -128,7 +128,7 @@ if [[ -z "$FAMILY_GROUP_ID" ]]; then
   FAMILY_GROUP_ID="$(jq -r '.children[0].family_group_id // empty' <<<"$owned_children")"
 fi
 if [[ -z "$KNOWN_CHILD_ID" || -z "$KNOWN_CHILD_NAME" || -z "$FAMILY_GROUP_ID" ]]; then
-  printf 'SKIP child-dependent MCP checks: parent %s has no owned child in a circle.\n' "$PARENT_USER_ID"
+  printf 'SKIP child-dependent MCP checks: username %s has no owned child in a circle.\n' "$USER_CENTER_USERNAME"
   printf '\nMCP catalog tests: %s passed, %s failed\n' "$pass_count" "$fail_count"
   if [ "$fail_count" -gt 0 ]; then
     exit 1

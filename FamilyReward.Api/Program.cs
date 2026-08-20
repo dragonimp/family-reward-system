@@ -1801,7 +1801,7 @@ app.MapPost("/api/agent/invoke", async (JsonObject body, IHttpClientFactory http
             agent.String("apiKey"),
             agent.String("profile", "happylife"),
             agent.String("workingDirectory", "/Users/wengzhishan/Projects/family-reward-system"),
-            access.Profile!.AppUserId,
+            GetUnifiedUsername(request),
             prompt,
             agent.Int("timeout_seconds") ?? 90);
         return acpResult.Ok
@@ -2190,7 +2190,7 @@ app.MapPost("/api/agentfree/chat/stream", async (JsonObject body, IHttpClientFac
                 ["channelType"] = "WebApp",
                 ["webAppBotId"] = webAppBotId,
                 ["agentId"] = agentId.Value,
-                ["parentAppUserId"] = access.Profile!.AppUserId
+                ["username"] = userName
             },
             ["gatewayContext"] = new JsonObject
             {
@@ -2199,7 +2199,7 @@ app.MapPost("/api/agentfree/chat/stream", async (JsonObject body, IHttpClientFac
                 ["GatewayMetadata_transport"] = webAppBotId,
                 ["GatewayMetadata_source"] = "family-reward-web",
                 ["GatewayMetadata_webAppBotId"] = webAppBotId,
-                ["GatewayMetadata_parentAppUserId"] = access.Profile!.AppUserId
+                ["GatewayMetadata_username"] = userName
             }
         };
         if (body["enableThinking"] is not null) payload["enableThinking"] = body["enableThinking"]!.DeepClone();
@@ -2477,7 +2477,7 @@ static async Task<(bool Ok, string Text, string Error)> InvokeGoldfishAcp(
     string apiKey,
     string profile,
     string workingDirectory,
-    string parentAppUserId,
+    string username,
     string prompt,
     int timeoutSeconds,
     Func<string, CancellationToken, Task>? onDelta = null,
@@ -2520,7 +2520,7 @@ static async Task<(bool Ok, string Text, string Error)> InvokeGoldfishAcp(
             sessionId = createdSessionId;
         }
 
-        var contextualPrompt = $"当前家长用户编号：{parentAppUserId}。调用规则相关工具时必须把该编号作为 user_id。\n\n{prompt}";
+        var contextualPrompt = $"当前登录用户的用户中心用户名：{username}。调用 MCP 工具时必须传 username，不能传或推断内部用户编号。\n\n{prompt}";
         var promptPayload = new JsonObject
         {
             ["jsonrpc"] = "2.0",
@@ -2539,7 +2539,7 @@ static async Task<(bool Ok, string Text, string Error)> InvokeGoldfishAcp(
                     {
                         ["agent_type"] = "Goldfish",
                         ["Profile"] = profile,
-                        ["user_id"] = parentAppUserId
+                        ["username"] = username
                     }
                 }
             }
@@ -3354,18 +3354,18 @@ static object BuildMcpToolCatalog()
             continue;
         }
 
-        properties["parent_user_id"] = new JsonObject
+        properties["username"] = new JsonObject
         {
             ["type"] = "string",
-            ["description"] = "当前操作家长的统一用户名或家长应用用户编号（必填）。服务端据此计算本人家庭、孩子所属关系和圈子成员权限，不能用它指定或冒充被操作对象。"
+            ["description"] = "当前登录用户的用户中心用户名（必填）。由 Goldfish 网关注入；服务端据此解析当前家长的内部权限范围。"
         };
         var required = schema["required"] as JsonArray ?? [];
-        if (!required.Any(item => string.Equals(item?.GetValue<string>(), "parent_user_id", StringComparison.Ordinal)))
+        if (!required.Any(item => string.Equals(item?.GetValue<string>(), "username", StringComparison.Ordinal)))
         {
-            required.Insert(0, "parent_user_id");
+            required.Insert(0, "username");
         }
         schema["required"] = required;
-        tool["description"] = $"{tool.String("description")} 所有调用必须传 parent_user_id，服务端会执行真实数据权限校验，越权返回权限不足。";
+        tool["description"] = $"{tool.String("description")} 所有调用必须传用户中心用户名 username；服务端会解析内部权限并拒绝越权访问。";
     }
 
     return new { tools = toolNodes };
@@ -3597,7 +3597,7 @@ static async Task<object> SafeInvokeFamilyRewardMcpTool(string toolName, JsonObj
         {
             ok = false,
             action = "validate_parent",
-            error = "缺少必填参数 parent_user_id。请传家长用户名或家长应用用户编号。"
+            error = "缺少必填参数 username。请传当前登录用户的用户中心用户名。"
         };
     }
 
@@ -3614,7 +3614,7 @@ static async Task<object> SafeInvokeFamilyRewardMcpTool(string toolName, JsonObj
 static IEnumerable<string> GetUnknownMcpArguments(string toolName, JsonObject arguments)
 {
     var allowed = GetAllowedMcpArguments(toolName);
-    allowed.Add("parent_user_id");
+    allowed.Add("username");
     return arguments.Select(item => item.Key).Where(key => !allowed.Contains(key, StringComparer.Ordinal));
 }
 
@@ -4327,7 +4327,7 @@ static async Task<object> McpQueryRules(string connectionString, JsonObject argu
 {
     var parentAppUserId = ResolveMcpParentAppUserId(arguments);
     return parentAppUserId is null
-        ? new { ok = false, action = "query_rules", error = "缺少家长用户信息 parent_user_id" }
+        ? new { ok = false, action = "query_rules", error = "缺少用户中心用户名 username" }
         : new { ok = true, action = "query_rules", data = await GetRules(connectionString, parentAppUserId) };
 }
 
@@ -4339,11 +4339,11 @@ static async Task<object> McpCreateRule(string connectionString, JsonObject argu
         return new { ok = false, error = "规则名称不能为空" };
     }
     var parentAppUserId = ResolveMcpParentAppUserId(arguments);
-    if (parentAppUserId is null) return new { ok = false, error = "缺少家长用户信息 parent_user_id" };
+    if (parentAppUserId is null) return new { ok = false, error = "缺少用户中心用户名 username" };
     var result = await CreatePersonalRule(connectionString, parentAppUserId, arguments);
     return result.ContainsKey("error")
         ? new { ok = false, error = Convert.ToString(result["error"], CultureInfo.InvariantCulture) }
-        : new { ok = true, action = "create_rule", rule = result["rule"], parent_app_user_id = parentAppUserId };
+        : new { ok = true, action = "create_rule", rule = result["rule"] };
 }
 
 static async Task<object> McpUpdateRule(string connectionString, JsonObject arguments)
@@ -4354,7 +4354,7 @@ static async Task<object> McpUpdateRule(string connectionString, JsonObject argu
         return new { ok = false, error = "缺少规则ID" };
     }
     var parentAppUserId = ResolveMcpParentAppUserId(arguments);
-    if (parentAppUserId is null) return new { ok = false, error = "缺少家长用户信息 parent_user_id" };
+    if (parentAppUserId is null) return new { ok = false, error = "缺少用户中心用户名 username" };
 
     await using var conn = await OpenConnection(connectionString);
     await using var cmd = new NpgsqlCommand("""
@@ -4392,7 +4392,7 @@ static async Task<object> McpDeleteRule(string connectionString, JsonObject argu
         return new { ok = false, error = "缺少规则ID" };
     }
     var parentAppUserId = ResolveMcpParentAppUserId(arguments);
-    if (parentAppUserId is null) return new { ok = false, error = "缺少家长用户信息 parent_user_id" };
+    if (parentAppUserId is null) return new { ok = false, error = "缺少用户中心用户名 username" };
 
     await using var conn = await OpenConnection(connectionString);
     await using var cmd = new NpgsqlCommand("DELETE FROM rules WHERE id = @id AND owner_app_user_id = @owner_app_user_id RETURNING *", conn);
@@ -4408,11 +4408,8 @@ static async Task<object> McpDeleteRule(string connectionString, JsonObject argu
 
 static string? ResolveMcpParentAppUserId(JsonObject arguments)
 {
-    var userId = arguments.String("parent_user_id").Trim();
-    if (string.IsNullOrWhiteSpace(userId)) return null;
-    return userId.EndsWith("parent", StringComparison.OrdinalIgnoreCase)
-        ? NormalizeBusinessUserName(userId)
-        : MakeParentAppUserId(userId);
+    var username = arguments.String("username").Trim();
+    return string.IsNullOrWhiteSpace(username) ? null : MakeParentAppUserId(username);
 }
 
 static async Task<object> McpQueryFamilyGroups(string connectionString, JsonObject arguments)

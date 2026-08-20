@@ -134,7 +134,7 @@ test('REQ-036 scopes personal rule templates to a parent across web, watch and M
   assert.match(api, /CREATE TABLE IF NOT EXISTS user_rule_template_items/);
   assert.match(api, /owner_app_user_id/);
   assert.match(api, /GetRules\(connectionString, binding\.Binding!\.ParentAppUserId\)/);
-  assert.match(api, /allowed\.Add\("parent_user_id"\)/);
+  assert.match(api, /allowed\.Add\("username"\)/);
   assert.match(api, /ResolveMcpParentAppUserId/);
   assert.match(page, />我的规则模板</);
   assert.match(page, /saveRuleTemplate\(selectedIds\)/);
@@ -181,17 +181,19 @@ test('REQ-045 previews the real watch UI for parent-owned children on mobile', a
   assert.match(backend, /虚拟手表仅供预览/);
 });
 
-test('REQ-048 requires parent scope for public MCP tools', async () => {
+test('REQ-048 scopes public MCP tools by User Center username', async () => {
   const [api, library] = await Promise.all([
     readFile(new URL('../FamilyReward.Api/Program.cs', import.meta.url), 'utf8'),
     readFile(new URL('../application/mcp/family-reward-mcp-tool-library-split.json', import.meta.url), 'utf8'),
   ]);
-  assert.match(api, /缺少必填参数 parent_user_id/);
+  assert.match(api, /缺少必填参数 username/);
   assert.match(api, /GetMcpVisibleFamilyChildren/);
   assert.match(api, /IsMcpFamilyAccessible/);
-  assert.match(api, /parentAppUserId: ResolveMcpParentAppUserId\(arguments\)/);
+  assert.match(api, /MakeParentAppUserId\(username\)/);
+  assert.doesNotMatch(api, /GatewayMetadata_parentAppUserId/);
   assert.match(api, /当前家长权限不足/);
-  assert.match(library, /parent_user_id/);
+  assert.match(library, /username/);
+  assert.doesNotMatch(library, /parent_user_id/);
 });
 
 test('REQ-049 removes legacy menus and manual watch request fields', async () => {

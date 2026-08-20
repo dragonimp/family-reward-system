@@ -7,7 +7,7 @@
 - 服务版本：`3.1.0`
 - 工具数量：40
 - 导入文件：`application/mcp/family-reward-mcp-tool-library-split.json`
-- 身份参数：每个工具都必须由网关注入当前登录家长的 `parent_user_id`，不得允许模型或最终用户指定他人身份。
+- 身份参数：每个工具都必须由网关注入当前登录家长的 `username`，不得允许模型或最终用户指定他人身份。
 
 ## 概念与权限
 

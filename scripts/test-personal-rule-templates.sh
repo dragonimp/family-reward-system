@@ -4,8 +4,10 @@ trap 'echo "not ok - personal rule template test failed at line ${LINENO}" >&2' 
 
 API_BASE="${FAMILY_REWARD_TEST_API_BASE:-http://127.0.0.1:5119}"
 SUFFIX="${REQ036_TEST_SUFFIX:-$(date +%s)-$$}"
-PARENT_A="req036-a-${SUFFIX}-parent"
-PARENT_B="req036-b-${SUFFIX}-parent"
+USERNAME_A="req036-a-${SUFFIX}"
+USERNAME_B="req036-b-${SUFFIX}"
+PARENT_A="${USERNAME_A}parent"
+PARENT_B="${USERNAME_B}parent"
 
 api() {
   local parent="$1"
@@ -41,17 +43,17 @@ test "$status" = '404'
 jq -e '.error | contains("公共规则")' /tmp/req036-public-edit.json >/dev/null
 echo 'ok 3 - 公共规则保持只读'
 
-mcp family_reward_query_rules '{}' | jq -e '.ok == false and (.error | contains("parent_user_id"))' >/dev/null
-custom_mcp="$(mcp family_reward_create_rule "{\"parent_user_id\":\"${PARENT_A}\",\"name\":\"主动阅读-${SUFFIX}\",\"category\":\"学习\",\"points\":8}")"
+mcp family_reward_query_rules '{}' | jq -e '.ok == false and (.error | contains("username"))' >/dev/null
+custom_mcp="$(mcp family_reward_create_rule "{\"username\":\"${USERNAME_A}\",\"name\":\"主动阅读-${SUFFIX}\",\"category\":\"学习\",\"points\":8}")"
 custom_mcp_id="$(jq -er '.rule.id' <<<"$custom_mcp")"
-mcp family_reward_query_rules "{\"parent_user_id\":\"${PARENT_A}\"}" | jq -e --argjson id "$custom_mcp_id" '.ok == true and (.data.personalRules | any(.id == $id))' >/dev/null
-mcp family_reward_query_rules "{\"parent_user_id\":\"${PARENT_B}\"}" | jq -e --argjson id "$custom_mcp_id" '.data.rules | all(.id != $id)' >/dev/null
+mcp family_reward_query_rules "{\"username\":\"${USERNAME_A}\"}" | jq -e --argjson id "$custom_mcp_id" '.ok == true and (.data.personalRules | any(.id == $id))' >/dev/null
+mcp family_reward_query_rules "{\"username\":\"${USERNAME_B}\"}" | jq -e --argjson id "$custom_mcp_id" '.data.rules | all(.id != $id)' >/dev/null
 echo 'ok 4 - MCP强制用户入参且新增规则隔离到该用户模板'
 
 redline="$(api "$PARENT_A" -H 'Content-Type: application/json' -d "{\"name\":\"说谎红线-${SUFFIX}\",\"category\":\"红线\",\"points\":5,\"ruleType\":\"redline\"}" "$API_BASE/api/rules")"
 redline_id="$(jq -er '.id' <<<"$redline")"
 jq -e '.score == -5 and .type == "negative" and .isRedLine == true' <<<"$redline" >/dev/null
-mcp_redline="$(mcp family_reward_create_rule "{\"parent_user_id\":\"${PARENT_A}\",\"name\":\"破坏物品-${SUFFIX}\",\"category\":\"红线\",\"points\":3,\"rule_type\":\"redline\"}")"
+mcp_redline="$(mcp family_reward_create_rule "{\"username\":\"${USERNAME_A}\",\"name\":\"破坏物品-${SUFFIX}\",\"category\":\"红线\",\"points\":3,\"rule_type\":\"redline\"}")"
 jq -e '.ok == true and .rule.score == -3 and .rule.isRedLine == true' <<<"$mcp_redline" >/dev/null
 echo 'ok 5 - Web与MCP均可明确新增红线减分规则'
 

@@ -28,8 +28,8 @@ scripts/test-family-reward-mcp.sh
 ## 覆盖场景
 
 1. 工具目录
-   - `/api/mcp` 返回 40 个工具，每个工具都要求 `parent_user_id`。
-   - `family_reward_query_children` 声明 `parent_user_id`、`family_group_id`、`child_id`、`child_name`。
+   - `/api/mcp` 返回 40 个工具，每个工具都要求 `username`。
+   - `family_reward_query_children` 声明 `username`、`family_group_id`、`child_id`、`child_name`。
    - `family_reward_list_children` 用于“查询孩子列表/列出孩子”等清单场景。
    - 工具描述明确区分家庭与圈子，并说明默认本人孩子、指定圈子全部孩子的查询范围。
 

@@ -10,7 +10,7 @@
       "tools": [
         {
           "name": "family_reward_add_child",
-          "description": "家庭管理/新增孩子：为当前家长创建全局孩子档案并建立所属关系，可设置初始积分、现金和物品。新孩子会同步进入该家长已创建或加入的圈子；family_group_id 只用于指定初始圈子且必须是当前家长可访问的圈子。 所有调用必须传 parent_user_id，服务端会执行真实数据权限校验，越权返回权限不足。",
+          "description": "家庭管理/新增孩子：为当前家长创建全局孩子档案并建立所属关系，可设置初始积分、现金和物品。新孩子会同步进入该家长已创建或加入的圈子；family_group_id 只用于指定初始圈子且必须是当前家长可访问的圈子。 所有调用必须传用户中心用户名 username；服务端会解析内部权限并拒绝越权访问。",
           "inputSchema": {
             "type": "object",
             "properties": {
@@ -42,20 +42,20 @@
                 "type": "integer",
                 "description": "初始物品数（默认为 0）"
               },
-              "parent_user_id": {
+              "username": {
                 "type": "string",
-                "description": "当前操作家长的统一用户名或家长应用用户编号（必填）。服务端据此计算本人家庭、孩子所属关系和圈子成员权限，不能用它指定或冒充被操作对象。"
+                "description": "当前登录用户的用户中心用户名（必填）。由 Goldfish 网关注入；服务端据此解析当前家长的内部权限范围。"
               }
             },
             "required": [
-              "parent_user_id",
+              "username",
               "name"
             ]
           }
         },
         {
           "name": "family_reward_update_child",
-          "description": "家庭管理/修改孩子：仅允许修改当前家长名下孩子的姓名、备注、状态和账户余额；加入同一圈子的其他家庭只能查看，不能修改。按 child_id 或 child_name 定位，至少更新一个字段。 所有调用必须传 parent_user_id，服务端会执行真实数据权限校验，越权返回权限不足。",
+          "description": "家庭管理/修改孩子：仅允许修改当前家长名下孩子的姓名、备注、状态和账户余额；加入同一圈子的其他家庭只能查看，不能修改。按 child_id 或 child_name 定位，至少更新一个字段。 所有调用必须传用户中心用户名 username；服务端会解析内部权限并拒绝越权访问。",
           "inputSchema": {
             "type": "object",
             "properties": {
@@ -95,19 +95,19 @@
                 "type": "integer",
                 "description": "更新后的物品数（覆盖，不是增量）"
               },
-              "parent_user_id": {
+              "username": {
                 "type": "string",
-                "description": "当前操作家长的统一用户名或家长应用用户编号（必填）。服务端据此计算本人家庭、孩子所属关系和圈子成员权限，不能用它指定或冒充被操作对象。"
+                "description": "当前登录用户的用户中心用户名（必填）。由 Goldfish 网关注入；服务端据此解析当前家长的内部权限范围。"
               }
             },
             "required": [
-              "parent_user_id"
+              "username"
             ]
           }
         },
         {
           "name": "family_reward_query_children",
-          "description": "查询孩子：不传 family_group_id 时只返回当前家长名下孩子；传 family_group_id 时先校验当前家长已创建或加入该圈子，再返回圈子内全部孩子（包括其他家庭的孩子，只读）。可用 child_id 或 child_name 定位单个孩子。未命中时必须调用 family_reward_list_children 在相同范围内复核完整清单。 所有调用必须传 parent_user_id，服务端会执行真实数据权限校验，越权返回权限不足。",
+          "description": "查询孩子：不传 family_group_id 时只返回当前家长名下孩子；传 family_group_id 时先校验当前家长已创建或加入该圈子，再返回圈子内全部孩子（包括其他家庭的孩子，只读）。可用 child_id 或 child_name 定位单个孩子。未命中时必须调用 family_reward_list_children 在相同范围内复核完整清单。 所有调用必须传用户中心用户名 username；服务端会解析内部权限并拒绝越权访问。",
           "inputSchema": {
             "type": "object",
             "properties": {
@@ -123,19 +123,19 @@
                 "type": "string",
                 "description": "孩子姓名（可选）。未找到时不要直接结束，应再查完整孩子清单进行对比"
               },
-              "parent_user_id": {
+              "username": {
                 "type": "string",
-                "description": "当前操作家长的统一用户名或家长应用用户编号（必填）。服务端据此计算本人家庭、孩子所属关系和圈子成员权限，不能用它指定或冒充被操作对象。"
+                "description": "当前登录用户的用户中心用户名（必填）。由 Goldfish 网关注入；服务端据此解析当前家长的内部权限范围。"
               }
             },
             "required": [
-              "parent_user_id"
+              "username"
             ]
           }
         },
         {
           "name": "family_reward_list_children",
-          "description": "列出孩子清单：不传 family_group_id 时只列出当前家长名下有效孩子；传入时仅在当前家长可访问的指定圈子中列出全部有效孩子。该工具是清单查询，不接受 child_id 或 child_name。 所有调用必须传 parent_user_id，服务端会执行真实数据权限校验，越权返回权限不足。",
+          "description": "列出孩子清单：不传 family_group_id 时只列出当前家长名下有效孩子；传入时仅在当前家长可访问的指定圈子中列出全部有效孩子。该工具是清单查询，不接受 child_id 或 child_name。 所有调用必须传用户中心用户名 username；服务端会解析内部权限并拒绝越权访问。",
           "inputSchema": {
             "type": "object",
             "properties": {
@@ -143,19 +143,19 @@
                 "type": "integer",
                 "description": "圈子ID；可选。只传此字段时返回该圈子全部孩子"
               },
-              "parent_user_id": {
+              "username": {
                 "type": "string",
-                "description": "当前操作家长的统一用户名或家长应用用户编号（必填）。服务端据此计算本人家庭、孩子所属关系和圈子成员权限，不能用它指定或冒充被操作对象。"
+                "description": "当前登录用户的用户中心用户名（必填）。由 Goldfish 网关注入；服务端据此解析当前家长的内部权限范围。"
               }
             },
             "required": [
-              "parent_user_id"
+              "username"
             ]
           }
         },
         {
           "name": "family_reward_delete_child",
-          "description": "家庭管理/删除孩子所属关系：仅允许当前家长删除自己名下的孩子；不会因为圈子成员身份获得删除权。删除最后一个所属关系时才清理该孩子全局档案及相关数据。按 child_id 或 child_name 定位。 所有调用必须传 parent_user_id，服务端会执行真实数据权限校验，越权返回权限不足。",
+          "description": "家庭管理/删除孩子所属关系：仅允许当前家长删除自己名下的孩子；不会因为圈子成员身份获得删除权。删除最后一个所属关系时才清理该孩子全局档案及相关数据。按 child_id 或 child_name 定位。 所有调用必须传用户中心用户名 username；服务端会解析内部权限并拒绝越权访问。",
           "inputSchema": {
             "type": "object",
             "properties": {
@@ -171,19 +171,19 @@
                 "type": "string",
                 "description": "孩子姓名（用于定位）"
               },
-              "parent_user_id": {
+              "username": {
                 "type": "string",
-                "description": "当前操作家长的统一用户名或家长应用用户编号（必填）。服务端据此计算本人家庭、孩子所属关系和圈子成员权限，不能用它指定或冒充被操作对象。"
+                "description": "当前登录用户的用户中心用户名（必填）。由 Goldfish 网关注入；服务端据此解析当前家长的内部权限范围。"
               }
             },
             "required": [
-              "parent_user_id"
+              "username"
             ]
           }
         },
         {
           "name": "family_reward_adjust_score",
-          "description": "调整积分：仅允许给当前家长名下孩子加分或减分；即使可以在圈子中查看其他家庭孩子积分，也不能修改。delta 正数加分、负数减分。 所有调用必须传 parent_user_id，服务端会执行真实数据权限校验，越权返回权限不足。",
+          "description": "调整积分：仅允许给当前家长名下孩子加分或减分；即使可以在圈子中查看其他家庭孩子积分，也不能修改。delta 正数加分、负数减分。 所有调用必须传用户中心用户名 username；服务端会解析内部权限并拒绝越权访问。",
           "inputSchema": {
             "type": "object",
             "properties": {
@@ -219,20 +219,20 @@
                 "type": "string",
                 "description": "交易描述（adjust_score）"
               },
-              "parent_user_id": {
+              "username": {
                 "type": "string",
-                "description": "当前操作家长的统一用户名或家长应用用户编号（必填）。服务端据此计算本人家庭、孩子所属关系和圈子成员权限，不能用它指定或冒充被操作对象。"
+                "description": "当前登录用户的用户中心用户名（必填）。由 Goldfish 网关注入；服务端据此解析当前家长的内部权限范围。"
               }
             },
             "required": [
-              "parent_user_id",
+              "username",
               "delta"
             ]
           }
         },
         {
           "name": "family_reward_query_score",
-          "description": "查询积分余额：不传 family_group_id 时仅查询当前家长名下孩子；传 family_group_id 时先校验圈子成员身份，再查询该圈子全部孩子余额。圈子成员可以看余额，但只有孩子所属家长可以通过 include_transactions 查看该孩子明细。未命中时必须在相同范围调用 family_reward_list_children 复核。 所有调用必须传 parent_user_id，服务端会执行真实数据权限校验，越权返回权限不足。",
+          "description": "查询积分余额：不传 family_group_id 时仅查询当前家长名下孩子；传 family_group_id 时先校验圈子成员身份，再查询该圈子全部孩子余额。圈子成员可以看余额，但只有孩子所属家长可以通过 include_transactions 查看该孩子明细。未命中时必须在相同范围调用 family_reward_list_children 复核。 所有调用必须传用户中心用户名 username；服务端会解析内部权限并拒绝越权访问。",
           "inputSchema": {
             "type": "object",
             "properties": {
@@ -264,19 +264,19 @@
                 "type": "string",
                 "description": "交易结束日期 YYYY-MM-DD（可选）"
               },
-              "parent_user_id": {
+              "username": {
                 "type": "string",
-                "description": "当前操作家长的统一用户名或家长应用用户编号（必填）。服务端据此计算本人家庭、孩子所属关系和圈子成员权限，不能用它指定或冒充被操作对象。"
+                "description": "当前登录用户的用户中心用户名（必填）。由 Goldfish 网关注入；服务端据此解析当前家长的内部权限范围。"
               }
             },
             "required": [
-              "parent_user_id"
+              "username"
             ]
           }
         },
         {
           "name": "family_reward_log_score_record",
-          "description": "写入积分明细并同步余额：仅允许操作当前家长名下孩子；圈子可见但不属于当前家长的孩子不可写。 所有调用必须传 parent_user_id，服务端会执行真实数据权限校验，越权返回权限不足。",
+          "description": "写入积分明细并同步余额：仅允许操作当前家长名下孩子；圈子可见但不属于当前家长的孩子不可写。 所有调用必须传用户中心用户名 username；服务端会解析内部权限并拒绝越权访问。",
           "inputSchema": {
             "type": "object",
             "properties": {
@@ -316,20 +316,20 @@
                 "type": "string",
                 "description": "备注"
               },
-              "parent_user_id": {
+              "username": {
                 "type": "string",
-                "description": "当前操作家长的统一用户名或家长应用用户编号（必填）。服务端据此计算本人家庭、孩子所属关系和圈子成员权限，不能用它指定或冒充被操作对象。"
+                "description": "当前登录用户的用户中心用户名（必填）。由 Goldfish 网关注入；服务端据此解析当前家长的内部权限范围。"
               }
             },
             "required": [
-              "parent_user_id",
+              "username",
               "delta"
             ]
           }
         },
         {
           "name": "family_reward_create_record",
-          "description": "新增账户记录：仅允许为当前家长名下孩子新增积分、现金或物品记录，并同步更新全局孩子账户。 所有调用必须传 parent_user_id，服务端会执行真实数据权限校验，越权返回权限不足。",
+          "description": "新增账户记录：仅允许为当前家长名下孩子新增积分、现金或物品记录，并同步更新全局孩子账户。 所有调用必须传用户中心用户名 username；服务端会解析内部权限并拒绝越权访问。",
           "inputSchema": {
             "type": "object",
             "properties": {
@@ -385,19 +385,19 @@
                 "type": "string",
                 "description": "备注"
               },
-              "parent_user_id": {
+              "username": {
                 "type": "string",
-                "description": "当前操作家长的统一用户名或家长应用用户编号（必填）。服务端据此计算本人家庭、孩子所属关系和圈子成员权限，不能用它指定或冒充被操作对象。"
+                "description": "当前登录用户的用户中心用户名（必填）。由 Goldfish 网关注入；服务端据此解析当前家长的内部权限范围。"
               }
             },
             "required": [
-              "parent_user_id"
+              "username"
             ]
           }
         },
         {
           "name": "family_reward_update_record",
-          "description": "修改账户记录：仅允许修改当前家长名下孩子的记录；按记录ID回滚旧影响后应用新记录，圈子成员身份不授予修改权。 所有调用必须传 parent_user_id，服务端会执行真实数据权限校验，越权返回权限不足。",
+          "description": "修改账户记录：仅允许修改当前家长名下孩子的记录；按记录ID回滚旧影响后应用新记录，圈子成员身份不授予修改权。 所有调用必须传用户中心用户名 username；服务端会解析内部权限并拒绝越权访问。",
           "inputSchema": {
             "type": "object",
             "properties": {
@@ -457,19 +457,19 @@
                 "type": "string",
                 "description": "备注"
               },
-              "parent_user_id": {
+              "username": {
                 "type": "string",
-                "description": "当前操作家长的统一用户名或家长应用用户编号（必填）。服务端据此计算本人家庭、孩子所属关系和圈子成员权限，不能用它指定或冒充被操作对象。"
+                "description": "当前登录用户的用户中心用户名（必填）。由 Goldfish 网关注入；服务端据此解析当前家长的内部权限范围。"
               }
             },
             "required": [
-              "parent_user_id"
+              "username"
             ]
           }
         },
         {
           "name": "family_reward_delete_record",
-          "description": "删除账户记录：仅允许删除当前家长名下孩子的记录，并自动回滚该记录对账户的影响。 所有调用必须传 parent_user_id，服务端会执行真实数据权限校验，越权返回权限不足。",
+          "description": "删除账户记录：仅允许删除当前家长名下孩子的记录，并自动回滚该记录对账户的影响。 所有调用必须传用户中心用户名 username；服务端会解析内部权限并拒绝越权访问。",
           "inputSchema": {
             "type": "object",
             "properties": {
@@ -477,19 +477,19 @@
                 "type": "integer",
                 "description": "记录ID"
               },
-              "parent_user_id": {
+              "username": {
                 "type": "string",
-                "description": "当前操作家长的统一用户名或家长应用用户编号（必填）。服务端据此计算本人家庭、孩子所属关系和圈子成员权限，不能用它指定或冒充被操作对象。"
+                "description": "当前登录用户的用户中心用户名（必填）。由 Goldfish 网关注入；服务端据此解析当前家长的内部权限范围。"
               }
             },
             "required": [
-              "parent_user_id"
+              "username"
             ]
           }
         },
         {
           "name": "family_reward_query_operation_records",
-          "description": "查询积分明细：仅查询当前家长名下孩子的积分交易，不因加入圈子而开放其他家庭孩子的行为明细。支持按孩子、日期、分类和分页筛选；未命中时在当前家长名下孩子范围复核。 所有调用必须传 parent_user_id，服务端会执行真实数据权限校验，越权返回权限不足。",
+          "description": "查询积分明细：仅查询当前家长名下孩子的积分交易，不因加入圈子而开放其他家庭孩子的行为明细。支持按孩子、日期、分类和分页筛选；未命中时在当前家长名下孩子范围复核。 所有调用必须传用户中心用户名 username；服务端会解析内部权限并拒绝越权访问。",
           "inputSchema": {
             "type": "object",
             "properties": {
@@ -529,35 +529,35 @@
                 "type": "integer",
                 "description": "每页数量，默认 20，最大 200"
               },
-              "parent_user_id": {
+              "username": {
                 "type": "string",
-                "description": "当前操作家长的统一用户名或家长应用用户编号（必填）。服务端据此计算本人家庭、孩子所属关系和圈子成员权限，不能用它指定或冒充被操作对象。"
+                "description": "当前登录用户的用户中心用户名（必填）。由 Goldfish 网关注入；服务端据此解析当前家长的内部权限范围。"
               }
             },
             "required": [
-              "parent_user_id"
+              "username"
             ]
           }
         },
         {
           "name": "family_reward_query_rules",
-          "description": "查询规则：返回公共规则、当前家长自己的个人规则和当前生效模板。其他家长的个人规则不可见。 所有调用必须传 parent_user_id，服务端会执行真实数据权限校验，越权返回权限不足。",
+          "description": "查询规则：返回公共规则、当前家长自己的个人规则和当前生效模板。其他家长的个人规则不可见。 所有调用必须传用户中心用户名 username；服务端会解析内部权限并拒绝越权访问。",
           "inputSchema": {
             "type": "object",
             "properties": {
-              "parent_user_id": {
+              "username": {
                 "type": "string",
-                "description": "当前操作家长的统一用户名或家长应用用户编号（必填）。服务端据此计算本人家庭、孩子所属关系和圈子成员权限，不能用它指定或冒充被操作对象。"
+                "description": "当前登录用户的用户中心用户名（必填）。由 Goldfish 网关注入；服务端据此解析当前家长的内部权限范围。"
               }
             },
             "required": [
-              "parent_user_id"
+              "username"
             ]
           }
         },
         {
           "name": "family_reward_create_rule",
-          "description": "为指定家长新增个人积分规则，并自动加入该家长的个人规则模板。 所有调用必须传 parent_user_id，服务端会执行真实数据权限校验，越权返回权限不足。",
+          "description": "为指定家长新增个人积分规则，并自动加入该家长的个人规则模板。 所有调用必须传用户中心用户名 username；服务端会解析内部权限并拒绝越权访问。",
           "inputSchema": {
             "type": "object",
             "properties": {
@@ -589,20 +589,20 @@
                 "type": "string",
                 "description": "描述"
               },
-              "parent_user_id": {
+              "username": {
                 "type": "string",
-                "description": "当前操作家长的统一用户名或家长应用用户编号（必填）。服务端据此计算本人家庭、孩子所属关系和圈子成员权限，不能用它指定或冒充被操作对象。"
+                "description": "当前登录用户的用户中心用户名（必填）。由 Goldfish 网关注入；服务端据此解析当前家长的内部权限范围。"
               }
             },
             "required": [
-              "parent_user_id",
+              "username",
               "name"
             ]
           }
         },
         {
           "name": "family_reward_update_rule",
-          "description": "修改指定家长自己的个人积分规则；公共规则不可修改。 所有调用必须传 parent_user_id，服务端会执行真实数据权限校验，越权返回权限不足。",
+          "description": "修改指定家长自己的个人积分规则；公共规则不可修改。 所有调用必须传用户中心用户名 username；服务端会解析内部权限并拒绝越权访问。",
           "inputSchema": {
             "type": "object",
             "properties": {
@@ -638,20 +638,20 @@
                 "type": "string",
                 "description": "描述"
               },
-              "parent_user_id": {
+              "username": {
                 "type": "string",
-                "description": "当前操作家长的统一用户名或家长应用用户编号（必填）。服务端据此计算本人家庭、孩子所属关系和圈子成员权限，不能用它指定或冒充被操作对象。"
+                "description": "当前登录用户的用户中心用户名（必填）。由 Goldfish 网关注入；服务端据此解析当前家长的内部权限范围。"
               }
             },
             "required": [
-              "parent_user_id",
+              "username",
               "rule_id"
             ]
           }
         },
         {
           "name": "family_reward_delete_rule",
-          "description": "删除指定家长自己的个人积分规则；公共规则不可删除。 所有调用必须传 parent_user_id，服务端会执行真实数据权限校验，越权返回权限不足。",
+          "description": "删除指定家长自己的个人积分规则；公共规则不可删除。 所有调用必须传用户中心用户名 username；服务端会解析内部权限并拒绝越权访问。",
           "inputSchema": {
             "type": "object",
             "properties": {
@@ -659,36 +659,36 @@
                 "type": "integer",
                 "description": "规则ID"
               },
-              "parent_user_id": {
+              "username": {
                 "type": "string",
-                "description": "当前操作家长的统一用户名或家长应用用户编号（必填）。服务端据此计算本人家庭、孩子所属关系和圈子成员权限，不能用它指定或冒充被操作对象。"
+                "description": "当前登录用户的用户中心用户名（必填）。由 Goldfish 网关注入；服务端据此解析当前家长的内部权限范围。"
               }
             },
             "required": [
-              "parent_user_id",
+              "username",
               "rule_id"
             ]
           }
         },
         {
           "name": "family_reward_query_family_groups",
-          "description": "圈子管理/查询圈子：只返回当前家长创建或已经加入的圈子，并标明 owner/member 角色。圈子是多个家庭协作查看孩子积分的空间，不等同于当前家长自己的家庭成员清单。 所有调用必须传 parent_user_id，服务端会执行真实数据权限校验，越权返回权限不足。",
+          "description": "圈子管理/查询圈子：只返回当前家长创建或已经加入的圈子，并标明 owner/member 角色。圈子是多个家庭协作查看孩子积分的空间，不等同于当前家长自己的家庭成员清单。 所有调用必须传用户中心用户名 username；服务端会解析内部权限并拒绝越权访问。",
           "inputSchema": {
             "type": "object",
             "properties": {
-              "parent_user_id": {
+              "username": {
                 "type": "string",
-                "description": "当前操作家长的统一用户名或家长应用用户编号（必填）。服务端据此计算本人家庭、孩子所属关系和圈子成员权限，不能用它指定或冒充被操作对象。"
+                "description": "当前登录用户的用户中心用户名（必填）。由 Goldfish 网关注入；服务端据此解析当前家长的内部权限范围。"
               }
             },
             "required": [
-              "parent_user_id"
+              "username"
             ]
           }
         },
         {
           "name": "family_reward_create_family_group",
-          "description": "圈子管理/新增圈子：当前家长成为圈子管理员，并自动把自己名下有效孩子同步到新圈子。 所有调用必须传 parent_user_id，服务端会执行真实数据权限校验，越权返回权限不足。",
+          "description": "圈子管理/新增圈子：当前家长成为圈子管理员，并自动把自己名下有效孩子同步到新圈子。 所有调用必须传用户中心用户名 username；服务端会解析内部权限并拒绝越权访问。",
           "inputSchema": {
             "type": "object",
             "properties": {
@@ -700,20 +700,20 @@
                 "type": "string",
                 "description": "描述"
               },
-              "parent_user_id": {
+              "username": {
                 "type": "string",
-                "description": "当前操作家长的统一用户名或家长应用用户编号（必填）。服务端据此计算本人家庭、孩子所属关系和圈子成员权限，不能用它指定或冒充被操作对象。"
+                "description": "当前登录用户的用户中心用户名（必填）。由 Goldfish 网关注入；服务端据此解析当前家长的内部权限范围。"
               }
             },
             "required": [
-              "parent_user_id",
+              "username",
               "name"
             ]
           }
         },
         {
           "name": "family_reward_update_family_group",
-          "description": "圈子管理/修改圈子：仅圈子创建者或 owner 管理员可修改圈子名称和说明；普通圈子成员只能查看。 所有调用必须传 parent_user_id，服务端会执行真实数据权限校验，越权返回权限不足。",
+          "description": "圈子管理/修改圈子：仅圈子创建者或 owner 管理员可修改圈子名称和说明；普通圈子成员只能查看。 所有调用必须传用户中心用户名 username；服务端会解析内部权限并拒绝越权访问。",
           "inputSchema": {
             "type": "object",
             "properties": {
@@ -729,13 +729,13 @@
                 "type": "string",
                 "description": "新的圈子说明"
               },
-              "parent_user_id": {
+              "username": {
                 "type": "string",
-                "description": "当前操作家长的统一用户名或家长应用用户编号（必填）。服务端据此计算本人家庭、孩子所属关系和圈子成员权限，不能用它指定或冒充被操作对象。"
+                "description": "当前登录用户的用户中心用户名（必填）。由 Goldfish 网关注入；服务端据此解析当前家长的内部权限范围。"
               }
             },
             "required": [
-              "parent_user_id",
+              "username",
               "family_group_id",
               "name"
             ]
@@ -743,7 +743,7 @@
         },
         {
           "name": "family_reward_delete_family_group",
-          "description": "圈子管理/删除圈子：仅圈子创建者或 owner 管理员可删除。删除圈子不会删除孩子全局档案和所属家庭关系。 所有调用必须传 parent_user_id，服务端会执行真实数据权限校验，越权返回权限不足。",
+          "description": "圈子管理/删除圈子：仅圈子创建者或 owner 管理员可删除。删除圈子不会删除孩子全局档案和所属家庭关系。 所有调用必须传用户中心用户名 username；服务端会解析内部权限并拒绝越权访问。",
           "inputSchema": {
             "type": "object",
             "properties": {
@@ -751,20 +751,20 @@
                 "type": "integer",
                 "description": "圈子ID"
               },
-              "parent_user_id": {
+              "username": {
                 "type": "string",
-                "description": "当前操作家长的统一用户名或家长应用用户编号（必填）。服务端据此计算本人家庭、孩子所属关系和圈子成员权限，不能用它指定或冒充被操作对象。"
+                "description": "当前登录用户的用户中心用户名（必填）。由 Goldfish 网关注入；服务端据此解析当前家长的内部权限范围。"
               }
             },
             "required": [
-              "parent_user_id",
+              "username",
               "family_group_id"
             ]
           }
         },
         {
           "name": "family_reward_get_family_group_invite",
-          "description": "圈子管理/获取邀请码：仅圈子创建者或 owner 管理员可生成或查看 8 位圈子邀请码。 所有调用必须传 parent_user_id，服务端会执行真实数据权限校验，越权返回权限不足。",
+          "description": "圈子管理/获取邀请码：仅圈子创建者或 owner 管理员可生成或查看 8 位圈子邀请码。 所有调用必须传用户中心用户名 username；服务端会解析内部权限并拒绝越权访问。",
           "inputSchema": {
             "type": "object",
             "properties": {
@@ -772,20 +772,20 @@
                 "type": "integer",
                 "description": "圈子ID"
               },
-              "parent_user_id": {
+              "username": {
                 "type": "string",
-                "description": "当前操作家长的统一用户名或家长应用用户编号（必填）。服务端据此计算本人家庭、孩子所属关系和圈子成员权限，不能用它指定或冒充被操作对象。"
+                "description": "当前登录用户的用户中心用户名（必填）。由 Goldfish 网关注入；服务端据此解析当前家长的内部权限范围。"
               }
             },
             "required": [
-              "parent_user_id",
+              "username",
               "family_group_id"
             ]
           }
         },
         {
           "name": "family_reward_join_family_group",
-          "description": "圈子管理/加入圈子：当前家长使用 8 位邀请码加入圈子，并自动把自己名下有效孩子同步到该圈子。 所有调用必须传 parent_user_id，服务端会执行真实数据权限校验，越权返回权限不足。",
+          "description": "圈子管理/加入圈子：当前家长使用 8 位邀请码加入圈子，并自动把自己名下有效孩子同步到该圈子。 所有调用必须传用户中心用户名 username；服务端会解析内部权限并拒绝越权访问。",
           "inputSchema": {
             "type": "object",
             "properties": {
@@ -793,20 +793,20 @@
                 "type": "string",
                 "description": "8 位数字圈子邀请码"
               },
-              "parent_user_id": {
+              "username": {
                 "type": "string",
-                "description": "当前操作家长的统一用户名或家长应用用户编号（必填）。服务端据此计算本人家庭、孩子所属关系和圈子成员权限，不能用它指定或冒充被操作对象。"
+                "description": "当前登录用户的用户中心用户名（必填）。由 Goldfish 网关注入；服务端据此解析当前家长的内部权限范围。"
               }
             },
             "required": [
-              "parent_user_id",
+              "username",
               "invite_code"
             ]
           }
         },
         {
           "name": "family_reward_remove_family_group_child",
-          "description": "圈子管理/移除孩子：仅圈子创建者或 owner 管理员可把孩子从该圈子移除；不会删除孩子的家庭所属关系或全局积分账户。 所有调用必须传 parent_user_id，服务端会执行真实数据权限校验，越权返回权限不足。",
+          "description": "圈子管理/移除孩子：仅圈子创建者或 owner 管理员可把孩子从该圈子移除；不会删除孩子的家庭所属关系或全局积分账户。 所有调用必须传用户中心用户名 username；服务端会解析内部权限并拒绝越权访问。",
           "inputSchema": {
             "type": "object",
             "properties": {
@@ -818,13 +818,13 @@
                 "type": "integer",
                 "description": "该圈子中的孩子ID"
               },
-              "parent_user_id": {
+              "username": {
                 "type": "string",
-                "description": "当前操作家长的统一用户名或家长应用用户编号（必填）。服务端据此计算本人家庭、孩子所属关系和圈子成员权限，不能用它指定或冒充被操作对象。"
+                "description": "当前登录用户的用户中心用户名（必填）。由 Goldfish 网关注入；服务端据此解析当前家长的内部权限范围。"
               }
             },
             "required": [
-              "parent_user_id",
+              "username",
               "family_group_id",
               "child_id"
             ]
@@ -832,23 +832,23 @@
         },
         {
           "name": "family_reward_query_family_members",
-          "description": "家庭管理/查询家庭成员：只返回当前家长自己的家庭成员清单，包括当前用户以及爸爸、妈妈、爷爷、奶奶等成员；家庭成员不随圈子切换而改变。 所有调用必须传 parent_user_id，服务端会执行真实数据权限校验，越权返回权限不足。",
+          "description": "家庭管理/查询家庭成员：只返回当前家长自己的家庭成员清单，包括当前用户以及爸爸、妈妈、爷爷、奶奶等成员；家庭成员不随圈子切换而改变。 所有调用必须传用户中心用户名 username；服务端会解析内部权限并拒绝越权访问。",
           "inputSchema": {
             "type": "object",
             "properties": {
-              "parent_user_id": {
+              "username": {
                 "type": "string",
-                "description": "当前操作家长的统一用户名或家长应用用户编号（必填）。服务端据此计算本人家庭、孩子所属关系和圈子成员权限，不能用它指定或冒充被操作对象。"
+                "description": "当前登录用户的用户中心用户名（必填）。由 Goldfish 网关注入；服务端据此解析当前家长的内部权限范围。"
               }
             },
             "required": [
-              "parent_user_id"
+              "username"
             ]
           }
         },
         {
           "name": "family_reward_create_family_member",
-          "description": "家庭管理/新增家庭成员：只在当前家长自己的家庭清单中新增成员，不会把该成员加入任何圈子。 所有调用必须传 parent_user_id，服务端会执行真实数据权限校验，越权返回权限不足。",
+          "description": "家庭管理/新增家庭成员：只在当前家长自己的家庭清单中新增成员，不会把该成员加入任何圈子。 所有调用必须传用户中心用户名 username；服务端会解析内部权限并拒绝越权访问。",
           "inputSchema": {
             "type": "object",
             "properties": {
@@ -874,13 +874,13 @@
                 "type": "string",
                 "description": "备注"
               },
-              "parent_user_id": {
+              "username": {
                 "type": "string",
-                "description": "当前操作家长的统一用户名或家长应用用户编号（必填）。服务端据此计算本人家庭、孩子所属关系和圈子成员权限，不能用它指定或冒充被操作对象。"
+                "description": "当前登录用户的用户中心用户名（必填）。由 Goldfish 网关注入；服务端据此解析当前家长的内部权限范围。"
               }
             },
             "required": [
-              "parent_user_id",
+              "username",
               "display_name",
               "role"
             ]
@@ -888,7 +888,7 @@
         },
         {
           "name": "family_reward_update_family_member",
-          "description": "家庭管理/修改家庭成员：仅允许修改当前家长自己的家庭成员；可修改当前用户角色，但不能改变成员所属家庭。 所有调用必须传 parent_user_id，服务端会执行真实数据权限校验，越权返回权限不足。",
+          "description": "家庭管理/修改家庭成员：仅允许修改当前家长自己的家庭成员；可修改当前用户角色，但不能改变成员所属家庭。 所有调用必须传用户中心用户名 username；服务端会解析内部权限并拒绝越权访问。",
           "inputSchema": {
             "type": "object",
             "properties": {
@@ -918,13 +918,13 @@
                 "type": "string",
                 "description": "备注"
               },
-              "parent_user_id": {
+              "username": {
                 "type": "string",
-                "description": "当前操作家长的统一用户名或家长应用用户编号（必填）。服务端据此计算本人家庭、孩子所属关系和圈子成员权限，不能用它指定或冒充被操作对象。"
+                "description": "当前登录用户的用户中心用户名（必填）。由 Goldfish 网关注入；服务端据此解析当前家长的内部权限范围。"
               }
             },
             "required": [
-              "parent_user_id",
+              "username",
               "member_id",
               "display_name",
               "role"
@@ -933,7 +933,7 @@
         },
         {
           "name": "family_reward_delete_family_member",
-          "description": "家庭管理/删除家庭成员：仅允许删除当前家长自己的非当前用户成员；当前用户不能从自己的家庭清单删除。 所有调用必须传 parent_user_id，服务端会执行真实数据权限校验，越权返回权限不足。",
+          "description": "家庭管理/删除家庭成员：仅允许删除当前家长自己的非当前用户成员；当前用户不能从自己的家庭清单删除。 所有调用必须传用户中心用户名 username；服务端会解析内部权限并拒绝越权访问。",
           "inputSchema": {
             "type": "object",
             "properties": {
@@ -941,20 +941,20 @@
                 "type": "integer",
                 "description": "家庭成员ID"
               },
-              "parent_user_id": {
+              "username": {
                 "type": "string",
-                "description": "当前操作家长的统一用户名或家长应用用户编号（必填）。服务端据此计算本人家庭、孩子所属关系和圈子成员权限，不能用它指定或冒充被操作对象。"
+                "description": "当前登录用户的用户中心用户名（必填）。由 Goldfish 网关注入；服务端据此解析当前家长的内部权限范围。"
               }
             },
             "required": [
-              "parent_user_id",
+              "username",
               "member_id"
             ]
           }
         },
         {
           "name": "family_reward_update_rule_template",
-          "description": "规则管理/更新规则模板：为当前家长保存有序规则ID清单；只能选择公共规则或当前家长自己的个人规则，顺序用于手表端展示。 所有调用必须传 parent_user_id，服务端会执行真实数据权限校验，越权返回权限不足。",
+          "description": "规则管理/更新规则模板：为当前家长保存有序规则ID清单；只能选择公共规则或当前家长自己的个人规则，顺序用于手表端展示。 所有调用必须传用户中心用户名 username；服务端会解析内部权限并拒绝越权访问。",
           "inputSchema": {
             "type": "object",
             "properties": {
@@ -965,20 +965,20 @@
                 },
                 "description": "按展示顺序排列的规则ID数组，可为空数组"
               },
-              "parent_user_id": {
+              "username": {
                 "type": "string",
-                "description": "当前操作家长的统一用户名或家长应用用户编号（必填）。服务端据此计算本人家庭、孩子所属关系和圈子成员权限，不能用它指定或冒充被操作对象。"
+                "description": "当前登录用户的用户中心用户名（必填）。由 Goldfish 网关注入；服务端据此解析当前家长的内部权限范围。"
               }
             },
             "required": [
-              "parent_user_id",
+              "username",
               "rule_ids"
             ]
           }
         },
         {
           "name": "family_reward_generate_child_auth_code",
-          "description": "家庭管理/生成儿童认证码：仅孩子所属家长可为自己名下孩子生成手表绑定认证码。 所有调用必须传 parent_user_id，服务端会执行真实数据权限校验，越权返回权限不足。",
+          "description": "家庭管理/生成儿童认证码：仅孩子所属家长可为自己名下孩子生成手表绑定认证码。 所有调用必须传用户中心用户名 username；服务端会解析内部权限并拒绝越权访问。",
           "inputSchema": {
             "type": "object",
             "properties": {
@@ -998,19 +998,19 @@
                 "type": "integer",
                 "description": "有效分钟数，10 到 1440，默认 1440"
               },
-              "parent_user_id": {
+              "username": {
                 "type": "string",
-                "description": "当前操作家长的统一用户名或家长应用用户编号（必填）。服务端据此计算本人家庭、孩子所属关系和圈子成员权限，不能用它指定或冒充被操作对象。"
+                "description": "当前登录用户的用户中心用户名（必填）。由 Goldfish 网关注入；服务端据此解析当前家长的内部权限范围。"
               }
             },
             "required": [
-              "parent_user_id"
+              "username"
             ]
           }
         },
         {
           "name": "family_reward_query_child_devices",
-          "description": "家庭管理/查询孩子手表设备：仅孩子所属家长可查看自己名下孩子的设备绑定。 所有调用必须传 parent_user_id，服务端会执行真实数据权限校验，越权返回权限不足。",
+          "description": "家庭管理/查询孩子手表设备：仅孩子所属家长可查看自己名下孩子的设备绑定。 所有调用必须传用户中心用户名 username；服务端会解析内部权限并拒绝越权访问。",
           "inputSchema": {
             "type": "object",
             "properties": {
@@ -1026,19 +1026,19 @@
                 "type": "integer",
                 "description": "孩子所在圈子ID，可选"
               },
-              "parent_user_id": {
+              "username": {
                 "type": "string",
-                "description": "当前操作家长的统一用户名或家长应用用户编号（必填）。服务端据此计算本人家庭、孩子所属关系和圈子成员权限，不能用它指定或冒充被操作对象。"
+                "description": "当前登录用户的用户中心用户名（必填）。由 Goldfish 网关注入；服务端据此解析当前家长的内部权限范围。"
               }
             },
             "required": [
-              "parent_user_id"
+              "username"
             ]
           }
         },
         {
           "name": "family_reward_revoke_child_device",
-          "description": "家庭管理/解绑孩子手表：仅孩子所属家长可撤销自己名下孩子的指定设备绑定。 所有调用必须传 parent_user_id，服务端会执行真实数据权限校验，越权返回权限不足。",
+          "description": "家庭管理/解绑孩子手表：仅孩子所属家长可撤销自己名下孩子的指定设备绑定。 所有调用必须传用户中心用户名 username；服务端会解析内部权限并拒绝越权访问。",
           "inputSchema": {
             "type": "object",
             "properties": {
@@ -1058,20 +1058,20 @@
                 "type": "integer",
                 "description": "设备绑定ID"
               },
-              "parent_user_id": {
+              "username": {
                 "type": "string",
-                "description": "当前操作家长的统一用户名或家长应用用户编号（必填）。服务端据此计算本人家庭、孩子所属关系和圈子成员权限，不能用它指定或冒充被操作对象。"
+                "description": "当前登录用户的用户中心用户名（必填）。由 Goldfish 网关注入；服务端据此解析当前家长的内部权限范围。"
               }
             },
             "required": [
-              "parent_user_id",
+              "username",
               "device_id"
             ]
           }
         },
         {
           "name": "family_reward_generate_device_unbind_code",
-          "description": "家庭管理/生成设备解绑码：仅孩子所属家长可为自己名下孩子的指定设备生成短期解绑码。 所有调用必须传 parent_user_id，服务端会执行真实数据权限校验，越权返回权限不足。",
+          "description": "家庭管理/生成设备解绑码：仅孩子所属家长可为自己名下孩子的指定设备生成短期解绑码。 所有调用必须传用户中心用户名 username；服务端会解析内部权限并拒绝越权访问。",
           "inputSchema": {
             "type": "object",
             "properties": {
@@ -1095,20 +1095,20 @@
                 "type": "integer",
                 "description": "有效分钟数，5 到 30，默认 10"
               },
-              "parent_user_id": {
+              "username": {
                 "type": "string",
-                "description": "当前操作家长的统一用户名或家长应用用户编号（必填）。服务端据此计算本人家庭、孩子所属关系和圈子成员权限，不能用它指定或冒充被操作对象。"
+                "description": "当前登录用户的用户中心用户名（必填）。由 Goldfish 网关注入；服务端据此解析当前家长的内部权限范围。"
               }
             },
             "required": [
-              "parent_user_id",
+              "username",
               "device_id"
             ]
           }
         },
         {
           "name": "family_reward_query_child_friends",
-          "description": "家庭管理/查询孩子好友：仅孩子所属家长可查看自己名下孩子的好友列表和好友积分榜。 所有调用必须传 parent_user_id，服务端会执行真实数据权限校验，越权返回权限不足。",
+          "description": "家庭管理/查询孩子好友：仅孩子所属家长可查看自己名下孩子的好友列表和好友积分榜。 所有调用必须传用户中心用户名 username；服务端会解析内部权限并拒绝越权访问。",
           "inputSchema": {
             "type": "object",
             "properties": {
@@ -1124,19 +1124,19 @@
                 "type": "integer",
                 "description": "孩子所在圈子ID，可选"
               },
-              "parent_user_id": {
+              "username": {
                 "type": "string",
-                "description": "当前操作家长的统一用户名或家长应用用户编号（必填）。服务端据此计算本人家庭、孩子所属关系和圈子成员权限，不能用它指定或冒充被操作对象。"
+                "description": "当前登录用户的用户中心用户名（必填）。由 Goldfish 网关注入；服务端据此解析当前家长的内部权限范围。"
               }
             },
             "required": [
-              "parent_user_id"
+              "username"
             ]
           }
         },
         {
           "name": "family_reward_query_friend_notifications",
-          "description": "家庭管理/查询好友通知：只返回当前家长名下孩子收到的好友关系通知。 所有调用必须传 parent_user_id，服务端会执行真实数据权限校验，越权返回权限不足。",
+          "description": "家庭管理/查询好友通知：只返回当前家长名下孩子收到的好友关系通知。 所有调用必须传用户中心用户名 username；服务端会解析内部权限并拒绝越权访问。",
           "inputSchema": {
             "type": "object",
             "properties": {
@@ -1144,19 +1144,19 @@
                 "type": "boolean",
                 "description": "是否只返回未读通知，默认 false"
               },
-              "parent_user_id": {
+              "username": {
                 "type": "string",
-                "description": "当前操作家长的统一用户名或家长应用用户编号（必填）。服务端据此计算本人家庭、孩子所属关系和圈子成员权限，不能用它指定或冒充被操作对象。"
+                "description": "当前登录用户的用户中心用户名（必填）。由 Goldfish 网关注入；服务端据此解析当前家长的内部权限范围。"
               }
             },
             "required": [
-              "parent_user_id"
+              "username"
             ]
           }
         },
         {
           "name": "family_reward_mark_friend_notification_read",
-          "description": "家庭管理/标记好友通知已读：仅允许处理当前家长名下孩子的通知。 所有调用必须传 parent_user_id，服务端会执行真实数据权限校验，越权返回权限不足。",
+          "description": "家庭管理/标记好友通知已读：仅允许处理当前家长名下孩子的通知。 所有调用必须传用户中心用户名 username；服务端会解析内部权限并拒绝越权访问。",
           "inputSchema": {
             "type": "object",
             "properties": {
@@ -1164,20 +1164,20 @@
                 "type": "integer",
                 "description": "好友通知ID"
               },
-              "parent_user_id": {
+              "username": {
                 "type": "string",
-                "description": "当前操作家长的统一用户名或家长应用用户编号（必填）。服务端据此计算本人家庭、孩子所属关系和圈子成员权限，不能用它指定或冒充被操作对象。"
+                "description": "当前登录用户的用户中心用户名（必填）。由 Goldfish 网关注入；服务端据此解析当前家长的内部权限范围。"
               }
             },
             "required": [
-              "parent_user_id",
+              "username",
               "notification_id"
             ]
           }
         },
         {
           "name": "family_reward_query_reward_requests",
-          "description": "积分申请/查询待确认申请：只返回当前家长名下孩子在当前家长可访问圈子中提交的申请；可按圈子和状态筛选。 所有调用必须传 parent_user_id，服务端会执行真实数据权限校验，越权返回权限不足。",
+          "description": "积分申请/查询待确认申请：只返回当前家长名下孩子在当前家长可访问圈子中提交的申请；可按圈子和状态筛选。 所有调用必须传用户中心用户名 username；服务端会解析内部权限并拒绝越权访问。",
           "inputSchema": {
             "type": "object",
             "properties": {
@@ -1193,19 +1193,19 @@
                 "type": "integer",
                 "description": "返回数量，默认 100，最大 200"
               },
-              "parent_user_id": {
+              "username": {
                 "type": "string",
-                "description": "当前操作家长的统一用户名或家长应用用户编号（必填）。服务端据此计算本人家庭、孩子所属关系和圈子成员权限，不能用它指定或冒充被操作对象。"
+                "description": "当前登录用户的用户中心用户名（必填）。由 Goldfish 网关注入；服务端据此解析当前家长的内部权限范围。"
               }
             },
             "required": [
-              "parent_user_id"
+              "username"
             ]
           }
         },
         {
           "name": "family_reward_approve_reward_request",
-          "description": "积分申请/确认领取：仅孩子所属家长可确认自己名下孩子的待处理申请，并生成积分流水。 所有调用必须传 parent_user_id，服务端会执行真实数据权限校验，越权返回权限不足。",
+          "description": "积分申请/确认领取：仅孩子所属家长可确认自己名下孩子的待处理申请，并生成积分流水。 所有调用必须传用户中心用户名 username；服务端会解析内部权限并拒绝越权访问。",
           "inputSchema": {
             "type": "object",
             "properties": {
@@ -1221,20 +1221,20 @@
                 "type": "string",
                 "description": "家长确认备注"
               },
-              "parent_user_id": {
+              "username": {
                 "type": "string",
-                "description": "当前操作家长的统一用户名或家长应用用户编号（必填）。服务端据此计算本人家庭、孩子所属关系和圈子成员权限，不能用它指定或冒充被操作对象。"
+                "description": "当前登录用户的用户中心用户名（必填）。由 Goldfish 网关注入；服务端据此解析当前家长的内部权限范围。"
               }
             },
             "required": [
-              "parent_user_id",
+              "username",
               "request_id"
             ]
           }
         },
         {
           "name": "family_reward_query_circle_dashboard",
-          "description": "圈子统计/查询总览：仅圈子成员可查看指定圈子的孩子余额和最近记录汇总。 所有调用必须传 parent_user_id，服务端会执行真实数据权限校验，越权返回权限不足。",
+          "description": "圈子统计/查询总览：仅圈子成员可查看指定圈子的孩子余额和最近记录汇总。 所有调用必须传用户中心用户名 username；服务端会解析内部权限并拒绝越权访问。",
           "inputSchema": {
             "type": "object",
             "properties": {
@@ -1242,20 +1242,20 @@
                 "type": "integer",
                 "description": "圈子ID"
               },
-              "parent_user_id": {
+              "username": {
                 "type": "string",
-                "description": "当前操作家长的统一用户名或家长应用用户编号（必填）。服务端据此计算本人家庭、孩子所属关系和圈子成员权限，不能用它指定或冒充被操作对象。"
+                "description": "当前登录用户的用户中心用户名（必填）。由 Goldfish 网关注入；服务端据此解析当前家长的内部权限范围。"
               }
             },
             "required": [
-              "parent_user_id",
+              "username",
               "family_group_id"
             ]
           }
         },
         {
           "name": "family_reward_query_circle_leaderboard",
-          "description": "圈子统计/查询积分榜：仅圈子成员可查看指定圈子孩子的积分排名。 所有调用必须传 parent_user_id，服务端会执行真实数据权限校验，越权返回权限不足。",
+          "description": "圈子统计/查询积分榜：仅圈子成员可查看指定圈子孩子的积分排名。 所有调用必须传用户中心用户名 username；服务端会解析内部权限并拒绝越权访问。",
           "inputSchema": {
             "type": "object",
             "properties": {
@@ -1263,20 +1263,20 @@
                 "type": "integer",
                 "description": "圈子ID"
               },
-              "parent_user_id": {
+              "username": {
                 "type": "string",
-                "description": "当前操作家长的统一用户名或家长应用用户编号（必填）。服务端据此计算本人家庭、孩子所属关系和圈子成员权限，不能用它指定或冒充被操作对象。"
+                "description": "当前登录用户的用户中心用户名（必填）。由 Goldfish 网关注入；服务端据此解析当前家长的内部权限范围。"
               }
             },
             "required": [
-              "parent_user_id",
+              "username",
               "family_group_id"
             ]
           }
         },
         {
           "name": "family_reward_query_circle_categories",
-          "description": "圈子统计/查询分类汇总：仅圈子成员可查看指定圈子的积分记录分类汇总。 所有调用必须传 parent_user_id，服务端会执行真实数据权限校验，越权返回权限不足。",
+          "description": "圈子统计/查询分类汇总：仅圈子成员可查看指定圈子的积分记录分类汇总。 所有调用必须传用户中心用户名 username；服务端会解析内部权限并拒绝越权访问。",
           "inputSchema": {
             "type": "object",
             "properties": {
@@ -1284,13 +1284,13 @@
                 "type": "integer",
                 "description": "圈子ID"
               },
-              "parent_user_id": {
+              "username": {
                 "type": "string",
-                "description": "当前操作家长的统一用户名或家长应用用户编号（必填）。服务端据此计算本人家庭、孩子所属关系和圈子成员权限，不能用它指定或冒充被操作对象。"
+                "description": "当前登录用户的用户中心用户名（必填）。由 Goldfish 网关注入；服务端据此解析当前家长的内部权限范围。"
               }
             },
             "required": [
-              "parent_user_id",
+              "username",
               "family_group_id"
             ]
           }
