@@ -1886,16 +1886,30 @@ app.MapGet("/api/agentfree/sessions", async (IHttpClientFactory httpClientFactor
         var userName = GetUnifiedUsername(request);
         var config = await configStore.LoadAsync();
         var webAppBotId = ResolveFamilyRewardWebAppBotId(config, request.Query.String("webAppBotId"));
-        var agentId = await ResolveFamilyRewardAgentFreeAgentIdForBot(httpClientFactory, userName, webAppBotId, request.HttpContext.RequestAborted);
-        if (agentId is null) return Results.Json(new JsonArray());
+        var agents = await GetFamilyRewardAgentFreeAgents(httpClientFactory, userName, webAppBotId, request.HttpContext.RequestAborted);
+        var authorizedAgentIds = agents
+            .OfType<JsonObject>()
+            .Select(item => item.Int("id"))
+            .Where(id => id.HasValue)
+            .Select(id => id!.Value)
+            .ToHashSet();
+        var requestedAgentId = request.Query.Int("agentId");
+        if (requestedAgentId.HasValue && !authorizedAgentIds.Contains(requestedAgentId.Value))
+        {
+            return Results.Json(new { error = "无权访问该智能体会话" }, statusCode: StatusCodes.Status403Forbidden);
+        }
+        if (authorizedAgentIds.Count == 0) return Results.Json(new JsonArray());
+        var sessionQuery = new List<string> { "gatewayType=WebApp" };
+        if (requestedAgentId.HasValue) sessionQuery.Add($"agentId={requestedAgentId.Value}");
+        if (request.Query.Int("limit") is int requestedLimit) sessionQuery.Add($"limit={Math.Clamp(requestedLimit, 1, 500)}");
         var sessions = await SendAgentFreeJson(
             httpClientFactory,
             HttpMethod.Get,
-            "/api/webapp/sessions?gatewayType=WebApp",
+            $"/api/webapp/sessions?{string.Join('&', sessionQuery)}",
             null,
             userName,
             request.HttpContext.RequestAborted);
-        var familySessions = FilterFamilyRewardAgentFreeSessions(sessions, agentId.Value);
+        var familySessions = FilterFamilyRewardAgentFreeSessions(sessions, authorizedAgentIds);
         return Results.Json(await FilterReadableFamilyRewardAgentFreeSessions(
             httpClientFactory,
             familySessions,
@@ -1944,7 +1958,9 @@ app.MapGet("/api/agentfree/sessions/{id}/messages", async (string id, IHttpClien
     try
     {
         var userName = GetUnifiedUsername(request);
-        if (await GetFamilyRewardAgentFreeSession(httpClientFactory, id, userName, request.HttpContext.RequestAborted) is null)
+        var config = await configStore.LoadAsync();
+        var webAppBotId = ResolveFamilyRewardWebAppBotId(config, request.Query.String("webAppBotId"));
+        if (await GetFamilyRewardAgentFreeSessionForBot(httpClientFactory, id, userName, webAppBotId, request.HttpContext.RequestAborted) is null)
         {
             return Results.Json(new { error = "无权访问该智能体会话" }, statusCode: StatusCodes.Status403Forbidden);
         }
@@ -1972,7 +1988,9 @@ app.MapGet("/api/agentfree/sessions/{id}/timeline", async (string id, IHttpClien
     try
     {
         var userName = GetUnifiedUsername(request);
-        if (await GetFamilyRewardAgentFreeSession(httpClientFactory, id, userName, request.HttpContext.RequestAborted) is null)
+        var config = await configStore.LoadAsync();
+        var webAppBotId = ResolveFamilyRewardWebAppBotId(config, request.Query.String("webAppBotId"));
+        if (await GetFamilyRewardAgentFreeSessionForBot(httpClientFactory, id, userName, webAppBotId, request.HttpContext.RequestAborted) is null)
         {
             return Results.Json(new { error = "无权访问该智能体会话" }, statusCode: StatusCodes.Status403Forbidden);
         }
@@ -2000,7 +2018,9 @@ app.MapGet("/api/agentfree/sessions/{id}/queue", async (string id, IHttpClientFa
     try
     {
         var userName = GetUnifiedUsername(request);
-        if (await GetFamilyRewardAgentFreeSession(httpClientFactory, id, userName, request.HttpContext.RequestAborted) is null)
+        var config = await configStore.LoadAsync();
+        var webAppBotId = ResolveFamilyRewardWebAppBotId(config, request.Query.String("webAppBotId"));
+        if (await GetFamilyRewardAgentFreeSessionForBot(httpClientFactory, id, userName, webAppBotId, request.HttpContext.RequestAborted) is null)
         {
             return Results.Json(new { error = "无权访问该智能体会话" }, statusCode: StatusCodes.Status403Forbidden);
         }
@@ -2061,7 +2081,9 @@ app.MapPut("/api/agentfree/sessions/{id}", async (string id, JsonObject body, IH
     try
     {
         var userName = GetUnifiedUsername(request);
-        if (await GetFamilyRewardAgentFreeSession(httpClientFactory, id, userName, request.HttpContext.RequestAborted) is null)
+        var config = await configStore.LoadAsync();
+        var webAppBotId = ResolveFamilyRewardWebAppBotId(config, request.Query.String("webAppBotId"));
+        if (await GetFamilyRewardAgentFreeSessionForBot(httpClientFactory, id, userName, webAppBotId, request.HttpContext.RequestAborted) is null)
         {
             return Results.Json(new { error = "无权访问该智能体会话" }, statusCode: StatusCodes.Status403Forbidden);
         }
@@ -2091,7 +2113,9 @@ app.MapPost("/api/agentfree/chat/sessions/{id}/reset", async (string id, IHttpCl
     try
     {
         var userName = GetUnifiedUsername(request);
-        if (await GetFamilyRewardAgentFreeSession(httpClientFactory, id, userName, request.HttpContext.RequestAborted) is null)
+        var config = await configStore.LoadAsync();
+        var webAppBotId = ResolveFamilyRewardWebAppBotId(config, request.Query.String("webAppBotId"));
+        if (await GetFamilyRewardAgentFreeSessionForBot(httpClientFactory, id, userName, webAppBotId, request.HttpContext.RequestAborted) is null)
         {
             return Results.Json(new { error = "无权访问该智能体会话" }, statusCode: StatusCodes.Status403Forbidden);
         }
@@ -2406,8 +2430,14 @@ static async Task<JsonObject?> GetFamilyRewardAgentFreeSessionForBot(
     string webAppBotId,
     CancellationToken cancellationToken)
 {
-    var agentId = await ResolveFamilyRewardAgentFreeAgentIdForBot(httpClientFactory, userName, webAppBotId, cancellationToken);
-    if (agentId is null) return null;
+    var agents = await GetFamilyRewardAgentFreeAgents(httpClientFactory, userName, webAppBotId, cancellationToken);
+    var authorizedAgentIds = agents
+        .OfType<JsonObject>()
+        .Select(item => item.Int("id"))
+        .Where(id => id.HasValue)
+        .Select(id => id!.Value)
+        .ToHashSet();
+    if (authorizedAgentIds.Count == 0) return null;
     var session = await SendAgentFreeJson(
         httpClientFactory,
         HttpMethod.Get,
@@ -2415,23 +2445,18 @@ static async Task<JsonObject?> GetFamilyRewardAgentFreeSessionForBot(
         null,
         userName,
         cancellationToken) as JsonObject;
-    return session?.Int("agentId") == agentId ? session : null;
+    var sessionAgentId = session?.Int("agentId");
+    return sessionAgentId.HasValue && authorizedAgentIds.Contains(sessionAgentId.Value) ? session : null;
 }
 
-static Task<JsonObject?> GetFamilyRewardAgentFreeSession(
-    IHttpClientFactory httpClientFactory,
-    string sessionId,
-    string userName,
-    CancellationToken cancellationToken) =>
-    GetFamilyRewardAgentFreeSessionForBot(httpClientFactory, sessionId, userName, "web-jiajaifen-chat", cancellationToken);
-
-static JsonArray FilterFamilyRewardAgentFreeSessions(JsonNode? sessions, int agentId)
+static JsonArray FilterFamilyRewardAgentFreeSessions(JsonNode? sessions, IReadOnlySet<int> authorizedAgentIds)
 {
     var result = new JsonArray();
     if (sessions is not JsonArray sessionArray) return result;
     foreach (var item in sessionArray.OfType<JsonObject>())
     {
-        if (item.Int("agentId") == agentId && !item.Bool("isArchived")) result.Add(item.DeepClone());
+        var agentId = item.Int("agentId");
+        if (agentId.HasValue && authorizedAgentIds.Contains(agentId.Value) && !item.Bool("isArchived")) result.Add(item.DeepClone());
     }
     return result;
 }
