@@ -25,11 +25,18 @@ test('mobile assistant reuses the complete AgentFree WebApp chat surface', async
   assert.match(cleanChat, /export \{ CleanChatView as default \} from '@agentfree\/webapp-chat'/);
   assert.doesNotMatch(cleanChat, /streamChat\(/);
   assert.match(api, /\/api\/agentfree\/chat\/stream/);
+  assert.match(api, /getSessions = \(gatewayType\?: string, user\?: string, agentId\?: number, limit\?: number\)/);
+  assert.match(api, /agentId: agentId \|\| undefined,[\s\S]*limit: limit \|\| undefined,[\s\S]*webAppBotId: getWebAppBotId\(\)/);
   assert.match(api, /readCurrentAppProfile/);
   assert.match(api, /'X-App-User-Id': appProfile\.appUserId/);
   assert.match(api, /'X-App-User-Role': appProfile\.role/);
   assert.match(api, /headers:\s*\{\s*'Content-Type': 'application\/json',\s*\.\.\.authHeaders\(\)/s);
   assert.match(backend, /webAppBotId/);
+  assert.match(backend, /request\.Query\.Int\("agentId"\)/);
+  assert.match(backend, /authorizedAgentIds\.Contains\(requestedAgentId\.Value\)/);
+  assert.match(backend, /authorizedAgentIds\.Contains\(sessionAgentId\.Value\)/);
+  assert.match(backend, /agentId=\{requestedAgentId\.Value\}/);
+  assert.doesNotMatch(backend, /GetFamilyRewardAgentFreeSessionForBot\(httpClientFactory, sessionId, userName, "web-jiajaifen-chat"/);
   assert.match(backend, /if \(active\) result\.Add\(item\.DeepClone\(\)\)/);
   assert.match(backend, /OpenChatStreamAsync/);
   assert.match(backend, /gatewayBaseUrl/);
