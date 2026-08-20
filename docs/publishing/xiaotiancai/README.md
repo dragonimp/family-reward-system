@@ -16,6 +16,7 @@
 - 必须由发布主体提供的材料：`08-user-provided-materials.md`
 - 官方要求核对笔记：`09-official-requirements-notes.md`
 - 项目管理外部市场平台模块审计：`10-external-market-platform-module-audit.md`
+- REQ-053 静态测试用例与追踪矩阵：`11-req-053-static-test-cases.md`
 
 ## 当前产品信息
 
