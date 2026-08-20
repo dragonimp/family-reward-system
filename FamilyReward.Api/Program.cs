@@ -2180,8 +2180,7 @@ app.MapPost("/api/agentfree/chat/stream", async (JsonObject body, IHttpClientFac
             {
                 ["username"] = userName,
                 ["displayName"] = displayName,
-                ["role"] = "parent",
-                ["appUserId"] = access.Profile!.AppUserId
+                ["role"] = "parent"
             },
             ["metadata"] = new JsonObject
             {

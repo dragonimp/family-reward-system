@@ -191,6 +191,7 @@ test('REQ-048 scopes public MCP tools by User Center username', async () => {
   assert.match(api, /IsMcpFamilyAccessible/);
   assert.match(api, /MakeParentAppUserId\(username\)/);
   assert.doesNotMatch(api, /GatewayMetadata_parentAppUserId/);
+  assert.doesNotMatch(api, /\["appUserId"\] = access\.Profile!\.AppUserId/);
   assert.match(api, /当前家长权限不足/);
   assert.match(library, /username/);
   assert.doesNotMatch(library, /parent_user_id/);
