@@ -31,9 +31,9 @@ rsync -az --delete "$ROOT_DIR/frontend/dist/" "$DEPLOY_HOST:$REMOTE_STAGE/fronte
 
 ssh "$DEPLOY_HOST" "set -e
   sudo test -s '$REMOTE_ROOT/api/system_config.json'
-  sudo mkdir -p '/var/backups/family-reward/$STAMP'
-  sudo cp -a '$REMOTE_ROOT/api' '/var/backups/family-reward/$STAMP/api'
-  sudo cp -a '$REMOTE_ROOT/frontend/static' '/var/backups/family-reward/$STAMP/frontend-static'
+  sudo mkdir -p '/opt/backups/family-reward/$STAMP'
+  sudo cp -a '$REMOTE_ROOT/api' '/opt/backups/family-reward/$STAMP/api'
+  sudo cp -a '$REMOTE_ROOT/frontend/static' '/opt/backups/family-reward/$STAMP/frontend-static'
   sudo rsync -a --delete --exclude system_config.json '$REMOTE_STAGE/api/' '$REMOTE_ROOT/api/'
   sudo rsync -a --delete '$REMOTE_STAGE/frontend/' '$REMOTE_ROOT/frontend/static/'
   sudo chown -R www-data:www-data '$REMOTE_ROOT/api' '$REMOTE_ROOT/frontend/static'
@@ -44,4 +44,4 @@ ssh "$DEPLOY_HOST" "set -e
   curl -fsS http://127.0.0.1:5102/health"
 
 echo
-echo "Deployed to https://happylife.ai.impx.net (backup: /var/backups/family-reward/$STAMP)"
+echo "Deployed to https://happylife.ai.impx.net (backup: /opt/backups/family-reward/$STAMP)"
