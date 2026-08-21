@@ -1899,16 +1899,12 @@ app.MapGet("/api/agentfree/sessions", async (IHttpClientFactory httpClientFactor
             return Results.Json(new { error = "无权访问该智能体会话" }, statusCode: StatusCodes.Status403Forbidden);
         }
         if (authorizedAgentIds.Count == 0) return Results.Json(new JsonArray());
-        var sessionQuery = new List<string> { "gatewayType=WebApp" };
-        if (requestedAgentId.HasValue) sessionQuery.Add($"agentId={requestedAgentId.Value}");
-        if (request.Query.Int("limit") is int requestedLimit) sessionQuery.Add($"limit={Math.Clamp(requestedLimit, 1, 500)}");
-        var sessions = await SendAgentFreeJson(
-            httpClientFactory,
-            HttpMethod.Get,
-            $"/api/webapp/sessions?{string.Join('&', sessionQuery)}",
-            null,
+        var sessions = await CreateOrbitWebAppClient(httpClientFactory, webAppBotId).GetSessionsAsync(
             userName,
-            request.HttpContext.RequestAborted);
+            gatewayType: "WebApp",
+            agentId: requestedAgentId,
+            limit: request.Query.Int("limit") is int requestedLimit ? Math.Clamp(requestedLimit, 1, 500) : null,
+            cancellationToken: request.HttpContext.RequestAborted);
         var familySessions = FilterFamilyRewardAgentFreeSessions(sessions, authorizedAgentIds);
         return Results.Json(await FilterReadableFamilyRewardAgentFreeSessions(
             httpClientFactory,
@@ -1932,14 +1928,9 @@ app.MapGet("/api/agentfree/sessions/{id}", async (string id, IHttpClientFactory 
         var config = await configStore.LoadAsync();
         var webAppBotId = ResolveFamilyRewardWebAppBotId(config, request.Query.String("webAppBotId"));
         var agentId = await ResolveFamilyRewardAgentFreeAgentIdForBot(httpClientFactory, userName, webAppBotId, request.HttpContext.RequestAborted);
-        var session = await SendAgentFreeJson(
-            httpClientFactory,
-            HttpMethod.Get,
-            $"/api/webapp/sessions/{Uri.EscapeDataString(id)}",
-            null,
-            userName,
-            request.HttpContext.RequestAborted);
-        if (agentId is null || session is not JsonObject sessionObject || sessionObject.Int("agentId") != agentId)
+        var session = await CreateOrbitWebAppClient(httpClientFactory, webAppBotId)
+            .GetSessionAsync(id, userName, request.HttpContext.RequestAborted);
+        if (agentId is null || session?.AgentId != agentId)
         {
             return Results.Json(new { error = "无权访问该智能体会话" }, statusCode: StatusCodes.Status403Forbidden);
         }
@@ -1964,15 +1955,17 @@ app.MapGet("/api/agentfree/sessions/{id}/messages", async (string id, IHttpClien
         {
             return Results.Json(new { error = "无权访问该智能体会话" }, statusCode: StatusCodes.Status403Forbidden);
         }
-        var query = request.QueryString.HasValue ? request.QueryString.Value : "";
-        var messages = await SendAgentFreeJson(
-            httpClientFactory,
-            HttpMethod.Get,
-            $"/api/webapp/sessions/{Uri.EscapeDataString(id)}/messages{query}",
-            null,
+        var messages = await CreateOrbitWebAppClient(httpClientFactory, webAppBotId).GetSessionMessagesAsync(
+            id,
             userName,
+            new OrbitWebAppMessageQuery
+            {
+                Take = request.Query.Int("take"),
+                BeforeId = long.TryParse(request.Query.String("beforeId"), out var beforeId) ? beforeId : null,
+                Ids = request.Query.String("ids")
+            },
             request.HttpContext.RequestAborted);
-        return Results.Json(messages ?? new JsonArray());
+        return Results.Json(messages);
     }
     catch (Exception ex)
     {
@@ -1994,14 +1987,8 @@ app.MapGet("/api/agentfree/sessions/{id}/timeline", async (string id, IHttpClien
         {
             return Results.Json(new { error = "无权访问该智能体会话" }, statusCode: StatusCodes.Status403Forbidden);
         }
-        var query = request.QueryString.HasValue ? request.QueryString.Value : "";
-        var timeline = await SendAgentFreeJson(
-            httpClientFactory,
-            HttpMethod.Get,
-            $"/api/sessions/{Uri.EscapeDataString(id)}/timeline{query}",
-            null,
-            userName,
-            request.HttpContext.RequestAborted);
+        var timeline = await CreateOrbitWebAppClient(httpClientFactory, webAppBotId).GetSessionTimelineAsync(
+            id, userName, request.QueryString.Value, request.HttpContext.RequestAborted);
         return Results.Json(timeline ?? new JsonArray());
     }
     catch (Exception ex)
@@ -2024,13 +2011,8 @@ app.MapGet("/api/agentfree/sessions/{id}/queue", async (string id, IHttpClientFa
         {
             return Results.Json(new { error = "无权访问该智能体会话" }, statusCode: StatusCodes.Status403Forbidden);
         }
-        var queue = await SendAgentFreeJson(
-            httpClientFactory,
-            HttpMethod.Get,
-            $"/api/webapp/chat/sessions/{Uri.EscapeDataString(id)}/queue",
-            null,
-            userName,
-            request.HttpContext.RequestAborted);
+        var queue = await CreateOrbitWebAppClient(httpClientFactory, webAppBotId)
+            .GetSessionQueueAsync(id, userName, request.HttpContext.RequestAborted);
         return Results.Json(queue ?? new JsonObject { ["items"] = new JsonArray(), ["waitingCount"] = 0 });
     }
     catch (Exception ex)
@@ -2054,15 +2036,12 @@ app.MapPost("/api/agentfree/sessions", async (JsonObject body, IHttpClientFactor
         {
             return Results.Json(new { error = "未找到家庭积分应用智能体" }, statusCode: StatusCodes.Status502BadGateway);
         }
-        var session = await SendAgentFreeJson(
-            httpClientFactory,
-            HttpMethod.Post,
-            "/api/webapp/sessions",
-            new JsonObject
+        var session = await CreateOrbitWebAppClient(httpClientFactory, webAppBotId).CreateSessionAsync(
+            new CreateOrbitWebAppSessionRequest
             {
-                ["agentId"] = agentId.Value,
-                ["name"] = string.IsNullOrWhiteSpace(body.String("name")) ? "家庭积分会话" : body.String("name").Trim(),
-                ["webAppBotId"] = webAppBotId
+                AgentId = agentId.Value,
+                Name = string.IsNullOrWhiteSpace(body.String("name")) ? "家庭积分会话" : body.String("name").Trim(),
+                WebAppBotId = webAppBotId
             },
             userName,
             request.HttpContext.RequestAborted);
@@ -2087,18 +2066,16 @@ app.MapPut("/api/agentfree/sessions/{id}", async (string id, JsonObject body, IH
         {
             return Results.Json(new { error = "无权访问该智能体会话" }, statusCode: StatusCodes.Status403Forbidden);
         }
-        var result = await SendAgentFreeJson(
-            httpClientFactory,
-            HttpMethod.Put,
-            $"/api/webapp/sessions/{Uri.EscapeDataString(id)}",
-            new JsonObject
+        await CreateOrbitWebAppClient(httpClientFactory, webAppBotId).UpdateSessionAsync(
+            id,
+            new UpdateOrbitWebAppSessionRequest
             {
-                ["name"] = body["name"]?.DeepClone(),
-                ["isArchived"] = body["isArchived"]?.DeepClone()
+                Name = body.String("name"),
+                IsArchived = body["isArchived"]?.GetValue<bool?>()
             },
             userName,
             request.HttpContext.RequestAborted);
-        return Results.Json(result ?? new JsonObject { ["id"] = id });
+        return Results.Json(new { id });
     }
     catch (Exception ex)
     {
@@ -2119,13 +2096,8 @@ app.MapPost("/api/agentfree/chat/sessions/{id}/reset", async (string id, IHttpCl
         {
             return Results.Json(new { error = "无权访问该智能体会话" }, statusCode: StatusCodes.Status403Forbidden);
         }
-        var result = await SendAgentFreeJson(
-            httpClientFactory,
-            HttpMethod.Post,
-            $"/api/webapp/chat/sessions/{Uri.EscapeDataString(id)}/reset",
-            null,
-            userName,
-            request.HttpContext.RequestAborted);
+        var result = await CreateOrbitWebAppClient(httpClientFactory, webAppBotId)
+            .ResetSessionContextAsync(id, userName, request.HttpContext.RequestAborted);
         return Results.Json(result ?? new JsonObject { ["id"] = id });
     }
     catch (Exception ex)
@@ -2140,13 +2112,8 @@ app.MapPost("/api/agentfree/interactions/{interactionId}/respond", async (string
     if (access.Error is not null) return access.Error;
     try
     {
-        var result = await SendAgentFreeJson(
-            httpClientFactory,
-            HttpMethod.Post,
-            $"/api/webapp/interactions/{Uri.EscapeDataString(interactionId)}/respond",
-            body,
-            GetUnifiedUsername(request),
-            request.HttpContext.RequestAborted);
+        var result = await CreateOrbitWebAppClient(httpClientFactory)
+            .RespondInteractionAsync(interactionId, body, GetUnifiedUsername(request), request.HttpContext.RequestAborted);
         return Results.Json(result ?? new JsonObject { ["interactionId"] = interactionId });
     }
     catch (Exception ex)
@@ -2380,18 +2347,6 @@ static OrbitWebAppClient CreateOrbitWebAppClient(IHttpClientFactory httpClientFa
     });
 }
 
-static async Task<JsonNode?> SendAgentFreeJson(
-    IHttpClientFactory httpClientFactory,
-    HttpMethod method,
-    string path,
-    JsonNode? body,
-    string userName,
-    CancellationToken cancellationToken)
-{
-    return await CreateOrbitWebAppClient(httpClientFactory)
-        .SendJsonAsync(method, path, body, userName, cancellationToken);
-}
-
 static async Task<JsonArray> GetFamilyRewardAgentFreeAgents(
     IHttpClientFactory httpClientFactory,
     string userName,
@@ -2423,7 +2378,7 @@ static async Task<int?> ResolveFamilyRewardAgentFreeAgentIdForBot(
     return agents.OfType<JsonObject>().Select(item => item.Int("id")).FirstOrDefault(id => id.HasValue);
 }
 
-static async Task<JsonObject?> GetFamilyRewardAgentFreeSessionForBot(
+static async Task<OrbitWebAppSession?> GetFamilyRewardAgentFreeSessionForBot(
     IHttpClientFactory httpClientFactory,
     string sessionId,
     string userName,
@@ -2438,50 +2393,36 @@ static async Task<JsonObject?> GetFamilyRewardAgentFreeSessionForBot(
         .Select(id => id!.Value)
         .ToHashSet();
     if (authorizedAgentIds.Count == 0) return null;
-    var session = await SendAgentFreeJson(
-        httpClientFactory,
-        HttpMethod.Get,
-        $"/api/webapp/sessions/{Uri.EscapeDataString(sessionId)}",
-        null,
-        userName,
-        cancellationToken) as JsonObject;
-    var sessionAgentId = session?.Int("agentId");
-    return sessionAgentId.HasValue && authorizedAgentIds.Contains(sessionAgentId.Value) ? session : null;
+    var session = await CreateOrbitWebAppClient(httpClientFactory, webAppBotId)
+        .GetSessionAsync(sessionId, userName, cancellationToken);
+    return session is not null && authorizedAgentIds.Contains(session.AgentId) ? session : null;
 }
 
-static JsonArray FilterFamilyRewardAgentFreeSessions(JsonNode? sessions, IReadOnlySet<int> authorizedAgentIds)
+static List<OrbitWebAppSession> FilterFamilyRewardAgentFreeSessions(
+    IEnumerable<OrbitWebAppSession> sessions,
+    IReadOnlySet<int> authorizedAgentIds)
 {
-    var result = new JsonArray();
-    if (sessions is not JsonArray sessionArray) return result;
-    foreach (var item in sessionArray.OfType<JsonObject>())
-    {
-        var agentId = item.Int("agentId");
-        if (agentId.HasValue && authorizedAgentIds.Contains(agentId.Value) && !item.Bool("isArchived")) result.Add(item.DeepClone());
-    }
-    return result;
+    return sessions
+        .Where(session => authorizedAgentIds.Contains(session.AgentId) && !session.IsArchived)
+        .ToList();
 }
 
-static async Task<JsonArray> FilterReadableFamilyRewardAgentFreeSessions(
+static async Task<List<OrbitWebAppSession>> FilterReadableFamilyRewardAgentFreeSessions(
     IHttpClientFactory httpClientFactory,
-    JsonArray sessions,
+    IEnumerable<OrbitWebAppSession> sessions,
     string userName,
     CancellationToken cancellationToken)
 {
-    var result = new JsonArray();
-    foreach (var item in sessions.OfType<JsonObject>())
+    var result = new List<OrbitWebAppSession>();
+    foreach (var item in sessions)
     {
-        var sessionId = item.String("id");
+        var sessionId = item.Id;
         if (string.IsNullOrWhiteSpace(sessionId)) continue;
         try
         {
-            var session = await SendAgentFreeJson(
-                httpClientFactory,
-                HttpMethod.Get,
-                $"/api/webapp/sessions/{Uri.EscapeDataString(sessionId)}",
-                null,
-                userName,
-                cancellationToken) as JsonObject;
-            if (session?.Int("agentId") == item.Int("agentId")) result.Add(item.DeepClone());
+            var session = await CreateOrbitWebAppClient(httpClientFactory)
+                .GetSessionAsync(sessionId, userName, cancellationToken);
+            if (session?.AgentId == item.AgentId && !session.IsArchived) result.Add(item);
         }
         catch (Exception ex) when (IsAgentFreeAccessDenied(ex))
         {

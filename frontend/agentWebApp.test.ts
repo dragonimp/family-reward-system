@@ -34,8 +34,16 @@ test('mobile assistant reuses the complete AgentFree WebApp chat surface', async
   assert.match(backend, /webAppBotId/);
   assert.match(backend, /request\.Query\.Int\("agentId"\)/);
   assert.match(backend, /authorizedAgentIds\.Contains\(requestedAgentId\.Value\)/);
-  assert.match(backend, /authorizedAgentIds\.Contains\(sessionAgentId\.Value\)/);
-  assert.match(backend, /agentId=\{requestedAgentId\.Value\}/);
+  assert.match(backend, /authorizedAgentIds\.Contains\(session\.AgentId\)/);
+  assert.match(backend, /GetSessionsAsync\(/);
+  assert.match(backend, /GetSessionMessagesAsync\(/);
+  assert.match(backend, /GetSessionTimelineAsync\(/);
+  assert.match(backend, /GetSessionQueueAsync\(/);
+  assert.match(backend, /CreateSessionAsync\(/);
+  assert.match(backend, /UpdateSessionAsync\(/);
+  assert.match(backend, /ResetSessionContextAsync\(/);
+  assert.match(backend, /RespondInteractionAsync\(/);
+  assert.doesNotMatch(backend, /SendAgentFreeJson/);
   assert.doesNotMatch(backend, /GetFamilyRewardAgentFreeSessionForBot\(httpClientFactory, sessionId, userName, "web-jiajaifen-chat"/);
   assert.match(backend, /if \(active\) result\.Add\(item\.DeepClone\(\)\)/);
   assert.match(backend, /OpenChatStreamAsync/);

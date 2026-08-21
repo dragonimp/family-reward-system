@@ -104,7 +104,8 @@ test('REQ-033 streams mobile family agent responses without waiting for the full
   assert.match(agentApi, /\/api\/agentfree\/chat\/stream/);
   assert.match(agentApi, /credentials: 'include'/);
   assert.match(api, /\/api\/agentfree\/sessions/);
-  assert.match(api, /\/api\/webapp\/sessions/);
+  assert.match(api, /GetSessionsAsync/);
+  assert.match(api, /CreateSessionAsync/);
   assert.match(api, /OpenChatStreamAsync/);
   assert.match(api, /gatewayBaseUrl/);
   assert.match(api, /webAppBotId/);
