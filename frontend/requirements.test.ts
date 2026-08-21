@@ -2,6 +2,23 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 
+test('TASK-158 declares the controlled production deployment profile', async () => {
+  const profile = JSON.parse(await readFile(
+    new URL('../.agentfree/deployment-profile.json', import.meta.url),
+    'utf8',
+  ));
+
+  assert.deepEqual(profile, {
+    projectCode: 'family-reward',
+    enabled: true,
+    workingDirectory: '~/Projects/family-reward-system',
+    executable: '/bin/bash',
+    arguments: ['scripts/atlas-deploy-server.sh'],
+    timeoutMinutes: 30,
+    healthChecks: ['https://happylife.ai.impx.net/health'],
+  });
+});
+
 test('REQ-028 offers an explicit family selector and scoped child view', async () => {
   const page = await readFile(new URL('./src/pages/FamilyGroups.tsx', import.meta.url), 'utf8');
   assert.match(page, /id="family-view-select"/);
