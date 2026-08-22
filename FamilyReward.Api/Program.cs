@@ -92,6 +92,7 @@ builder.Services.AddAgentIdentityJwtCookieAuthentication(new AgentIdentityOption
     CookieName = Environment.GetEnvironmentVariable("AGENTIDENTITY_COOKIE_NAME") ?? "happylife_access_token",
     LogoutCompletedPath = "/auth/logged-out"
 });
+builder.Services.AddAgentIdentityFeedbackClient(builder.Configuration);
 
 var app = builder.Build();
 
