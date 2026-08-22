@@ -38,6 +38,9 @@ ssh "$DEPLOY_HOST" "set -e
   sudo rsync -a --delete '$REMOTE_STAGE/frontend/' '$REMOTE_ROOT/frontend/static/'
   sudo chown -R www-data:www-data '$REMOTE_ROOT/api' '$REMOTE_ROOT/frontend/static'
   sudo chmod 600 '$REMOTE_ROOT/api/system_config.json'
+  sudo mkdir -p /etc/systemd/system/family-reward-api.service.d
+  printf '[Service]\nEnvironmentFile=/etc/agent-secrets/application-feedback.env\n' | sudo tee /etc/systemd/system/family-reward-api.service.d/feedback.conf >/dev/null
+  sudo systemctl daemon-reload
   sudo systemctl restart family-reward-api.service
   sleep 2
   systemctl is-active family-reward-api.service
