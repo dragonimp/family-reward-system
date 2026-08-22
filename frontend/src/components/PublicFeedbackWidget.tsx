@@ -26,7 +26,7 @@ declare global {
 }
 
 const PUBLIC_WIDGET_ID = 'atlas-public-feedback-widget';
-const PUBLIC_WIDGET_URL = 'https://auth.ai.xmkurt.com/feedback-widget.js';
+const PUBLIC_WIDGET_URL = 'https://auth.ai.xmkurt.com/feedback-widget.js?v=same-origin-submit-v1';
 
 export default function PublicFeedbackWidget() {
   const { user } = useAuth();
