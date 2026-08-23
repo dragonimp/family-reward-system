@@ -8,11 +8,11 @@
 - 服务说明：`家加分 MCP：家庭是当前家长自己的成员和孩子；圈子是多个家庭协作查看孩子积分的空间`
 - MCP 接口地址：`https://happylife.ai.impx.net/api/mcp`
 - 支持方法：`initialize`、`initialized`、`notifications/initialized`、`ping`、`tools/list`、`tools/call`
-- 独立工具：40 个，完整名称、描述和权限见 `docs/FAMILY-REWARD-MCP-TOOLS.md`。
+- 独立工具：41 个，完整名称、描述和权限见 `docs/FAMILY-REWARD-MCP-TOOLS.md`。
 
 ## 可直接导入文件
 
-- `goldfish-tool-library.json`（40 个工具及完整 `inputSchema`）
+- `goldfish-tool-library.json`（41 个工具及完整 `inputSchema`）
 
 ## 建议接入方式
 

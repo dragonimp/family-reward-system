@@ -22,6 +22,7 @@ const string FamilyRewardMcpAddChildToolName = "family_reward_add_child";
 const string FamilyRewardMcpUpdateChildToolName = "family_reward_update_child";
 const string FamilyRewardMcpDeleteChildToolName = "family_reward_delete_child";
 const string FamilyRewardMcpAdjustScoreToolName = "family_reward_adjust_score";
+const string FamilyRewardMcpApplyMatchingRuleToolName = "family_reward_apply_matching_rule";
 const string FamilyRewardMcpQueryScoreToolName = "family_reward_query_score";
 const string FamilyRewardMcpCreateRecordToolName = "family_reward_create_record";
 const string FamilyRewardMcpUpdateRecordToolName = "family_reward_update_record";
@@ -115,7 +116,7 @@ await InitDatabase(connectionString);
 app.MapGet("/health", () => Results.Json(new
 {
     status = "ok",
-    version = "3.1.0",
+    version = "3.2.0",
     stack = "aspnet-core",
     db = "postgresql"
 }));
@@ -2268,9 +2269,9 @@ app.MapPost("/api/mcp", async (JsonObject body) =>
                 serverInfo = new
                 {
                     name = FamilyRewardMcpServiceName,
-                    version = "3.0.0"
+                    version = "3.2.0"
                 },
-                instructions = "Use tools/list and tools/call with separated tools for children, score/accounts, records/transactions, rules, and family groups. 不要把不同对象合并到一个工具里。"
+                instructions = "Use tools/list and tools/call with separated tools for children, score/accounts, records/transactions, rules, and family groups. 自然语言行为记分必须优先调用 family_reward_apply_matching_rule，由服务端匹配当前生效规则并落库；不要仅查询规则后口头回复。"
             }));
         case "initialized":
         case "notifications/initialized":
@@ -2663,7 +2664,7 @@ static object BuildMcpServiceDescriptor()
         service = new
         {
             name = FamilyRewardMcpServiceName,
-            version = "3.1.0",
+            version = "3.2.0",
             title = "家加分 MCP 业务工具服务",
             description = "提供家庭成员、孩子、圈子、积分记录、规则、设备、好友、申请审批和圈子统计工具；家庭是当前家长自己的成员清单，圈子是多个家庭协作共享孩子积分的空间。"
         },
@@ -2784,6 +2785,26 @@ static object BuildMcpToolCatalog()
                         description = new { type = "string", description = "交易描述（adjust_score）" },
                     },
                     required = new[] { "delta" }
+                }
+            },
+            new
+            {
+                name = FamilyRewardMcpApplyMatchingRuleToolName,
+                description = "按当前生效规则自动加减积分：处理“玥玥今天帮助妹妹，请加分”这类自然语言记分请求。服务端会校验孩子属于当前家长，匹配该家长当前生效规则模板，并在一次事务中写入积分明细和更新余额。不得只查询规则、猜测分值或仅回复说明；无法唯一匹配时不会写入。",
+                inputSchema = new
+                {
+                    type = "object",
+                    properties = new
+                    {
+                        family_group_id = new { type = "integer", description = "圈子ID；仅用于缩小孩子姓名定位范围" },
+                        child_id = new { type = "integer", description = "孩子ID（与 child_name 二选一）" },
+                        child_name = new { type = "string", description = "孩子姓名（与 child_id 二选一）" },
+                        behavior = new { type = "string", description = "孩子完成的自然语言行为，例如：今天帮助妹妹" },
+                        date = new { type = "string", description = "交易日期，格式 YYYY-MM-DD（默认今天）" },
+                        request_id = new { type = "string", description = "本次用户消息的稳定请求号；流式重试时复用同一值，避免重复入账" },
+                        notes = new { type = "string", description = "可选备注" }
+                    },
+                    required = new[] { "behavior" }
                 }
             },
             new
@@ -3348,6 +3369,7 @@ static bool IsKnownMcpTool(string toolName) => toolName is
     FamilyRewardMcpUpdateChildToolName or
     FamilyRewardMcpDeleteChildToolName or
     FamilyRewardMcpAdjustScoreToolName or
+    FamilyRewardMcpApplyMatchingRuleToolName or
     FamilyRewardMcpQueryScoreToolName or
     FamilyRewardMcpCreateRecordToolName or
     FamilyRewardMcpUpdateRecordToolName or
@@ -3614,6 +3636,10 @@ static HashSet<string> GetAllowedMcpArguments(string toolName) => toolName switc
     {
         "family_group_id", "child_id", "child_name", "delta", "direction", "date", "category", "description"
     },
+    FamilyRewardMcpApplyMatchingRuleToolName => new(StringComparer.Ordinal)
+    {
+        "family_group_id", "child_id", "child_name", "behavior", "date", "request_id", "notes"
+    },
     FamilyRewardMcpLogScoreOperationToolName => new(StringComparer.Ordinal)
     {
         "family_group_id", "child_id", "child_name", "delta", "direction", "date", "category", "description", "notes"
@@ -3741,6 +3767,7 @@ static async Task<object> InvokeFamilyRewardMcpTool(string toolName, JsonObject 
         FamilyRewardMcpListChildrenToolName => await McpQueryChildren(connectionString, arguments),
         FamilyRewardMcpDeleteChildToolName => await McpDeleteChild(connectionString, arguments),
         FamilyRewardMcpAdjustScoreToolName => await McpAdjustScore(connectionString, arguments),
+        FamilyRewardMcpApplyMatchingRuleToolName => await McpApplyMatchingRule(connectionString, arguments),
         FamilyRewardMcpQueryScoreToolName => await McpQueryScore(connectionString, arguments),
         FamilyRewardMcpCreateRecordToolName => await McpCreateRecord(connectionString, arguments),
         FamilyRewardMcpUpdateRecordToolName => await McpUpdateRecord(connectionString, arguments),
@@ -3848,6 +3875,163 @@ static async Task<object> McpAdjustScore(string connectionString, JsonObject arg
 
     var updated = (await GetMcpChildren(connectionString, arguments)).FirstOrDefault(c => GetInt(c, "id") == GetInt(target, "id"));
     return new { ok = true, action = "adjust_score", child = updated, transaction = tx["transaction"] };
+}
+
+static async Task<object> McpApplyMatchingRule(string connectionString, JsonObject arguments)
+{
+    var children = await GetMcpChildren(connectionString, arguments);
+    var target = ResolveChildByReference(children, arguments);
+    if (target is null)
+    {
+        return new { ok = false, action = "apply_matching_rule", error = "未找到目标孩子，或当前家长权限不足" };
+    }
+
+    var behavior = arguments.String("behavior").Trim();
+    if (string.IsNullOrWhiteSpace(behavior))
+    {
+        return new { ok = false, action = "apply_matching_rule", error = "behavior 行为描述不能为空" };
+    }
+    if (!TryParseDateFilter(arguments.String("date"), out _))
+    {
+        return new { ok = false, action = "apply_matching_rule", error = "date 日期格式无效，请使用 yyyy-MM-dd" };
+    }
+
+    var parentAppUserId = ResolveMcpParentAppUserId(arguments)!;
+    var ruleData = await GetRules(connectionString, parentAppUserId);
+    var effectiveRules = (List<Dictionary<string, object?>>)ruleData["rules"];
+    var childName = Convert.ToString(target["name"], CultureInfo.InvariantCulture) ?? string.Empty;
+    var matches = effectiveRules
+        .Select(rule => new
+        {
+            Rule = rule,
+            Score = ScoreRuleMatch(behavior, childName, rule),
+            IsPersonal = !string.IsNullOrWhiteSpace(Convert.ToString(rule["ownerAppUserId"], CultureInfo.InvariantCulture))
+        })
+        .Where(candidate => candidate.Score >= 70)
+        .OrderByDescending(candidate => candidate.Score)
+        .ThenByDescending(candidate => candidate.IsPersonal)
+        .ThenByDescending(candidate => NormalizeRuleMatchText(Convert.ToString(candidate.Rule["name"], CultureInfo.InvariantCulture) ?? string.Empty, string.Empty).Length)
+        .ThenBy(candidate => GetInt(candidate.Rule, "id"))
+        .ToList();
+
+    if (matches.Count == 0)
+    {
+        return new
+        {
+            ok = false,
+            action = "apply_matching_rule",
+            error = "当前生效规则中没有匹配该行为的规则，未写入积分",
+            behavior,
+            effective_rule_count = effectiveRules.Count
+        };
+    }
+
+    var best = matches[0];
+    var sameRank = matches
+        .Where(candidate => candidate.Score == best.Score && candidate.IsPersonal == best.IsPersonal)
+        .ToList();
+    if (sameRank.Count > 1)
+    {
+        return new
+        {
+            ok = false,
+            action = "apply_matching_rule",
+            error = "匹配到多个同等规则，未写入积分；请补充更具体的行为描述",
+            candidates = sameRank.Select(candidate => new
+            {
+                id = GetInt(candidate.Rule, "id"),
+                name = Convert.ToString(candidate.Rule["name"], CultureInfo.InvariantCulture),
+                points = GetDecimal(candidate.Rule, "points")
+            })
+        };
+    }
+
+    var points = GetDecimal(best.Rule, "points");
+    if (points == 0)
+    {
+        return new { ok = false, action = "apply_matching_rule", error = "匹配规则的积分为 0，未写入积分" };
+    }
+
+    var requestId = arguments.String("request_id").Trim();
+    var idempotencyKey = string.IsNullOrWhiteSpace(requestId)
+        ? string.Empty
+        : Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes($"{parentAppUserId}:{requestId}"))).ToLowerInvariant();
+    var beforeScore = GetDecimal(target, "score");
+    var txBody = new JsonObject
+    {
+        ["child_id"] = GetInt(target, "id"),
+        ["type"] = "points",
+        ["direction"] = points > 0 ? "+" : "-",
+        ["points"] = Math.Abs(points),
+        ["category"] = Convert.ToString(best.Rule["category"], CultureInfo.InvariantCulture) ?? "规则记分",
+        ["description"] = $"{Convert.ToString(best.Rule["name"], CultureInfo.InvariantCulture)}：{behavior}",
+        ["notes"] = arguments.String("notes"),
+        ["date"] = arguments.String("date", DateTime.Today.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)),
+        ["idempotency_key"] = idempotencyKey
+    };
+    var tx = await CreateTransaction(connectionString, txBody, parentAppUserId: parentAppUserId);
+    if (tx.ContainsKey("error"))
+    {
+        return new { ok = false, action = "apply_matching_rule", error = tx["error"] };
+    }
+
+    var updated = (await GetMcpChildren(connectionString, arguments))
+        .FirstOrDefault(child => GetInt(child, "id") == GetInt(target, "id"));
+    return new
+    {
+        ok = true,
+        action = "apply_matching_rule",
+        behavior,
+        matched_rule = best.Rule,
+        points_delta = points,
+        before_score = beforeScore,
+        after_score = updated is null ? beforeScore : GetDecimal(updated, "score"),
+        deduplicated = tx.TryGetValue("deduplicated", out var deduplicated) && Convert.ToBoolean(deduplicated, CultureInfo.InvariantCulture),
+        child = updated,
+        transaction = tx["transaction"]
+    };
+}
+
+static int ScoreRuleMatch(string behavior, string childName, Dictionary<string, object?> rule)
+{
+    var eventText = NormalizeRuleMatchText(behavior, childName);
+    var ruleName = NormalizeRuleMatchText(Convert.ToString(rule["name"], CultureInfo.InvariantCulture) ?? string.Empty, string.Empty);
+    var ruleDescription = NormalizeRuleMatchText(Convert.ToString(rule["description"], CultureInfo.InvariantCulture) ?? string.Empty, string.Empty);
+    if (string.IsNullOrWhiteSpace(eventText) || string.IsNullOrWhiteSpace(ruleName)) return 0;
+    if (eventText == ruleName) return 100;
+    if (eventText.Contains(ruleName, StringComparison.Ordinal) || ruleName.Contains(eventText, StringComparison.Ordinal)) return 90;
+    if (!string.IsNullOrWhiteSpace(ruleDescription)
+        && (ruleDescription.Contains(eventText, StringComparison.Ordinal) || eventText.Contains(ruleDescription, StringComparison.Ordinal))) return 80;
+
+    var eventBigrams = BuildTextBigrams(eventText);
+    var ruleBigrams = BuildTextBigrams($"{ruleName}{ruleDescription}");
+    if (eventBigrams.Count == 0 || ruleBigrams.Count == 0) return 0;
+    var overlap = eventBigrams.Intersect(ruleBigrams, StringComparer.Ordinal).Count();
+    return (int)Math.Round(69m * overlap / eventBigrams.Count, MidpointRounding.AwayFromZero);
+}
+
+static string NormalizeRuleMatchText(string text, string childName)
+{
+    var normalized = text.Trim().ToLowerInvariant();
+    if (!string.IsNullOrWhiteSpace(childName)) normalized = normalized.Replace(childName.Trim().ToLowerInvariant(), string.Empty, StringComparison.Ordinal);
+    foreach (var ignored in new[] { "今天", "今日", "昨天", "刚刚", "请", "给", "因为", "需要", "进行", "积分", "加分", "扣分", "记分", "一下", "这次", "孩子" })
+    {
+        normalized = normalized.Replace(ignored, string.Empty, StringComparison.Ordinal);
+    }
+    foreach (var synonym in new[] { "照料", "照看", "照顾", "关照", "爱护", "帮忙", "帮了", "协助" })
+    {
+        normalized = normalized.Replace(synonym, "帮助", StringComparison.Ordinal);
+    }
+    normalized = normalized.Replace("帮妹妹", "帮助妹妹", StringComparison.Ordinal)
+        .Replace("帮弟弟", "帮助弟弟", StringComparison.Ordinal);
+    return new string(normalized.Where(char.IsLetterOrDigit).ToArray());
+}
+
+static HashSet<string> BuildTextBigrams(string text)
+{
+    var result = new HashSet<string>(StringComparer.Ordinal);
+    for (var index = 0; index + 1 < text.Length; index++) result.Add(text.Substring(index, 2));
+    return result;
 }
 
 static async Task<object> McpLogScoreOperation(string connectionString, JsonObject arguments)
@@ -5640,6 +5824,7 @@ static async Task InitDatabase(string connectionString)
             CHECK (direction IN ('+', '-'))
         )
         """,
+        "ALTER TABLE transactions ADD COLUMN IF NOT EXISTS idempotency_key VARCHAR(64)",
         """
         CREATE TABLE IF NOT EXISTS rules (
             id SERIAL PRIMARY KEY,
@@ -5704,6 +5889,7 @@ static async Task InitDatabase(string connectionString)
         "CREATE INDEX IF NOT EXISTS idx_tx_child ON transactions(child_id)",
         "CREATE INDEX IF NOT EXISTS idx_tx_date ON transactions(date)",
         "CREATE INDEX IF NOT EXISTS idx_tx_type ON transactions(type)",
+        "CREATE UNIQUE INDEX IF NOT EXISTS ux_tx_idempotency_key ON transactions(idempotency_key) WHERE idempotency_key IS NOT NULL AND idempotency_key <> ''",
         "CREATE INDEX IF NOT EXISTS idx_rules_owner ON rules(owner_app_user_id)",
         "CREATE UNIQUE INDEX IF NOT EXISTS ux_rules_source_redline ON rules(source_redline_id) WHERE source_redline_id IS NOT NULL",
         "CREATE INDEX IF NOT EXISTS idx_user_rule_template_items_order ON user_rule_template_items(parent_app_user_id, sort_order)",
@@ -7548,6 +7734,7 @@ static async Task<Dictionary<string, object?>> CreateTransaction(
         var points = body.Decimal("points") ?? body.Decimal("amount") ?? 0;
         var cash = body.Decimal("cash_cny") ?? (type == "cash" ? body.Decimal("amount") : null) ?? 0;
         var itemText = body.String("items");
+        var idempotencyKey = body.String("idempotency_key").Trim();
 
         if (!string.IsNullOrWhiteSpace(parentAppUserId))
         {
@@ -7580,8 +7767,9 @@ static async Task<Dictionary<string, object?>> CreateTransaction(
         }
 
         await using var cmd = new NpgsqlCommand("""
-            INSERT INTO transactions (date, child_id, type, direction, category, description, points, cash_cny, items, notes)
-            VALUES (@date, @child_id, @type, @direction, @category, @description, @points, @cash_cny, @items, @notes)
+            INSERT INTO transactions (date, child_id, type, direction, category, description, points, cash_cny, items, notes, idempotency_key)
+            VALUES (@date, @child_id, @type, @direction, @category, @description, @points, @cash_cny, @items, @notes, @idempotency_key)
+            ON CONFLICT (idempotency_key) WHERE idempotency_key IS NOT NULL AND idempotency_key <> '' DO NOTHING
             RETURNING *
             """, conn, tx);
         cmd.Parameters.AddWithValue("date", DateOnly.Parse(body.String("date", DateTime.Today.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)), CultureInfo.InvariantCulture));
@@ -7594,16 +7782,40 @@ static async Task<Dictionary<string, object?>> CreateTransaction(
         cmd.Parameters.AddWithValue("cash_cny", cash);
         cmd.Parameters.AddWithValue("items", itemText);
         cmd.Parameters.AddWithValue("notes", body.String("notes"));
+        cmd.Parameters.Add(new NpgsqlParameter("idempotency_key", NpgsqlDbType.Varchar)
+        {
+            Value = string.IsNullOrWhiteSpace(idempotencyKey) ? DBNull.Value : idempotencyKey
+        });
 
         await using var reader = await cmd.ExecuteReaderAsync();
-        await reader.ReadAsync();
+        if (!await reader.ReadAsync())
+        {
+            await reader.CloseAsync();
+            await using var existingCmd = new NpgsqlCommand("SELECT * FROM transactions WHERE idempotency_key = @idempotency_key", conn, tx);
+            existingCmd.Parameters.AddWithValue("idempotency_key", idempotencyKey);
+            await using var existingReader = await existingCmd.ExecuteReaderAsync();
+            if (!await existingReader.ReadAsync())
+            {
+                await tx.RollbackAsync();
+                return new Dictionary<string, object?> { ["error"] = "积分请求幂等冲突，请稍后重试" };
+            }
+            var existingTransaction = ReadTransaction(existingReader);
+            await existingReader.CloseAsync();
+            await tx.CommitAsync();
+            return new Dictionary<string, object?>
+            {
+                ["transaction"] = existingTransaction,
+                ["status"] = "ok",
+                ["deduplicated"] = true
+            };
+        }
         var transaction = ReadTransaction(reader);
         await reader.CloseAsync();
 
         await UpdateAccount(conn, tx, childId, type, direction, points, cash, itemText);
         await tx.CommitAsync();
 
-        return new Dictionary<string, object?> { ["transaction"] = transaction, ["status"] = "ok" };
+        return new Dictionary<string, object?> { ["transaction"] = transaction, ["status"] = "ok", ["deduplicated"] = false };
     }
     catch (Exception ex)
     {

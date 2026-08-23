@@ -3,7 +3,7 @@
     {
       "name": "family-reward-mcp",
       "title": "家庭积分应用",
-      "description": "家加分 MCP：40 个独立工具。家庭指当前家长自己的家庭成员与名下孩子，不随圈子切换；圈子指多个家庭协作空间。默认孩子/积分查询仅返回本人名下孩子；指定 family_group_id 时仅圈子成员可查看圈内孩子余额；孩子明细、积分写入、设备和申请操作仍限孩子所属家长；规则仅公开规则和本人个人规则可见。",
+      "description": "家加分 MCP：41 个独立工具。家庭指当前家长自己的家庭成员与名下孩子，不随圈子切换；圈子指多个家庭协作空间。默认孩子/积分查询仅返回本人名下孩子；指定 family_group_id 时仅圈子成员可查看圈内孩子余额；孩子明细、积分写入、设备和申请操作仍限孩子所属家长；规则仅公开规则和本人个人规则可见。",
       "baseUrl": "https://happylife.ai.impx.net",
       "mcpEndpoint": "/api/mcp",
       "httpEndpoint": "https://happylife.ai.impx.net/api/mcp",
@@ -227,6 +227,51 @@
             "required": [
               "username",
               "delta"
+            ]
+          }
+        },
+        {
+          "name": "family_reward_apply_matching_rule",
+          "description": "按当前生效规则自动加减积分：处理“玥玥今天帮助妹妹，请加分”这类自然语言记分请求。服务端会校验孩子属于当前家长，匹配该家长当前生效规则模板，并在一次事务中写入积分明细和更新余额。不得只查询规则、猜测分值或仅回复说明；无法唯一匹配时不会写入。 所有调用必须传用户中心用户名 username；服务端会解析内部权限并拒绝越权访问。",
+          "inputSchema": {
+            "type": "object",
+            "properties": {
+              "family_group_id": {
+                "type": "integer",
+                "description": "圈子ID；仅用于缩小孩子姓名定位范围"
+              },
+              "child_id": {
+                "type": "integer",
+                "description": "孩子ID（与 child_name 二选一）"
+              },
+              "child_name": {
+                "type": "string",
+                "description": "孩子姓名（与 child_id 二选一）"
+              },
+              "behavior": {
+                "type": "string",
+                "description": "孩子完成的自然语言行为，例如：今天帮助妹妹"
+              },
+              "date": {
+                "type": "string",
+                "description": "交易日期，格式 YYYY-MM-DD（默认今天）"
+              },
+              "request_id": {
+                "type": "string",
+                "description": "本次用户消息的稳定请求号；流式重试时复用同一值，避免重复入账"
+              },
+              "notes": {
+                "type": "string",
+                "description": "可选备注"
+              },
+              "username": {
+                "type": "string",
+                "description": "当前登录用户的用户中心用户名（必填）。由 Goldfish 网关注入；服务端据此解析当前家长的内部权限范围。"
+              }
+            },
+            "required": [
+              "username",
+              "behavior"
             ]
           }
         },

@@ -208,6 +208,16 @@ test('REQ-048 scopes public MCP tools by User Center username', async () => {
   assert.doesNotMatch(library, /parent_user_id/);
 });
 
+test('smart score commands use one atomic active-rule tool', async () => {
+  const api = await readFile(new URL('../FamilyReward.Api/Program.cs', import.meta.url), 'utf8');
+  assert.match(api, /family_reward_apply_matching_rule/);
+  assert.match(api, /按当前生效规则自动加减积分/);
+  assert.match(api, /ScoreRuleMatch/);
+  assert.match(api, /idempotency_key/);
+  assert.match(api, /当前生效规则中没有匹配该行为的规则，未写入积分/);
+  assert.match(api, /匹配到多个同等规则，未写入积分/);
+});
+
 test('REQ-049 removes legacy menus and manual watch request fields', async () => {
   const [layout, dashboard, api] = await Promise.all([
     readFile(new URL('./src/components/Layout.tsx', import.meta.url), 'utf8'),

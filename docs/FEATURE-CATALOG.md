@@ -99,7 +99,7 @@
 | FR-G04 | MCP 协议服务 | 提供 initialize、ping、tools/list 和 tools/call 等 JSON-RPC 能力 | 已实现 | `/api/mcp`、`application/mcp/` |
 | FR-G05 | MCP 孩子与积分工具 | 所有工具要求 `username`；默认仅查询本人孩子，指定圈子可查看圈内孩子余额，明细和写操作仍限孩子所属家长 | 已实现 | `BuildMcpToolCatalog`、`scripts/test-family-reward-mcp.sh`、`scripts/test-family-reward-mcp-authorization.sh` |
 | FR-G06 | MCP 家庭、规则与圈子工具 | 家庭成员不随圈子切换；规则按家长隔离；圈子只允许成员查询、管理员维护，并拒绝未声明参数 | 已实现 | `SafeInvokeFamilyRewardMcpTool`、`application/goldfish-tool-library.json` |
-| FR-G07 | MCP 全业务工具目录 | 40 个工具覆盖孩子、账户记录、规则模板、家庭成员、圈子、设备、好友、积分申请和圈子统计 | 已实现 | `docs/FAMILY-REWARD-MCP-TOOLS.md`、`application/mcp/family-reward-mcp-tool-library-split.json` |
+| FR-G07 | MCP 全业务工具目录 | 41 个工具覆盖孩子、账户记录、规则模板、按生效规则自动记分、家庭成员、圈子、设备、好友、积分申请和圈子统计 | 已实现 | `docs/FAMILY-REWARD-MCP-TOOLS.md`、`application/mcp/family-reward-mcp-tool-library-split.json` |
 
 ### H. 安全、数据与运维边界
 

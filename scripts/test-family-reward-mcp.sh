@@ -49,7 +49,7 @@ assert_jq() {
 }
 
 catalog="$(curl -sS "$MCP_URL")"
-assert_jq "catalog exposes 40 tools" "$catalog" '.tools.tools | length == 40'
+assert_jq "catalog exposes 41 tools" "$catalog" '.tools.tools | length == 41'
 assert_jq "query_children declares strict snake_case keys" "$catalog" '
   [.tools.tools[] | select(.name == "family_reward_query_children") | .inputSchema.properties | keys]
   | .[0] == ["child_id", "child_name", "family_group_id", "username"]
@@ -59,7 +59,7 @@ assert_jq "list_children declares family group and username only" "$catalog" '
   | .[0] == ["family_group_id", "username"]
 '
 assert_jq "all tools require username" "$catalog" '
-  .tools.tools | length == 40 and all(.inputSchema.required | index("username") != null)
+  .tools.tools | length == 41 and all(.inputSchema.required | index("username") != null)
 '
 assert_jq "catalog covers current parent business UI" "$catalog" '
   [.tools.tools[].name] as $names
@@ -80,6 +80,7 @@ assert_jq "catalog covers current parent business UI" "$catalog" '
       "family_reward_join_family_group",
       "family_reward_remove_family_group_child",
       "family_reward_query_rules",
+      "family_reward_apply_matching_rule",
       "family_reward_create_rule",
       "family_reward_update_rule",
       "family_reward_delete_rule",
