@@ -79,6 +79,15 @@ test('TC-014 detects case-insensitive secret parameter variants', () => {
   assert.equal(sanitized, 'https://happylife.ai.impx.net/parents/rewards?locale=zh-CN');
 });
 
+test('TC-014 applies the same secret filtering on the authenticated backend', async () => {
+  const api = await readFile(new URL('../FamilyReward.Api/Program.cs', import.meta.url), 'utf8');
+
+  assert.match(api, /Fragment = SanitizeFeedbackFragment\(uri\.Fragment\)/);
+  assert.match(api, /builder\.Fragment = SanitizeFeedbackFragment\(uri\.Fragment\)/);
+  assert.match(api, /static string SanitizeFeedbackFragment\(string value\)/);
+  assert.match(api, /ParseQuery\(fragment\[\(queryIndex \+ 1\)\.\.\]\)/);
+});
+
 test('REQ-032 keeps service configuration usable on narrow screens', async () => {
   const page = await readFile(new URL('./src/pages/Settings.tsx', import.meta.url), 'utf8');
   assert.match(page, />服务配置</);
