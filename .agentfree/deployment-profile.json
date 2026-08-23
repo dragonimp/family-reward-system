@@ -1,0 +1,13 @@
+{
+  "projectCode": "family-reward",
+  "enabled": true,
+  "workingDirectory": "~/Projects/family-reward-system",
+  "executable": "/bin/bash",
+  "arguments": [
+    "scripts/atlas-deploy-server.sh"
+  ],
+  "timeoutMinutes": 30,
+  "healthChecks": [
+    "https://happylife.ai.impx.net/health"
+  ]
+}
