@@ -58,6 +58,7 @@ const string FamilyRewardMcpQueryCircleDashboardToolName = "family_reward_query_
 const string FamilyRewardMcpQueryCircleLeaderboardToolName = "family_reward_query_circle_leaderboard";
 const string FamilyRewardMcpQueryCircleCategoriesToolName = "family_reward_query_circle_categories";
 const string FamilyRewardMcpServiceName = "family-reward-mcp";
+const string FamilyRewardMcpGroundingInstructions = "涉及孩子、家庭成员、积分余额或流水、规则、圈子、设备、好友、申请和统计等家加分业务事实时，必须先调用对应工具，并且只能依据工具本次返回的数据回答；不得依赖记忆、会话猜测或编造结果。工具不可用、调用失败或结果不足时，必须明确说明暂时无法核验并建议重试，不得声称查询或操作成功。自然语言行为记分必须优先调用 family_reward_apply_matching_rule，由服务端匹配当前生效规则并落库；不要仅查询规则后口头回复。";
 const string DefaultFamilyGroupName = "WWXYhome";
 const string DefaultUserId = "local-admin";
 
@@ -2271,7 +2272,7 @@ app.MapPost("/api/mcp", async (JsonObject body) =>
                     name = FamilyRewardMcpServiceName,
                     version = "3.2.0"
                 },
-                instructions = "Use tools/list and tools/call with separated tools for children, score/accounts, records/transactions, rules, and family groups. 自然语言行为记分必须优先调用 family_reward_apply_matching_rule，由服务端匹配当前生效规则并落库；不要仅查询规则后口头回复。"
+                instructions = $"Use tools/list and tools/call with separated tools for children, score/accounts, records/transactions, rules, and family groups. {FamilyRewardMcpGroundingInstructions}"
             }));
         case "initialized":
         case "notifications/initialized":

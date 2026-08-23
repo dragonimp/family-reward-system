@@ -60,3 +60,19 @@ test('mobile assistant reuses the complete AgentFree WebApp chat surface', async
   assert.match(styles, /@media \(max-width: 768px\)[\s\S]*textarea,[\s\S]*font-size: 16px !important/);
   assert.match(styles, /body\.assistant-mode \.adfw-dock[\s\S]*bottom: calc\(132px \+ env\(safe-area-inset-bottom, 0px\)\)/);
 });
+
+test('family reward MCP requires tool-grounded business answers', async () => {
+  const [backend, gatewayLibrary, splitLibrary] = await Promise.all([
+    readFile(new URL('../FamilyReward.Api/Program.cs', import.meta.url), 'utf8'),
+    readFile(new URL('../application/goldfish-tool-library.json', import.meta.url), 'utf8'),
+    readFile(new URL('../application/mcp/family-reward-mcp-tool-library-split.json', import.meta.url), 'utf8'),
+  ]);
+
+  for (const source of [backend, gatewayLibrary, splitLibrary]) {
+    assert.match(source, /必须先调用对应工具/);
+    assert.match(source, /只能依据(?:工具)?本次返回的数据回答/);
+    assert.match(source, /不得(?:依赖记忆、会话)?猜测/);
+    assert.match(source, /无法核验/);
+  }
+  assert.match(backend, /instructions = \$"[^"]*\{FamilyRewardMcpGroundingInstructions\}"/);
+});
