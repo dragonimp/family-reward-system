@@ -1,8 +1,26 @@
 # 小天才官方要求核对笔记
 
-资料复核日期：2026-08-20
+资料复核日期：2026-08-24
 
 本笔记来自小天才开放平台公开文档，真实提交当天仍以平台后台和官方最新页面为准。
+
+## 定制 Android、开放机型与测试获取
+
+官方页面：
+
+- https://developer.okii.com/docs/develop/00-model.html
+- https://developer.okii.com/docs/develop/01-setting.html
+- https://developer.okii.com/docs/develop/06-problem.html
+
+核对项：
+
+- 小天才手表采用 Android 系统，不是 Android Wear/Wear OS，按普通 Android 应用方式开发。
+- 开放系统版本为 Android 4.4、7.1.1、8.1.0，CPU 为 ARMv7 32 位；主流开放机型为 320x360，D3 为 240x240。
+- 当前 APK 的 `minSdk=23`，首版覆盖 Android 7.1.1/8.1.0 的 320x360 开放机型，不覆盖 D3 的 Android 4.4/API 19。
+- 官方要求按测试需要从电商或线下购买手表，并联系小天才获取开发数据线。
+- ADB 调试需要平台下发权限；手表需绑定、更新最新固件并重启。ADB 安装应用后也可能需要重启才可见。
+- 测试环境和生产环境由平台协助切换；小天才账号 SDK 由平台技术人员在对接群提供，测试与生产使用不同 `appId/appSecret`。
+- 公开开发文档未发现官方模拟器或远程真机入口，因此 AOSP Android 8.1 只能作为前置预检，最终兼容结论必须来自小天才开放机型真机。
 
 ## 版本提供
 

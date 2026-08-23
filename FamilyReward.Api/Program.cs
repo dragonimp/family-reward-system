@@ -786,10 +786,11 @@ app.MapGet("/watch", () =>
             html,body{width:100%;height:100%;overscroll-behavior:none}
             body{min-height:100vh;height:100vh;height:100dvh;margin:0;overflow:hidden;background:#dce8e2;color:#102019;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
             .wrap{display:grid;place-items:center;width:100%;height:100%;padding:4px;padding:4px max(4px,env(safe-area-inset-right)) 4px max(4px,env(safe-area-inset-left));overflow:hidden}
-            .watch-shell{--watch-size:min(calc(100vw - clamp(36px,14vmin,52px)),calc(100vh - 8px),346px);position:relative;width:var(--watch-size);height:var(--watch-size);margin-right:clamp(26px,10vmin,38px)}
-            @supports(height:100dvh){.watch-shell{--watch-size:min(calc(100vw - clamp(36px,14vmin,52px)),calc(100dvh - 8px),346px)}}
-            .watch-face{position:relative;width:100%;height:100%;overflow:hidden;border-radius:50%;border:clamp(6px,2.8vmin,10px) solid #17231b;background:#f9fbf7;box-shadow:0 12px 30px rgba(16,32,25,.2),inset 0 0 0 1px #cad7ce}
-            .watch-face:before{content:"";position:absolute;inset:clamp(8px,4vmin,14px);border:1px solid #d8e2dc;border-radius:50%;pointer-events:none}
+            .watch-shell{position:relative;width:calc(100vw - 52px);height:calc(100vw - 52px);max-width:300px;max-height:300px;margin-right:32px}
+            @supports (width:min(100px,100%)){.watch-shell{--watch-size:min(calc(100vw - clamp(36px,14vmin,52px)),calc(100vh - 8px),346px);width:var(--watch-size);height:var(--watch-size);max-width:none;max-height:none;margin-right:clamp(26px,10vmin,38px)}}
+            @supports(height:100dvh){@supports (width:min(100px,100%)){.watch-shell{--watch-size:min(calc(100vw - clamp(36px,14vmin,52px)),calc(100dvh - 8px),346px)}}}
+            .watch-face{position:relative;width:100%;height:100%;overflow:hidden;border-radius:50%;border:8px solid #17231b;border:clamp(6px,2.8vmin,10px) solid #17231b;background:#f9fbf7;box-shadow:0 12px 30px rgba(16,32,25,.2),inset 0 0 0 1px #cad7ce}
+            .watch-face:before{content:"";position:absolute;top:12px;right:12px;bottom:12px;left:12px;inset:clamp(8px,4vmin,14px);border:1px solid #d8e2dc;border-radius:50%;pointer-events:none}
             .watch-face.face-world{background:linear-gradient(135deg,#e8f6e9 0 22%,#b9e0b3 22% 39%,#f6f0d3 39% 58%,#96c66d 58% 76%,#e8f6e9 76%);color:#102019}
             .watch-face.face-hellokitty{background:radial-gradient(circle at 68% 23%,#fff 0 10%,transparent 11%),linear-gradient(145deg,#ffeaf3,#fff7fb 48%,#ffd7e8);color:#2d1d24}
             .watch-face.face-starlight{background:radial-gradient(circle at 24% 22%,#ffe27a 0 2.8%,transparent 3.2%),radial-gradient(circle at 72% 34%,#8dd9ff 0 2.5%,transparent 3%),linear-gradient(145deg,#10233b,#284c72 58%,#8bd0d4);color:#f8fbff}
@@ -798,19 +799,19 @@ app.MapGet("/watch", () =>
             .watch-face.face-space{background:radial-gradient(circle at 22% 24%,#fff 0 1.2%,transparent 1.8%),radial-gradient(circle at 76% 34%,#ffe16b 0 2%,transparent 2.7%),radial-gradient(circle at 62% 74%,#8cddff 0 1.5%,transparent 2.2%),linear-gradient(145deg,#10142f,#332a68 62%,#145f7a);color:#f8fbff}
             .watch-face.face-starlight .topline,.watch-face.face-starlight .brand{color:#f8fbff}.watch-face.face-starlight .metric,.watch-face.face-starlight .rule-btn,.watch-face.face-starlight input,.watch-face.face-starlight textarea{background:rgba(255,255,255,.94)}
             .watch-face.face-space .topline,.watch-face.face-space .brand{color:#f8fbff}.watch-face.face-space .metric,.watch-face.face-space .rule-btn,.watch-face.face-space input,.watch-face.face-space textarea{background:rgba(255,255,255,.94)}
-            .screen{position:absolute;inset:clamp(14px,7vmin,24px);display:flex;align-items:center;justify-content:center;overflow:hidden;text-align:center}
-            .topline{position:absolute;top:clamp(7px,3vmin,11px);left:18%;right:18%;display:flex;align-items:center;justify-content:center;gap:4px;overflow:hidden;color:#65736b;font-size:clamp(9px,3.2vmin,11px);white-space:nowrap}
-            .brand{font-size:clamp(10px,3.5vmin,12px);font-weight:900;color:#245138}
-            .home-child{max-width:min(170px,70vmin);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:clamp(18px,7vmin,24px);font-weight:900}
-            .score-ring{display:grid;place-items:center;width:clamp(76px,42vmin,150px);height:clamp(76px,42vmin,150px);margin:clamp(4px,2.8vmin,10px) 0 clamp(3px,1.8vmin,6px);border-radius:50%;border:clamp(4px,2vmin,7px) solid #1f7a48;background:#fff}
-            .score{width:100%;padding:0 2px;color:#0c6f3b;font-size:clamp(24px,10vmin,38px);font-variant-numeric:tabular-nums;font-weight:900;letter-spacing:0;line-height:.95;white-space:nowrap}
-            .unit{margin-top:clamp(2px,1.4vmin,5px);color:#5c6b62;font-size:clamp(9px,3.5vmin,12px);font-weight:800}
-            .metric-row{display:grid;grid-template-columns:1fr 1fr;gap:clamp(3px,1.8vmin,6px);width:min(170px,70vmin)}
-            .metric{min-width:0;border:1px solid #d7e1da;border-radius:8px;padding:clamp(3px,1.4vmin,5px) clamp(4px,1.8vmin,6px);background:#eef5f0}
-            .metric b{display:block;overflow:hidden;color:#24352b;font-size:clamp(11px,4vmin,14px);text-overflow:ellipsis;white-space:nowrap}.metric span{display:block;margin-top:1px;color:#65736b;font-size:clamp(8px,3vmin,10px)}
-            .menu-dock{position:absolute;right:clamp(-4px,-1vmin,-2px);top:50%;z-index:3;transform:translateY(-50%)}
-            .menu-toggle{display:grid;place-items:center;width:clamp(34px,13vmin,44px);height:clamp(34px,13vmin,44px);border:2px solid #17231b;border-radius:50%;background:#17231b;color:#fff;font-size:clamp(9px,3.2vmin,11px);font-weight:900;box-shadow:0 4px 10px rgba(16,32,25,.16)}
-            .panel{--panel-scale:1;display:none;width:min(205px,100%);max-width:100%;overflow:hidden;text-align:left;transform:scale(var(--panel-scale));transform-origin:center;will-change:transform}.panel.active{display:block}.panel[data-panel=home],#bind-panel .panel{text-align:center}.panel[data-panel=home].active{display:flex;flex-direction:column;align-items:center;justify-content:center}
+            .screen{position:absolute;top:20px;right:20px;bottom:20px;left:20px;inset:clamp(14px,7vmin,24px);display:flex;align-items:center;justify-content:center;overflow:hidden;text-align:center}
+            .topline{position:absolute;top:9px;top:clamp(7px,3vmin,11px);left:18%;right:18%;display:flex;align-items:center;justify-content:center;gap:4px;overflow:hidden;color:#65736b;font-size:10px;font-size:clamp(9px,3.2vmin,11px);white-space:nowrap}
+            .brand{font-size:11px;font-size:clamp(10px,3.5vmin,12px);font-weight:900;color:#245138}
+            .home-child{max-width:170px;max-width:min(170px,70vmin);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:22px;font-size:clamp(18px,7vmin,24px);font-weight:900}
+            .score-ring{display:grid;place-items:center;width:130px;width:clamp(76px,42vmin,150px);height:130px;height:clamp(76px,42vmin,150px);margin:8px 0 5px;margin:clamp(4px,2.8vmin,10px) 0 clamp(3px,1.8vmin,6px);border-radius:50%;border:6px solid #1f7a48;border:clamp(4px,2vmin,7px) solid #1f7a48;background:#fff}
+            .score{width:100%;padding:0 2px;color:#0c6f3b;font-size:34px;font-size:clamp(24px,10vmin,38px);font-variant-numeric:tabular-nums;font-weight:900;letter-spacing:0;line-height:.95;white-space:nowrap}
+            .unit{margin-top:4px;margin-top:clamp(2px,1.4vmin,5px);color:#5c6b62;font-size:11px;font-size:clamp(9px,3.5vmin,12px);font-weight:800}
+            .metric-row{display:grid;grid-template-columns:1fr 1fr;gap:5px;gap:clamp(3px,1.8vmin,6px);width:170px;width:min(170px,70vmin)}
+            .metric{min-width:0;border:1px solid #d7e1da;border-radius:8px;padding:4px 5px;padding:clamp(3px,1.4vmin,5px) clamp(4px,1.8vmin,6px);background:#eef5f0}
+            .metric b{display:block;overflow:hidden;color:#24352b;font-size:13px;font-size:clamp(11px,4vmin,14px);text-overflow:ellipsis;white-space:nowrap}.metric span{display:block;margin-top:1px;color:#65736b;font-size:9px;font-size:clamp(8px,3vmin,10px)}
+            .menu-dock{position:absolute;right:-3px;right:clamp(-4px,-1vmin,-2px);top:50%;z-index:3;transform:translateY(-50%)}
+            .menu-toggle{display:grid;place-items:center;width:40px;width:clamp(34px,13vmin,44px);height:40px;height:clamp(34px,13vmin,44px);border:2px solid #17231b;border-radius:50%;background:#17231b;color:#fff;font-size:10px;font-size:clamp(9px,3.2vmin,11px);font-weight:900;box-shadow:0 4px 10px rgba(16,32,25,.16)}
+            .panel{--panel-scale:1;display:none;width:205px;width:min(205px,100%);max-width:100%;overflow:hidden;text-align:left;transform:scale(var(--panel-scale));transform-origin:center;will-change:transform}.panel.active{display:block}.panel[data-panel=home],#bind-panel .panel{text-align:center}.panel[data-panel=home].active{display:flex;flex-direction:column;align-items:center;justify-content:center}
             .panel:not([data-panel=home]){height:100%;padding:1px 5px 4px 1px;overflow-x:hidden;overflow-y:auto;overscroll-behavior:contain;scrollbar-color:#5d7768 transparent;scrollbar-gutter:stable;scrollbar-width:thin;touch-action:pan-y}.panel:not([data-panel=home])::-webkit-scrollbar{width:4px}.panel:not([data-panel=home])::-webkit-scrollbar-thumb{border-radius:4px;background:#5d7768}.panel:not([data-panel=home])::-webkit-scrollbar-track{background:transparent}
             .panel[data-panel=menu]{height:auto;overflow:hidden;padding:0}
             .panel h1,.panel h2{margin:0 0 8px;text-align:center;font-size:18px;line-height:1.1}.bind-title{font-size:20px;font-weight:900}.bind-sub{margin:5px 0 10px;color:#65736b;font-size:12px}.rules{display:grid;gap:6px}
@@ -1019,7 +1020,7 @@ app.MapGet("/watch", () =>
               currentView = view;
               document.querySelectorAll('[data-panel]').forEach((panel) => panel.classList.toggle('active', panel.dataset.panel === view));
               document.getElementById('menu').classList.toggle('hidden', view !== 'home');
-              if (push && history.state?.watchView !== view) history.pushState({ watchView: view }, '', location.href);
+              if (push && (!history.state || history.state.watchView !== view)) history.pushState({ watchView: view }, '', location.href);
               fitActivePanel();
             };
             const fetchJson = async (url, options = {}) => {
@@ -1109,7 +1110,8 @@ app.MapGet("/watch", () =>
                 return;
               }
               msg.textContent = '正在提交...';
-              const data = Object.fromEntries(new FormData(form).entries());
+              const data = {};
+              new FormData(form).forEach((value, key) => { data[key] = value; });
               try {
                 const response = await fetch('/api/watch/requests', {
                   method: 'POST',
@@ -1227,14 +1229,16 @@ app.MapGet("/watch", () =>
                     msg.textContent = '正在听，请说话...';
                   };
                   recognition.onresult = (event) => {
-                    const text = event.results?.[0]?.[0]?.transcript || '';
+                    const firstResult = event.results && event.results[0];
+                    const firstAlternative = firstResult && firstResult[0];
+                    const text = firstAlternative ? firstAlternative.transcript || '' : '';
                     target.value = target.value ? `${target.value}${text}` : text;
                     msg.textContent = text ? '语音已转成文字，请确认后提交' : '没有识别到内容';
                   };
                   recognition.onerror = () => { msg.textContent = '语音识别失败，请使用键盘输入'; };
                   recognition.onend = () => { button.classList.remove('listening'); };
                   recognition.start();
-                } catch {
+                } catch (error) {
                   button.classList.remove('listening');
                   msg.textContent = '无法启动语音识别，请使用键盘输入';
                 }
@@ -1242,7 +1246,7 @@ app.MapGet("/watch", () =>
             });
             history.replaceState({ watchView: 'home' }, '', location.href);
             window.addEventListener('popstate', (event) => {
-              const next = event.state?.watchView || (currentView === 'home' ? 'home' : 'menu');
+              const next = (event.state && event.state.watchView) || (currentView === 'home' ? 'home' : 'menu');
               setView(next, false);
             });
             window.addEventListener('resize', fitActivePanel);

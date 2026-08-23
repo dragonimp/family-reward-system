@@ -24,6 +24,18 @@ test('REQ-030 exposes one watch menu with six icon destinations and voice fallba
   assert.match(api, /当前手表不支持语音识别，请使用键盘输入/);
 });
 
+test('Xiaotiancai watch page remains parseable by Android 7.1 and 8.1 WebView', async () => {
+  const api = await readFile(new URL('../FamilyReward.Api/Program.cs', import.meta.url), 'utf8');
+  const watchPage = api.slice(api.indexOf('app.MapGet("/watch"'), api.indexOf('app.MapPost("/api/children"'));
+
+  assert.doesNotMatch(watchPage, /\?\./);
+  assert.doesNotMatch(watchPage, /Object\.fromEntries/);
+  assert.doesNotMatch(watchPage, /catch\s*\{/);
+  assert.match(watchPage, /new FormData\(form\)\.forEach/);
+  assert.match(watchPage, /width:calc\(100vw - 52px\)/);
+  assert.match(watchPage, /@supports \(width:min\(100px,100%\)\)/);
+});
+
 test('REQ-031 directly loads the public feedback widget with current user contact details', async () => {
   const [widget, layout, api] = await Promise.all([
     readFile(new URL('./src/components/PublicFeedbackWidget.tsx', import.meta.url), 'utf8'),

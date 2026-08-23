@@ -5,12 +5,32 @@
   "entryUrl": "https://happylife.ai.impx.net/watch?source=watch-app&platform=xiaotiancai",
   "distributionType": "android_webview_wrapper",
   "targetAudience": "child",
+  "runtime": {
+    "osFamily": "custom_android",
+    "notWearOs": true,
+    "supportedAndroidVersions": ["7.1.1", "8.1.0"],
+    "supportedScreenSizes": ["320x360"],
+    "cpuArchitecture": "armv7-32bit",
+    "excludedModels": [
+      {
+        "model": "D3",
+        "reason": "Android 4.4/API 19 is below the current minSdk 23"
+      }
+    ]
+  },
+  "testAccess": {
+    "deviceSource": "Purchase an open model through ecommerce or an offline store",
+    "developmentCable": "Contact Xiaotiancai to obtain the development cable",
+    "adbPermission": "Assigned by Xiaotiancai after the watch is bound, updated and rebooted",
+    "testEnvironment": "Switched by Xiaotiancai"
+  },
   "permissions": ["INTERNET", "ACCESS_NETWORK_STATE", "RECORD_AUDIO"],
   "reviewNotes": [
     "应用只提供孩子积分查询、积分申请、最近申请状态查看。",
     "麦克风仅在孩子主动点击语音输入时申请；服务端不保存原始录音，也可拒绝权限并使用键盘。",
     "不申请定位、通讯录、相机、短信、通话记录或后台常驻权限。",
-    "登录后手表端默认孩子身份。"
+    "登录后手表端默认孩子身份。",
+    "当前版本面向 Android 7.1/8.1、320x360 的开放机型，不是 Android Wear/Wear OS 应用。"
   ],
-  "submitBlockers": ["小天才准入", "软件著作权", "APP备案", "法定代表人证件", "公司签章", "物理真机验收"]
+  "submitBlockers": ["小天才准入", "开放机型真机", "开发数据线", "ADB调试权限", "测试环境切换", "软件著作权", "APP备案", "法定代表人证件", "公司签章", "物理真机验收"]
 }

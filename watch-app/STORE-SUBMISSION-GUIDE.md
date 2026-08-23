@@ -198,11 +198,16 @@ cd watch-app/android
 
 ### 5.1 准入判断
 
-小天才公开文档说明手表是 Android 系统，不是 Android Wear，开发思路接近手机应用，但发布前仍需确认开放平台或商务合作准入。当前 Android WebView 壳可以作为技术基础，但真实上架通常需要先拿到：
+小天才公开文档明确说明手表采用定制 Android，不是 Android Wear/Wear OS，开发方式接近普通 Android 手机应用。开放机型公开矩阵包含 Android 4.4、7.1.1、8.1.0，CPU 为 ARMv7 32 位，主流开放机型屏幕为 320x360。
+
+当前 `1.0.0` 包的 `minSdk=23`，首版只声明兼容 Android 7.1.1/8.1.0、320x360 的 Z2/Z3/Z5/Z6/Z6巅峰版/Z7/Z8/Z8_SNB/Z9。D3 使用 Android 4.4/API 19，低于当前 `minSdk`，不在首版兼容范围。包内没有 native so，不存在 64 位 native 库阻断 ARMv7 的问题。
+
+公开文档没有提供可替代真机验收的官方模拟器流程。AOSP Android 8.1、320x360、旧 WebView 只能用于前置兼容检查；真实上架仍需要开放机型、官方开发数据线、ADB 权限和平台测试环境：
 
 - 小天才开放平台或商务合作账号。
 - 应用发布权限。
-- 目标机型和系统版本范围。
+- Android 7.1.1/8.1.0 的开放机型，首台建议选择 Z8 或 Z9。
+- 向小天才申请的开发数据线、ADB 调试权限和测试环境切换。
 - 平台签名、测试和审核要求。
 - 是否要求接入小天才账号授权或应用服务号。
 
@@ -210,13 +215,13 @@ cd watch-app/android
 
 ### 5.2 后台/商务步骤
 
-1. 联系小天才开放平台或商务接口，确认第三方应用上架入口和目标机型。
-2. 提供应用基本信息、包名、功能说明、隐私政策和儿童数据说明。
-3. 确认是否必须接入小天才账号授权、应用服务号或平台 SDK。
-4. 按平台要求生成签名 APK。
-5. 提交 APK、截图、审核账号/认证码、真机测试说明。
-6. 根据平台反馈处理适配、SDK 或服务号要求。
-7. 取得受理单、审核状态和最终版本号。
+1. 从电商或线下渠道购买官方开放机型；首轮建议 Z8 或 Z9（Android 8.1、320x360、1 GB）。
+2. 使用小天才 App 绑定手表并更新到最新固件，记录型号、系统版本和脱敏设备标识。
+3. 联系小天才开放平台或 `developer@eebbk.com`，提供应用名“家加分手表积分”、包名 `net.impx.happylife.watch` 和目标机型，申请开发数据线、ADB 调试权限与测试环境切换。
+4. ADB 权限下发后重启手表，连接官方开发数据线，用 `adb devices` 确认设备，再用 `adb install -r` 安装正式签名 APK；官方 FAQ 提醒 ADB 安装后可能还需重启手表。
+5. 完成绑定、积分查询、积分申请、语音权限、解绑、断网和功耗真机用例并获取原始截图。
+6. 确认是否必须接入小天才账号授权、应用服务号或平台 SDK；SDK、测试和生产 `appId/appSecret` 由平台技术人员提供。
+7. 提交 APK、截图、审核账号/认证码、真机测试报告和合规材料，保存受理单、审核状态和最终版本号。
 
 ### 5.3 小天才材料建议
 
@@ -227,7 +232,7 @@ cd watch-app/android
 | 功能说明 | 孩子查询积分、提交积分申请、查看申请状态 |
 | 账号说明 | 无手表账号密码；输入家长端生成的一次性儿童认证码绑定设备 |
 | 权限说明 | 网络访问、网络状态；主动语音输入时使用麦克风，不保存原始录音 |
-| 目标机型 | 由平台确认，优先选择支持第三方应用和 WebView 的 4G 手表 |
+| 目标机型 | 首版为 Z2/Z3/Z5/Z6/Z6巅峰版/Z7/Z8/Z8_SNB/Z9；首轮真机建议 Z8 或 Z9；不含 D3 |
 | 特别说明 | 不含广告、付费、定位、通讯录、相机、短信和通话能力；麦克风仅用于主动语音输入 |
 
 ### 5.4 小天才高风险驳回点
@@ -237,6 +242,7 @@ cd watch-app/android
 - WebView 页面在小圆屏/低分辨率设备上裁切。
 - 手表输入法无法正常输入认证码。
 - 审核认证码过期，审核人员无法进入绑定后页面。
+- 仅在新 Android 模拟器验证，未覆盖 Android 7.1/8.1 设备内置旧 WebView。
 
 ## 6. 提交给平台的统一审核备注
 
@@ -282,3 +288,6 @@ watch-release-evidence/
 - 华为 AppGallery Connect 入门：https://developer.huawei.com/consumer/cn/appgallery/devstart/
 - 小天才开放平台应用服务号：https://developer.okii.com/docs/develop/08-service.html
 - 小天才开放平台常见问题：https://developer.okii.com/docs/develop/06-problem.html
+- 小天才开放平台基础配置：https://developer.okii.com/docs/develop/01-setting.html
+- 小天才开放机型：https://developer.okii.com/docs/develop/00-model.html
+- 小天才版本提供：https://developer.okii.com/docs/publish/03-version.html
