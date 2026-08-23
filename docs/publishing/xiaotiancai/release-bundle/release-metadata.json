@@ -4,6 +4,7 @@
   "versionName": "1.0.0",
   "versionCode": 100,
   "generatedAt": "2026-08-21T00:15:00+08:00",
+  "lastVerifiedAt": "2026-08-24T00:56:22+08:00",
   "androidSourceCommit": "6b25120",
   "apk": {
     "file": "家加分手表积分_1.0.0_100_signed.apk",
@@ -34,7 +35,7 @@
     {"name": "家加分手表积分_隐私政策.pdf", "sha256": "f2db784db71068b14cb2297074c0886534a59db2659e15ccc8656b6145e513ab"},
     {"name": "家加分手表积分_用户协议.pdf", "sha256": "d016e0c4274cdf8905bf417f917832c9e3be2e200bbef4d78d0bc48bec4f7338"},
     {"name": "家加分手表积分_首次提交免责函_待盖章.pdf", "sha256": "97e95053007fc3e063e29f75b14e7a8051b09b126f82c9fb1e3eb599d86de7ef"},
-    {"name": "家加分手表积分_测试报告.pdf", "sha256": "7354e100ff25a367a2e4cab064edbadfd9ba13add7f32c30c39497548742027c"},
+    {"name": "家加分手表积分_测试报告.pdf", "sha256": "69fb37ef11234791a9e9509623bfc4a37d0879ccc26a5b3667b56a668cf76250"},
     {"name": "家加分手表积分_服务器性能报告.pdf", "sha256": "e288634e333c6ef7a3b8e2b3e93673c2bac2abb8b1384b1d330cf2dbd7cbec96"},
     {"name": "家加分手表积分_客服审核使用说明.pdf", "sha256": "a20c39374e84d81a992f04d958c6b726a469e42d4b80a76da3b2d5adb5fc29c8"}
   ],

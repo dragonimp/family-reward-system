@@ -230,7 +230,7 @@ def parse_table(lines: list[str], styles, available_width: float):
     return table
 
 
-def markdown_story(source: Path, styles, available_width: float):
+def markdown_story(source: Path, styles, available_width: float, subtitle_date: str):
     lines = source.read_text(encoding="utf-8").splitlines()
     story = []
     index = 0
@@ -270,7 +270,7 @@ def markdown_story(source: Path, styles, available_width: float):
             level = len(heading.group(1))
             if level == 1 and first_title:
                 story.append(Paragraph(inline_markup(heading.group(2)), styles["title"]))
-                story.append(Paragraph("小天才应用市场提审材料 | 2026年8月20日", styles["body"]))
+                story.append(Paragraph(f"小天才应用市场提审材料 | {subtitle_date}", styles["body"]))
                 story.append(Spacer(1, 4))
                 first_title = False
             else:
@@ -313,9 +313,16 @@ def markdown_story(source: Path, styles, available_width: float):
 
 def build(source: Path, output: Path, landscape_mode: bool = False):
     styles = make_styles()
-    title = source.read_text(encoding="utf-8").splitlines()[0].lstrip("# ")
+    source_text = source.read_text(encoding="utf-8")
+    title = source_text.splitlines()[0].lstrip("# ")
+    test_date = re.search(r"\|\s*测试日期\s*\|\s*(\d{4})-(\d{2})-(\d{2})\s*\|", source_text)
+    subtitle_date = (
+        f"{test_date.group(1)}年{int(test_date.group(2))}月{int(test_date.group(3))}日"
+        if test_date
+        else "2026年8月20日"
+    )
     doc = SubmissionDoc(output, title, landscape_mode)
-    doc.build(markdown_story(source, styles, doc.width))
+    doc.build(markdown_story(source, styles, doc.width, subtitle_date))
 
 
 def main(repo: Path):
