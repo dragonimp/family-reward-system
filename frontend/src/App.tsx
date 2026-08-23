@@ -10,7 +10,6 @@ import SettingsPage from './pages/Settings';
 import AssistantPage from './pages/Assistant';
 import IdentityPage from './pages/Identity';
 import VirtualWatchPage from './pages/VirtualWatch';
-import WatchReleasePage from './pages/WatchRelease';
 import IdentityGate from './components/IdentityGate';
 import Layout from './components/Layout';
 import ProtectedRoute from './components/ProtectedRoute';
@@ -49,7 +48,6 @@ export default function App() {
                         <Route path="/stats" element={<StatsPage />} />
                         <Route path="/settings" element={<SettingsPage />} />
                         <Route path="/virtual-watch" element={<VirtualWatchPage />} />
-                        <Route path="/watch-release" element={<WatchReleasePage />} />
                         <Route path="/assistant/*" element={<AssistantPage />} />
                       </Routes>
                     </Layout>
