@@ -783,7 +783,7 @@ app.MapGet("/watch", () =>
           <title>手表积分</title>
           <style>
             *{box-sizing:border-box}
-            html,body{width:100%;height:100%;overscroll-behavior:none}
+            html,body{width:100%;height:100%;overscroll-behavior:none;-webkit-text-size-adjust:100%;text-size-adjust:100%}
             body{min-height:100vh;height:100vh;height:100dvh;margin:0;overflow:hidden;background:#dce8e2;color:#102019;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
             .wrap{display:grid;place-items:center;width:100%;height:100%;padding:4px;padding:4px max(4px,env(safe-area-inset-right)) 4px max(4px,env(safe-area-inset-left));overflow:hidden}
             .watch-shell{position:relative;width:calc(100vw - 52px);height:calc(100vw - 52px);max-width:300px;max-height:300px;margin-right:32px}
@@ -998,7 +998,7 @@ app.MapGet("/watch", () =>
                 const panel = screen.querySelector('.panel.active');
                 if (!panel) return;
                 panel.style.setProperty('--panel-scale', '1');
-                if (!panel.matches('[data-panel="home"],[data-panel="menu"]')) return;
+                if (screen.id !== 'bind-panel' && !panel.matches('[data-panel="home"],[data-panel="menu"]')) return;
                 const scale = calculatePanelScale(
                   Math.max(1, screen.clientWidth - 2),
                   Math.max(1, screen.clientHeight - 2),

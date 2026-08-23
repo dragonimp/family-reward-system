@@ -52,6 +52,8 @@ test('Xiaotiancai watch page remains parseable by Android 7.1 and 8.1 WebView', 
   assert.match(watchPage, /new FormData\(form\)\.forEach/);
   assert.match(watchPage, /width:calc\(100vw - 52px\)/);
   assert.match(watchPage, /@supports \(width:min\(100px,100%\)\)/);
+  assert.match(watchPage, /-webkit-text-size-adjust:100%/);
+  assert.match(watchPage, /screen\.id !== 'bind-panel'/);
 });
 
 test('REQ-031 directly loads the public feedback widget with current user contact details', async () => {
