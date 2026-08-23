@@ -9388,7 +9388,7 @@ static string SanitizeFeedbackUrl(string value, HttpRequest request)
     if (!allowed) return "";
 
     var blockedKeys = new[] { "token", "code", "auth", "key", "password", "secret" };
-    var builder = new UriBuilder(uri) { Query = "" };
+    var builder = new UriBuilder(uri) { Query = "", Fragment = SanitizeFeedbackFragment(uri.Fragment) };
     foreach (var pair in Microsoft.AspNetCore.WebUtilities.QueryHelpers.ParseQuery(uri.Query))
     {
         if (blockedKeys.Any(key => pair.Key.Contains(key, StringComparison.OrdinalIgnoreCase))) continue;
@@ -9415,7 +9415,30 @@ static string SanitizeFeedbackPath(string value)
             builder.Query = Microsoft.AspNetCore.WebUtilities.QueryHelpers.AddQueryString(builder.Query.TrimStart('?'), pair.Key, item ?? "");
         }
     }
+    builder.Fragment = SanitizeFeedbackFragment(uri.Fragment);
     return LimitText($"{builder.Path}{builder.Query}{builder.Fragment}", 500);
+}
+
+static string SanitizeFeedbackFragment(string value)
+{
+    if (string.IsNullOrWhiteSpace(value)) return "";
+
+    var fragment = value.TrimStart('#');
+    var queryIndex = fragment.IndexOf('?');
+    if (queryIndex < 0) return fragment;
+
+    var prefix = fragment[..queryIndex];
+    var query = "";
+    var blockedKeys = new[] { "token", "code", "auth", "key", "password", "secret" };
+    foreach (var pair in Microsoft.AspNetCore.WebUtilities.QueryHelpers.ParseQuery(fragment[(queryIndex + 1)..]))
+    {
+        if (blockedKeys.Any(key => pair.Key.Contains(key, StringComparison.OrdinalIgnoreCase))) continue;
+        foreach (var item in pair.Value)
+        {
+            query = Microsoft.AspNetCore.WebUtilities.QueryHelpers.AddQueryString(query.TrimStart('?'), pair.Key, item ?? "");
+        }
+    }
+    return string.IsNullOrEmpty(query) ? prefix : $"{prefix}{query}";
 }
 
 static string FormatFeedbackPageContext(JsonObject source)
