@@ -1060,11 +1060,11 @@ app.MapGet("/watch", () =>
                 document.getElementById('updated-at').textContent = new Date(score.updatedAt).toLocaleTimeString('zh-CN', { hour12: false, hour: '2-digit', minute: '2-digit' });
                 document.getElementById('child-name').textContent = child.name || '暂无孩子';
                 document.getElementById('score').textContent = formatPoints(child.points);
-                document.getElementById('cash').textContent = child.cash ?? 0;
-                document.getElementById('items').textContent = child.items ?? 0;
+                document.getElementById('cash').textContent = child.cash == null ? 0 : child.cash;
+                document.getElementById('items').textContent = child.items == null ? 0 : child.items;
                 document.getElementById('detail-score').textContent = formatPoints(child.points);
-                document.getElementById('detail-cash').textContent = child.cash ?? 0;
-                document.getElementById('detail-items').textContent = child.items ?? 0;
+                document.getElementById('detail-cash').textContent = child.cash == null ? 0 : child.cash;
+                document.getElementById('detail-items').textContent = child.items == null ? 0 : child.items;
                 document.getElementById('device-id').textContent = isPreview ? '虚拟预览' : '#' + escapeText(score.deviceId);
                 document.getElementById('rules').innerHTML = (rulesPayload.rules || []).map((rule, index) => `
                   <button type="button" class="rule-btn" data-rule-id="${rule.id}" data-points="${rule.points}" data-title="${escapeText(rule.name)}">

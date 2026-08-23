@@ -46,6 +46,7 @@ test('Xiaotiancai watch page remains parseable by Android 7.1 and 8.1 WebView', 
   const watchPage = api.slice(api.indexOf('app.MapGet("/watch"'), api.indexOf('app.MapPost("/api/children"'));
 
   assert.doesNotMatch(watchPage, /\?\./);
+  assert.doesNotMatch(watchPage, /\?\?/);
   assert.doesNotMatch(watchPage, /Object\.fromEntries/);
   assert.doesNotMatch(watchPage, /catch\s*\{/);
   assert.match(watchPage, /new FormData\(form\)\.forEach/);
