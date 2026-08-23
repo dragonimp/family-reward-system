@@ -15,7 +15,6 @@ const manageItems = [
   { path: '/children', label: '家庭管理', icon: '🏠' },
   { path: '/rules', label: '规则管理', icon: '📋' },
   { path: '/settings', label: '系统设置', icon: '⚙️' },
-  { path: '/watch-release', label: '上架准备', icon: '🚀' },
 ];
 
 const mobileNavItems = [...navItems, ...manageItems];

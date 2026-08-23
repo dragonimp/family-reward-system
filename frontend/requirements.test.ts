@@ -2,7 +2,6 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { sanitizeFeedbackLocation } from './src/utils/feedbackPrivacy.ts';
-import { calculateReleaseReadiness, xiaotiancaiReleaseMaterials } from './src/utils/releaseReadiness.ts';
 
 test('REQ-028 offers an explicit family selector and scoped child view', async () => {
   const page = await readFile(new URL('./src/pages/FamilyGroups.tsx', import.meta.url), 'utf8');
@@ -192,68 +191,14 @@ test('REQ-045 previews the real watch UI for parent-owned children on mobile', a
   assert.match(backend, /虚拟手表仅供预览/);
 });
 
-test('REQ-053 / TC-032 references User Center credentials without collecting secret values', async () => {
-  const page = await readFile(new URL('./src/pages/WatchRelease.tsx', import.meta.url), 'utf8');
-
-  assert.match(page, /用户中心 → 个人信息管理 → 凭证管理/);
-  assert.match(page, /不接收密码、验证码、证件号码或密钥原文/);
-  assert.match(page, /本页“凭证管理已配置”不等于材料已验证/);
-  assert.match(page, /短信验证码和一次性儿童认证码只允许送审时人工输入/);
-  assert.doesNotMatch(page, /<(?:input|textarea)\b/);
-});
-
-test('REQ-053 / TC-033 exposes the Xiaotiancai release workspace and full material set', async () => {
-  const [app, layout, page, readiness] = await Promise.all([
+test('release readiness is managed only in Atlas project management', async () => {
+  const [app, layout] = await Promise.all([
     readFile(new URL('./src/App.tsx', import.meta.url), 'utf8'),
     readFile(new URL('./src/components/Layout.tsx', import.meta.url), 'utf8'),
-    readFile(new URL('./src/pages/WatchRelease.tsx', import.meta.url), 'utf8'),
-    readFile(new URL('./src/utils/releaseReadiness.ts', import.meta.url), 'utf8'),
   ]);
 
-  assert.match(app, /path="\/watch-release" element=\{<WatchReleasePage \/>\}/);
-  assert.match(layout, /上架准备/);
-  assert.match(page, /calculateReleaseReadiness/);
-  assert.match(page, /只有正式签名 APK、软著\/备案、盖章免责函、主体证照/);
-  assert.equal(xiaotiancaiReleaseMaterials.length, 24);
-  assert.equal(new Set(xiaotiancaiReleaseMaterials.map(({ id }) => id)).size, 24);
-  assert.deepEqual(
-    new Set(xiaotiancaiReleaseMaterials.map(({ group }) => group)),
-    new Set(['账号与主体', '合规材料', '构建与签名', '真机与素材', '审核与送审']),
-  );
-  for (const id of [
-    'developer_access',
-    'publisher_identity',
-    'software_copyright',
-    'filing',
-    'signed_apk',
-    'app_icon',
-    'intro_images',
-    'device_test',
-    'test_account',
-    'child_auth_code',
-  ]) assert.ok(xiaotiancaiReleaseMaterials.some((material) => material.id === id), `missing ${id}`);
-  assert.match(readiness, /credential_configured/);
-  assert.match(readiness, /一次性儿童认证码/);
-});
-
-test('REQ-053 / TC-031 calculates Xiaotiancai gaps without treating configured credentials as verified', () => {
-  const initial = calculateReleaseReadiness(xiaotiancaiReleaseMaterials, {});
-  const configured = calculateReleaseReadiness(xiaotiancaiReleaseMaterials, {
-    developer_access: 'credential_configured',
-    contact: 'credential_configured',
-  });
-  const verified = calculateReleaseReadiness(xiaotiancaiReleaseMaterials, {
-    developer_access: 'verified',
-    contact: 'verified',
-  });
-
-  assert.deepEqual(initial, { total: 24, ready: 3, missing: 21, credentialConfigured: 0, percent: 13 });
-  assert.equal(configured.ready, 3);
-  assert.equal(configured.missing, 21);
-  assert.equal(configured.credentialConfigured, 2);
-  assert.equal(verified.ready, 5);
-  assert.equal(verified.missing, 19);
-  assert.equal(verified.percent, 21);
+  assert.doesNotMatch(app, /WatchRelease|\/watch-release/);
+  assert.doesNotMatch(layout, /上架准备|\/watch-release/);
 });
 
 test('REQ-048 scopes public MCP tools by User Center username', async () => {
