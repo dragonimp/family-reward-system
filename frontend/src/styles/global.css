@@ -36,9 +36,23 @@ body {
 }
 
 @media (max-width: 768px) {
-  input,
+  /* iOS Safari / Android WebView: prevent focus zoom (triggered below 16px). */
+  input:not([type='checkbox']):not([type='radio']):not([type='range']):not([type='file']),
   textarea,
-  select {
+  select,
+  [contenteditable='true'],
+  .ant-input,
+  .ant-input-affix-wrapper,
+  .ant-input-affix-wrapper input,
+  .ant-input-number-input,
+  .ant-picker-input > input,
+  .ant-select-selector,
+  .ant-select-selection-item,
+  .ant-select-selection-placeholder,
+  .ant-cascader-input,
+  .ant-mentions textarea,
+  .el-input__inner,
+  .el-textarea__inner {
     font-size: 16px !important;
   }
 
