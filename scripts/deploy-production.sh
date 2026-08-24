@@ -31,7 +31,6 @@ rsync -az --delete "$ROOT_DIR/frontend/dist/" "$DEPLOY_HOST:$REMOTE_STAGE/fronte
 
 ssh "$DEPLOY_HOST" "set -e
   sudo test -s '$REMOTE_ROOT/api/system_config.json'
-  sudo test -s '/etc/agent-secrets/xiaotiancai-email.env'
   sudo mkdir -p '/opt/backups/family-reward/$STAMP'
   sudo cp -a '$REMOTE_ROOT/api' '/opt/backups/family-reward/$STAMP/api'
   sudo cp -a '$REMOTE_ROOT/frontend/static' '/opt/backups/family-reward/$STAMP/frontend-static'
@@ -41,7 +40,12 @@ ssh "$DEPLOY_HOST" "set -e
   sudo chmod 600 '$REMOTE_ROOT/api/system_config.json'
   sudo mkdir -p /etc/systemd/system/family-reward-api.service.d
   printf '[Service]\nEnvironmentFile=/etc/agent-secrets/application-feedback.env\n' | sudo tee /etc/systemd/system/family-reward-api.service.d/feedback.conf >/dev/null
-  printf '[Service]\nEnvironmentFile=/etc/agent-secrets/xiaotiancai-email.env\n' | sudo tee /etc/systemd/system/family-reward-api.service.d/xiaotiancai-email.conf >/dev/null
+  if sudo test -s '/etc/agent-secrets/xiaotiancai-email.env'; then
+    printf '[Service]\nEnvironmentFile=/etc/agent-secrets/xiaotiancai-email.env\n' | sudo tee /etc/systemd/system/family-reward-api.service.d/xiaotiancai-email.conf >/dev/null
+  else
+    # 邮件发送是可选能力；缺少凭证不能阻塞其余应用发布。
+    sudo rm -f /etc/systemd/system/family-reward-api.service.d/xiaotiancai-email.conf
+  fi
   sudo systemctl daemon-reload
   sudo systemctl restart family-reward-api.service
   sleep 2
