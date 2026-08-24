@@ -48,8 +48,11 @@ ssh "$DEPLOY_HOST" "set -e
   fi
   sudo systemctl daemon-reload
   sudo systemctl restart family-reward-api.service
-  sleep 2
   systemctl is-active family-reward-api.service
+  for attempt in \$(seq 1 20); do
+    if curl -fsS http://127.0.0.1:5102/health >/dev/null; then break; fi
+    sleep 1
+  done
   curl -fsS http://127.0.0.1:5102/health"
 
 echo
