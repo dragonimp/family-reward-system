@@ -9,6 +9,8 @@
 - 应用基础资料：`01-app-basic-info.md`
 - 客服/审核使用说明：`02-review-user-guide.md`
 - 测试用例与实测报告：`03-test-cases-and-report.md`
+- 官网测试标准与报告模板映射：`14-official-test-standards-and-template-mapping.md`
+- 官网测试模板原件：`official-templates/`
 - 隐私政策定稿：`04-privacy-policy-draft.md`（历史文件名保留）
 - 用户协议定稿：`05-user-agreement-draft.md`（历史文件名保留）
 - 首次提交免责函定稿：`06-disclaimer-draft.md`（待公司盖章）
