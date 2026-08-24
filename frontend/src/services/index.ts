@@ -10,6 +10,7 @@ import type {
   WatchRewardRequestsPayload,
 } from '../types';
 import type { SystemConfig } from '../types';
+import type { XiaotiancaiDeviceTestEmailPreview, XiaotiancaiDeviceTestEmailSubmission } from '../types';
 
 export const getFamilyGroups = (params?: { userId?: string }) => http.get<unknown, FamilyGroup[]>('/api/family-groups', { params });
 export const createFamilyGroup = (data: Partial<FamilyGroup>) => http.post<unknown, FamilyGroup>('/api/family-groups', data);
@@ -75,3 +76,13 @@ export const getCategoryStats = (params?: { familyGroupId?: number }) => http.ge
 
 export const getSystemConfig = () => http.get<unknown, SystemConfig>('/api/system/config');
 export const updateSystemConfig = (data: SystemConfig) => http.put<unknown, SystemConfig>('/api/system/config', data);
+
+export const getXiaotiancaiDeviceTestApplication = () =>
+  http.get<unknown, XiaotiancaiDeviceTestEmailPreview>('/api/xiaotiancai/device-test-application');
+
+export const sendXiaotiancaiDeviceTestApplication = (data: {
+  deviceModel: string;
+  confirmed: boolean;
+  expectedApkSha256: string;
+  expectedReportSha256: string;
+}) => http.post<unknown, XiaotiancaiDeviceTestEmailSubmission>('/api/xiaotiancai/device-test-application/send', data);

@@ -108,6 +108,54 @@ export interface WatchRewardRequestsPayload {
   requests: WatchRewardRequest[];
 }
 
+export interface XiaotiancaiEmailAttachment {
+  fileName: string;
+  sizeBytes: number;
+  sha256: string;
+  contentType: string;
+}
+
+export interface XiaotiancaiDeviceTestEmailSubmission {
+  id: number;
+  requestedBy: string;
+  recipient: string;
+  sender: string;
+  deviceModel: string;
+  versionName: string;
+  versionCode: number;
+  subject: string;
+  messageId?: string | null;
+  previousMessageId?: string | null;
+  attachments: XiaotiancaiEmailAttachment[];
+  status: 'sending' | 'sent' | 'failed';
+  providerResponse?: string | null;
+  errorMessage?: string | null;
+  sentAt?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface XiaotiancaiDeviceTestEmailPreview {
+  recipient: string;
+  sender: string;
+  deviceModel: string;
+  appName: string;
+  packageId: string;
+  versionName: string;
+  versionCode: number;
+  lastVerifiedAt: string;
+  apkSha256: string;
+  reportSha256: string;
+  previousMessageId?: string | null;
+  subject: string;
+  body: string;
+  attachments: XiaotiancaiEmailAttachment[];
+  sendingConfigured: boolean;
+  credentialReady: boolean;
+  requestedBy: string;
+  submissions: XiaotiancaiDeviceTestEmailSubmission[];
+}
+
 export interface FamilyGroup {
   id: number;
   name: string;

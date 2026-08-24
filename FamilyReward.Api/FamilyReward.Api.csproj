@@ -13,6 +13,7 @@
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
       <PrivateAssets>all</PrivateAssets>
     </PackageReference>
+    <PackageReference Include="MailKit" Version="4.14.1" />
     <PackageReference Include="Npgsql" Version="10.0.3" />
   </ItemGroup>
 
@@ -23,6 +24,18 @@
 
   <ItemGroup>
     <Content Update="system_config.json" CopyToPublishDirectory="Never" />
+    <Content Include="../docs/publishing/xiaotiancai/release-bundle/家加分手表积分_1.0.0_100_signed.apk">
+      <Link>xiaotiancai-release/家加分手表积分_1.0.0_100_signed.apk</Link>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+    </Content>
+    <Content Include="../docs/publishing/xiaotiancai/release-bundle/家加分手表积分_测试报告.pdf">
+      <Link>xiaotiancai-release/家加分手表积分_测试报告.pdf</Link>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+    </Content>
+    <Content Include="../docs/publishing/xiaotiancai/release-bundle/release-metadata.json">
+      <Link>xiaotiancai-release/release-metadata.json</Link>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+    </Content>
   </ItemGroup>
 
 </Project>

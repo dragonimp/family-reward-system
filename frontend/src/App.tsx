@@ -10,6 +10,7 @@ import SettingsPage from './pages/Settings';
 import AssistantPage from './pages/Assistant';
 import IdentityPage from './pages/Identity';
 import VirtualWatchPage from './pages/VirtualWatch';
+import XiaotiancaiDeviceTestApplicationPage from './pages/XiaotiancaiDeviceTestApplication';
 import IdentityGate from './components/IdentityGate';
 import Layout from './components/Layout';
 import ProtectedRoute from './components/ProtectedRoute';
@@ -48,6 +49,7 @@ export default function App() {
                         <Route path="/stats" element={<StatsPage />} />
                         <Route path="/settings" element={<SettingsPage />} />
                         <Route path="/virtual-watch" element={<VirtualWatchPage />} />
+                        <Route path="/xiaotiancai-device-test" element={<XiaotiancaiDeviceTestApplicationPage />} />
                         <Route path="/assistant/*" element={<AssistantPage />} />
                       </Routes>
                     </Layout>

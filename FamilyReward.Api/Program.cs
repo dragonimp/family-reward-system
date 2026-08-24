@@ -87,6 +87,7 @@ builder.Services.AddCors(options =>
         policy.AllowAnyOrigin().AllowAnyHeader().AllowAnyMethod());
 });
 builder.Services.AddHttpClient();
+builder.Services.AddSingleton<XiaotiancaiDeviceTestEmailService>();
 builder.Services.AddAgentIdentityJwtCookieAuthentication(new AgentIdentityOptions
 {
     Authority = (Environment.GetEnvironmentVariable("AGENTIDENTITY_AUTHORITY") ?? "https://auth.ai.xmkurt.com").TrimEnd('/'),
@@ -1674,6 +1675,57 @@ app.MapPut("/api/system/config", async (JsonObject body, HttpRequest request) =>
     if (access.Error is not null) return access.Error;
     var saved = await configStore.SaveAsync(body);
     return Results.Json(saved);
+});
+
+app.MapGet("/api/xiaotiancai/device-test-application", async (
+    XiaotiancaiDeviceTestEmailService emailService,
+    HttpRequest request,
+    CancellationToken cancellationToken) =>
+{
+    var access = RequireXiaotiancaiEmailOperator(request);
+    if (access.Error is not null) return access.Error;
+    try
+    {
+        return Results.Json(await emailService.GetPreviewAsync(connectionString, access.Username!, cancellationToken));
+    }
+    catch (XiaotiancaiEmailConflictException exception)
+    {
+        return Results.Json(new { error = exception.Message }, statusCode: StatusCodes.Status409Conflict);
+    }
+    catch (XiaotiancaiEmailConfigurationException exception)
+    {
+        return Results.Json(new { error = exception.Message }, statusCode: StatusCodes.Status503ServiceUnavailable);
+    }
+});
+
+app.MapPost("/api/xiaotiancai/device-test-application/send", async (
+    XiaotiancaiDeviceTestEmailRequest body,
+    XiaotiancaiDeviceTestEmailService emailService,
+    HttpRequest request,
+    CancellationToken cancellationToken) =>
+{
+    var access = RequireXiaotiancaiEmailOperator(request);
+    if (access.Error is not null) return access.Error;
+    try
+    {
+        return Results.Json(await emailService.SendAsync(connectionString, access.Username!, body, cancellationToken));
+    }
+    catch (XiaotiancaiEmailValidationException exception)
+    {
+        return Results.BadRequest(new { error = exception.Message });
+    }
+    catch (XiaotiancaiEmailConflictException exception)
+    {
+        return Results.Json(new { error = exception.Message }, statusCode: StatusCodes.Status409Conflict);
+    }
+    catch (XiaotiancaiEmailConfigurationException exception)
+    {
+        return Results.Json(new { error = exception.Message }, statusCode: StatusCodes.Status503ServiceUnavailable);
+    }
+    catch (XiaotiancaiEmailSendException exception)
+    {
+        return Results.Json(new { error = exception.Message }, statusCode: StatusCodes.Status502BadGateway);
+    }
 });
 
 app.MapPost("/api/agent/parse-reward", async (JsonObject body, IHttpClientFactory httpClientFactory, HttpRequest request) =>
@@ -5535,6 +5587,32 @@ static async Task InitDatabase(string connectionString)
         )
         """,
         """
+        CREATE TABLE IF NOT EXISTS xiaotiancai_device_test_email_submissions (
+            id SERIAL PRIMARY KEY,
+            requested_by VARCHAR(160) NOT NULL,
+            recipient VARCHAR(320) NOT NULL,
+            sender VARCHAR(320) NOT NULL,
+            device_model VARCHAR(20) NOT NULL,
+            version_name VARCHAR(40) NOT NULL,
+            version_code INTEGER NOT NULL,
+            subject VARCHAR(500) NOT NULL,
+            message_id VARCHAR(500),
+            previous_message_id VARCHAR(500),
+            attachment_manifest JSONB NOT NULL,
+            status VARCHAR(20) NOT NULL,
+            provider_response TEXT,
+            error_message TEXT,
+            sent_at TIMESTAMP,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+        """,
+        """
+        CREATE UNIQUE INDEX IF NOT EXISTS ux_xiaotiancai_device_test_email_sending
+        ON xiaotiancai_device_test_email_submissions ((status))
+        WHERE status = 'sending'
+        """,
+        """
         CREATE TABLE IF NOT EXISTS family_groups (
             id SERIAL PRIMARY KEY,
             name VARCHAR(100) NOT NULL,
@@ -6809,6 +6887,41 @@ static Dictionary<string, object?> ReadHouseholdMember(NpgsqlDataReader reader) 
     ["createdAt"] = reader.GetDateTime(reader.GetOrdinal("created_at")),
     ["updatedAt"] = reader.GetDateTime(reader.GetOrdinal("updated_at"))
 };
+
+static (string? Username, IResult? Error) RequireXiaotiancaiEmailOperator(HttpRequest request)
+{
+    if (request.HttpContext.User.Identity?.IsAuthenticated != true)
+    {
+        return (null, Results.Json(
+            new { error = "请先通过用户中心登录", code = "login_required" },
+            statusCode: StatusCodes.Status401Unauthorized));
+    }
+    var claimUsername = FirstClaim(request, "preferred_username", ClaimTypes.Name, "name");
+    if (string.IsNullOrWhiteSpace(claimUsername))
+    {
+        return (null, Results.Json(
+            new { error = "登录凭证缺少用户中心用户名", code = "username_required" },
+            statusCode: StatusCodes.Status403Forbidden));
+    }
+    var username = NormalizeBusinessUserName(claimUsername);
+    var allowedUsers = (Environment.GetEnvironmentVariable("XIAOTIANCAI_EMAIL_ALLOWED_USERS") ?? "")
+        .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+        .Select(NormalizeBusinessUserName)
+        .ToHashSet(StringComparer.OrdinalIgnoreCase);
+    if (allowedUsers.Count == 0)
+    {
+        return (null, Results.Json(
+            new { error = "小天才申请邮件操作人尚未配置", code = "operator_not_configured" },
+            statusCode: StatusCodes.Status503ServiceUnavailable));
+    }
+    if (!allowedUsers.Contains(username))
+    {
+        return (null, Results.Json(
+            new { error = "当前用户无权发送小天才真机测试申请", code = "operator_forbidden" },
+            statusCode: StatusCodes.Status403Forbidden));
+    }
+    return (username, null);
+}
 
 static async Task<(AppUserProfile? Profile, IResult? Error)> RequireParentProfile(string connectionString, HttpRequest request)
 {

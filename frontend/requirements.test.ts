@@ -234,6 +234,33 @@ test('release readiness is managed only in Atlas project management', async () =
   assert.doesNotMatch(layout, /上架准备|\/watch-release/);
 });
 
+test('Xiaotiancai device-test email is a confirmed audited action, not release readiness', async () => {
+  const [app, layout, page, services, backend, emailService] = await Promise.all([
+    readFile(new URL('./src/App.tsx', import.meta.url), 'utf8'),
+    readFile(new URL('./src/components/Layout.tsx', import.meta.url), 'utf8'),
+    readFile(new URL('./src/pages/XiaotiancaiDeviceTestApplication.tsx', import.meta.url), 'utf8'),
+    readFile(new URL('./src/services/index.ts', import.meta.url), 'utf8'),
+    readFile(new URL('../FamilyReward.Api/Program.cs', import.meta.url), 'utf8'),
+    readFile(new URL('../FamilyReward.Api/XiaotiancaiDeviceTestEmailService.cs', import.meta.url), 'utf8'),
+  ]);
+
+  assert.match(app, /path="\/xiaotiancai-device-test"/);
+  assert.match(layout, /真机测试申请/);
+  assert.match(page, /我已核对目标机型、收件人、邮件正文及上述附件哈希/);
+  assert.match(page, /window\.confirm/);
+  assert.match(page, /expectedApkSha256: preview\.apkSha256/);
+  assert.match(page, /expectedReportSha256: preview\.reportSha256/);
+  assert.doesNotMatch(page, /SECURITY_AUTHORIZATION_CODE|smtpRuntime|password/);
+  assert.match(services, /\/api\/xiaotiancai\/device-test-application\/send/);
+  assert.match(backend, /RequireXiaotiancaiEmailOperator/);
+  assert.match(backend, /User\.Identity\?\.IsAuthenticated/);
+  assert.match(backend, /XIAOTIANCAI_EMAIL_ALLOWED_USERS/);
+  assert.match(emailService, /FixedTimeEquals\(request\.ExpectedApkSha256/);
+  assert.match(emailService, /status = 'sent', message_id = @message_id/);
+  assert.match(emailService, /security-authorizations\/application-credentials/);
+  assert.doesNotMatch(emailService, /dragonimp@impx\.net.*password/i);
+});
+
 test('REQ-048 scopes public MCP tools by User Center username', async () => {
   const [api, library] = await Promise.all([
     readFile(new URL('../FamilyReward.Api/Program.cs', import.meta.url), 'utf8'),
