@@ -97,5 +97,6 @@ test('parent reward page keeps the core operation compact and rules collapsed by
   assert.match(page, /setPositiveRulesOpen\(false\)/);
   assert.match(page, /setNegativeRulesOpen\(false\)/);
   assert.match(page, /flex flex-wrap gap-2/);
-  assert.ok(page.indexOf('快速积分操作') < page.indexOf('待确认申请'));
+  assert.equal(page.includes('语音记录积分'), false);
+  assert.ok(page.indexOf('待确认申请') < page.indexOf('快速积分操作'));
 });

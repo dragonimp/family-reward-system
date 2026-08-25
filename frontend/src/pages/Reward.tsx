@@ -1,7 +1,7 @@
 import { Card } from '../components/Card';
 import { Modal } from '../components/Modal';
 import type { Child, Rule, WatchRewardRequest } from '../types';
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   approveRewardRequest,
@@ -31,9 +31,6 @@ export default function Reward() {
   const [customType, setCustomType] = useState<RewardTransactionType>('score');
   const [customCategory, setCustomCategory] = useState('');
   const [customDescription, setCustomDescription] = useState('');
-  const [voiceText, setVoiceText] = useState('');
-  const [voiceListening, setVoiceListening] = useState(false);
-  const recognitionRef = useRef<any>(null);
   const [approvingRequestId, setApprovingRequestId] = useState<number | null>(null);
   const [showConfirm, setShowConfirm] = useState(false);
   const [transactionPreview, setTransactionPreview] = useState<RewardTransactionPreview | null>(null);
@@ -101,57 +98,6 @@ export default function Reward() {
     const rule = rules.find((r) => r.id === ruleId);
     if (rule) {
       setCustomAmount(Math.abs(rule.score));
-    }
-  };
-
-  const applyLocalVoiceFallback = (text: string) => {
-    const normalized = text.replace(/\s+/g, '');
-    const child = children.find((item) => normalized.includes(item.name));
-    if (!child) return;
-    const numberMatch = normalized.match(/-?\d+(?:\.\d+)?/);
-    if (!numberMatch) return;
-    const rawAmount = Number(numberMatch[0]);
-    const negative = rawAmount < 0 || /扣|减|罚|扣除|减少|兑换/.test(normalized);
-    const amount = Math.abs(rawAmount) * (negative ? -1 : 1);
-
-    setSelectedChild(child.id);
-    setSelectedRule(null);
-    setCustomType('score');
-    setCustomAmount(amount);
-    setCustomCategory(negative ? '扣分' : '奖励');
-    setCustomDescription(text);
-  };
-
-  const startVoiceRecord = () => {
-    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-    if (!SpeechRecognition) {
-      showToast('当前浏览器不支持语音识别', 'error');
-      return;
-    }
-
-    try {
-      const rec = new SpeechRecognition();
-      recognitionRef.current = rec;
-      rec.lang = 'zh-CN';
-      rec.interimResults = false;
-      rec.maxAlternatives = 1;
-      rec.onstart = () => setVoiceListening(true);
-      rec.onresult = (event: any) => {
-        const text = event.results?.[0]?.[0]?.transcript || '';
-        setVoiceText(text);
-        if (text) {
-          applyLocalVoiceFallback(text);
-        }
-      };
-      rec.onerror = () => {
-        showToast('语音识别失败，请重试', 'error');
-      };
-      rec.onend = () => setVoiceListening(false);
-      rec.start();
-    } catch (error) {
-      console.error(error);
-      setVoiceListening(false);
-      showToast('语音初始化失败', 'error');
     }
   };
 
@@ -255,6 +201,40 @@ export default function Reward() {
         <h2 className="text-2xl font-bold text-gray-900">积分操作</h2>
         <p className="text-gray-500 mt-1">只操作当前家长账号名下的孩子，积分在各圈子中同步</p>
       </div>
+
+      <Card className="p-4 sm:p-5">
+        <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h3 className="text-sm font-semibold text-gray-700">待确认申请</h3>
+            <p className="mt-1 text-xs text-gray-500">孩子从手表端提交的积分申请会显示在这里</p>
+          </div>
+          <span className="rounded-full bg-orange-50 px-3 py-1 text-sm font-medium text-orange-700">{pendingRequests.length} 条</span>
+        </div>
+        {pendingRequests.length === 0 ? (
+          <div className="rounded-lg border border-dashed border-gray-200 py-6 text-center text-sm text-gray-400">暂无待确认申请</div>
+        ) : (
+          <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
+            {pendingRequests.map((item) => (
+              <div key={item.id} className="rounded-lg border border-orange-100 bg-orange-50/50 p-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="font-semibold text-gray-900">{item.childName}</span>
+                      <span className="rounded-full bg-white px-2 py-0.5 text-xs font-medium text-orange-700">+{item.points} 分</span>
+                    </div>
+                    <p className="mt-1 truncate text-sm text-gray-700">{item.title}</p>
+                    <p className="mt-1 text-xs text-gray-500">{item.category || '手表申请'}{item.requestedAt ? ` · ${formatRequestTime(item.requestedAt)}` : ''}</p>
+                    {item.note && <p className="mt-2 text-xs text-gray-500">{item.note}</p>}
+                  </div>
+                  <button type="button" disabled={approvingRequestId === item.id} onClick={() => handleApproveRequest(item.id)} className="shrink-0 rounded-lg bg-[#4A90D9] px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-[#3A7BC8] disabled:opacity-60">
+                    {approvingRequestId === item.id ? '确认中...' : '确认'}
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </Card>
 
       <Card className="border-[#4A90D9]/30 p-4 sm:p-5">
         <div className="flex items-start justify-between gap-3">
@@ -423,53 +403,6 @@ export default function Reward() {
             className="w-full rounded-lg bg-[#4A90D9] px-6 py-3 text-base font-semibold text-white shadow-md transition duration-150 hover:bg-[#3A7BC8] active:scale-[0.99] sm:w-auto"
           >
             ✅ 确认操作
-          </button>
-        </div>
-      </Card>
-
-      <Card className="p-4 sm:p-5">
-        <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <h3 className="text-sm font-semibold text-gray-700">待确认申请</h3>
-            <p className="mt-1 text-xs text-gray-500">孩子从手表端提交的积分申请会显示在这里</p>
-          </div>
-          <span className="rounded-full bg-orange-50 px-3 py-1 text-sm font-medium text-orange-700">{pendingRequests.length} 条</span>
-        </div>
-        {pendingRequests.length === 0 ? (
-          <div className="rounded-lg border border-dashed border-gray-200 py-6 text-center text-sm text-gray-400">暂无待确认申请</div>
-        ) : (
-          <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
-            {pendingRequests.map((item) => (
-              <div key={item.id} className="rounded-lg border border-orange-100 bg-orange-50/50 p-4">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span className="font-semibold text-gray-900">{item.childName}</span>
-                      <span className="rounded-full bg-white px-2 py-0.5 text-xs font-medium text-orange-700">+{item.points} 分</span>
-                    </div>
-                    <p className="mt-1 truncate text-sm text-gray-700">{item.title}</p>
-                    <p className="mt-1 text-xs text-gray-500">{item.category || '手表申请'}{item.requestedAt ? ` · ${formatRequestTime(item.requestedAt)}` : ''}</p>
-                    {item.note && <p className="mt-2 text-xs text-gray-500">{item.note}</p>}
-                  </div>
-                  <button type="button" disabled={approvingRequestId === item.id} onClick={() => handleApproveRequest(item.id)} className="shrink-0 rounded-lg bg-[#4A90D9] px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-[#3A7BC8] disabled:opacity-60">
-                    {approvingRequestId === item.id ? '确认中...' : '确认'}
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </Card>
-
-      <Card className="border-[#4A90D9]/30 p-4 sm:p-5">
-        <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
-          <div>
-            <h3 className="text-sm font-semibold text-gray-700">语音记录积分</h3>
-            <p className="mt-1 text-xs text-gray-500">例如：给某个孩子加5分，因为主动完成任务；或扣10分，因为违反约定。</p>
-            {voiceText && <p className="mt-2 text-sm text-[#4A90D9]">浏览器识别：{voiceText}</p>}
-          </div>
-          <button type="button" onClick={startVoiceRecord} disabled={voiceListening || children.length === 0} className="w-full rounded-lg bg-[#4A90D9] px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-[#3A7BC8] disabled:opacity-60 sm:w-auto">
-            {voiceListening ? '正在听...' : '🎤 语音记录'}
           </button>
         </div>
       </Card>
