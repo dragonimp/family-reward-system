@@ -87,3 +87,15 @@ test('parent reward page loads owned children and supports watch request approva
   assert.match(page, /approveRewardRequest\(requestId/);
   assert.match(page, /await loadData\(true\)/);
 });
+
+test('parent reward page keeps the core operation compact and rules collapsed by default', async () => {
+  const page = await readFile(new URL('./src/pages/Reward.tsx', import.meta.url), 'utf8');
+
+  assert.match(page, /快速积分操作/);
+  assert.match(page, /aria-expanded=\{positiveRulesOpen\}/);
+  assert.match(page, /aria-expanded=\{negativeRulesOpen\}/);
+  assert.match(page, /setPositiveRulesOpen\(false\)/);
+  assert.match(page, /setNegativeRulesOpen\(false\)/);
+  assert.match(page, /flex flex-wrap gap-2/);
+  assert.ok(page.indexOf('快速积分操作') < page.indexOf('待确认申请'));
+});
