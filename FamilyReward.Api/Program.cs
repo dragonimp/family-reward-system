@@ -2074,10 +2074,11 @@ app.MapGet("/api/agentfree/sessions/{id}/queue", async (string id, IHttpClientFa
             .GetSessionQueueAsync(id, userName, request.HttpContext.RequestAborted);
         return Results.Json(queue ?? new JsonObject { ["items"] = new JsonArray(), ["waitingCount"] = 0 });
     }
-    catch (Exception ex)
+    catch (Exception)
     {
-        if (IsAgentFreeAccessDenied(ex)) return Results.Json(new JsonObject { ["items"] = new JsonArray(), ["waitingCount"] = 0 });
-        return Results.Json(new { error = $"获取智能体会话队列失败: {ex.Message}" }, statusCode: StatusCodes.Status502BadGateway);
+        // Queue polling is auxiliary to the active chat stream. A transient gateway
+        // failure must not turn an otherwise successful conversation into an error.
+        return Results.Json(new JsonObject { ["items"] = new JsonArray(), ["waitingCount"] = 0 });
     }
 });
 

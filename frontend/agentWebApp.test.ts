@@ -39,6 +39,8 @@ test('mobile assistant reuses the complete AgentFree WebApp chat surface', async
   assert.match(backend, /GetSessionMessagesAsync\(/);
   assert.match(backend, /GetSessionTimelineAsync\(/);
   assert.match(backend, /GetSessionQueueAsync\(/);
+  assert.match(backend, /Queue polling is auxiliary[\s\S]*waitingCount["'\]]+\s*=\s*0/);
+  assert.doesNotMatch(backend, /获取智能体会话队列失败/);
   assert.match(backend, /CreateSessionAsync\(/);
   assert.match(backend, /UpdateSessionAsync\(/);
   assert.match(backend, /ResetSessionContextAsync\(/);
