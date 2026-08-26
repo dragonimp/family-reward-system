@@ -1,4 +1,5 @@
 using AgentIdentity.Sdk;
+using AgentDash.Payment.Client;
 using Goldfish.WebAppSdk;
 using Microsoft.AspNetCore.HttpOverrides;
 using System.Data;
@@ -61,6 +62,9 @@ const string FamilyRewardMcpServiceName = "family-reward-mcp";
 const string FamilyRewardMcpGroundingInstructions = "涉及孩子、家庭成员、积分余额或流水、规则、圈子、设备、好友、申请和统计等家加分业务事实时，必须先调用对应工具，并且只能依据工具本次返回的数据回答；不得依赖记忆、会话猜测或编造结果。工具不可用、调用失败或结果不足时，必须明确说明暂时无法核验并建议重试，不得声称查询或操作成功。自然语言行为记分必须优先调用 family_reward_apply_matching_rule，由服务端匹配当前生效规则并落库；不要仅查询规则后口头回复。";
 const string DefaultFamilyGroupName = "WWXYhome";
 const string DefaultUserId = "local-admin";
+const string FamilyRewardPaymentProductCode = "family-reward";
+const string VipHomePlusPlanCode = "vip-home-plus";
+const string VipWatchFacesFeatureCode = "vip_watch_faces";
 
 var builder = WebApplication.CreateBuilder(args);
 builder.WebHost.UseUrls(apiUrls);
@@ -87,6 +91,7 @@ builder.Services.AddCors(options =>
         policy.AllowAnyOrigin().AllowAnyHeader().AllowAnyMethod());
 });
 builder.Services.AddHttpClient();
+builder.Services.AddHttpClient("agent-pay");
 builder.Services.AddSingleton<XiaotiancaiDeviceTestEmailService>();
 builder.Services.AddAgentIdentityJwtCookieAuthentication(new AgentIdentityOptions
 {
@@ -125,6 +130,22 @@ app.MapGet("/health", () => Results.Json(new
 
 app.MapGet("/watch/manifest.json", (HttpRequest request) => Results.Json(BuildWatchWebManifest(request)));
 app.MapGet("/api/watch/app-info", (HttpRequest request) => Results.Json(BuildWatchAppInfo(request)));
+app.MapPost("/api/payment/fulfillment", async (HttpRequest request, JsonObject body) =>
+{
+    if (!VerifyPaymentCallback(request, body.ToJsonString())) return Results.Unauthorized();
+    if (!string.Equals(body.String("productCode"), FamilyRewardPaymentProductCode, StringComparison.OrdinalIgnoreCase))
+        return Results.Ok(new { ignored = true });
+    var userId = body.String("ownerId").Trim();
+    var planCode = body.String("planCode").Trim().ToLowerInvariant();
+    var orderId = body.String("orderId").Trim();
+    var eventId = body.String("eventId").Trim();
+    if (string.IsNullOrWhiteSpace(userId) || string.IsNullOrWhiteSpace(planCode) || string.IsNullOrWhiteSpace(orderId) || string.IsNullOrWhiteSpace(eventId))
+        return Results.BadRequest(new { error = "支付履约事件不完整" });
+    var startsAt = body["startsAt"]?.GetValue<DateTime>() ?? DateTime.UtcNow;
+    var expiresAt = body["expiresAt"]?.GetValue<DateTime>() ?? DateTime.UtcNow;
+    await UpsertSubscriptionSnapshot(connectionString, userId, planCode, orderId, eventId, startsAt, expiresAt);
+    return Results.Ok(new { status = "ok" });
+});
 app.MapGet("/watch/icon.svg", () => Results.Content("""
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
       <rect width="512" height="512" rx="96" fill="#16643a"/>
@@ -509,7 +530,7 @@ app.MapGet("/api/watch/preview/{childId:int}", async (int childId, HttpRequest r
         },
         rules = new { rules },
         requests = new { familyGroupId, requests },
-        settings = await GetWatchSettings(connectionString, childProfileKey),
+        settings = await GetWatchSettings(connectionString, childProfileKey, access.Profile.AppUserId),
         friends = new
         {
             friends = await GetChildFriends(connectionString, childProfileKey),
@@ -567,14 +588,14 @@ app.MapGet("/api/watch/settings", async (HttpRequest request) =>
 {
     var binding = await RequireWatchDeviceBinding(connectionString, request, touch: false);
     if (binding.Error is not null) return binding.Error;
-    return Results.Json(await GetWatchSettings(connectionString, binding.Binding!.ChildProfileKey));
+    return Results.Json(await GetWatchSettings(connectionString, binding.Binding!.ChildProfileKey, binding.Binding.ParentAppUserId));
 });
 
 app.MapPut("/api/watch/settings", async (JsonObject body, HttpRequest request) =>
 {
     var binding = await RequireWatchDeviceBinding(connectionString, request, touch: false);
     if (binding.Error is not null) return binding.Error;
-    var result = await UpdateWatchSettings(connectionString, binding.Binding!.ChildProfileKey, body.String("watchFace"));
+    var result = await UpdateWatchSettings(connectionString, binding.Binding!.ChildProfileKey, binding.Binding.ParentAppUserId, body.String("watchFace"));
     return result.ContainsKey("error") ? Results.BadRequest(result) : Results.Json(result);
 });
 
@@ -798,6 +819,7 @@ app.MapGet("/watch", () =>
             .watch-face.face-dinosaur{background:radial-gradient(circle at 72% 28%,#f5df77 0 8%,transparent 8.5%),linear-gradient(155deg,#d7f3cb,#76bd6e 58%,#3d8655);color:#153521}
             .watch-face.face-rainbow{background:linear-gradient(145deg,#ff9cab 0 20%,#ffd56a 20% 40%,#8bd48c 40% 60%,#76c8f2 60% 80%,#bca2ee 80%);color:#30243b}
             .watch-face.face-space{background:radial-gradient(circle at 22% 24%,#fff 0 1.2%,transparent 1.8%),radial-gradient(circle at 76% 34%,#ffe16b 0 2%,transparent 2.7%),radial-gradient(circle at 62% 74%,#8cddff 0 1.5%,transparent 2.2%),linear-gradient(145deg,#10142f,#332a68 62%,#145f7a);color:#f8fbff}
+            .watch-face.face-meteor{background:linear-gradient(145deg,#0e1738,#3b2c67 56%,#f37e75);color:#fff}.watch-face.face-snow{background:radial-gradient(circle,#fff 0 2px,transparent 3px) 0 0/22px 22px,linear-gradient(145deg,#244f79,#9fdbef);color:#fff}.watch-face.face-flowers{background:radial-gradient(circle at 18% 22%,#fff0f4 0 7%,transparent 8%),radial-gradient(circle at 76% 68%,#ffd7e6 0 9%,transparent 10%),linear-gradient(145deg,#6cae6f,#d8f0b2);color:#183720}.watch-face.face-night{background:radial-gradient(circle at 24% 20%,#ffe27a 0 5%,transparent 5.8%),radial-gradient(circle at 72% 36%,#fff 0 1%,transparent 1.8%),linear-gradient(145deg,#10142f,#25245b 66%,#5169a5);color:#fff}.watch-face.face-pixel{background:linear-gradient(90deg,#66bd72 0 20%,#b5df77 20% 40%,#6fa5d8 40% 60%,#f4cc6b 60% 80%,#df7c78 80%);color:#17231b}
             .watch-face.face-starlight .topline,.watch-face.face-starlight .brand{color:#f8fbff}.watch-face.face-starlight .metric,.watch-face.face-starlight .rule-btn,.watch-face.face-starlight input,.watch-face.face-starlight textarea{background:rgba(255,255,255,.94)}
             .watch-face.face-space .topline,.watch-face.face-space .brand{color:#f8fbff}.watch-face.face-space .metric,.watch-face.face-space .rule-btn,.watch-face.face-space input,.watch-face.face-space textarea{background:rgba(255,255,255,.94)}
             .screen{position:absolute;top:20px;right:20px;bottom:20px;left:20px;inset:clamp(14px,7vmin,24px);display:flex;align-items:center;justify-content:center;overflow:hidden;text-align:center}
@@ -924,6 +946,11 @@ app.MapGet("/watch", () =>
                       <button class="face-option" type="button" data-face="dinosaur"><span>恐龙乐园</span><i class="face-swatch swatch-dinosaur"></i></button>
                       <button class="face-option" type="button" data-face="rainbow"><span>彩虹糖果</span><i class="face-swatch swatch-rainbow"></i></button>
                       <button class="face-option" type="button" data-face="space"><span>宇宙探险</span><i class="face-swatch swatch-space"></i></button>
+                      <button class="face-option vip-face" type="button" data-face="meteor"><span>流星 · VIP</span><i class="face-swatch swatch-space"></i></button>
+                      <button class="face-option vip-face" type="button" data-face="snow"><span>雪花 · VIP</span><i class="face-swatch swatch-starlight"></i></button>
+                      <button class="face-option vip-face" type="button" data-face="flowers"><span>花朵 · VIP</span><i class="face-swatch swatch-rainbow"></i></button>
+                      <button class="face-option vip-face" type="button" data-face="night"><span>星夜 · VIP</span><i class="face-swatch swatch-space"></i></button>
+                      <button class="face-option vip-face" type="button" data-face="pixel"><span>像素乐园 · VIP</span><i class="face-swatch swatch-world"></i></button>
                     </div>
                     <p id="settings-msg" class="msg"></p>
                   </div>
@@ -971,11 +998,12 @@ app.MapGet("/watch", () =>
             const faceLabels = { world: '我的世界', hellokitty: 'HelloKitty', starlight: '星光梦可', dinosaur: '恐龙乐园', rainbow: '彩虹糖果', space: '宇宙探险' };
             const ruleIcons = ['📚', '✏️', '🪥', '🧹', '🏃', '🤝', '⏰', '🌟'];
             const ruleIcon = (index) => ruleIcons[index % ruleIcons.length];
-            const normalizeFace = (value) => ['world', 'hellokitty', 'starlight', 'dinosaur', 'rainbow', 'space'].includes(value) ? value : 'world';
+            const faceCodes = ['world', 'hellokitty', 'starlight', 'dinosaur', 'rainbow', 'space', 'meteor', 'snow', 'flowers', 'night', 'pixel'];
+            const normalizeFace = (value) => faceCodes.includes(value) ? value : 'world';
             const applyWatchFace = (value) => {
               const face = normalizeFace(value);
               const watchFace = document.getElementById('watch-face');
-              watchFace.classList.remove('face-world', 'face-hellokitty', 'face-starlight', 'face-dinosaur', 'face-rainbow', 'face-space');
+              watchFace.classList.remove(...faceCodes.map((item) => 'face-' + item));
               watchFace.classList.add('face-' + face);
               document.querySelectorAll('.face-option').forEach((button) => {
                 button.classList.toggle('active', button.dataset.face === face);
@@ -1056,6 +1084,10 @@ app.MapGet("/watch", () =>
                 }
                 showBound(true);
                 applyWatchFace(settingsPayload.watchFace);
+                document.querySelectorAll('.vip-face').forEach((button) => {
+                  button.disabled = !settingsPayload.vipWatchFaces;
+                  button.title = settingsPayload.vipWatchFaces ? '' : '需要 VIP家庭+ 套餐';
+                });
                 renderFriends(friendsPayload);
                 const child = (score.children || [])[0] || {};
                 document.getElementById('updated-at').textContent = new Date(score.updatedAt).toLocaleTimeString('zh-CN', { hour12: false, hour: '2-digit', minute: '2-digit' });
@@ -5743,6 +5775,50 @@ static async Task InitDatabase(string connectionString)
         )
         """,
         """
+        CREATE TABLE IF NOT EXISTS subscription_plan_features (
+            product_code VARCHAR(80) NOT NULL,
+            plan_code VARCHAR(80) NOT NULL,
+            feature_code VARCHAR(80) NOT NULL,
+            enabled BOOLEAN NOT NULL DEFAULT FALSE,
+            updated_by VARCHAR(180) NOT NULL DEFAULT '',
+            updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (product_code, plan_code, feature_code)
+        )
+        """,
+        """
+        CREATE TABLE IF NOT EXISTS app_user_subscriptions (
+            unified_user_id VARCHAR(180) NOT NULL,
+            product_code VARCHAR(80) NOT NULL,
+            plan_code VARCHAR(80) NOT NULL,
+            source_order_id VARCHAR(80) NOT NULL,
+            status VARCHAR(30) NOT NULL,
+            starts_at TIMESTAMP NOT NULL,
+            expires_at TIMESTAMP NOT NULL,
+            last_event_id VARCHAR(180) NOT NULL,
+            updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (unified_user_id, product_code, plan_code)
+        )
+        """,
+        """
+        CREATE TABLE IF NOT EXISTS app_user_business_statuses (
+            unified_user_id VARCHAR(180) PRIMARY KEY,
+            status VARCHAR(20) NOT NULL DEFAULT 'active',
+            reason VARCHAR(500) NOT NULL DEFAULT '',
+            updated_by VARCHAR(180) NOT NULL DEFAULT '',
+            updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+        )
+        """,
+        """
+        CREATE TABLE IF NOT EXISTS app_admin_audit_events (
+            id SERIAL PRIMARY KEY,
+            actor_unified_user_id VARCHAR(180) NOT NULL,
+            action VARCHAR(80) NOT NULL,
+            target VARCHAR(240) NOT NULL,
+            detail_json JSONB NOT NULL DEFAULT '{}'::jsonb,
+            created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+        )
+        """,
+        """
         CREATE TABLE IF NOT EXISTS child_friend_codes (
             id SERIAL PRIMARY KEY,
             child_profile_key VARCHAR(180) NOT NULL,
@@ -6015,6 +6091,18 @@ static async Task InitDatabase(string connectionString)
     {
         await using var cmd = new NpgsqlCommand(sql, conn);
         await cmd.ExecuteNonQueryAsync();
+    }
+
+    await using (var seedVipFeature = new NpgsqlCommand("""
+        INSERT INTO subscription_plan_features (product_code, plan_code, feature_code, enabled, updated_by)
+        VALUES (@product_code, @plan_code, @feature_code, TRUE, 'system')
+        ON CONFLICT (product_code, plan_code, feature_code) DO NOTHING
+        """, conn))
+    {
+        seedVipFeature.Parameters.AddWithValue("product_code", FamilyRewardPaymentProductCode);
+        seedVipFeature.Parameters.AddWithValue("plan_code", VipHomePlusPlanCode);
+        seedVipFeature.Parameters.AddWithValue("feature_code", VipWatchFacesFeatureCode);
+        await seedVipFeature.ExecuteNonQueryAsync();
     }
 
     var defaultFamilyGroupId = await EnsureFamilyGroup(conn, DefaultFamilyGroupName, DefaultUserId);
@@ -8093,8 +8181,9 @@ static async Task<Dictionary<string, object?>?> GetParentOwnedChild(string conne
     return await GetChildForFamily(conn, null, childId, familyGroupId, parentAppUserId);
 }
 
-static async Task<Dictionary<string, object?>> GetWatchSettings(string connectionString, string childProfileKey)
+static async Task<Dictionary<string, object?>> GetWatchSettings(string connectionString, string childProfileKey, string parentAppUserId)
 {
+    var vipEnabled = await HasPlanFeature(connectionString, parentAppUserId, VipWatchFacesFeatureCode);
     await using var conn = await OpenConnection(connectionString);
     await using var cmd = new NpgsqlCommand("""
         SELECT watch_face, updated_at
@@ -8108,20 +8197,28 @@ static async Task<Dictionary<string, object?>> GetWatchSettings(string connectio
         return new Dictionary<string, object?>
         {
             ["watchFace"] = NormalizeWatchFace(reader.String("watch_face")),
-            ["updatedAt"] = reader.DateTime("updated_at").ToString("O")
+            ["updatedAt"] = reader.DateTime("updated_at").ToString("O"),
+            ["vipWatchFaces"] = vipEnabled,
+            ["availableFaces"] = BuildWatchFaceCatalog(vipEnabled)
         };
     }
 
     return new Dictionary<string, object?>
     {
         ["watchFace"] = "world",
-        ["updatedAt"] = DateTime.UtcNow.ToString("O", CultureInfo.InvariantCulture)
+        ["updatedAt"] = DateTime.UtcNow.ToString("O", CultureInfo.InvariantCulture),
+        ["vipWatchFaces"] = vipEnabled,
+        ["availableFaces"] = BuildWatchFaceCatalog(vipEnabled)
     };
 }
 
-static async Task<Dictionary<string, object?>> UpdateWatchSettings(string connectionString, string childProfileKey, string watchFace)
+static async Task<Dictionary<string, object?>> UpdateWatchSettings(string connectionString, string childProfileKey, string parentAppUserId, string watchFace)
 {
     var normalized = NormalizeWatchFace(watchFace);
+    if (IsVipWatchFace(normalized) && !await HasPlanFeature(connectionString, parentAppUserId, VipWatchFacesFeatureCode))
+    {
+        return new Dictionary<string, object?> { ["error"] = "该动态表盘需要 VIP家庭+ 套餐" };
+    }
     await using var conn = await OpenConnection(connectionString);
     await using var cmd = new NpgsqlCommand("""
         INSERT INTO watch_face_preferences (child_profile_key, watch_face, updated_at)
@@ -8140,6 +8237,45 @@ static async Task<Dictionary<string, object?>> UpdateWatchSettings(string connec
         ["watchFace"] = reader.String("watch_face"),
         ["updatedAt"] = reader.DateTime("updated_at").ToString("O")
     };
+}
+
+static bool IsVipWatchFace(string face) => face is "meteor" or "snow" or "flowers" or "night" or "pixel";
+
+static object[] BuildWatchFaceCatalog(bool vipEnabled) => new object[]
+{
+    new { code = "world", name = "我的世界", vip = false, available = true },
+    new { code = "hellokitty", name = "HelloKitty", vip = false, available = true },
+    new { code = "starlight", name = "星光梦可", vip = false, available = true },
+    new { code = "dinosaur", name = "恐龙乐园", vip = false, available = true },
+    new { code = "rainbow", name = "彩虹糖果", vip = false, available = true },
+    new { code = "space", name = "宇宙探险", vip = false, available = true },
+    new { code = "meteor", name = "流星", vip = true, available = vipEnabled },
+    new { code = "snow", name = "雪花", vip = true, available = vipEnabled },
+    new { code = "flowers", name = "花朵", vip = true, available = vipEnabled },
+    new { code = "night", name = "星夜", vip = true, available = vipEnabled },
+    new { code = "pixel", name = "像素乐园", vip = true, available = vipEnabled }
+};
+
+static async Task<bool> HasPlanFeature(string connectionString, string parentAppUserId, string featureCode)
+{
+    await using var conn = await OpenConnection(connectionString);
+    await using var cmd = new NpgsqlCommand("""
+        SELECT EXISTS (
+            SELECT 1
+            FROM app_user_profiles profile
+            JOIN app_user_subscriptions subscription ON subscription.unified_user_id = profile.unified_user_id
+            JOIN subscription_plan_features feature ON feature.product_code = subscription.product_code
+                AND feature.plan_code = subscription.plan_code
+            WHERE profile.app_user_id = @parent_app_user_id
+              AND subscription.status = 'active'
+              AND subscription.expires_at > CURRENT_TIMESTAMP
+              AND feature.feature_code = @feature_code
+              AND feature.enabled = TRUE
+        )
+        """, conn);
+    cmd.Parameters.AddWithValue("parent_app_user_id", parentAppUserId);
+    cmd.Parameters.AddWithValue("feature_code", featureCode);
+    return Convert.ToBoolean(await cmd.ExecuteScalarAsync(), CultureInfo.InvariantCulture);
 }
 
 static async Task<Dictionary<string, object?>> CreateWatchFriendCode(string connectionString, WatchDeviceBinding binding, int expiresInMinutes)
@@ -9514,6 +9650,11 @@ static string NormalizeWatchFace(string value) => value.Trim().ToLowerInvariant(
     "dinosaur" or "dino" or "恐龙乐园" => "dinosaur",
     "rainbow" or "彩虹糖果" => "rainbow",
     "space" or "宇宙探险" => "space",
+    "meteor" or "流星" => "meteor",
+    "snow" or "雪花" => "snow",
+    "flowers" or "花朵" => "flowers",
+    "night" or "星夜" => "night",
+    "pixel" or "像素乐园" => "pixel",
     _ => "world"
 };
 
@@ -9555,6 +9696,43 @@ static string HashSecret(string value)
 {
     var bytes = SHA256.HashData(Encoding.UTF8.GetBytes(value));
     return Convert.ToHexString(bytes).ToLowerInvariant();
+}
+
+static bool VerifyPaymentCallback(HttpRequest request, string body)
+{
+    var secret = Environment.GetEnvironmentVariable("PAYMENT_APP_SECRET");
+    var timestamp = request.Headers["X-AD-Timestamp"].ToString();
+    var nonce = request.Headers["X-AD-Nonce"].ToString();
+    var signature = request.Headers["X-AD-Signature"].ToString();
+    if (string.IsNullOrWhiteSpace(secret) || string.IsNullOrWhiteSpace(timestamp) || string.IsNullOrWhiteSpace(nonce) || string.IsNullOrWhiteSpace(signature)
+        || !long.TryParse(timestamp, out var unix) || Math.Abs(DateTimeOffset.UtcNow.ToUnixTimeSeconds() - unix) > 300)
+        return false;
+    var canonical = string.Join('\n', timestamp, nonce, request.Method.ToUpperInvariant(), request.Path + request.QueryString, body);
+    using var hmac = new HMACSHA256(Encoding.UTF8.GetBytes(secret));
+    var expected = Convert.ToBase64String(hmac.ComputeHash(Encoding.UTF8.GetBytes(canonical)));
+    return CryptographicOperations.FixedTimeEquals(Encoding.UTF8.GetBytes(expected), Encoding.UTF8.GetBytes(signature));
+}
+
+static async Task UpsertSubscriptionSnapshot(string connectionString, string userId, string planCode, string orderId, string eventId, DateTime startsAt, DateTime expiresAt)
+{
+    await using var conn = await OpenConnection(connectionString);
+    await using var cmd = new NpgsqlCommand("""
+        INSERT INTO app_user_subscriptions (unified_user_id, product_code, plan_code, source_order_id, status, starts_at, expires_at, last_event_id)
+        VALUES (@user_id, @product_code, @plan_code, @order_id, 'active', @starts_at, @expires_at, @event_id)
+        ON CONFLICT (unified_user_id, product_code, plan_code) DO UPDATE SET
+            source_order_id = EXCLUDED.source_order_id, status = EXCLUDED.status,
+            starts_at = EXCLUDED.starts_at, expires_at = EXCLUDED.expires_at,
+            last_event_id = EXCLUDED.last_event_id, updated_at = CURRENT_TIMESTAMP
+        WHERE app_user_subscriptions.last_event_id <> EXCLUDED.last_event_id
+        """, conn);
+    cmd.Parameters.AddWithValue("user_id", userId);
+    cmd.Parameters.AddWithValue("product_code", FamilyRewardPaymentProductCode);
+    cmd.Parameters.AddWithValue("plan_code", planCode);
+    cmd.Parameters.AddWithValue("order_id", orderId);
+    cmd.Parameters.AddWithValue("starts_at", startsAt);
+    cmd.Parameters.AddWithValue("expires_at", expiresAt);
+    cmd.Parameters.AddWithValue("event_id", eventId);
+    await cmd.ExecuteNonQueryAsync();
 }
 
 static string GetWatchDeviceToken(HttpRequest request)

@@ -20,6 +20,7 @@
   <ItemGroup>
     <ProjectReference Include="../../AgentIdentity/src/AgentIdentity.Sdk/AgentIdentity.Sdk.csproj" />
     <ProjectReference Include="../../AgentFree/src/Goldfish.WebAppSdk/Goldfish.WebAppSdk.csproj" />
+    <ProjectReference Include="../../Agent-Pay/src/AgentDash.Payment.Client/AgentDash.Payment.Client.csproj" />
   </ItemGroup>
 
   <ItemGroup>
