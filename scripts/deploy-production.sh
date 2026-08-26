@@ -46,6 +46,11 @@ ssh "$DEPLOY_HOST" "set -e
     # 邮件发送是可选能力；缺少凭证不能阻塞其余应用发布。
     sudo rm -f /etc/systemd/system/family-reward-api.service.d/xiaotiancai-email.conf
   fi
+  if sudo test -s '/etc/agent-secrets/family-reward-payment.env'; then
+    printf '[Service]\nEnvironmentFile=/etc/agent-secrets/family-reward-payment.env\n' | sudo tee /etc/systemd/system/family-reward-api.service.d/payment.conf >/dev/null
+  else
+    sudo rm -f /etc/systemd/system/family-reward-api.service.d/payment.conf
+  fi
   sudo systemctl daemon-reload
   sudo systemctl restart family-reward-api.service
   systemctl is-active family-reward-api.service
