@@ -153,13 +153,46 @@ app.MapGet("/api/subscription", async (HttpRequest request) =>
     var access = await RequireParentProfile(connectionString, request);
     if (access.Error is not null) return access.Error;
     var vipWatchFaces = await HasPlanFeature(connectionString, access.Profile!.AppUserId, VipWatchFacesFeatureCode);
+    var subscription = await GetCurrentSubscription(connectionString, access.Profile.UnifiedUserId);
     return Results.Json(new
     {
         productCode = FamilyRewardPaymentProductCode,
         standardIncluded = true,
         vipWatchFaces,
-        featureCode = VipWatchFacesFeatureCode
+        featureCode = VipWatchFacesFeatureCode,
+        subscription
     });
+});
+
+app.MapPost("/api/subscription/checkout", async (JsonObject body, IHttpClientFactory httpClientFactory, HttpRequest request) =>
+{
+    var access = await RequireParentProfile(connectionString, request);
+    if (access.Error is not null) return access.Error;
+    try
+    {
+        var checkout = await GetFamilyRewardPaymentClient(httpClientFactory).CreateCheckoutAsync(
+            new CreateCheckoutRequest(access.Profile!.UnifiedUserId, FamilyRewardPaymentProductCode, "monthly", VipHomePlusPlanCode),
+            $"family-reward:{access.Profile.UnifiedUserId}:{Guid.NewGuid():N}");
+        return Results.Ok(checkout);
+    }
+    catch (HttpRequestException ex) { return Results.BadRequest(new { error = ex.Message }); }
+    catch (InvalidOperationException ex) { return Results.Problem(ex.Message, statusCode: StatusCodes.Status503ServiceUnavailable); }
+});
+
+app.MapPost("/api/subscription/checkout/{checkoutId}/order", async (string checkoutId, JsonObject body, IHttpClientFactory httpClientFactory, HttpRequest request) =>
+{
+    var access = await RequireParentProfile(connectionString, request);
+    if (access.Error is not null) return access.Error;
+    var channel = body.String("channel").Trim().ToLowerInvariant();
+    if (channel is not ("wechatpay" or "alipay")) return Results.BadRequest(new { error = "请选择微信支付或支付宝" });
+    try
+    {
+        var order = await GetFamilyRewardPaymentClient(httpClientFactory).CreateCheckoutOrderAsync(checkoutId,
+            new CreateCheckoutOrderRequest(channel), $"family-reward-order:{checkoutId}:{channel}");
+        return Results.Ok(order);
+    }
+    catch (HttpRequestException ex) { return Results.BadRequest(new { error = ex.Message }); }
+    catch (InvalidOperationException ex) { return Results.Problem(ex.Message, statusCode: StatusCodes.Status503ServiceUnavailable); }
 });
 
 app.MapGet("/api/admin/users", async (IHttpClientFactory httpClientFactory, HttpRequest request, CancellationToken cancellationToken) =>
@@ -7407,6 +7440,29 @@ static async Task<List<Dictionary<string, object?>>> GetPlanFeatures(string conn
     await using var reader = await cmd.ExecuteReaderAsync();
     while (await reader.ReadAsync()) result.Add(new Dictionary<string, object?> { ["planCode"] = reader.String("plan_code"), ["featureCode"] = reader.String("feature_code"), ["enabled"] = reader.GetBoolean(reader.GetOrdinal("enabled")), ["updatedBy"] = reader.String("updated_by"), ["updatedAt"] = reader.GetDateTime(reader.GetOrdinal("updated_at")).ToString("O") });
     return result;
+}
+
+static async Task<Dictionary<string, object?>?> GetCurrentSubscription(string connectionString, string unifiedUserId)
+{
+    await using var conn = await OpenConnection(connectionString);
+    await using var cmd = new NpgsqlCommand("""
+        SELECT plan_code, status, starts_at, expires_at, source_order_id, updated_at
+        FROM app_user_subscriptions
+        WHERE unified_user_id = @user_id AND product_code = @product_code
+          AND status = 'active' AND expires_at > CURRENT_TIMESTAMP
+        ORDER BY expires_at DESC LIMIT 1
+        """, conn);
+    cmd.Parameters.AddWithValue("user_id", unifiedUserId);
+    cmd.Parameters.AddWithValue("product_code", FamilyRewardPaymentProductCode);
+    await using var reader = await cmd.ExecuteReaderAsync();
+    if (!await reader.ReadAsync()) return null;
+    return new Dictionary<string, object?>
+    {
+        ["planCode"] = reader.String("plan_code"), ["status"] = reader.String("status"),
+        ["startsAt"] = reader.GetDateTime(reader.GetOrdinal("starts_at")).ToString("O"),
+        ["expiresAt"] = reader.GetDateTime(reader.GetOrdinal("expires_at")).ToString("O"),
+        ["updatedAt"] = reader.GetDateTime(reader.GetOrdinal("updated_at")).ToString("O")
+    };
 }
 
 static async Task SetPlanFeature(string connectionString, string planCode, string featureCode, bool enabled, string actor)

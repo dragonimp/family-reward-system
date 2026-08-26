@@ -95,3 +95,11 @@ export const setAdminUserStatus = (id: string, data: { status: 'active' | 'disab
 export const getAdminPlans = () => http.get<unknown, AdminPlanPayload>('/api/admin/plans');
 export const setAdminPlanFeature = (planCode: string, featureCode: string, enabled: boolean) => http.put(`/api/admin/plans/${planCode}/features/${featureCode}`, { enabled });
 export const bootstrapAdminCatalog = () => http.post('/api/admin/catalog/bootstrap', {});
+
+export interface SubscriptionInfo { planCode: string; status: string; startsAt: string; expiresAt: string; updatedAt: string; }
+export interface FamilySubscription { productCode: string; standardIncluded: boolean; vipWatchFaces: boolean; featureCode: string; subscription?: SubscriptionInfo | null; }
+export interface CheckoutSession { id: string; amountCents: number; currency: string; paymentChannels: { code: string; name: string; status: string }[]; }
+export interface PaymentOrder { paymentUrl: string; qrCodeUrl: string; status: string; }
+export const getSubscription = () => http.get<unknown, FamilySubscription>('/api/subscription');
+export const createSubscriptionCheckout = () => http.post<unknown, CheckoutSession>('/api/subscription/checkout', {});
+export const createSubscriptionOrder = (checkoutId: string, channel: 'wechatpay' | 'alipay') => http.post<unknown, PaymentOrder>(`/api/subscription/checkout/${encodeURIComponent(checkoutId)}/order`, { channel });
