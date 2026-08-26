@@ -162,11 +162,22 @@ app.MapGet("/api/subscription", async (HttpRequest request) =>
     });
 });
 
-app.MapGet("/api/admin/users", async (HttpRequest request) =>
+app.MapGet("/api/admin/users", async (IHttpClientFactory httpClientFactory, HttpRequest request, CancellationToken cancellationToken) =>
 {
     var admin = RequireFamilyRewardAdmin(request);
     if (admin.Error is not null) return admin.Error;
-    return Results.Json(new { users = await GetAppAdminUsers(connectionString) });
+    try
+    {
+        var directoryUsers = await GetIdentityApplicationUsers(httpClientFactory, request, cancellationToken);
+        var localUsers = await GetAppAdminUsers(connectionString);
+        return Results.Json(new { users = MergeIdentityAndLocalAdminUsers(directoryUsers, localUsers) });
+    }
+    catch (HttpRequestException ex)
+    {
+        return Results.Json(
+            new { error = $"统一用户清单同步失败：{ex.Message}" },
+            statusCode: StatusCodes.Status502BadGateway);
+    }
 });
 
 app.MapPut("/api/admin/users/{unifiedUserId}/status", async (string unifiedUserId, JsonObject body, HttpRequest request) =>
@@ -7224,10 +7235,129 @@ static async Task<List<Dictionary<string, object?>>> GetAppAdminUsers(string con
             ["childCount"] = Convert.ToInt32(reader.GetInt64(reader.GetOrdinal("child_count")), CultureInfo.InvariantCulture),
             ["activeDeviceCount"] = Convert.ToInt32(reader.GetInt64(reader.GetOrdinal("active_device_count")), CultureInfo.InvariantCulture),
             ["subscriptionPlanCode"] = reader.IsDBNull(reader.GetOrdinal("subscription_plan_code")) ? null : reader.String("subscription_plan_code"),
-            ["subscriptionExpiresAt"] = reader.IsDBNull(reader.GetOrdinal("subscription_expires_at")) ? null : reader.GetDateTime(reader.GetOrdinal("subscription_expires_at")).ToString("O")
+            ["subscriptionExpiresAt"] = reader.IsDBNull(reader.GetOrdinal("subscription_expires_at")) ? null : reader.GetDateTime(reader.GetOrdinal("subscription_expires_at")).ToString("O"),
+            ["hasAppProfile"] = true
         });
     }
     return users;
+}
+
+static async Task<List<IdentityApplicationUser>> GetIdentityApplicationUsers(
+    IHttpClientFactory httpClientFactory,
+    HttpRequest incomingRequest,
+    CancellationToken cancellationToken)
+{
+    var authority = (Environment.GetEnvironmentVariable("AGENTIDENTITY_AUTHORITY") ?? "https://auth.ai.xmkurt.com").Trim().TrimEnd('/');
+    var clientId = (Environment.GetEnvironmentVariable("AGENTIDENTITY_CLIENT_ID") ?? "happylife.ai").Trim();
+    using var request = new HttpRequestMessage(
+        HttpMethod.Get,
+        $"{authority}/api/applications/{Uri.EscapeDataString(clientId)}/users");
+    foreach (var headerName in new[] { "Authorization", "Cookie", "X-User-Id", "X-User-Name", "X-User-Role" })
+    {
+        if (incomingRequest.Headers.TryGetValue(headerName, out var value) && !string.IsNullOrWhiteSpace(value.ToString()))
+            request.Headers.TryAddWithoutValidation(headerName, value.ToArray());
+    }
+
+    using var response = await httpClientFactory.CreateClient().SendAsync(
+        request,
+        HttpCompletionOption.ResponseHeadersRead,
+        cancellationToken);
+    var body = await response.Content.ReadAsStringAsync(cancellationToken);
+    if (!response.IsSuccessStatusCode)
+        throw new HttpRequestException($"用户中心返回 HTTP {(int)response.StatusCode}");
+
+    try
+    {
+        using var document = JsonDocument.Parse(body);
+        var root = document.RootElement;
+        var source = root.ValueKind == JsonValueKind.Array
+            ? root.EnumerateArray()
+            : root.ValueKind == JsonValueKind.Object
+                && root.TryGetProperty("users", out var users)
+                && users.ValueKind == JsonValueKind.Array
+                    ? users.EnumerateArray()
+                    : Enumerable.Empty<JsonElement>();
+        return source
+            .Select(ParseIdentityApplicationUser)
+            .Where(user => !string.IsNullOrWhiteSpace(user.UnifiedUserId) && !string.IsNullOrWhiteSpace(user.Username))
+            .GroupBy(user => user.UnifiedUserId, StringComparer.OrdinalIgnoreCase)
+            .Select(group => group.First())
+            .ToList();
+    }
+    catch (JsonException ex)
+    {
+        throw new HttpRequestException("用户中心返回了无效的用户清单", ex);
+    }
+}
+
+static IdentityApplicationUser ParseIdentityApplicationUser(JsonElement item)
+{
+    var id = item.TryGetProperty("id", out var idElement)
+        ? idElement.ValueKind == JsonValueKind.String ? idElement.GetString() ?? "" : idElement.GetRawText()
+        : "";
+    var username = item.TryGetProperty("username", out var usernameElement) && usernameElement.ValueKind == JsonValueKind.String
+        ? usernameElement.GetString() ?? ""
+        : "";
+    var roles = item.TryGetProperty("applicationRoles", out var roleElements) && roleElements.ValueKind == JsonValueKind.Array
+        ? roleElements.EnumerateArray()
+            .Select(role => role.TryGetProperty("role", out var value) && value.ValueKind == JsonValueKind.String ? value.GetString() : null)
+            .Where(role => !string.IsNullOrWhiteSpace(role))
+            .Select(role => role!)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray()
+        : [];
+    return new IdentityApplicationUser(id.Trim(), username.Trim(), roles);
+}
+
+static List<Dictionary<string, object?>> MergeIdentityAndLocalAdminUsers(
+    IReadOnlyCollection<IdentityApplicationUser> directoryUsers,
+    List<Dictionary<string, object?>> localUsers)
+{
+    var matchedLocalUsers = new HashSet<Dictionary<string, object?>>();
+    var merged = new List<Dictionary<string, object?>>();
+    foreach (var directoryUser in directoryUsers.OrderBy(user => user.Username, StringComparer.OrdinalIgnoreCase))
+    {
+        var local = localUsers.FirstOrDefault(user =>
+            string.Equals(Convert.ToString(user["unifiedUserId"], CultureInfo.InvariantCulture), directoryUser.UnifiedUserId, StringComparison.OrdinalIgnoreCase))
+            ?? localUsers.FirstOrDefault(user =>
+                string.Equals(Convert.ToString(user["username"], CultureInfo.InvariantCulture), directoryUser.Username, StringComparison.OrdinalIgnoreCase));
+        if (local is not null)
+        {
+            matchedLocalUsers.Add(local);
+            local["unifiedUserId"] = directoryUser.UnifiedUserId;
+            local["username"] = directoryUser.Username;
+            local["applicationRoles"] = directoryUser.Roles;
+            local["syncedFromUserCenter"] = true;
+            merged.Add(local);
+            continue;
+        }
+
+        merged.Add(new Dictionary<string, object?>
+        {
+            ["unifiedUserId"] = directoryUser.UnifiedUserId,
+            ["username"] = directoryUser.Username,
+            ["channel"] = "identity",
+            ["role"] = directoryUser.Roles.FirstOrDefault() ?? "user",
+            ["applicationRoles"] = directoryUser.Roles,
+            ["appUserId"] = "",
+            ["status"] = "active",
+            ["reason"] = "",
+            ["childCount"] = 0,
+            ["activeDeviceCount"] = 0,
+            ["subscriptionPlanCode"] = null,
+            ["subscriptionExpiresAt"] = null,
+            ["hasAppProfile"] = false,
+            ["syncedFromUserCenter"] = true
+        });
+    }
+
+    foreach (var local in localUsers.Where(user => !matchedLocalUsers.Contains(user)))
+    {
+        local["applicationRoles"] = Array.Empty<string>();
+        local["syncedFromUserCenter"] = false;
+        merged.Add(local);
+    }
+    return merged;
 }
 
 static async Task<bool> UpdateAppUserBusinessStatus(string connectionString, string unifiedUserId, string status, string reason, string actor)
@@ -10564,6 +10694,11 @@ public sealed record AppUserProfile(
     string? ChildProfileKey,
     int? ChildId,
     bool NeedsRole);
+
+public sealed record IdentityApplicationUser(
+    string UnifiedUserId,
+    string Username,
+    IReadOnlyList<string> Roles);
 
 public sealed record WatchDeviceBinding(
     int Id,
