@@ -87,7 +87,7 @@ export const sendXiaotiancaiDeviceTestApplication = (data: {
   expectedReportSha256: string;
 }) => http.post<unknown, XiaotiancaiDeviceTestEmailSubmission>('/api/xiaotiancai/device-test-application/send', data);
 
-export interface AdminUser { unifiedUserId: string; username: string; channel: string; role: string; status: string; childCount: number; activeDeviceCount: number; subscriptionPlanCode?: string | null; }
+export interface AdminUser { unifiedUserId: string; username: string; channel: string; role: string; status: string; childCount: number; activeDeviceCount: number; subscriptionPlanCode?: string | null; hasAppProfile: boolean; applicationRoles?: string[]; }
 export interface AdminPlanFeature { planCode: string; featureCode: string; enabled: boolean; }
 export interface AdminPlanPayload { catalog: unknown; features: AdminPlanFeature[]; onlyVipFeature: string; }
 export const getAdminUsers = () => http.get<unknown, { users: AdminUser[] }>('/api/admin/users');
