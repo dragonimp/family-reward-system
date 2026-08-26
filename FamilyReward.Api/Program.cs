@@ -143,7 +143,8 @@ app.MapPost("/api/payment/fulfillment", async (HttpRequest request, JsonObject b
         return Results.BadRequest(new { error = "支付履约事件不完整" });
     var startsAt = body["startsAt"]?.GetValue<DateTime>() ?? DateTime.UtcNow;
     var expiresAt = body["expiresAt"]?.GetValue<DateTime>() ?? DateTime.UtcNow;
-    await UpsertSubscriptionSnapshot(connectionString, userId, planCode, orderId, eventId, startsAt, expiresAt);
+    var subscriptionUserId = await ResolveSubscriptionUserId(connectionString, userId);
+    await UpsertSubscriptionSnapshot(connectionString, subscriptionUserId, planCode, orderId, eventId, startsAt, expiresAt);
     return Results.Ok(new { status = "ok" });
 });
 
@@ -7138,6 +7139,21 @@ static async Task<bool> IsAppUserBusinessActive(string connectionString, string 
     await using var cmd = new NpgsqlCommand("SELECT COALESCE((SELECT status FROM app_user_business_statuses WHERE unified_user_id = @id), 'active')", conn);
     cmd.Parameters.AddWithValue("id", unifiedUserId);
     return string.Equals(Convert.ToString(await cmd.ExecuteScalarAsync(), CultureInfo.InvariantCulture), "active", StringComparison.OrdinalIgnoreCase);
+}
+
+static async Task<string> ResolveSubscriptionUserId(string connectionString, string paymentOwnerId)
+{
+    await using var conn = await OpenConnection(connectionString);
+    await using var cmd = new NpgsqlCommand("""
+        SELECT unified_user_id
+        FROM app_user_profiles
+        WHERE unified_user_id = @owner_id OR username = @owner_id
+        ORDER BY CASE WHEN unified_user_id = @owner_id THEN 0 ELSE 1 END, updated_at DESC
+        LIMIT 1
+        """, conn);
+    cmd.Parameters.AddWithValue("owner_id", paymentOwnerId);
+    var mapped = Convert.ToString(await cmd.ExecuteScalarAsync(), CultureInfo.InvariantCulture)?.Trim();
+    return string.IsNullOrWhiteSpace(mapped) ? paymentOwnerId : mapped;
 }
 
 static (string? Username, IResult? Error) RequireFamilyRewardAdmin(HttpRequest request)
