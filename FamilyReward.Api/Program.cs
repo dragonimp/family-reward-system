@@ -146,6 +146,98 @@ app.MapPost("/api/payment/fulfillment", async (HttpRequest request, JsonObject b
     await UpsertSubscriptionSnapshot(connectionString, userId, planCode, orderId, eventId, startsAt, expiresAt);
     return Results.Ok(new { status = "ok" });
 });
+
+app.MapGet("/api/subscription", async (HttpRequest request) =>
+{
+    var access = await RequireParentProfile(connectionString, request);
+    if (access.Error is not null) return access.Error;
+    var vipWatchFaces = await HasPlanFeature(connectionString, access.Profile!.AppUserId, VipWatchFacesFeatureCode);
+    return Results.Json(new
+    {
+        productCode = FamilyRewardPaymentProductCode,
+        standardIncluded = true,
+        vipWatchFaces,
+        featureCode = VipWatchFacesFeatureCode
+    });
+});
+
+app.MapGet("/api/admin/users", async (HttpRequest request) =>
+{
+    var admin = RequireFamilyRewardAdmin(request);
+    if (admin.Error is not null) return admin.Error;
+    return Results.Json(new { users = await GetAppAdminUsers(connectionString) });
+});
+
+app.MapPut("/api/admin/users/{unifiedUserId}/status", async (string unifiedUserId, JsonObject body, HttpRequest request) =>
+{
+    var admin = RequireFamilyRewardAdmin(request);
+    if (admin.Error is not null) return admin.Error;
+    var status = body.String("status").Trim().ToLowerInvariant();
+    if (status is not ("active" or "disabled")) return Results.BadRequest(new { error = "状态只能是 active 或 disabled" });
+    var result = await UpdateAppUserBusinessStatus(connectionString, unifiedUserId, status, body.String("reason"), admin.Username!);
+    return result ? Results.Ok(new { unifiedUserId, status }) : Results.NotFound(new { error = "应用用户不存在" });
+});
+
+app.MapGet("/api/admin/plans", async (IHttpClientFactory httpClientFactory, HttpRequest request) =>
+{
+    var admin = RequireFamilyRewardAdmin(request);
+    if (admin.Error is not null) return admin.Error;
+    try
+    {
+        var catalog = await GetFamilyRewardPaymentClient(httpClientFactory).GetCatalogAsync();
+        var features = await GetPlanFeatures(connectionString);
+        return Results.Json(new { catalog, features, onlyVipFeature = VipWatchFacesFeatureCode });
+    }
+    catch (HttpRequestException)
+    {
+        return Results.StatusCode(StatusCodes.Status503ServiceUnavailable);
+    }
+    catch (InvalidOperationException ex)
+    {
+        return Results.Problem(ex.Message, statusCode: StatusCodes.Status503ServiceUnavailable);
+    }
+});
+
+app.MapPost("/api/admin/catalog/bootstrap", async (IHttpClientFactory httpClientFactory, HttpRequest request) =>
+{
+    var admin = RequireFamilyRewardAdmin(request);
+    if (admin.Error is not null) return admin.Error;
+    try
+    {
+        var payment = GetFamilyRewardPaymentClient(httpClientFactory);
+        await payment.UpsertCatalogProductAsync(new UpsertPaymentProductRequest(FamilyRewardPaymentProductCode, "家加分会员", "家加分普通与 VIP家庭+ 套餐", 0, 0, 0));
+        await payment.UpsertCatalogPlanAsync("standard", new UpsertProductPlanRequest(FamilyRewardPaymentProductCode, "standard", "普通用户", 0, "免费，包含家加分全部基础功能", 0, 0, 0, 0, 0));
+        await payment.UpsertCatalogPlanAsync(VipHomePlusPlanCode, new UpsertProductPlanRequest(FamilyRewardPaymentProductCode, VipHomePlusPlanCode, "VIP家庭+", 1, "仅额外提供动态表盘", 0, 0, 990, 0, 0));
+        return Results.Ok(await payment.GetCatalogAsync());
+    }
+    catch (HttpRequestException ex) { return Results.BadRequest(new { error = ex.Message }); }
+    catch (InvalidOperationException ex) { return Results.Problem(ex.Message, statusCode: StatusCodes.Status503ServiceUnavailable); }
+});
+
+app.MapPut("/api/admin/plans/{planCode}/features/{featureCode}", async (string planCode, string featureCode, JsonObject body, HttpRequest request) =>
+{
+    var admin = RequireFamilyRewardAdmin(request);
+    if (admin.Error is not null) return admin.Error;
+    if (!string.Equals(planCode, VipHomePlusPlanCode, StringComparison.OrdinalIgnoreCase)
+        || !string.Equals(featureCode, VipWatchFacesFeatureCode, StringComparison.OrdinalIgnoreCase))
+        return Results.BadRequest(new { error = "当前仅支持配置 VIP家庭+ 的动态表盘权益" });
+    await SetPlanFeature(connectionString, planCode, featureCode, body["enabled"]?.GetValue<bool>() ?? false, admin.Username!);
+    return Results.Ok(new { planCode = VipHomePlusPlanCode, featureCode = VipWatchFacesFeatureCode, enabled = body["enabled"]?.GetValue<bool>() ?? false });
+});
+
+app.MapPut("/api/admin/plans/{planCode}/catalog", async (string planCode, UpsertProductPlanRequest requestBody, IHttpClientFactory httpClientFactory, HttpRequest request) =>
+{
+    var admin = RequireFamilyRewardAdmin(request);
+    if (admin.Error is not null) return admin.Error;
+    if (planCode is not ("standard" or VipHomePlusPlanCode)) return Results.BadRequest(new { error = "无效套餐编号" });
+    try
+    {
+        var updated = await GetFamilyRewardPaymentClient(httpClientFactory).UpsertCatalogPlanAsync(planCode, requestBody with { ProductCode = FamilyRewardPaymentProductCode, Code = planCode });
+        return Results.Ok(updated);
+    }
+    catch (HttpRequestException ex) { return Results.BadRequest(new { error = ex.Message }); }
+    catch (InvalidOperationException ex) { return Results.Problem(ex.Message, statusCode: StatusCodes.Status503ServiceUnavailable); }
+});
 app.MapGet("/watch/icon.svg", () => Results.Content("""
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
       <rect width="512" height="512" rx="96" fill="#16643a"/>
@@ -995,7 +1087,7 @@ app.MapGet("/watch", () =>
                 ? points.toLocaleString('zh-CN', { useGrouping: false, minimumFractionDigits: 0, maximumFractionDigits: 1 })
                 : '0';
             };
-            const faceLabels = { world: '我的世界', hellokitty: 'HelloKitty', starlight: '星光梦可', dinosaur: '恐龙乐园', rainbow: '彩虹糖果', space: '宇宙探险' };
+            const faceLabels = { world: '我的世界', hellokitty: 'HelloKitty', starlight: '星光梦可', dinosaur: '恐龙乐园', rainbow: '彩虹糖果', space: '宇宙探险', meteor: '流星', snow: '雪花', flowers: '花朵', night: '星夜', pixel: '像素乐园' };
             const ruleIcons = ['📚', '✏️', '🪥', '🧹', '🏃', '🤝', '⏰', '🌟'];
             const ruleIcon = (index) => ruleIcons[index % ruleIcons.length];
             const faceCodes = ['world', 'hellokitty', 'starlight', 'dinosaur', 'rainbow', 'space', 'meteor', 'snow', 'flowers', 'night', 'pixel'];
@@ -7033,7 +7125,155 @@ static async Task<(AppUserProfile? Profile, IResult? Error)> RequireParentProfil
     {
         return (null, Results.Json(new { error = "孩子账号只能使用手表端积分查询和积分申请功能", code = "child_forbidden" }, statusCode: StatusCodes.Status403Forbidden));
     }
+    if (!await IsAppUserBusinessActive(connectionString, profile.UnifiedUserId))
+    {
+        return (null, Results.Json(new { error = "该家加分账号已被停用", code = "user_disabled" }, statusCode: StatusCodes.Status403Forbidden));
+    }
     return (profile, null);
+}
+
+static async Task<bool> IsAppUserBusinessActive(string connectionString, string unifiedUserId)
+{
+    await using var conn = await OpenConnection(connectionString);
+    await using var cmd = new NpgsqlCommand("SELECT COALESCE((SELECT status FROM app_user_business_statuses WHERE unified_user_id = @id), 'active')", conn);
+    cmd.Parameters.AddWithValue("id", unifiedUserId);
+    return string.Equals(Convert.ToString(await cmd.ExecuteScalarAsync(), CultureInfo.InvariantCulture), "active", StringComparison.OrdinalIgnoreCase);
+}
+
+static (string? Username, IResult? Error) RequireFamilyRewardAdmin(HttpRequest request)
+{
+    if (!HasUnifiedIdentity(request))
+    {
+        return (null, Results.Json(new { error = "请先登录", code = "login_required" }, statusCode: StatusCodes.Status401Unauthorized));
+    }
+    var username = NormalizeBusinessUserName(GetUnifiedUsername(request));
+    var allowedUsers = (Environment.GetEnvironmentVariable("FAMILY_REWARD_ADMIN_USERS") ?? "")
+        .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+        .Select(NormalizeBusinessUserName)
+        .ToHashSet(StringComparer.OrdinalIgnoreCase);
+    if (allowedUsers.Count == 0)
+    {
+        return (null, Results.Json(new { error = "家加分应用管理员尚未配置", code = "admin_not_configured" }, statusCode: StatusCodes.Status503ServiceUnavailable));
+    }
+    if (!allowedUsers.Contains(username))
+    {
+        return (null, Results.Json(new { error = "当前用户没有家加分应用后台权限", code = "admin_forbidden" }, statusCode: StatusCodes.Status403Forbidden));
+    }
+    return (username, null);
+}
+
+static AgentDashPaymentClient GetFamilyRewardPaymentClient(IHttpClientFactory httpClientFactory)
+{
+    var baseUrl = Environment.GetEnvironmentVariable("PAYMENT_BASE_URL")?.Trim();
+    var appSecret = Environment.GetEnvironmentVariable("PAYMENT_APP_SECRET")?.Trim();
+    if (string.IsNullOrWhiteSpace(baseUrl) || string.IsNullOrWhiteSpace(appSecret))
+        throw new InvalidOperationException("支付中心连接尚未配置");
+    return new AgentDashPaymentClient(httpClientFactory.CreateClient("agent-pay"), new PaymentClientOptions
+    {
+        BaseAddress = new Uri(baseUrl.TrimEnd('/') + "/"),
+        AppId = Environment.GetEnvironmentVariable("PAYMENT_APP_ID")?.Trim() ?? "family-reward",
+        AppSecret = appSecret
+    });
+}
+
+static async Task<List<Dictionary<string, object?>>> GetAppAdminUsers(string connectionString)
+{
+    await using var conn = await OpenConnection(connectionString);
+    await using var cmd = new NpgsqlCommand("""
+        SELECT aup.unified_user_id, aup.username, aup.channel, aup.role, aup.app_user_id,
+               COALESCE(bus.status, 'active') AS business_status, COALESCE(bus.reason, '') AS status_reason,
+               COUNT(DISTINCT cub.child_profile_key) AS child_count,
+               COUNT(DISTINCT wdb.id) FILTER (WHERE wdb.revoked_at IS NULL) AS active_device_count,
+               MAX(sub.expires_at) FILTER (WHERE sub.status = 'active') AS subscription_expires_at,
+               MAX(sub.plan_code) FILTER (WHERE sub.status = 'active') AS subscription_plan_code
+        FROM app_user_profiles aup
+        LEFT JOIN app_user_business_statuses bus ON bus.unified_user_id = aup.unified_user_id
+        LEFT JOIN child_user_bindings cub ON cub.parent_app_user_id = aup.app_user_id
+        LEFT JOIN watch_device_bindings wdb ON wdb.parent_app_user_id = aup.app_user_id
+        LEFT JOIN app_user_subscriptions sub ON sub.unified_user_id = aup.unified_user_id
+          AND sub.product_code = @product_code AND sub.expires_at > CURRENT_TIMESTAMP
+        GROUP BY aup.unified_user_id, aup.username, aup.channel, aup.role, aup.app_user_id, bus.status, bus.reason
+        ORDER BY aup.updated_at DESC
+        """, conn);
+    cmd.Parameters.AddWithValue("product_code", FamilyRewardPaymentProductCode);
+    var users = new List<Dictionary<string, object?>>();
+    await using var reader = await cmd.ExecuteReaderAsync();
+    while (await reader.ReadAsync())
+    {
+        users.Add(new Dictionary<string, object?>
+        {
+            ["unifiedUserId"] = reader.String("unified_user_id"), ["username"] = reader.String("username"),
+            ["channel"] = reader.String("channel"), ["role"] = reader.String("role"), ["appUserId"] = reader.String("app_user_id"),
+            ["status"] = reader.String("business_status"), ["reason"] = reader.String("status_reason"),
+            ["childCount"] = Convert.ToInt32(reader.GetInt64(reader.GetOrdinal("child_count")), CultureInfo.InvariantCulture),
+            ["activeDeviceCount"] = Convert.ToInt32(reader.GetInt64(reader.GetOrdinal("active_device_count")), CultureInfo.InvariantCulture),
+            ["subscriptionPlanCode"] = reader.IsDBNull(reader.GetOrdinal("subscription_plan_code")) ? null : reader.String("subscription_plan_code"),
+            ["subscriptionExpiresAt"] = reader.IsDBNull(reader.GetOrdinal("subscription_expires_at")) ? null : reader.GetDateTime(reader.GetOrdinal("subscription_expires_at")).ToString("O")
+        });
+    }
+    return users;
+}
+
+static async Task<bool> UpdateAppUserBusinessStatus(string connectionString, string unifiedUserId, string status, string reason, string actor)
+{
+    await using var conn = await OpenConnection(connectionString);
+    await using var tx = await conn.BeginTransactionAsync();
+    await using (var exists = new NpgsqlCommand("SELECT COUNT(*) FROM app_user_profiles WHERE unified_user_id = @id", conn, tx))
+    {
+        exists.Parameters.AddWithValue("id", unifiedUserId);
+        if (Convert.ToInt32(await exists.ExecuteScalarAsync(), CultureInfo.InvariantCulture) == 0) return false;
+    }
+    await using (var update = new NpgsqlCommand("""
+        INSERT INTO app_user_business_statuses (unified_user_id, status, reason, updated_by)
+        VALUES (@id, @status, @reason, @actor)
+        ON CONFLICT (unified_user_id) DO UPDATE SET status = @status, reason = @reason, updated_by = @actor, updated_at = CURRENT_TIMESTAMP
+        """, conn, tx))
+    {
+        update.Parameters.AddWithValue("id", unifiedUserId); update.Parameters.AddWithValue("status", status);
+        update.Parameters.AddWithValue("reason", LimitText(reason, 500)); update.Parameters.AddWithValue("actor", actor);
+        await update.ExecuteNonQueryAsync();
+    }
+    if (status == "disabled")
+    {
+        await using var revoke = new NpgsqlCommand("""
+            UPDATE watch_device_bindings SET revoked_at = CURRENT_TIMESTAMP
+            WHERE revoked_at IS NULL AND parent_app_user_id IN (SELECT app_user_id FROM app_user_profiles WHERE unified_user_id = @id)
+            """, conn, tx);
+        revoke.Parameters.AddWithValue("id", unifiedUserId);
+        await revoke.ExecuteNonQueryAsync();
+    }
+    await using (var audit = new NpgsqlCommand("INSERT INTO app_admin_audit_events (actor_unified_user_id, action, target, detail_json) VALUES (@actor, 'user-status', @target, @detail::jsonb)", conn, tx))
+    {
+        audit.Parameters.AddWithValue("actor", actor); audit.Parameters.AddWithValue("target", unifiedUserId);
+        audit.Parameters.AddWithValue("detail", JsonSerializer.Serialize(new { status, reason = LimitText(reason, 500) }));
+        await audit.ExecuteNonQueryAsync();
+    }
+    await tx.CommitAsync();
+    return true;
+}
+
+static async Task<List<Dictionary<string, object?>>> GetPlanFeatures(string connectionString)
+{
+    await using var conn = await OpenConnection(connectionString);
+    await using var cmd = new NpgsqlCommand("SELECT plan_code, feature_code, enabled, updated_by, updated_at FROM subscription_plan_features WHERE product_code = @code ORDER BY plan_code, feature_code", conn);
+    cmd.Parameters.AddWithValue("code", FamilyRewardPaymentProductCode);
+    var result = new List<Dictionary<string, object?>>();
+    await using var reader = await cmd.ExecuteReaderAsync();
+    while (await reader.ReadAsync()) result.Add(new Dictionary<string, object?> { ["planCode"] = reader.String("plan_code"), ["featureCode"] = reader.String("feature_code"), ["enabled"] = reader.GetBoolean(reader.GetOrdinal("enabled")), ["updatedBy"] = reader.String("updated_by"), ["updatedAt"] = reader.GetDateTime(reader.GetOrdinal("updated_at")).ToString("O") });
+    return result;
+}
+
+static async Task SetPlanFeature(string connectionString, string planCode, string featureCode, bool enabled, string actor)
+{
+    await using var conn = await OpenConnection(connectionString);
+    await using var cmd = new NpgsqlCommand("""
+        INSERT INTO subscription_plan_features (product_code, plan_code, feature_code, enabled, updated_by)
+        VALUES (@product_code, @plan_code, @feature_code, @enabled, @actor)
+        ON CONFLICT (product_code, plan_code, feature_code) DO UPDATE SET enabled = @enabled, updated_by = @actor, updated_at = CURRENT_TIMESTAMP
+        """, conn);
+    cmd.Parameters.AddWithValue("product_code", FamilyRewardPaymentProductCode); cmd.Parameters.AddWithValue("plan_code", planCode);
+    cmd.Parameters.AddWithValue("feature_code", featureCode); cmd.Parameters.AddWithValue("enabled", enabled); cmd.Parameters.AddWithValue("actor", actor);
+    await cmd.ExecuteNonQueryAsync();
 }
 
 static async Task<AppUserProfile> GetOrCreateAppUserProfile(

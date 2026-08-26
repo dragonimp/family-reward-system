@@ -16,6 +16,7 @@ const manageItems = [
   { path: '/rules', label: '规则管理', icon: '📋' },
   { path: '/settings', label: '系统设置', icon: '⚙️' },
   { path: '/xiaotiancai-device-test', label: '真机测试申请', icon: '⌚' },
+  { path: '/admin', label: '应用后台', icon: '🛠️' },
 ];
 
 const mobileNavItems = [...navItems, ...manageItems];

@@ -86,3 +86,12 @@ export const sendXiaotiancaiDeviceTestApplication = (data: {
   expectedApkSha256: string;
   expectedReportSha256: string;
 }) => http.post<unknown, XiaotiancaiDeviceTestEmailSubmission>('/api/xiaotiancai/device-test-application/send', data);
+
+export interface AdminUser { unifiedUserId: string; username: string; channel: string; role: string; status: string; childCount: number; activeDeviceCount: number; subscriptionPlanCode?: string | null; }
+export interface AdminPlanFeature { planCode: string; featureCode: string; enabled: boolean; }
+export interface AdminPlanPayload { catalog: unknown; features: AdminPlanFeature[]; onlyVipFeature: string; }
+export const getAdminUsers = () => http.get<unknown, { users: AdminUser[] }>('/api/admin/users');
+export const setAdminUserStatus = (id: string, data: { status: 'active' | 'disabled'; reason?: string }) => http.put(`/api/admin/users/${encodeURIComponent(id)}/status`, data);
+export const getAdminPlans = () => http.get<unknown, AdminPlanPayload>('/api/admin/plans');
+export const setAdminPlanFeature = (planCode: string, featureCode: string, enabled: boolean) => http.put(`/api/admin/plans/${planCode}/features/${featureCode}`, { enabled });
+export const bootstrapAdminCatalog = () => http.post('/api/admin/catalog/bootstrap', {});
