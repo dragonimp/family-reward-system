@@ -6,6 +6,17 @@ API_BASE="${FAMILY_REWARD_TEST_API_BASE:-http://127.0.0.1:5118}"
 SUFFIX="${REQ023_TEST_SUFFIX:-$(date +%s)-$$}"
 PARENT_A="req023-parent-a-${SUFFIX}"
 PARENT_B="req023-parent-b-${SUFFIX}"
+group_a_id=""
+group_b_id=""
+cleanup_group_ids_a=""
+cleanup_group_ids_b=""
+
+cleanup() {
+  set +e
+  for group_id in $cleanup_group_ids_a; do api "$PARENT_A" -X DELETE "$API_BASE/api/family-groups/$group_id" >/dev/null; done
+  for group_id in $cleanup_group_ids_b; do api "$PARENT_B" -X DELETE "$API_BASE/api/family-groups/$group_id" >/dev/null; done
+}
+trap cleanup EXIT
 
 api() {
   local parent="$1"
@@ -31,12 +42,19 @@ assert_http_400() {
   test "$status" = "400"
 }
 
+# A new parent profile receives an empty default family group.  Record it
+# alongside the test groups so an integration run leaves no synthetic data.
+cleanup_group_ids_a="$(api "$PARENT_A" "$API_BASE/api/family-groups" | jq -r '.[].id')"
+cleanup_group_ids_b="$(api "$PARENT_B" "$API_BASE/api/family-groups" | jq -r '.[].id')"
+
 group_a="$(api "$PARENT_A" -H 'Content-Type: application/json' \
   -d "{\"name\":\"REQ023-A-${SUFFIX}\"}" "$API_BASE/api/family-groups")"
 group_b="$(api "$PARENT_B" -H 'Content-Type: application/json' \
   -d "{\"name\":\"REQ023-B-${SUFFIX}\"}" "$API_BASE/api/family-groups")"
 group_a_id="$(jq -er '.id' <<<"$group_a")"
 group_b_id="$(jq -er '.id' <<<"$group_b")"
+cleanup_group_ids_a="$cleanup_group_ids_a $group_a_id"
+cleanup_group_ids_b="$cleanup_group_ids_b $group_b_id"
 
 child_a="$(api "$PARENT_A" -H 'Content-Type: application/json' \
   -d "{\"name\":\"小明-${SUFFIX}\",\"familyGroupId\":${group_a_id}}" "$API_BASE/api/children")"
