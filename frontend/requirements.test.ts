@@ -176,6 +176,17 @@ test('REQ-034 adds child-friendly watch navigation, icons, leaderboard and faces
   for (const face of ['dinosaur', 'rainbow', 'space']) assert.match(api, new RegExp(`data-face="${face}"`));
 });
 
+test('REQ-062 keeps VIP watch-face animation decorative and accessible', async () => {
+  const api = await readFile(new URL('../FamilyReward.Api/Program.cs', import.meta.url), 'utf8');
+  for (const face of ['meteor', 'snow', 'flowers', 'night', 'pixel']) {
+    assert.match(api, new RegExp(`face-${face}:after`));
+  }
+  assert.match(api, /@keyframes vip-meteor/);
+  assert.match(api, /@keyframes vip-snow/);
+  assert.match(api, /@media\(prefers-reduced-motion:reduce\).*animation:none/);
+  assert.match(api, /pointer-events:none/);
+});
+
 test('REQ-036 scopes personal rule templates to a parent across web, watch and MCP', async () => {
   const [api, page] = await Promise.all([
     readFile(new URL('../FamilyReward.Api/Program.cs', import.meta.url), 'utf8'),
