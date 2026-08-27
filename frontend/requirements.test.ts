@@ -158,6 +158,14 @@ test('REQ-033 streams mobile family agent responses without waiting for the full
   assert.match(deploy, /--exclude system_config\.json/);
 });
 
+test('family reward registers its assistant in the shared feedback dock', async () => {
+  const widget = await readFile(new URL('./src/components/PublicFeedbackWidget.tsx', import.meta.url), 'utf8');
+  assert.match(widget, /launcherEntries/);
+  assert.match(widget, /family-reward-assistant/);
+  assert.match(widget, /to: '\/assistant'/);
+  assert.match(widget, /floating-dock-v2/);
+});
+
 test('REQ-034 adds child-friendly watch navigation, icons, leaderboard and faces', async () => {
   const api = await readFile(new URL('../FamilyReward.Api/Program.cs', import.meta.url), 'utf8');
   assert.match(api, /id="home-menu"/);

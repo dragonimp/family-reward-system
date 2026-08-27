@@ -17,6 +17,12 @@ interface PublicFeedbackConfig {
     email: string;
     phone: string;
   } | null;
+  launcherEntries: Array<{
+    id: string;
+    label: string;
+    icon: string;
+    open: { type: 'route'; to: string };
+  }>;
 }
 
 declare global {
@@ -26,7 +32,7 @@ declare global {
 }
 
 const PUBLIC_WIDGET_ID = 'atlas-public-feedback-widget';
-const PUBLIC_WIDGET_URL = 'https://auth.ai.xmkurt.com/feedback-widget.js?v=same-origin-submit-v1';
+const PUBLIC_WIDGET_URL = 'https://auth.ai.xmkurt.com/feedback-widget.js?v=floating-dock-v2';
 
 export default function PublicFeedbackWidget() {
   const { user } = useAuth();
@@ -45,6 +51,12 @@ export default function PublicFeedbackWidget() {
       clientId: 'happylife.ai',
       endpoint: '/api/feedback',
       sourceApp: '家加分',
+      launcherEntries: [{
+        id: 'family-reward-assistant',
+        label: '智能对话',
+        icon: '✦',
+        open: { type: 'route', to: '/assistant' },
+      }],
       currentUser: user ? {
         id: user.userId || user.id || '',
         username: user.username,
