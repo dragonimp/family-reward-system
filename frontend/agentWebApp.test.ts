@@ -28,6 +28,10 @@ test('mobile assistant reuses the complete AgentFree WebApp chat surface', async
   assert.match(api, /getSessions = \(gatewayType\?: string, user\?: string, agentId\?: number, limit\?: number\)/);
   assert.match(api, /agentId: agentId \|\| undefined,[\s\S]*limit: limit \|\| undefined,[\s\S]*webAppBotId: getWebAppBotId\(\)/);
   assert.match(api, /readCurrentAppProfile/);
+  assert.match(api, /AGENTFREE_REQUEST_TIMEOUT_MS = 10 \* 60 \* 1000/);
+  assert.match(api, /function agentFreeRequestConfig/);
+  assert.match(api, /timeout: AGENTFREE_REQUEST_TIMEOUT_MS/);
+  assert.match(api, /respondInteraction[\s\S]*agentFreeRequestConfig\(\)/);
   assert.match(api, /'X-App-User-Id': appProfile\.appUserId/);
   assert.match(api, /'X-App-User-Role': appProfile\.role/);
   assert.match(api, /headers:\s*\{\s*'Content-Type': 'application\/json',\s*\.\.\.authHeaders\(\)/s);
