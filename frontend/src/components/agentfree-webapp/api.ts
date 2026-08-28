@@ -13,6 +13,10 @@ type AgentFreeWebAppUser = {
 } | null
 
 export const WEB_APP_BOT_ID = ''
+// Agent turns and interaction callbacks can legitimately take longer than the
+// application's 10-second default HTTP deadline. Keep the adapter aligned with
+// the backend Orbit client instead of aborting a healthy conversation early.
+export const AGENTFREE_REQUEST_TIMEOUT_MS = 10 * 60 * 1000
 let explicitCurrentUser: AgentFreeWebAppUser = null
 let explicitWebAppBotId = ''
 
@@ -48,6 +52,14 @@ function authHeaders() {
   }
 }
 
+function agentFreeRequestConfig(params?: Record<string, unknown>) {
+  return {
+    headers: authHeaders(),
+    timeout: AGENTFREE_REQUEST_TIMEOUT_MS,
+    ...(params ? { params } : {}),
+  }
+}
+
 export const getAgents = (
   authorizedOnly = false,
   gatewayType?: string,
@@ -55,47 +67,47 @@ export const getAgents = (
   ownedOnly = false,
   webAppBotId?: string,
 ) => wrap(http.get<unknown, Agent[]>('/api/agentfree/agents', {
-  headers: authHeaders(),
-  params: {
+  ...agentFreeRequestConfig({
     authorizedOnly: authorizedOnly || undefined,
     gatewayType: gatewayType && gatewayType !== 'All' ? gatewayType : undefined,
     user: user || undefined,
     ownedOnly: ownedOnly || undefined,
     webAppBotId: webAppBotId || getWebAppBotId(),
-  },
+  }),
 }))
 
 export const getSessions = (gatewayType?: string, user?: string, agentId?: number, limit?: number) => wrap(http.get<unknown, Session[]>('/api/agentfree/sessions', {
-  headers: authHeaders(),
-  params: {
+  ...agentFreeRequestConfig({
     gatewayType: gatewayType && gatewayType !== 'All' ? gatewayType : undefined,
     user: user || undefined,
     agentId: agentId || undefined,
     limit: limit || undefined,
     webAppBotId: getWebAppBotId(),
-  },
+  }),
 }))
 
-export const getSession = (id: string) => wrap(http.get<unknown, Session>(`/api/agentfree/sessions/${encodeURIComponent(id)}`, {
-  headers: authHeaders(),
-}))
+export const getSession = (id: string) =>
+  wrap(http.get<unknown, Session>(`/api/agentfree/sessions/${encodeURIComponent(id)}`, agentFreeRequestConfig()))
 
 export const getMessages = (sessionId: string, params?: { take?: number; beforeId?: number; ids?: string }) =>
-  wrap(http.get<unknown, ChatMessage[]>(`/api/agentfree/sessions/${encodeURIComponent(sessionId)}/messages`, {
-    headers: authHeaders(),
-    params,
-  }))
+  wrap(http.get<unknown, ChatMessage[]>(
+    `/api/agentfree/sessions/${encodeURIComponent(sessionId)}/messages`,
+    agentFreeRequestConfig(params),
+  ))
 
 export const getSessionTimeline = (
   sessionId: string,
   params?: { turnId?: string; eventType?: string; includePayload?: boolean; take?: number },
-) => wrap(http.get<unknown, GatewayConversationEvent[]>(`/api/agentfree/sessions/${encodeURIComponent(sessionId)}/timeline`, {
-  headers: authHeaders(),
-  params,
-}))
+) => wrap(http.get<unknown, GatewayConversationEvent[]>(
+  `/api/agentfree/sessions/${encodeURIComponent(sessionId)}/timeline`,
+  agentFreeRequestConfig(params),
+))
 
 export const getSessionQueue = (sessionId: string) =>
-  wrap(http.get<unknown, unknown>(`/api/agentfree/sessions/${encodeURIComponent(sessionId)}/queue`, { headers: authHeaders() }))
+  wrap(http.get<unknown, unknown>(
+    `/api/agentfree/sessions/${encodeURIComponent(sessionId)}/queue`,
+    agentFreeRequestConfig(),
+  ))
 
 export const getStudioAgents = (_params?: { mine?: boolean }): AxiosLike<StudioAgent[]> => Promise.resolve({ data: [] })
 
@@ -103,18 +115,30 @@ export const createSession = (data: { agentId: number; name?: string; webAppBotI
   wrap(http.post<unknown, Session>('/api/agentfree/sessions', {
     ...data,
     webAppBotId: data.webAppBotId || getWebAppBotId(),
-  }, { headers: authHeaders() }))
+  }, agentFreeRequestConfig()))
 
 export const updateSession = (id: string, data: { name?: string; isArchived?: boolean }) =>
-  wrap(http.put<unknown, unknown>(`/api/agentfree/sessions/${encodeURIComponent(id)}`, data, { headers: authHeaders() }))
+  wrap(http.put<unknown, unknown>(
+    `/api/agentfree/sessions/${encodeURIComponent(id)}`,
+    data,
+    agentFreeRequestConfig(),
+  ))
 
 export const archiveSession = (id: string) => updateSession(id, { isArchived: true })
 
 export const resetSessionContext = (id: string) =>
-  wrap(http.post<unknown, unknown>(`/api/agentfree/chat/sessions/${encodeURIComponent(id)}/reset`, undefined, { headers: authHeaders() }))
+  wrap(http.post<unknown, unknown>(
+    `/api/agentfree/chat/sessions/${encodeURIComponent(id)}/reset`,
+    undefined,
+    agentFreeRequestConfig(),
+  ))
 
 export const respondInteraction = (data: Record<string, unknown> & { interactionId: string }) =>
-  wrap(http.post<unknown, { message: string }>(`/api/agentfree/interactions/${encodeURIComponent(data.interactionId)}/respond`, data, { headers: authHeaders() }))
+  wrap(http.post<unknown, { message: string }>(
+    `/api/agentfree/interactions/${encodeURIComponent(data.interactionId)}/respond`,
+    data,
+    agentFreeRequestConfig(),
+  ))
 
 export function streamChat(streamRequest: {
   sessionId: string
