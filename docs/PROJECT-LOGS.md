@@ -1,5 +1,10 @@
 # 家加分 - 进展日志
 
+## [2026-08-30] family-reward-REQ-065 方形手表表盘需求分析
+- Orbit：`gpt_ce5e25fd21f04e458f84c8dd5231f455`；需求：`family-reward-REQ-065`（`603eb8b0-b06f-48f4-a9ee-88c47b24d634`）；分析任务：`family-reward-TASK-240`。
+- 新增 `docs/REQ-065-ANALYSIS.md`，确认 REQ-065 与 REQ-063、REQ-066 的目标、终端范围和功能点相同，应选择一个主需求并只实施一套响应式方形 `/watch` 页面。
+- 当前外框和内描边仍为圆形，华为/小米目标设备矩阵尚未建立；`TASK-240` 可凭分析文档和对应提交关闭，REQ-065 只能在确认为重复项时按重复关闭，不能视为方形表盘已交付。
+
 ## [2026-08-28] family-reward-REQ-062 VIP 表盘动画测试用例设计
 - Orbit：`gpt_628da64994dc47f3b988976505cffc78`；需求：`family-reward-REQ-062`（`2af86812-fa22-4e91-b9c2-f97cd59fda5a`）；测试设计任务：`family-reward-TASK-231`（`d06b3ba5-6f62-46eb-a14b-6f54a823537b`）；功能点：`245414ae-7163-46af-82bb-1bb73cf9a63b`。
 - 新增 `docs/publishing/xiaotiancai/13-req-062-static-test-cases.md`，建立九条需求—功能点—用例追踪，覆盖五款 VIP 动画、VIP/非 VIP 权益隔离、表盘切换、积分/时间刷新、五组窄屏视口、减少动态效果、弱网回退、点击可达性和无业务写入副作用。
