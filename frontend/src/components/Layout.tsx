@@ -8,6 +8,8 @@ import MobileAssistantBar from './MobileAssistantBar';
 const navItems = [
   { path: '/dashboard', label: '仪表盘', icon: '📊' },
   { path: '/reward', label: '积分操作', icon: '⭐' },
+  { path: '/growth', label: '共同成长', icon: '💛' },
+  { path: '/stats', label: '成长趋势', icon: '🌱' },
 ];
 
 const manageItems = [

@@ -12,11 +12,13 @@ import {
   generateChildAuthCode,
   getChildFriendNotifications,
   getChildFriends,
+  getChildGrowthSettings,
   getChildWatchDevices,
   getHouseholdMembers,
   markChildFriendNotificationRead,
   revokeChildWatchDevice,
   updateHouseholdMember,
+  updateChildGrowthSettings,
   generateWatchDeviceUnbindCode,
 } from '../services';
 
@@ -72,6 +74,7 @@ export default function Children() {
   const [friendLeaderboard, setFriendLeaderboard] = useState<ChildFriend[]>([]);
   const [friendNotifications, setFriendNotifications] = useState<ChildFriendNotification[]>([]);
   const [friendsLoading, setFriendsLoading] = useState(false);
+  const [friendLeaderboardEnabled, setFriendLeaderboardEnabled] = useState(false);
   const [toast, setToast] = useState<{ show: boolean; message: string; type: 'success' | 'error' }>({ show: false, message: '', type: 'success' });
 
   const showToast = (message: string, type: 'success' | 'error' = 'success') => {
@@ -315,16 +318,32 @@ export default function Children() {
     setFriendChild(child);
     setFriends([]);
     setFriendLeaderboard([]);
+    setFriendLeaderboardEnabled(false);
     setFriendsLoading(true);
     try {
-      const result = await getChildFriends(child.id);
+      const familyGroupId = child.familyGroupId ?? child.family_group_id;
+      const [result, settings] = await Promise.all([getChildFriends(child.id), getChildGrowthSettings(child.id, { familyGroupId })]);
       setFriends(result.friends || []);
       setFriendLeaderboard(result.leaderboard || []);
+      setFriendLeaderboardEnabled(Boolean(settings.friendLeaderboardEnabled));
     } catch (error) {
       console.error('好友列表加载失败:', error);
       showToast('好友列表加载失败', 'error');
     } finally {
       setFriendsLoading(false);
+    }
+  };
+
+  const handleFriendLeaderboardToggle = async (enabled: boolean) => {
+    if (!friendChild) return;
+    setFriendLeaderboardEnabled(enabled);
+    try {
+      await updateChildGrowthSettings(friendChild.id, { familyGroupId: friendChild.familyGroupId ?? friendChild.family_group_id, friendLeaderboardEnabled: enabled });
+      showToast(enabled ? '好友排行榜已开启' : '好友排行榜已关闭');
+    } catch (error) {
+      setFriendLeaderboardEnabled(!enabled);
+      console.error('排行榜设置失败:', error);
+      showToast('排行榜设置失败', 'error');
     }
   };
 
@@ -777,8 +796,15 @@ export default function Children() {
             )}
           </div>
 
-          <div>
-            <div className="mb-2 text-sm font-medium text-gray-700">好友积分榜</div>
+          <div className="rounded-xl border border-emerald-100 bg-emerald-50 p-4">
+            <label className="flex items-center justify-between gap-4 text-sm font-medium text-gray-800">
+              <span><span className="block">手表显示好友排行榜</span><span className="mt-1 block text-xs font-normal text-gray-500">默认关闭，鼓励孩子先关注自己的变化</span></span>
+              <input type="checkbox" checked={friendLeaderboardEnabled} onChange={(event) => handleFriendLeaderboardToggle(event.target.checked)} className="h-5 w-5 accent-emerald-600" />
+            </label>
+          </div>
+
+          {friendLeaderboardEnabled && <div>
+            <div className="mb-2 text-sm font-medium text-gray-700">好友积分榜（家长已开启）</div>
             {friendLeaderboard.length === 0 ? (
               <div className="rounded-lg border border-gray-200 py-6 text-center text-sm text-gray-400">暂无排行数据</div>
             ) : (
@@ -796,7 +822,7 @@ export default function Children() {
                 ))}
               </div>
             )}
-          </div>
+          </div>}
         </div>
       </Modal>
     </div>

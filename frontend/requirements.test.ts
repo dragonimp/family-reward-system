@@ -41,6 +41,29 @@ test('REQ-030 exposes one watch menu with six icon destinations and voice fallba
   assert.match(api, /当前手表不支持语音识别，请使用键盘输入/);
 });
 
+test('REQ-067 adds unrated parent warm moments and traceable dual growth reports', async () => {
+  const [api, dashboard, growth, stats] = await Promise.all([
+    readFile(new URL('../FamilyReward.Api/Program.cs', import.meta.url), 'utf8'),
+    readFile(new URL('./src/pages/Dashboard.tsx', import.meta.url), 'utf8'),
+    readFile(new URL('./src/pages/Growth.tsx', import.meta.url), 'utf8'),
+    readFile(new URL('./src/pages/Stats.tsx', import.meta.url), 'utf8'),
+  ]);
+
+  assert.match(api, /CREATE TABLE IF NOT EXISTS parent_warm_moments/);
+  assert.doesNotMatch(api.slice(api.indexOf('CREATE TABLE IF NOT EXISTS parent_warm_moments'), api.indexOf('CREATE INDEX IF NOT EXISTS idx_parent_warm_moments')), /rating|score|good|bad/i);
+  assert.match(api, /data-view="warm-moment"/);
+  assert.match(api, /data-speech-target="warm-content"/);
+  assert.match(api, /friend_leaderboard_enabled BOOLEAN NOT NULL DEFAULT FALSE/);
+  assert.match(api, /CHECK \(period_type IN \('daily', 'weekly', 'monthly'\)\)/);
+  assert.match(api, /source_refs JSONB/);
+  assert.match(api, /generated_by='ai'/);
+  assert.match(dashboard, /今日暖心报告/);
+  assert.match(growth, /做得好的点|report\.praise/);
+  assert.match(growth, /具体记录/);
+  assert.match(stats, /和过去的自己比/);
+  assert.doesNotMatch(stats, /排行榜|孩子积分对比/);
+});
+
 test('Xiaotiancai watch page remains parseable by Android 7.1 and 8.1 WebView', async () => {
   const api = await readFile(new URL('../FamilyReward.Api/Program.cs', import.meta.url), 'utf8');
   const watchPage = api.slice(api.indexOf('app.MapGet("/watch"'), api.indexOf('app.MapPost("/api/children"'));

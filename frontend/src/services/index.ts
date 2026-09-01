@@ -11,6 +11,7 @@ import type {
 } from '../types';
 import type { SystemConfig } from '../types';
 import type { XiaotiancaiDeviceTestEmailPreview, XiaotiancaiDeviceTestEmailSubmission } from '../types';
+import type { ChildGrowthStats, GrowthReport, WarmMoment } from '../types';
 
 export const getFamilyGroups = (params?: { userId?: string }) => http.get<unknown, FamilyGroup[]>('/api/family-groups', { params });
 export const createFamilyGroup = (data: Partial<FamilyGroup>) => http.post<unknown, FamilyGroup>('/api/family-groups', data);
@@ -73,6 +74,16 @@ export const saveRuleTemplate = (ruleIds: number[]) => http.put('/api/rule-templ
 export const getChildStats = (params?: { familyGroupId?: number }) => http.get('/api/stats/dashboard', { params });
 export const getLeaderboard = (params?: { familyGroupId?: number }) => http.get('/api/stats/leaderboard', { params });
 export const getCategoryStats = (params?: { familyGroupId?: number }) => http.get('/api/stats/categories', { params });
+export const getGrowthStats = (params?: { familyGroupId?: number }) =>
+  http.get<unknown, { children: ChildGrowthStats[] }>('/api/stats/growth', { params });
+export const getWarmMoments = (params?: { childId?: number; limit?: number }) =>
+  http.get<unknown, { moments: WarmMoment[] }>('/api/warm-moments', { params });
+export const getGrowthReports = (params: { audience: 'child' | 'parent'; period: 'daily' | 'weekly' | 'monthly'; childId?: number }) =>
+  http.get<unknown, { reports: GrowthReport[] }>('/api/growth-reports', { params });
+export const getChildGrowthSettings = (childId: number, params?: { familyGroupId?: number }) =>
+  http.get<unknown, { friendLeaderboardEnabled: boolean }>(`/api/children/${childId}/growth-settings`, { params });
+export const updateChildGrowthSettings = (childId: number, data: { familyGroupId?: number; friendLeaderboardEnabled: boolean }) =>
+  http.put<unknown, { friendLeaderboardEnabled: boolean }>(`/api/children/${childId}/growth-settings`, data);
 
 export const getSystemConfig = () => http.get<unknown, SystemConfig>('/api/system/config');
 export const updateSystemConfig = (data: SystemConfig) => http.put<unknown, SystemConfig>('/api/system/config', data);

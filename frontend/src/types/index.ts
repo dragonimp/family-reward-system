@@ -17,6 +17,48 @@ export interface Child {
   updatedAt?: string;
 }
 
+export interface WarmMoment {
+  id: number;
+  childId: number;
+  childName: string;
+  parentDisplayName: string;
+  content: string;
+  inputMethod: 'voice' | 'text';
+  createdAt: string;
+}
+
+export interface GrowthSourceRef {
+  type: 'transaction' | 'warmMoment';
+  id: number;
+}
+
+export interface GrowthReport {
+  id: number;
+  subjectName: string;
+  audience: 'child' | 'parent';
+  period: 'daily' | 'weekly' | 'monthly';
+  periodStart: string;
+  periodEnd: string;
+  praise: string;
+  nextStep: string;
+  changeSummary: string;
+  sourceRefs: GrowthSourceRef[];
+  sourceCount: number;
+  generatedBy: string;
+  generatedAt: string;
+}
+
+export interface ChildGrowthStats {
+  childId: number;
+  childName: string;
+  currentWeekRecords: number;
+  previousWeekRecords: number;
+  change: number;
+  activeDays: number;
+  streakDays: number;
+  trend: Array<{ date: string; records: number }>;
+}
+
 export interface ChildAuthCode {
   code: string;
   expiresAt: string;

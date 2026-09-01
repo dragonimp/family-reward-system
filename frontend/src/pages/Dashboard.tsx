@@ -1,9 +1,9 @@
 import { Card } from '../components/Card';
-import type { Child, Transaction } from '../types';
+import type { Child, GrowthReport, Transaction, WarmMoment } from '../types';
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useFamilyGroup } from '../contexts/FamilyGroupContext';
-import { getChildren, getTransactions } from '../services';
+import { getChildren, getGrowthReports, getTransactions, getWarmMoments } from '../services';
 
 interface ChildCardProps {
   child: Child;
@@ -144,15 +144,20 @@ export default function Dashboard() {
   const [transactions, setTransactions] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string>('');
+  const [dailyParentReport, setDailyParentReport] = useState<GrowthReport | null>(null);
+  const [latestWarmMoment, setLatestWarmMoment] = useState<WarmMoment | null>(null);
+  const [showDailyReport, setShowDailyReport] = useState(false);
 
   const loadData = useCallback(async (silent = false) => {
     try {
       if (!silent) setLoading(true);
       setError('');
       
-      const [childrenRes, transactionsRes] = await Promise.all([
+      const [childrenRes, transactionsRes, reportRes, warmRes] = await Promise.all([
         getChildren({ familyGroupId: selectedGroupId ?? undefined }),
         getTransactions({ page: 1, pageSize: 20, familyGroupId: selectedGroupId ?? undefined }),
+        getGrowthReports({ audience: 'parent', period: 'daily' }),
+        getWarmMoments({ limit: 1 }),
       ]);
 
       const ch = Array.isArray(childrenRes) ? childrenRes : childrenRes?.data;
@@ -168,6 +173,13 @@ export default function Dashboard() {
           child_name: t.child_name || t.childName || '',
         }));
         setTransactions(mapped);
+      }
+      const report = reportRes.reports?.[0] || null;
+      setDailyParentReport(report);
+      setLatestWarmMoment(warmRes.moments?.[0] || null);
+      if (report && !silent) {
+        const seenKey = `family-growth-report-seen-${report.id}-${report.generatedAt.slice(0, 10)}`;
+        setShowDailyReport(localStorage.getItem(seenKey) !== '1');
       }
     } catch (err) {
       console.error('加载数据失败:', err);
@@ -214,6 +226,13 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-6">
+      {showDailyReport && dailyParentReport && <div className="fixed inset-0 z-[70] bg-slate-900/45 backdrop-blur-sm flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-label="今日暖心报告">
+        <div className="w-full max-w-lg rounded-3xl bg-white shadow-2xl overflow-hidden">
+          <div className="bg-gradient-to-br from-rose-100 via-amber-50 to-emerald-100 p-6"><p className="text-sm text-rose-600 font-medium">💛 今日暖心报告</p><h3 className="text-xl font-bold text-gray-900 mt-2">一起看见今天的好</h3></div>
+          <div className="p-6 space-y-3 text-sm leading-6"><p>{dailyParentReport.praise}</p><p>{dailyParentReport.nextStep}</p><p>{dailyParentReport.changeSummary}</p><p className="text-xs text-gray-400">依据 {dailyParentReport.sourceCount} 条具体记录整理</p></div>
+          <div className="px-6 pb-6 flex gap-3"><button onClick={() => navigate('/growth')} className="flex-1 rounded-xl bg-emerald-600 text-white py-3 font-medium">查看完整报告</button><button onClick={() => { localStorage.setItem(`family-growth-report-seen-${dailyParentReport.id}-${dailyParentReport.generatedAt.slice(0, 10)}`, '1'); setShowDailyReport(false); }} className="rounded-xl bg-gray-100 px-5 py-3 text-gray-600">今天知道了</button></div>
+        </div>
+      </div>}
       {/* 页面标题 */}
       <div className="flex items-center justify-between">
         <div>
@@ -233,6 +252,14 @@ export default function Dashboard() {
           ⚠️ {error}
         </div>
       )}
+
+      <button onClick={() => navigate('/growth')} className="w-full text-left rounded-3xl border border-rose-100 bg-gradient-to-r from-rose-50 via-amber-50 to-emerald-50 p-5 shadow-sm transition hover:shadow-md">
+        <div className="flex flex-col md:flex-row md:items-center gap-4">
+          <div className="text-4xl">💛</div>
+          <div className="flex-1"><h3 className="text-lg font-bold text-gray-900">家长暖心时刻</h3><p className="mt-1 text-sm text-gray-600">{latestWarmMoment ? `${latestWarmMoment.childName}说：“${latestWarmMoment.content}”` : '孩子可以在手表上用语音记录爸爸妈妈的闪光时刻'}</p>{dailyParentReport && <p className="mt-2 text-xs text-emerald-700">今日报告：{dailyParentReport.changeSummary}</p>}</div>
+          <span className="text-sm font-medium text-rose-600">查看暖心记录与双向报告 →</span>
+        </div>
+      </button>
 
       {/* 孩子卡片 */}
       <div>

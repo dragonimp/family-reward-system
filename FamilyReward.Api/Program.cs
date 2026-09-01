@@ -119,6 +119,8 @@ app.MapAgentIdentityAuthEndpoints();
 
 var connectionString = BuildConnectionString(builder.Configuration);
 await InitDatabase(connectionString);
+var configStore = new SystemConfigStore(connectionString, app.Environment.ContentRootPath);
+await configStore.LoadAsync();
 
 app.MapGet("/health", () => Results.Json(new
 {
@@ -736,6 +738,31 @@ app.MapPut("/api/watch/settings", async (JsonObject body, HttpRequest request) =
     return result.ContainsKey("error") ? Results.BadRequest(result) : Results.Json(result);
 });
 
+app.MapGet("/api/watch/warm-moment-options", async (HttpRequest request) =>
+{
+    var binding = await RequireWatchDeviceBinding(connectionString, request, touch: false);
+    if (binding.Error is not null) return binding.Error;
+    return Results.Json(new { parents = await GetWarmMomentParentOptions(connectionString, binding.Binding!.ParentAppUserId) });
+});
+
+app.MapPost("/api/watch/warm-moments", async (JsonObject body, HttpRequest request) =>
+{
+    var binding = await RequireWatchDeviceBinding(connectionString, request);
+    if (binding.Error is not null) return binding.Error;
+    var result = await CreateWarmMoment(connectionString, binding.Binding!, body);
+    return result.ContainsKey("error") ? Results.BadRequest(result) : Results.Created($"/api/warm-moments/{GetInt(result, "id")}", result);
+});
+
+app.MapGet("/api/watch/growth-report", async (HttpRequest request, IHttpClientFactory httpClientFactory) =>
+{
+    var binding = await RequireWatchDeviceBinding(connectionString, request, touch: false);
+    if (binding.Error is not null) return binding.Error;
+    var period = NormalizeGrowthPeriod(request.Query.String("period"));
+    var report = await EnsureGrowthReport(connectionString, binding.Binding!.ParentAppUserId, binding.Binding.ChildProfileKey, "child", period);
+    report = await TryGenerateAiGrowthReport(connectionString, configStore, httpClientFactory, binding.Binding.ParentAppUserId, report, request.HttpContext.RequestAborted);
+    return Results.Json(new { report });
+});
+
 app.MapGet("/api/watch/friends", async (HttpRequest request) =>
 {
     var binding = await RequireWatchDeviceBinding(connectionString, request);
@@ -826,6 +853,57 @@ app.MapGet("/api/reward-requests", async (HttpRequest request) =>
     var status = request.Query.String("status");
     var result = await GetParentWatchRewardRequests(connectionString, familyGroupId, access.Profile!.AppUserId, status, limit);
     return result.ContainsKey("error") ? Results.BadRequest(result) : Results.Json(result);
+});
+
+app.MapGet("/api/warm-moments", async (HttpRequest request) =>
+{
+    var access = await RequireParentProfile(connectionString, request);
+    if (access.Error is not null) return access.Error;
+    var limit = Math.Clamp(request.Query.Int("limit") ?? 30, 1, 100);
+    var childId = request.Query.Int("childId");
+    return Results.Json(new { moments = await GetWarmMoments(connectionString, access.Profile!.AppUserId, childId, limit) });
+});
+
+app.MapGet("/api/growth-reports", async (HttpRequest request, IHttpClientFactory httpClientFactory) =>
+{
+    var access = await RequireParentProfile(connectionString, request);
+    if (access.Error is not null) return access.Error;
+    var period = NormalizeGrowthPeriod(request.Query.String("period"));
+    var audience = request.Query.String("audience").Equals("parent", StringComparison.OrdinalIgnoreCase) ? "parent" : "child";
+    var childId = request.Query.Int("childId");
+    var reports = await EnsureParentGrowthReports(connectionString, access.Profile!.AppUserId, audience, period, childId);
+    for (var index = 0; index < reports.Count; index++)
+        reports[index] = await TryGenerateAiGrowthReport(connectionString, configStore, httpClientFactory, access.Profile.AppUserId, reports[index], request.HttpContext.RequestAborted);
+    return Results.Json(new { period, audience, reports });
+});
+
+app.MapGet("/api/stats/growth", async (HttpRequest request) =>
+{
+    var access = await RequireParentProfile(connectionString, request);
+    if (access.Error is not null) return access.Error;
+    var familyGroupId = HasFamilyGroupSelector(request) ? await ResolveFamilyGroupId(connectionString, request) : (int?)null;
+    return Results.Json(new { children = await GetSelfGrowthStats(connectionString, access.Profile!.AppUserId, familyGroupId) });
+});
+
+app.MapGet("/api/children/{id:int}/growth-settings", async (int id, HttpRequest request) =>
+{
+    var access = await RequireParentProfile(connectionString, request);
+    if (access.Error is not null) return access.Error;
+    var familyGroupId = await ResolveFamilyGroupId(connectionString, request);
+    var child = await GetParentOwnedChild(connectionString, id, familyGroupId, access.Profile!.AppUserId);
+    if (child is null) return Results.NotFound(new { error = "未找到孩子" });
+    return Results.Json(await GetWatchSettings(connectionString, Convert.ToString(child["profileKey"], CultureInfo.InvariantCulture) ?? $"child-{id}", access.Profile.AppUserId));
+});
+
+app.MapPut("/api/children/{id:int}/growth-settings", async (int id, JsonObject body, HttpRequest request) =>
+{
+    var access = await RequireParentProfile(connectionString, request);
+    if (access.Error is not null) return access.Error;
+    var familyGroupId = await ResolveFamilyGroupId(connectionString, request, body);
+    var child = await GetParentOwnedChild(connectionString, id, familyGroupId, access.Profile!.AppUserId);
+    if (child is null) return Results.NotFound(new { error = "未找到孩子" });
+    var profileKey = Convert.ToString(child["profileKey"], CultureInfo.InvariantCulture) ?? $"child-{id}";
+    return Results.Json(await UpdateFriendLeaderboardSetting(connectionString, profileKey, body.Bool("friendLeaderboardEnabled")));
 });
 
 app.MapPost("/api/reward-requests/{id:int}/approve", async (int id, JsonObject body, HttpRequest request) =>
@@ -979,8 +1057,8 @@ app.MapGet("/watch", () =>
             .panel[data-panel=menu]{height:auto;overflow:hidden;padding:0}
             .panel h1,.panel h2{margin:0 0 8px;text-align:center;font-size:18px;line-height:1.1}.bind-title{font-size:20px;font-weight:900}.bind-sub{margin:5px 0 10px;color:#65736b;font-size:12px}.rules{display:grid;gap:6px}
             .menu-header{display:grid;grid-template-columns:30px 1fr 30px;align-items:center;margin-bottom:7px}.menu-header h2{grid-column:2;margin:0}.home-menu{display:grid;place-items:center;width:28px;height:28px;border:1px solid #c9dbcf;border-radius:8px;background:#fff;color:#17613a;font-size:16px}.menu-groups{display:grid;gap:7px}.menu-group-title{margin:0 0 3px;color:#526258;font-size:10px;font-weight:900}.menu-grid{display:grid;grid-template-columns:1fr 1fr;gap:5px}.menu-card{display:grid;grid-template-columns:26px 1fr;align-items:center;min-height:42px;border:1px solid #d5e0d9;border-radius:8px;background:rgba(255,255,255,.94);padding:5px;color:#17231b;text-align:left}.menu-icon{display:grid;place-items:center;width:24px;height:24px;border-radius:7px;background:#e7f2eb;font-size:15px}.menu-card span:last-child{font-size:10px;font-weight:900;line-height:1.15}.back-menu{display:inline-flex;align-items:center;gap:3px;margin:0 0 6px;border:0;background:transparent;color:#17613a;padding:2px 0;font-size:11px;font-weight:900}.rule-btn{display:grid;grid-template-columns:24px 1fr auto;align-items:center;gap:6px;width:100%;min-height:36px;border:1px solid #d3ded7;border-radius:8px;background:#fff;color:#17231b;padding:5px 7px;font-size:11px;text-align:left}.rule-icon{display:grid;place-items:center;width:22px;height:22px;border-radius:6px;background:#eef5f0}.rule-btn span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.rule-btn b{color:#0c6f3b;white-space:nowrap}.input-action{display:grid;grid-template-columns:1fr auto;gap:5px;align-items:center}.voice-btn{display:grid;place-items:center;width:34px;height:34px;border:1px solid #bfd2c5;border-radius:8px;background:#edf6f0;color:#155c37;font-size:16px}.voice-btn.listening{background:#155c37;color:#fff}.detail-metrics{display:grid;grid-template-columns:repeat(3,1fr);gap:4px;margin-bottom:8px}.detail-metric{border:1px solid #dce6df;border-radius:8px;background:rgba(255,255,255,.92);padding:6px 2px;text-align:center}.detail-metric b{display:block;color:#0c6f3b;font-size:15px}.detail-metric span{font-size:9px;color:#65736b}
-            label{display:block;margin:7px 0 3px;color:#44544a;font-size:11px;font-weight:700}input,textarea{width:100%;border:1px solid #cbd8cf;border-radius:8px;background:#fff;color:#17231b;padding:7px;font-size:14px}textarea{min-height:44px;resize:none}.submit,.ghost{width:100%;margin-top:8px;border:0;border-radius:8px;padding:9px;font-size:14px;font-weight:900}.submit{background:#1f7a48;color:#fff}.ghost{background:#e7efe9;color:#17462c}.msg{min-height:16px;margin:6px 0 0;text-align:center;color:#16643a;font-size:11px}
-            .requests{list-style:none;margin:0;padding:0;display:grid;gap:5px}.requests li{display:grid;grid-template-columns:1fr auto;gap:6px;border-top:1px solid #e3ebe6;padding-top:5px;color:#25362c;font-size:11px}.requests span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.requests b{color:#71601b;white-space:nowrap}.empty,.empty-row{color:#64746a;text-align:center;font-size:12px}.code{text-align:center;letter-spacing:3px;font-size:22px;font-weight:900;text-transform:uppercase}.hidden{display:none!important}
+            label{display:block;margin:7px 0 3px;color:#44544a;font-size:11px;font-weight:700}input,textarea,select{width:100%;border:1px solid #cbd8cf;border-radius:8px;background:#fff;color:#17231b;padding:7px;font-size:14px}textarea{min-height:44px;resize:none}.submit,.ghost{width:100%;margin-top:8px;border:0;border-radius:8px;padding:9px;font-size:14px;font-weight:900}.submit{background:#1f7a48;color:#fff}.ghost{background:#e7efe9;color:#17462c}.msg{min-height:16px;margin:6px 0 0;text-align:center;color:#16643a;font-size:11px}
+            .requests{list-style:none;margin:0;padding:0;display:grid;gap:5px}.requests li{display:grid;grid-template-columns:1fr auto;gap:6px;border-top:1px solid #e3ebe6;padding-top:5px;color:#25362c;font-size:11px}.requests span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.requests b{color:#71601b;white-space:nowrap}.empty,.empty-row{color:#64746a;text-align:center;font-size:12px}.code{text-align:center;letter-spacing:3px;font-size:22px;font-weight:900;text-transform:uppercase}.hidden{display:none!important}.warm-shortcut{width:100%;margin-top:6px;border:1px solid #f2cfd7;border-radius:9px;background:#fff1f5;color:#8b3650;padding:6px;font-size:11px;font-weight:900}.report-card{display:grid;gap:6px;border:1px solid #dce7df;border-radius:9px;background:#fff;padding:8px;font-size:11px;line-height:1.4}.report-card b{color:#16643a}.report-card p{margin:0}.source-note{color:#6b776f;font-size:10px}
             .friend-code{margin:5px 0;border:1px solid #cfe1d4;border-radius:8px;background:#fff;padding:8px;text-align:center}.friend-code b{display:block;color:#102019;font-size:22px;letter-spacing:3px}.friend-code span{display:block;margin-top:2px;color:#637268;font-size:10px}.compact-list{list-style:none;margin:0;padding:0;display:grid;gap:5px}.compact-list li{display:grid;grid-template-columns:auto 1fr auto;gap:5px;align-items:center;border:1px solid #e0e9e3;border-radius:8px;background:rgba(255,255,255,.9);padding:5px 6px;font-size:11px}.compact-list li.empty-row{display:block;text-align:center}.compact-list em{font-style:normal;font-weight:900;color:#5e6a63}.compact-list span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.compact-list b{color:#0c6f3b;white-space:nowrap}.leaderboard-banner{margin:0 0 6px;border:1px solid #e6c856;border-radius:8px;background:#fff7ca;padding:6px;text-align:center;color:#765817;font-size:11px;font-weight:900}.leaderboard-list li{min-height:34px;border-color:#d8dfc2;background:#fffdf2}.leaderboard-list li:first-child{border-color:#e5b72f;background:#fff2ad}.leaderboard-list li:nth-child(2){border-color:#b9c3c7;background:#f3f6f7}.leaderboard-list li:nth-child(3){border-color:#d29b6c;background:#fff0e2}.rank-icon{display:grid;place-items:center;width:24px;height:24px;font-size:17px}.face-grid{display:grid;gap:6px}.face-option{display:flex;align-items:center;justify-content:space-between;width:100%;border:1px solid #d8e4dc;border-radius:8px;background:#fff;padding:7px;color:#17231b;font-size:12px;font-weight:900}.face-option.active{border-color:#1f7a48;background:#e7f5ec;color:#0c6f3b}.face-swatch{width:22px;height:22px;border-radius:50%;border:1px solid #becdc4}.swatch-world{background:linear-gradient(135deg,#b9e0b3 0 45%,#f6f0d3 45% 65%,#96c66d 65%)}.swatch-hellokitty{background:linear-gradient(145deg,#ffeaf3,#ffd7e8)}.swatch-starlight{background:linear-gradient(145deg,#10233b,#8bd0d4)}.swatch-dinosaur{background:linear-gradient(145deg,#d7f3cb,#3d8655)}.swatch-rainbow{background:linear-gradient(145deg,#ff9cab,#ffd56a,#76c8f2,#bca2ee)}.swatch-space{background:linear-gradient(145deg,#10142f,#145f7a)}
             @media(max-width:260px),(max-height:260px){.panel h1,.panel h2{font-size:16px}.rules{gap:4px}input,textarea{font-size:13px;padding:6px}}
             @media(prefers-reduced-motion:reduce){.panel{will-change:auto}.watch-face.face-meteor:after,.watch-face.face-snow:after,.watch-face.face-flowers:after,.watch-face.face-night:after,.watch-face.face-pixel:after{animation:none}}
@@ -1013,6 +1091,7 @@ app.MapGet("/watch", () =>
                       <div class="metric"><b id="cash">0</b><span>现金</span></div>
                       <div class="metric"><b id="items">0</b><span>物品</span></div>
                     </div>
+                    <button class="warm-shortcut" type="button" data-view="warm-moment">💛 记录爸爸妈妈的闪光时刻</button>
                   </div>
                   <div class="panel" data-panel="menu">
                     <div class="menu-header"><button class="home-menu" id="home-menu" type="button" aria-label="返回首页">⌂</button><h2>功能菜单</h2></div>
@@ -1023,7 +1102,11 @@ app.MapGet("/watch", () =>
                       </div></div>
                       <div><p class="menu-group-title">好友</p><div class="menu-grid">
                         <button class="menu-card" type="button" data-view="friend-add"><span class="menu-icon">👥</span><span>添加好友</span></button>
-                        <button class="menu-card" type="button" data-view="leaderboard"><span class="menu-icon">🏆</span><span>排行榜</span></button>
+                        <button class="menu-card hidden" id="leaderboard-menu" type="button" data-view="leaderboard"><span class="menu-icon">🏆</span><span>排行榜</span></button>
+                      </div></div>
+                      <div><p class="menu-group-title">共同成长</p><div class="menu-grid">
+                        <button class="menu-card" type="button" data-view="warm-moment"><span class="menu-icon">💛</span><span>暖心时刻</span></button>
+                        <button class="menu-card" type="button" data-view="growth-report"><span class="menu-icon">🌱</span><span>今日鼓励</span></button>
                       </div></div>
                       <div><p class="menu-group-title">设置</p><div class="menu-grid">
                         <button class="menu-card" type="button" data-view="settings"><span class="menu-icon">⌚</span><span>表盘设置</span></button>
@@ -1075,6 +1158,24 @@ app.MapGet("/watch", () =>
                     <h2>好友积分榜</h2>
                     <div class="leaderboard-banner">🏆 一起加油，天天进步</div>
                     <ul class="compact-list leaderboard-list" id="friend-leaderboard"></ul>
+                  </div>
+                  <div class="panel" data-panel="warm-moment">
+                    <button class="back-menu" type="button">‹ 返回菜单</button>
+                    <h2>爸爸妈妈的闪光时刻</h2>
+                    <form id="warm-form">
+                      <label for="warm-parent">想记录谁</label>
+                      <select id="warm-parent" name="householdMemberId"></select>
+                      <label for="warm-content">发生了什么</label>
+                      <div class="input-action"><textarea id="warm-content" name="content" maxlength="500" placeholder="比如 妈妈认真听我说完了今天的事"></textarea><button class="voice-btn" type="button" data-speech-target="warm-content" data-message-target="warm-msg" aria-label="语音记录暖心时刻">🎙</button></div>
+                      <input type="hidden" id="warm-input-method" name="inputMethod" value="text">
+                      <button class="submit" type="submit">保存暖心时刻</button>
+                      <p id="warm-msg" class="msg"></p>
+                    </form>
+                  </div>
+                  <div class="panel" data-panel="growth-report">
+                    <button class="back-menu" type="button">‹ 返回菜单</button>
+                    <h2>今日鼓励</h2>
+                    <div class="report-card" id="watch-report"><p>正在准备今天的鼓励...</p></div>
                   </div>
                   <div class="panel" data-panel="settings">
                     <button class="back-menu" type="button">‹ 返回菜单</button>
@@ -1206,6 +1307,8 @@ app.MapGet("/watch", () =>
                 let requestsPayload;
                 let settingsPayload;
                 let friendsPayload;
+                let warmOptionsPayload = { parents: [] };
+                let growthReportPayload = { report: null };
                 if (isPreview) {
                   const previewPayload = await fetchJson('/api/watch/preview/' + encodeURIComponent(previewChildId));
                   score = previewPayload.score;
@@ -1214,12 +1317,14 @@ app.MapGet("/watch", () =>
                   settingsPayload = previewPayload.settings;
                   friendsPayload = previewPayload.friends;
                 } else {
-                  [score, rulesPayload, requestsPayload, settingsPayload, friendsPayload] = await Promise.all([
+                  [score, rulesPayload, requestsPayload, settingsPayload, friendsPayload, warmOptionsPayload, growthReportPayload] = await Promise.all([
                     fetchJson('/api/watch/score', { headers: authHeaders() }),
                     fetchJson('/api/watch/rules', { headers: authHeaders() }),
                     fetchJson('/api/watch/requests?limit=6', { headers: authHeaders() }),
                     fetchJson('/api/watch/settings', { headers: authHeaders() }),
-                    fetchJson('/api/watch/friends', { headers: authHeaders() })
+                    fetchJson('/api/watch/friends', { headers: authHeaders() }),
+                    fetchJson('/api/watch/warm-moment-options', { headers: authHeaders() }),
+                    fetchJson('/api/watch/growth-report?period=daily', { headers: authHeaders() })
                   ]);
                 }
                 showBound(true);
@@ -1229,6 +1334,14 @@ app.MapGet("/watch", () =>
                   button.title = settingsPayload.vipWatchFaces ? '' : '需要 VIP家庭+ 套餐';
                 });
                 renderFriends(friendsPayload);
+                document.getElementById('leaderboard-menu').classList.toggle('hidden', !settingsPayload.friendLeaderboardEnabled);
+                document.getElementById('warm-parent').innerHTML = (warmOptionsPayload.parents || []).map((parent) => `<option value="${parent.id}">${escapeText(parent.displayName)}</option>`).join('');
+                const report = growthReportPayload.report;
+                document.getElementById('watch-report').innerHTML = report ? `
+                  <p><b>✨ ${escapeText(report.praise)}</b></p>
+                  <p>${escapeText(report.nextStep)}</p>
+                  <p>${escapeText(report.changeSummary)}</p>
+                  <p class="source-note">来自 ${Number(report.sourceCount) || 0} 条具体记录</p>` : '<p>今天还没有可展示的报告</p>';
                 const child = (score.children || [])[0] || {};
                 document.getElementById('updated-at').textContent = new Date(score.updatedAt).toLocaleTimeString('zh-CN', { hour12: false, hour: '2-digit', minute: '2-digit' });
                 document.getElementById('child-name').textContent = child.name || '暂无孩子';
@@ -1301,6 +1414,24 @@ app.MapGet("/watch", () =>
               } catch (error) {
                 msg.textContent = error.message || '提交失败';
               }
+            });
+            document.getElementById('warm-form').addEventListener('submit', async (event) => {
+              event.preventDefault();
+              const warmMsg = document.getElementById('warm-msg');
+              if (blockPreviewWrite(warmMsg)) return;
+              const warmForm = event.currentTarget;
+              const data = {};
+              new FormData(warmForm).forEach((value, key) => { data[key] = value; });
+              warmMsg.textContent = '正在保存...';
+              try {
+                await fetchJson('/api/watch/warm-moments', {
+                  method: 'POST', headers: { 'Content-Type': 'application/json', ...authHeaders() }, body: JSON.stringify(data)
+                });
+                warmForm.reset();
+                document.getElementById('warm-input-method').value = 'text';
+                warmMsg.textContent = '已保存，爸爸妈妈会看到这份温暖';
+                await load();
+              } catch (error) { warmMsg.textContent = error.message || '保存失败'; }
             });
             document.getElementById('unbind').addEventListener('click', async () => {
               const unbindMsg = document.getElementById('unbind-msg');
@@ -1388,8 +1519,9 @@ app.MapGet("/watch", () =>
               button.addEventListener('click', () => {
                 const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
                 const target = document.getElementById(button.dataset.speechTarget || '');
+                const speechMsg = document.getElementById(button.dataset.messageTarget || 'msg');
                 if (!SpeechRecognition || !target) {
-                  msg.textContent = '当前手表不支持语音识别，请使用键盘输入';
+                  speechMsg.textContent = '当前手表不支持语音识别，请使用键盘输入';
                   return;
                 }
                 try {
@@ -1399,21 +1531,22 @@ app.MapGet("/watch", () =>
                   recognition.maxAlternatives = 1;
                   recognition.onstart = () => {
                     button.classList.add('listening');
-                    msg.textContent = '正在听，请说话...';
+                    speechMsg.textContent = '正在听，请说话...';
                   };
                   recognition.onresult = (event) => {
                     const firstResult = event.results && event.results[0];
                     const firstAlternative = firstResult && firstResult[0];
                     const text = firstAlternative ? firstAlternative.transcript || '' : '';
                     target.value = target.value ? `${target.value}${text}` : text;
-                    msg.textContent = text ? '语音已转成文字，请确认后提交' : '没有识别到内容';
+                    if (target.id === 'warm-content') document.getElementById('warm-input-method').value = 'voice';
+                    speechMsg.textContent = text ? '语音已转成文字，请确认后提交' : '没有识别到内容';
                   };
-                  recognition.onerror = () => { msg.textContent = '语音识别失败，请使用键盘输入'; };
+                  recognition.onerror = () => { speechMsg.textContent = '语音识别失败，请使用键盘输入'; };
                   recognition.onend = () => { button.classList.remove('listening'); };
                   recognition.start();
                 } catch (error) {
                   button.classList.remove('listening');
-                  msg.textContent = '无法启动语音识别，请使用键盘输入';
+                  speechMsg.textContent = '无法启动语音识别，请使用键盘输入';
                 }
               });
             });
@@ -1830,9 +1963,6 @@ app.MapGet("/api/stats/categories", async (HttpRequest request) =>
 
     return Results.Json(rows);
 });
-
-var configStore = new SystemConfigStore(connectionString, app.Environment.ContentRootPath);
-await configStore.LoadAsync();
 
 app.MapGet("/api/system/config", async (HttpRequest request) =>
 {
@@ -2558,6 +2688,378 @@ app.MapPost("/api/mcp", async (JsonObject body) =>
 });
 
 app.Run();
+
+static string NormalizeGrowthPeriod(string value) => value.Trim().ToLowerInvariant() switch
+{
+    "weekly" or "week" => "weekly",
+    "monthly" or "month" => "monthly",
+    _ => "daily"
+};
+
+static (DateOnly Start, DateOnly End) GetGrowthPeriodRange(string period)
+{
+    var today = DateOnly.FromDateTime(DateTime.UtcNow.AddHours(8));
+    return period switch
+    {
+        "weekly" => (today.AddDays(-(((int)today.DayOfWeek + 6) % 7)), today.AddDays(6 - (((int)today.DayOfWeek + 6) % 7))),
+        "monthly" => (new DateOnly(today.Year, today.Month, 1), new DateOnly(today.Year, today.Month, 1).AddMonths(1).AddDays(-1)),
+        _ => (today, today)
+    };
+}
+
+static async Task<List<Dictionary<string, object?>>> GetWarmMomentParentOptions(string connectionString, string parentAppUserId)
+{
+    await using var conn = await OpenConnection(connectionString);
+    await using (var ensure = new NpgsqlCommand("""
+        INSERT INTO household_members (owner_parent_app_user_id, display_name, role, is_current_user)
+        SELECT @owner, COALESCE(NULLIF(username, ''), '爸爸妈妈'), 'guardian', TRUE
+        FROM app_user_profiles
+        WHERE app_user_id = @owner AND role = 'parent'
+          AND NOT EXISTS (SELECT 1 FROM household_members WHERE owner_parent_app_user_id = @owner)
+        ORDER BY id LIMIT 1
+        """, conn))
+    {
+        ensure.Parameters.AddWithValue("owner", parentAppUserId);
+        await ensure.ExecuteNonQueryAsync();
+    }
+    await using var cmd = new NpgsqlCommand("""
+        SELECT id, display_name, role, is_current_user
+        FROM household_members
+        WHERE owner_parent_app_user_id = @owner
+        ORDER BY is_current_user DESC, id
+        """, conn);
+    cmd.Parameters.AddWithValue("owner", parentAppUserId);
+    var result = new List<Dictionary<string, object?>>();
+    await using var reader = await cmd.ExecuteReaderAsync();
+    while (await reader.ReadAsync()) result.Add(new()
+    {
+        ["id"] = reader.Int("id"), ["displayName"] = reader.String("display_name"),
+        ["role"] = reader.String("role"), ["isCurrentUser"] = reader.Bool("is_current_user")
+    });
+    return result;
+}
+
+static async Task<Dictionary<string, object?>> CreateWarmMoment(string connectionString, WatchDeviceBinding binding, JsonObject body)
+{
+    var content = body.String("content").Trim();
+    if (content.Length is < 2 or > 500) return new() { ["error"] = "请记录 2 到 500 个字的暖心时刻" };
+    var inputMethod = body.String("inputMethod").Equals("voice", StringComparison.OrdinalIgnoreCase) ? "voice" : "text";
+    var memberId = body.Int("householdMemberId");
+    await using var conn = await OpenConnection(connectionString);
+    await using var cmd = new NpgsqlCommand("""
+        INSERT INTO parent_warm_moments
+          (parent_app_user_id, child_profile_key, child_id, family_group_id, household_member_id, parent_display_name, content, input_method)
+        SELECT @owner, @profile, @child, @group, hm.id, hm.display_name, @content, @method
+        FROM household_members hm
+        WHERE hm.id = @member AND hm.owner_parent_app_user_id = @owner
+        RETURNING id, parent_display_name, content, input_method, created_at
+        """, conn);
+    cmd.Parameters.AddWithValue("owner", binding.ParentAppUserId);
+    cmd.Parameters.AddWithValue("profile", binding.ChildProfileKey);
+    cmd.Parameters.AddWithValue("child", binding.ChildId);
+    cmd.Parameters.AddWithValue("group", binding.FamilyGroupId);
+    cmd.Parameters.AddWithValue("member", memberId ?? 0);
+    cmd.Parameters.AddWithValue("content", content);
+    cmd.Parameters.AddWithValue("method", inputMethod);
+    await using var reader = await cmd.ExecuteReaderAsync();
+    if (!await reader.ReadAsync()) return new() { ["error"] = "请选择要记录的爸爸或妈妈" };
+    return new()
+    {
+        ["id"] = reader.Int("id"), ["parentDisplayName"] = reader.String("parent_display_name"),
+        ["content"] = reader.String("content"), ["inputMethod"] = reader.String("input_method"),
+        ["createdAt"] = reader.DateTime("created_at").ToString("O")
+    };
+}
+
+static async Task<List<Dictionary<string, object?>>> GetWarmMoments(string connectionString, string parentAppUserId, int? childId, int limit)
+{
+    await using var conn = await OpenConnection(connectionString);
+    await using var cmd = new NpgsqlCommand("""
+        SELECT pwm.id, pwm.child_id, cp.name AS child_name, pwm.parent_display_name, pwm.content, pwm.input_method, pwm.created_at
+        FROM parent_warm_moments pwm
+        LEFT JOIN child_profiles cp ON cp.profile_key = pwm.child_profile_key
+        WHERE pwm.parent_app_user_id = @owner AND (@child_id = 0 OR pwm.child_id = @child_id)
+        ORDER BY pwm.created_at DESC LIMIT @limit
+        """, conn);
+    cmd.Parameters.AddWithValue("owner", parentAppUserId);
+    cmd.Parameters.AddWithValue("child_id", childId ?? 0);
+    cmd.Parameters.AddWithValue("limit", limit);
+    var rows = new List<Dictionary<string, object?>>();
+    await using var reader = await cmd.ExecuteReaderAsync();
+    while (await reader.ReadAsync()) rows.Add(new()
+    {
+        ["id"] = reader.Int("id"), ["childId"] = reader.Int("child_id"), ["childName"] = reader.String("child_name"),
+        ["parentDisplayName"] = reader.String("parent_display_name"), ["content"] = reader.String("content"),
+        ["inputMethod"] = reader.String("input_method"), ["createdAt"] = reader.DateTime("created_at").ToString("O")
+    });
+    return rows;
+}
+
+static async Task<List<Dictionary<string, object?>>> EnsureParentGrowthReports(string connectionString, string owner, string audience, string period, int? childId)
+{
+    var reports = new List<Dictionary<string, object?>>();
+    if (audience == "parent")
+    {
+        reports.Add(await EnsureGrowthReport(connectionString, owner, null, audience, period));
+        return reports;
+    }
+    await using var conn = await OpenConnection(connectionString);
+    await using var cmd = new NpgsqlCommand("""
+        SELECT DISTINCT c.profile_key
+        FROM children c
+        WHERE c.status = 'active' AND (@child = 0 OR c.id = @child)
+          AND EXISTS (SELECT 1 FROM child_user_bindings cub WHERE cub.child_profile_key = c.profile_key AND cub.parent_app_user_id = @owner)
+        ORDER BY c.profile_key
+        """, conn);
+    cmd.Parameters.AddWithValue("owner", owner);
+    cmd.Parameters.AddWithValue("child", childId ?? 0);
+    var keys = new List<string>();
+    await using (var reader = await cmd.ExecuteReaderAsync()) while (await reader.ReadAsync()) keys.Add(reader.String("profile_key"));
+    foreach (var key in keys) reports.Add(await EnsureGrowthReport(connectionString, owner, key, audience, period));
+    return reports;
+}
+
+static async Task<Dictionary<string, object?>> EnsureGrowthReport(string connectionString, string owner, string? childProfileKey, string audience, string period)
+{
+    var (start, end) = GetGrowthPeriodRange(period);
+    await using var conn = await OpenConnection(connectionString);
+    var sources = new JsonArray();
+    var descriptions = new List<string>();
+    string subjectName;
+    if (audience == "parent")
+    {
+        subjectName = "爸爸妈妈";
+        await using var sourceCmd = new NpgsqlCommand("""
+            SELECT id, parent_display_name, content FROM parent_warm_moments
+            WHERE parent_app_user_id = @owner AND created_at::date BETWEEN @start AND @end
+            ORDER BY created_at DESC LIMIT 30
+            """, conn);
+        sourceCmd.Parameters.AddWithValue("owner", owner);
+        sourceCmd.Parameters.AddWithValue("start", start);
+        sourceCmd.Parameters.AddWithValue("end", end);
+        await using var reader = await sourceCmd.ExecuteReaderAsync();
+        while (await reader.ReadAsync())
+        {
+            var id = reader.Int("id");
+            sources.Add(new JsonObject { ["type"] = "warmMoment", ["id"] = id });
+            descriptions.Add($"{reader.String("parent_display_name")}：{reader.String("content")}");
+        }
+    }
+    else
+    {
+        await using (var nameCmd = new NpgsqlCommand("SELECT name FROM child_profiles WHERE profile_key = @profile", conn))
+        {
+            nameCmd.Parameters.AddWithValue("profile", childProfileKey ?? "");
+            subjectName = Convert.ToString(await nameCmd.ExecuteScalarAsync(), CultureInfo.InvariantCulture) ?? "孩子";
+        }
+        await using var sourceCmd = new NpgsqlCommand("""
+            SELECT t.id, COALESCE(NULLIF(t.description, ''), NULLIF(t.category, ''), '一次认真记录') AS description
+            FROM transactions t JOIN children c ON c.id = t.child_id
+            WHERE c.profile_key = @profile AND t.date BETWEEN @start AND @end
+            ORDER BY t.date DESC, t.id DESC LIMIT 30
+            """, conn);
+        sourceCmd.Parameters.AddWithValue("profile", childProfileKey ?? "");
+        sourceCmd.Parameters.AddWithValue("start", start);
+        sourceCmd.Parameters.AddWithValue("end", end);
+        await using var reader = await sourceCmd.ExecuteReaderAsync();
+        while (await reader.ReadAsync())
+        {
+            var id = reader.Int("id");
+            sources.Add(new JsonObject { ["type"] = "transaction", ["id"] = id });
+            descriptions.Add(reader.String("description"));
+        }
+    }
+    var praise = descriptions.Count == 0
+        ? $"{subjectName}，今天还没有新的记录，愿意一起留意生活本身就很珍贵。"
+        : $"做得好的点：{subjectName}留下了{descriptions.Count}条真实记录，尤其是“{descriptions[0]}”。";
+    var nextStep = descriptions.Count == 0 ? "接下来可以试试：记录一个让自己感到温暖或有进步的小瞬间。" : "接下来可以试试：延续其中一件小事，并说说当时的感受。";
+    var summary = descriptions.Count < 2 ? "变化总结：记录正在从一个小瞬间开始积累。" : $"变化总结：这段时间持续记录了{descriptions.Count}个具体瞬间，比单看积分更能看见成长。";
+    await using var upsert = new NpgsqlCommand("""
+        INSERT INTO growth_reports (parent_app_user_id, child_profile_key, audience, period_type, period_start, period_end, praise, next_step, change_summary, source_refs, generated_by, updated_at)
+        VALUES (@owner, @profile, @audience, @period, @start, @end, @praise, @next, @summary, @sources::jsonb, 'rules', CURRENT_TIMESTAMP)
+        ON CONFLICT (parent_app_user_id, child_profile_key, audience, period_type, period_start) DO UPDATE SET
+          period_end = EXCLUDED.period_end,
+          praise = CASE WHEN growth_reports.source_refs IS DISTINCT FROM EXCLUDED.source_refs THEN EXCLUDED.praise ELSE growth_reports.praise END,
+          next_step = CASE WHEN growth_reports.source_refs IS DISTINCT FROM EXCLUDED.source_refs THEN EXCLUDED.next_step ELSE growth_reports.next_step END,
+          change_summary = CASE WHEN growth_reports.source_refs IS DISTINCT FROM EXCLUDED.source_refs THEN EXCLUDED.change_summary ELSE growth_reports.change_summary END,
+          generated_by = CASE WHEN growth_reports.source_refs IS DISTINCT FROM EXCLUDED.source_refs THEN 'rules' ELSE growth_reports.generated_by END,
+          source_refs = EXCLUDED.source_refs, updated_at = CURRENT_TIMESTAMP
+        RETURNING id, praise, next_step, change_summary, source_refs::text AS source_refs, generated_by, generated_at, updated_at
+        """, conn);
+    upsert.Parameters.AddWithValue("owner", owner);
+    upsert.Parameters.AddWithValue("profile", childProfileKey ?? "");
+    upsert.Parameters.AddWithValue("audience", audience);
+    upsert.Parameters.AddWithValue("period", period);
+    upsert.Parameters.AddWithValue("start", start);
+    upsert.Parameters.AddWithValue("end", end);
+    upsert.Parameters.AddWithValue("praise", praise);
+    upsert.Parameters.AddWithValue("next", nextStep);
+    upsert.Parameters.AddWithValue("summary", summary);
+    upsert.Parameters.AddWithValue("sources", sources.ToJsonString());
+    await using var saved = await upsert.ExecuteReaderAsync();
+    await saved.ReadAsync();
+    var savedSourcesJson = saved.String("source_refs");
+    var savedSources = JsonSerializer.Deserialize<object[]>(savedSourcesJson) ?? [];
+    return new()
+    {
+        ["id"] = saved.Int("id"), ["subjectName"] = subjectName, ["audience"] = audience, ["period"] = period,
+        ["periodStart"] = start.ToString("yyyy-MM-dd"), ["periodEnd"] = end.ToString("yyyy-MM-dd"),
+        ["praise"] = saved.String("praise"), ["nextStep"] = saved.String("next_step"), ["changeSummary"] = saved.String("change_summary"),
+        ["sourceRefs"] = savedSources, ["sourceCount"] = savedSources.Length,
+        ["generatedBy"] = saved.String("generated_by"), ["generatedAt"] = saved.DateTime("updated_at").ToString("O")
+    };
+}
+
+static async Task<Dictionary<string, object?>> TryGenerateAiGrowthReport(
+    string connectionString,
+    SystemConfigStore configStore,
+    IHttpClientFactory httpClientFactory,
+    string parentAppUserId,
+    Dictionary<string, object?> report,
+    CancellationToken cancellationToken)
+{
+    var initialGenerator = Convert.ToString(report["generatedBy"], CultureInfo.InvariantCulture) ?? "";
+    if (initialGenerator is "ai" or "ai-fallback") return report;
+    string? sessionId = null;
+    string? username = null;
+    string? webAppBotId = null;
+    try
+    {
+        await using (var conn = await OpenConnection(connectionString))
+        await using (var usernameCmd = new NpgsqlCommand("SELECT COALESCE(NULLIF(username, ''), unified_user_id) FROM app_user_profiles WHERE app_user_id = @owner AND role = 'parent' ORDER BY id LIMIT 1", conn))
+        {
+            usernameCmd.Parameters.AddWithValue("owner", parentAppUserId);
+            username = Convert.ToString(await usernameCmd.ExecuteScalarAsync(cancellationToken), CultureInfo.InvariantCulture);
+        }
+        if (string.IsNullOrWhiteSpace(username)) return report;
+        var config = await configStore.LoadAsync();
+        webAppBotId = ResolveFamilyRewardWebAppBotId(config, null);
+        var agentId = await ResolveFamilyRewardAgentFreeAgentIdForBot(httpClientFactory, username, webAppBotId, cancellationToken);
+        if (agentId is null) return report;
+        var client = CreateOrbitWebAppClient(httpClientFactory, webAppBotId);
+        var session = await client.CreateSessionAsync(new CreateOrbitWebAppSessionRequest
+        {
+            AgentId = agentId.Value,
+            Name = $"成长报告-{report["periodStart"]}",
+            WebAppBotId = webAppBotId
+        }, username, cancellationToken);
+        if (session is null) return report;
+        sessionId = session.Id;
+        var prompt = $"""
+            你是家加分的亲子共同成长记录助手。请根据下面已有报告草稿润色，严格只返回 JSON 对象，字段为 praise、nextStep、changeSummary。
+            要求：每项不超过80字；结构分别体现“做得好的点”“接下来可以试试”“变化总结”；温暖、具体、非诊断式；禁止星级、分项评分、好/不好判断、孩子或家长间排名；不得增加草稿之外的事实。
+            对象：{report["subjectName"]}；周期：{report["periodStart"]}至{report["periodEnd"]}；来源记录数：{report["sourceCount"]}。
+            草稿：{report["praise"]} {report["nextStep"]} {report["changeSummary"]}
+            """;
+        var payload = new JsonObject
+        {
+            ["sessionId"] = session.Id, ["agentId"] = agentId.Value, ["AgentId"] = agentId.Value,
+            ["name"] = "生成成长报告", ["content"] = prompt, ["attachments"] = new JsonArray(),
+            ["user"] = new JsonObject { ["username"] = username, ["displayName"] = username, ["role"] = "parent" },
+            ["metadata"] = new JsonObject { ["source"] = "family-reward-growth-report", ["gatewayType"] = "WebApp", ["channelType"] = "WebApp", ["webAppBotId"] = webAppBotId, ["agentId"] = agentId.Value, ["username"] = username },
+            ["gatewayContext"] = new JsonObject { ["GatewayType"] = "WebApp", ["GatewayBotId"] = webAppBotId, ["GatewayMetadata_transport"] = webAppBotId, ["GatewayMetadata_source"] = "family-reward-growth-report", ["GatewayMetadata_webAppBotId"] = webAppBotId, ["GatewayMetadata_username"] = username }
+        };
+        using var streamResult = await client.OpenChatStreamAsync(payload, username, cancellationToken);
+        if (!streamResult.Response.IsSuccessStatusCode) return report;
+        await using var stream = await streamResult.Response.Content.ReadAsStreamAsync(cancellationToken);
+        using var reader = new StreamReader(stream);
+        var content = new StringBuilder();
+        while (true)
+        {
+            var line = await reader.ReadLineAsync(cancellationToken);
+            if (line is null) break;
+            if (string.IsNullOrWhiteSpace(line)) continue;
+            var raw = line.StartsWith("data:", StringComparison.OrdinalIgnoreCase) ? line[5..].Trim() : line.Trim();
+            if (raw is "[DONE]" or "done") break;
+            JsonObject? frame;
+            try { frame = JsonNode.Parse(raw) as JsonObject; } catch { continue; }
+            if (frame?.String("type") == "stream.delta" && frame["payload"] is JsonObject framePayload && framePayload.String("channel") == "content") content.Append(framePayload.String("delta"));
+        }
+        var jsonText = content.ToString().Trim().Replace("```json", "", StringComparison.OrdinalIgnoreCase).Replace("```", "").Trim();
+        var generated = JsonNode.Parse(jsonText) as JsonObject;
+        var praise = generated?.String("praise").Trim() ?? "";
+        var nextStep = generated?.String("nextStep").Trim() ?? "";
+        var summary = generated?.String("changeSummary").Trim() ?? "";
+        if (praise.Length is < 4 or > 160 || nextStep.Length is < 4 or > 160 || summary.Length is < 4 or > 160) return report;
+        await using var updateConn = await OpenConnection(connectionString);
+        await using var update = new NpgsqlCommand("UPDATE growth_reports SET praise=@praise, next_step=@next, change_summary=@summary, generated_by='ai', generated_at=CURRENT_TIMESTAMP, updated_at=CURRENT_TIMESTAMP WHERE id=@id", updateConn);
+        update.Parameters.AddWithValue("praise", praise); update.Parameters.AddWithValue("next", nextStep); update.Parameters.AddWithValue("summary", summary); update.Parameters.AddWithValue("id", GetInt(report, "id"));
+        await update.ExecuteNonQueryAsync(cancellationToken);
+        report["praise"] = praise; report["nextStep"] = nextStep; report["changeSummary"] = summary; report["generatedBy"] = "ai"; report["generatedAt"] = DateTime.UtcNow.ToString("O");
+    }
+    catch { /* Agent unavailable: keep the safe, traceable fallback report. */ }
+    finally
+    {
+        if (!string.IsNullOrWhiteSpace(sessionId) && !string.IsNullOrWhiteSpace(username) && !string.IsNullOrWhiteSpace(webAppBotId))
+        {
+            try { await CreateOrbitWebAppClient(httpClientFactory, webAppBotId).UpdateSessionAsync(sessionId, new UpdateOrbitWebAppSessionRequest { IsArchived = true }, username, cancellationToken); } catch { }
+        }
+        if (!string.Equals(Convert.ToString(report["generatedBy"], CultureInfo.InvariantCulture), "ai", StringComparison.OrdinalIgnoreCase))
+        {
+            report["generatedBy"] = "ai-fallback";
+            try
+            {
+                await using var fallbackConn = await OpenConnection(connectionString);
+                await using var fallback = new NpgsqlCommand("UPDATE growth_reports SET generated_by='ai-fallback', generated_at=CURRENT_TIMESTAMP WHERE id=@id AND generated_by <> 'ai'", fallbackConn);
+                fallback.Parameters.AddWithValue("id", GetInt(report, "id"));
+                await fallback.ExecuteNonQueryAsync();
+            }
+            catch { }
+        }
+    }
+    return report;
+}
+
+static async Task<List<Dictionary<string, object?>>> GetSelfGrowthStats(string connectionString, string owner, int? familyGroupId)
+{
+    var today = DateOnly.FromDateTime(DateTime.UtcNow.AddHours(8));
+    var weekStart = today.AddDays(-(((int)today.DayOfWeek + 6) % 7));
+    await using var conn = await OpenConnection(connectionString);
+    await using var cmd = new NpgsqlCommand("""
+        SELECT c.id, c.name, c.profile_key, t.date, COUNT(t.id) AS record_count,
+               COALESCE(SUM(CASE WHEN t.type = 'points' AND t.direction = '+' THEN t.points ELSE 0 END), 0) AS positive_points
+        FROM children c
+        LEFT JOIN transactions t ON t.child_id = c.id AND t.date >= @from
+        WHERE c.status = 'active' AND (@group_id = 0 OR c.family_group_id = @group_id)
+          AND EXISTS (SELECT 1 FROM child_user_bindings cub WHERE cub.child_profile_key = c.profile_key AND cub.parent_app_user_id = @owner)
+        GROUP BY c.id, c.name, c.profile_key, t.date ORDER BY c.id, t.date
+        """, conn);
+    cmd.Parameters.AddWithValue("owner", owner);
+    cmd.Parameters.AddWithValue("group_id", familyGroupId ?? 0);
+    cmd.Parameters.AddWithValue("from", weekStart.AddDays(-7));
+    var raw = new List<(int Id, string Name, string Key, DateOnly? Date, int Count, decimal Points)>();
+    await using (var reader = await cmd.ExecuteReaderAsync()) while (await reader.ReadAsync()) raw.Add((reader.Int("id"), reader.String("name"), reader.String("profile_key"), reader.IsDBNull(reader.GetOrdinal("date")) ? null : DateOnly.FromDateTime(reader.GetDateTime(reader.GetOrdinal("date"))), Convert.ToInt32(reader["record_count"]), reader.Decimal("positive_points")));
+    return raw.GroupBy(x => new { x.Id, x.Name, x.Key }).Select(group =>
+    {
+        var days = group.Where(x => x.Date.HasValue).ToDictionary(x => x.Date!.Value, x => new { x.Count, x.Points });
+        var current = days.Where(x => x.Key >= weekStart).Sum(x => x.Value.Count);
+        var previous = days.Where(x => x.Key >= weekStart.AddDays(-7) && x.Key < weekStart).Sum(x => x.Value.Count);
+        var streak = 0;
+        for (var day = today; days.ContainsKey(day); day = day.AddDays(-1)) streak++;
+        return new Dictionary<string, object?>
+        {
+            ["childId"] = group.Key.Id, ["childName"] = group.Key.Name, ["currentWeekRecords"] = current,
+            ["previousWeekRecords"] = previous, ["change"] = current - previous, ["activeDays"] = days.Keys.Count(d => d >= weekStart),
+            ["streakDays"] = streak, ["trend"] = Enumerable.Range(0, 7).Select(i => new { date = weekStart.AddDays(i).ToString("MM-dd"), records = days.GetValueOrDefault(weekStart.AddDays(i))?.Count ?? 0 }).ToArray()
+        };
+    }).ToList();
+}
+
+static async Task<Dictionary<string, object?>> UpdateFriendLeaderboardSetting(string connectionString, string profileKey, bool enabled)
+{
+    await using var conn = await OpenConnection(connectionString);
+    await using var cmd = new NpgsqlCommand("""
+        INSERT INTO watch_face_preferences (child_profile_key, friend_leaderboard_enabled, updated_at)
+        VALUES (@profile, @enabled, CURRENT_TIMESTAMP)
+        ON CONFLICT (child_profile_key) DO UPDATE SET friend_leaderboard_enabled = EXCLUDED.friend_leaderboard_enabled, updated_at = CURRENT_TIMESTAMP
+        RETURNING friend_leaderboard_enabled, updated_at
+        """, conn);
+    cmd.Parameters.AddWithValue("profile", profileKey);
+    cmd.Parameters.AddWithValue("enabled", enabled);
+    await using var reader = await cmd.ExecuteReaderAsync();
+    await reader.ReadAsync();
+    return new() { ["friendLeaderboardEnabled"] = reader.Bool("friend_leaderboard_enabled"), ["updatedAt"] = reader.DateTime("updated_at").ToString("O") };
+}
 
 static string ResolveFamilyRewardWebAppBotId(JsonObject config, string? requestedBotId)
 {
@@ -5911,7 +6413,47 @@ static async Task InitDatabase(string connectionString)
         CREATE TABLE IF NOT EXISTS watch_face_preferences (
             child_profile_key VARCHAR(180) PRIMARY KEY,
             watch_face VARCHAR(40) NOT NULL DEFAULT 'world',
+            friend_leaderboard_enabled BOOLEAN NOT NULL DEFAULT FALSE,
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+        """,
+        "ALTER TABLE watch_face_preferences ADD COLUMN IF NOT EXISTS friend_leaderboard_enabled BOOLEAN NOT NULL DEFAULT FALSE",
+        """
+        CREATE TABLE IF NOT EXISTS parent_warm_moments (
+            id SERIAL PRIMARY KEY,
+            parent_app_user_id VARCHAR(180) NOT NULL,
+            child_profile_key VARCHAR(180) NOT NULL,
+            child_id INTEGER NOT NULL,
+            family_group_id INTEGER NOT NULL,
+            household_member_id INTEGER REFERENCES household_members(id) ON DELETE SET NULL,
+            parent_display_name VARCHAR(50) NOT NULL,
+            content TEXT NOT NULL,
+            input_method VARCHAR(20) NOT NULL DEFAULT 'text',
+            created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            CHECK (input_method IN ('text', 'voice'))
+        )
+        """,
+        "CREATE INDEX IF NOT EXISTS idx_parent_warm_moments_owner_created ON parent_warm_moments(parent_app_user_id, created_at DESC)",
+        "CREATE INDEX IF NOT EXISTS idx_parent_warm_moments_child_created ON parent_warm_moments(child_profile_key, created_at DESC)",
+        """
+        CREATE TABLE IF NOT EXISTS growth_reports (
+            id SERIAL PRIMARY KEY,
+            parent_app_user_id VARCHAR(180) NOT NULL,
+            child_profile_key VARCHAR(180),
+            audience VARCHAR(20) NOT NULL,
+            period_type VARCHAR(20) NOT NULL,
+            period_start DATE NOT NULL,
+            period_end DATE NOT NULL,
+            praise TEXT NOT NULL,
+            next_step TEXT NOT NULL,
+            change_summary TEXT NOT NULL,
+            source_refs JSONB NOT NULL DEFAULT '[]'::jsonb,
+            generated_by VARCHAR(30) NOT NULL DEFAULT 'rules',
+            generated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            CHECK (audience IN ('child', 'parent')),
+            CHECK (period_type IN ('daily', 'weekly', 'monthly')),
+            UNIQUE (parent_app_user_id, child_profile_key, audience, period_type, period_start)
         )
         """,
         """
@@ -8631,7 +9173,7 @@ static async Task<Dictionary<string, object?>> GetWatchSettings(string connectio
     var vipEnabled = await HasPlanFeature(connectionString, parentAppUserId, VipWatchFacesFeatureCode);
     await using var conn = await OpenConnection(connectionString);
     await using var cmd = new NpgsqlCommand("""
-        SELECT watch_face, updated_at
+        SELECT watch_face, friend_leaderboard_enabled, updated_at
         FROM watch_face_preferences
         WHERE child_profile_key = @child_profile_key
         """, conn);
@@ -8642,6 +9184,7 @@ static async Task<Dictionary<string, object?>> GetWatchSettings(string connectio
         return new Dictionary<string, object?>
         {
             ["watchFace"] = NormalizeWatchFace(reader.String("watch_face")),
+            ["friendLeaderboardEnabled"] = reader.Bool("friend_leaderboard_enabled"),
             ["updatedAt"] = reader.DateTime("updated_at").ToString("O"),
             ["vipWatchFaces"] = vipEnabled,
             ["availableFaces"] = BuildWatchFaceCatalog(vipEnabled)
@@ -8651,6 +9194,7 @@ static async Task<Dictionary<string, object?>> GetWatchSettings(string connectio
     return new Dictionary<string, object?>
     {
         ["watchFace"] = "world",
+        ["friendLeaderboardEnabled"] = false,
         ["updatedAt"] = DateTime.UtcNow.ToString("O", CultureInfo.InvariantCulture),
         ["vipWatchFaces"] = vipEnabled,
         ["availableFaces"] = BuildWatchFaceCatalog(vipEnabled)
