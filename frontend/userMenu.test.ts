@@ -16,7 +16,7 @@ test('all account actions live inside the username menu', async () => {
   ]);
 
   assert.doesNotMatch(layout, /auth\/logout|退出登录/);
-  assert.match(userMenu, /修改信息/);
+  assert.match(userMenu, /用户中心/);
   assert.match(userMenu, /修改密码/);
   assert.match(userMenu, /退出登录/);
 });

@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom';
 import { useEffect, useRef } from 'react';
+import { HomeOutlined, KeyOutlined, LogoutOutlined, SettingOutlined, UserOutlined } from '@ant-design/icons';
 import { getUserCenterUrl } from '../auth';
 import { useFamilyGroup } from '../contexts/FamilyGroupContext';
 import type { AuthUser } from '../types';
@@ -48,7 +49,7 @@ export default function UserMenu({ user, userId, onLogout }: UserMenuProps) {
           <details className="group/family">
             <summary className="list-none [&::-webkit-details-marker]:hidden flex items-center justify-between gap-2 px-3 py-2 rounded-md text-sm text-gray-700 hover:bg-gray-50 cursor-pointer select-none">
               <span className="flex items-center gap-2 min-w-0">
-                <span>🏠</span>
+                <HomeOutlined aria-hidden="true" />
                 <span>切换圈子</span>
               </span>
               <span className="flex items-center gap-2 min-w-0 text-xs text-gray-400">
@@ -75,7 +76,7 @@ export default function UserMenu({ user, userId, onLogout }: UserMenuProps) {
                       active ? 'bg-[#4A90D9]/10 text-[#4A90D9]' : 'text-gray-700 hover:bg-white'
                     }`}
                   >
-                    <span className="truncate">{group.name}</span>
+                    <span className="flex items-center gap-2 min-w-0"><UserOutlined aria-hidden="true" /><span className="truncate">{group.name}</span></span>
                     {active && <span className="text-xs font-medium">当前</span>}
                   </button>
                 );
@@ -84,15 +85,15 @@ export default function UserMenu({ user, userId, onLogout }: UserMenuProps) {
           </details>
           <div className="my-1 border-t border-gray-100" />
           <Link to="/settings" onClick={closeMenu} className="flex items-center gap-2 px-3 py-2 rounded-md text-sm text-gray-700 hover:bg-gray-50">
-            <span>⚙️</span>
+            <SettingOutlined aria-hidden="true" />
             <span>系统设置</span>
           </Link>
           <a href={getUserCenterUrl('info')} onClick={closeMenu} className="flex items-center gap-2 px-3 py-2 rounded-md text-sm text-gray-700 hover:bg-gray-50">
-            <span>✎</span>
-            <span>修改信息</span>
+            <UserOutlined aria-hidden="true" />
+            <span>用户中心</span>
           </a>
           <a href={getUserCenterUrl('password')} onClick={closeMenu} className="flex items-center gap-2 px-3 py-2 rounded-md text-sm text-gray-700 hover:bg-gray-50">
-            <span>🔑</span>
+            <KeyOutlined aria-hidden="true" />
             <span>修改密码</span>
           </a>
           <div className="my-1 border-t border-gray-100" />
@@ -105,7 +106,7 @@ export default function UserMenu({ user, userId, onLogout }: UserMenuProps) {
             }}
             className="flex items-center gap-2 px-3 py-2 rounded-md text-sm text-red-600 hover:bg-red-50"
           >
-            <span>↩</span>
+            <LogoutOutlined aria-hidden="true" />
             <span>退出登录</span>
           </a>
         </div>
