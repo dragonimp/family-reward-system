@@ -2288,10 +2288,9 @@ app.MapGet("/api/agentfree/sessions/{id}", async (string id, IHttpClientFactory 
         var userName = GetUnifiedUsername(request);
         var config = await configStore.LoadAsync();
         var webAppBotId = ResolveFamilyRewardWebAppBotId(config, request.Query.String("webAppBotId"));
-        var agentId = await ResolveFamilyRewardAgentFreeAgentIdForBot(httpClientFactory, userName, webAppBotId, request.HttpContext.RequestAborted);
-        var session = await CreateOrbitWebAppClient(httpClientFactory, webAppBotId)
-            .GetSessionAsync(id, userName, request.HttpContext.RequestAborted);
-        if (agentId is null || session?.AgentId != agentId)
+        var session = await GetFamilyRewardAgentFreeSessionForBot(
+            httpClientFactory, id, userName, webAppBotId, request.HttpContext.RequestAborted);
+        if (session is null)
         {
             return Results.Json(new { error = "无权访问该智能体会话" }, statusCode: StatusCodes.Status403Forbidden);
         }
@@ -2393,8 +2392,20 @@ app.MapPost("/api/agentfree/sessions", async (JsonObject body, IHttpClientFactor
         var userName = GetUnifiedUsername(request);
         var config = await configStore.LoadAsync();
         var webAppBotId = ResolveFamilyRewardWebAppBotId(config, body.String("webAppBotId"));
-        var agentId = await ResolveFamilyRewardAgentFreeAgentIdForBot(httpClientFactory, userName, webAppBotId, request.HttpContext.RequestAborted);
-        if (agentId is null)
+        var agents = await GetFamilyRewardAgentFreeAgents(httpClientFactory, userName, webAppBotId, request.HttpContext.RequestAborted);
+        var authorizedAgentIds = agents
+            .OfType<JsonObject>()
+            .Select(item => item.Int("id"))
+            .Where(id => id.HasValue)
+            .Select(id => id!.Value)
+            .ToList();
+        var requestedAgentId = body.Int("agentId");
+        if (requestedAgentId.HasValue && !authorizedAgentIds.Contains(requestedAgentId.Value))
+        {
+            return Results.Json(new { error = "无权使用该智能体" }, statusCode: StatusCodes.Status403Forbidden);
+        }
+        int? agentId = requestedAgentId ?? authorizedAgentIds.Select(id => (int?)id).FirstOrDefault();
+        if (!agentId.HasValue)
         {
             return Results.Json(new { error = "未找到家庭积分应用智能体" }, statusCode: StatusCodes.Status502BadGateway);
         }
@@ -2505,16 +2516,11 @@ app.MapPost("/api/agentfree/chat/stream", async (JsonObject body, IHttpClientFac
         var userName = GetUnifiedUsername(context.Request);
         var config = await configStore.LoadAsync();
         var webAppBotId = ResolveFamilyRewardWebAppBotId(config, body.String("webAppBotId"));
-        var agentId = await ResolveFamilyRewardAgentFreeAgentIdForBot(httpClientFactory, userName, webAppBotId, context.RequestAborted);
-        if (agentId is null)
-        {
-            context.Response.StatusCode = StatusCodes.Status502BadGateway;
-            await context.Response.WriteAsJsonAsync(new { error = "未找到家庭积分应用智能体" }, context.RequestAborted);
-            return;
-        }
         var sessionId = body.String("sessionId").Trim();
-        if (string.IsNullOrWhiteSpace(sessionId)
-                || await GetFamilyRewardAgentFreeSessionForBot(httpClientFactory, sessionId, userName, webAppBotId, context.RequestAborted) is null)
+        var session = string.IsNullOrWhiteSpace(sessionId)
+            ? null
+            : await GetFamilyRewardAgentFreeSessionForBot(httpClientFactory, sessionId, userName, webAppBotId, context.RequestAborted);
+        if (session is null)
         {
             context.Response.StatusCode = StatusCodes.Status403Forbidden;
             await context.Response.WriteAsJsonAsync(new { error = "无权访问该智能体会话" }, context.RequestAborted);
@@ -2524,8 +2530,8 @@ app.MapPost("/api/agentfree/chat/stream", async (JsonObject body, IHttpClientFac
         var payload = new JsonObject
         {
             ["sessionId"] = sessionId,
-            ["agentId"] = agentId.Value,
-            ["AgentId"] = agentId.Value,
+            ["agentId"] = session.AgentId,
+            ["AgentId"] = session.AgentId,
             ["name"] = message.Length > 24 ? message[..24] : message,
             ["content"] = message,
             ["attachments"] = body["attachments"]?.DeepClone() ?? new JsonArray(),
@@ -2541,7 +2547,7 @@ app.MapPost("/api/agentfree/chat/stream", async (JsonObject body, IHttpClientFac
                 ["gatewayType"] = "WebApp",
                 ["channelType"] = "WebApp",
                 ["webAppBotId"] = webAppBotId,
-                ["agentId"] = agentId.Value,
+                ["agentId"] = session.AgentId,
                 ["username"] = userName
             },
             ["gatewayContext"] = new JsonObject
