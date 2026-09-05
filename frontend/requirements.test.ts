@@ -80,6 +80,27 @@ test('Xiaotiancai watch page remains parseable by Android 7.1 and 8.1 WebView', 
   assert.match(watchPage, /#app-panel \.panel:not\(\[data-panel=home\]\)/);
 });
 
+test('REQ-066 uses one responsive square watch face with an internal safe menu', async () => {
+  const api = await readFile(new URL('../FamilyReward.Api/Program.cs', import.meta.url), 'utf8');
+  const watchPage = api.slice(api.indexOf('app.MapGet("/watch"'), api.indexOf('app.MapPost("/api/children"'));
+  const faceRule = watchPage.match(/\.watch-face\{[^}]+\}/)?.[0] || '';
+  const innerRule = watchPage.match(/\.watch-face:before\{[^}]+\}/)?.[0] || '';
+  const menuRule = watchPage.match(/\.menu-dock\{[^}]+\}/)?.[0] || '';
+
+  assert.match(watchPage, /width:calc\(100vw - 52px\);height:calc\(100vw - 52px\)/);
+  assert.match(watchPage, /width:calc\(100vmin - 8px\);height:calc\(100vmin - 8px\)/);
+  assert.match(watchPage, /@supports \(aspect-ratio:1 \/ 1\)/);
+  assert.match(watchPage, /@media\(max-width:260px\),\(max-height:260px\)/);
+  assert.match(faceRule, /border-radius:0/);
+  assert.match(innerRule, /border-radius:0/);
+  assert.doesNotMatch(faceRule, /border-radius:50%/);
+  assert.doesNotMatch(innerRule, /border-radius:50%/);
+  assert.match(menuRule, /right:8px/);
+  assert.match(menuRule, /top:8px/);
+  assert.match(menuRule, /transform:none/);
+  assert.doesNotMatch(menuRule, /right:-/);
+});
+
 test('REQ-031 directly loads the public feedback widget with current user contact details', async () => {
   const [widget, layout, api] = await Promise.all([
     readFile(new URL('./src/components/PublicFeedbackWidget.tsx', import.meta.url), 'utf8'),
