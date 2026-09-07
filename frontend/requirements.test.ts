@@ -117,6 +117,18 @@ test('REQ-066 uses one responsive 8:9 portrait watch face with an internal safe 
   assert.doesNotMatch(menuRule, /right:-/);
 });
 
+test('REQ-069 makes the home warm-moment shortcut work and shows household roles', async () => {
+  const api = await readFile(new URL('../FamilyReward.Api/Program.cs', import.meta.url), 'utf8');
+  const watchPage = api.slice(api.indexOf('app.MapGet("/watch"'), api.indexOf('app.MapPost("/api/children"'));
+
+  assert.match(watchPage, /class="warm-shortcut"[^>]+data-view="warm-moment"/);
+  assert.match(watchPage, /document\.querySelectorAll\('\[data-view\]'\)/);
+  assert.match(watchPage, /escapeText\(parent\.roleLabel\)/);
+  assert.doesNotMatch(watchPage, /<option value="\$\{parent\.id\}">\$\{escapeText\(parent\.displayName\)\}<\/option>/);
+  assert.match(api, /\["roleLabel"\] = HouseholdRoleDisplayName\(reader\.String\("role"\)\)/);
+  for (const role of ['爸爸', '妈妈', '爷爷', '奶奶', '外公', '外婆', '监护人']) assert.match(api, new RegExp(`=> "${role}"`));
+});
+
 test('REQ-031 directly loads the public feedback widget with current user contact details', async () => {
   const [widget, layout, api] = await Promise.all([
     readFile(new URL('./src/components/PublicFeedbackWidget.tsx', import.meta.url), 'utf8'),

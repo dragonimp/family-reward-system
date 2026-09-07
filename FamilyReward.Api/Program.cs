@@ -1338,7 +1338,7 @@ app.MapGet("/watch", () =>
                 });
                 renderFriends(friendsPayload);
                 document.getElementById('leaderboard-menu').classList.toggle('hidden', !settingsPayload.friendLeaderboardEnabled);
-                document.getElementById('warm-parent').innerHTML = (warmOptionsPayload.parents || []).map((parent) => `<option value="${parent.id}">${escapeText(parent.displayName)}</option>`).join('');
+                document.getElementById('warm-parent').innerHTML = (warmOptionsPayload.parents || []).map((parent) => `<option value="${parent.id}">${escapeText(parent.roleLabel)}</option>`).join('');
                 const report = growthReportPayload.report;
                 document.getElementById('watch-report').innerHTML = report ? `
                   <p><b>✨ ${escapeText(report.praise)}</b></p>
@@ -1507,7 +1507,7 @@ app.MapGet("/watch", () =>
                 }
               });
             });
-            document.querySelectorAll('.menu-card').forEach((button) => {
+            document.querySelectorAll('[data-view]').forEach((button) => {
               button.addEventListener('click', () => setView(button.dataset.view || 'home'));
             });
             document.querySelectorAll('.back-menu').forEach((button) => {
@@ -2742,7 +2742,8 @@ static async Task<List<Dictionary<string, object?>>> GetWarmMomentParentOptions(
     while (await reader.ReadAsync()) result.Add(new()
     {
         ["id"] = reader.Int("id"), ["displayName"] = reader.String("display_name"),
-        ["role"] = reader.String("role"), ["isCurrentUser"] = reader.Bool("is_current_user")
+        ["role"] = reader.String("role"), ["roleLabel"] = HouseholdRoleDisplayName(reader.String("role")),
+        ["isCurrentUser"] = reader.Bool("is_current_user")
     });
     return result;
 }
@@ -7648,6 +7649,18 @@ static string NormalizeHouseholdRole(string? role)
         ? normalized
         : "";
 }
+
+static string HouseholdRoleDisplayName(string role) => role switch
+{
+    "father" => "爸爸",
+    "mother" => "妈妈",
+    "grandfather" => "爷爷",
+    "grandmother" => "奶奶",
+    "maternal_grandfather" => "外公",
+    "maternal_grandmother" => "外婆",
+    "guardian" => "监护人",
+    _ => "其他"
+};
 
 static async Task<List<Dictionary<string, object?>>> GetHouseholdMembers(NpgsqlConnection conn, string parentAppUserId)
 {
