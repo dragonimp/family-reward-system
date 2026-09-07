@@ -145,6 +145,7 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string>('');
   const [dailyParentReport, setDailyParentReport] = useState<GrowthReport | null>(null);
+  const [dailyChildReports, setDailyChildReports] = useState<GrowthReport[]>([]);
   const [latestWarmMoment, setLatestWarmMoment] = useState<WarmMoment | null>(null);
   const [showDailyReport, setShowDailyReport] = useState(false);
 
@@ -153,10 +154,11 @@ export default function Dashboard() {
       if (!silent) setLoading(true);
       setError('');
       
-      const [childrenRes, transactionsRes, reportRes, warmRes] = await Promise.all([
+      const [childrenRes, transactionsRes, parentReportRes, childReportRes, warmRes] = await Promise.all([
         getChildren({ familyGroupId: selectedGroupId ?? undefined }),
         getTransactions({ page: 1, pageSize: 20, familyGroupId: selectedGroupId ?? undefined }),
-        getGrowthReports({ audience: 'parent', period: 'daily' }),
+        getGrowthReports({ audience: 'parent', period: 'daily', ai: false }),
+        getGrowthReports({ audience: 'child', period: 'daily', ai: false }),
         getWarmMoments({ limit: 1 }),
       ]);
 
@@ -174,11 +176,15 @@ export default function Dashboard() {
         }));
         setTransactions(mapped);
       }
-      const report = reportRes.reports?.[0] || null;
+      const report = parentReportRes.reports?.[0] || null;
+      const visibleChildNames = new Set((ch || []).map((child: Child) => child.name));
+      const childReports = (childReportRes.reports || []).filter((childReport) => visibleChildNames.has(childReport.subjectName));
       setDailyParentReport(report);
+      setDailyChildReports(childReports);
       setLatestWarmMoment(warmRes.moments?.[0] || null);
-      if (report && !silent) {
-        const seenKey = `family-growth-report-seen-${report.id}-${report.generatedAt.slice(0, 10)}`;
+      if ((report || childReports.length > 0) && !silent) {
+        const reportDate = report?.periodStart || childReports[0]?.periodStart || '';
+        const seenKey = `family-growth-report-seen-${reportDate}`;
         setShowDailyReport(localStorage.getItem(seenKey) !== '1');
       }
     } catch (err) {
@@ -224,13 +230,20 @@ export default function Dashboard() {
     );
   }
 
+  const childHighlights = dailyChildReports.filter((report) => report.sourceCount > 0);
+  const dailyReportDate = dailyParentReport?.periodStart || dailyChildReports[0]?.periodStart || '';
+  const dailyReportSeenKey = `family-growth-report-seen-${dailyReportDate}`;
+
   return (
     <div className="space-y-6">
-      {showDailyReport && dailyParentReport && <div className="fixed inset-0 z-[70] bg-slate-900/45 backdrop-blur-sm flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-label="今日暖心报告">
+      {showDailyReport && (dailyParentReport || dailyChildReports.length > 0) && <div className="fixed inset-0 z-[70] bg-slate-900/45 backdrop-blur-sm flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-label="今日双向成长报告">
         <div className="w-full max-w-lg rounded-3xl bg-white shadow-2xl overflow-hidden">
-          <div className="bg-gradient-to-br from-rose-100 via-amber-50 to-emerald-100 p-6"><p className="text-sm text-rose-600 font-medium">💛 今日暖心报告</p><h3 className="text-xl font-bold text-gray-900 mt-2">一起看见今天的好</h3></div>
-          <div className="p-6 space-y-3 text-sm leading-6"><p>{dailyParentReport.praise}</p><p>{dailyParentReport.nextStep}</p><p>{dailyParentReport.changeSummary}</p><p className="text-xs text-gray-400">依据 {dailyParentReport.sourceCount} 条具体记录整理</p></div>
-          <div className="px-6 pb-6 flex gap-3"><button onClick={() => navigate('/growth')} className="flex-1 rounded-xl bg-emerald-600 text-white py-3 font-medium">查看完整报告</button><button onClick={() => { localStorage.setItem(`family-growth-report-seen-${dailyParentReport.id}-${dailyParentReport.generatedAt.slice(0, 10)}`, '1'); setShowDailyReport(false); }} className="rounded-xl bg-gray-100 px-5 py-3 text-gray-600">今天知道了</button></div>
+          <div className="bg-gradient-to-br from-rose-100 via-amber-50 to-emerald-100 p-6"><p className="text-sm text-rose-600 font-medium">💛 今日双向成长</p><h3 className="text-xl font-bold text-gray-900 mt-2">一起看见彼此的进步</h3></div>
+          <div className="p-6 space-y-4 text-sm leading-6">
+            <section><h4 className="font-bold text-emerald-700">🌱 孩子成长</h4>{childHighlights.length > 0 ? childHighlights.map((report) => <p className="mt-1" key={report.id}>{report.praise}</p>) : <p className="mt-1 text-gray-500">今天还没有新的积分成长记录。</p>}</section>
+            <section><h4 className="font-bold text-rose-600">💛 爸妈成长</h4><p className="mt-1">{dailyParentReport?.praise || '今天还没有新的暖心记录。'}</p></section>
+          </div>
+          <div className="px-6 pb-6 flex gap-3"><button onClick={() => navigate('/growth')} className="flex-1 rounded-xl bg-emerald-600 text-white py-3 font-medium">查看双向报告</button><button onClick={() => { localStorage.setItem(dailyReportSeenKey, '1'); setShowDailyReport(false); }} className="rounded-xl bg-gray-100 px-5 py-3 text-gray-600">知道了</button></div>
         </div>
       </div>}
       {/* 页面标题 */}
@@ -256,7 +269,7 @@ export default function Dashboard() {
       <button onClick={() => navigate('/growth')} className="w-full text-left rounded-3xl border border-rose-100 bg-gradient-to-r from-rose-50 via-amber-50 to-emerald-50 p-5 shadow-sm transition hover:shadow-md">
         <div className="flex flex-col md:flex-row md:items-center gap-4">
           <div className="text-4xl">💛</div>
-          <div className="flex-1"><h3 className="text-lg font-bold text-gray-900">家长暖心时刻</h3><p className="mt-1 text-sm text-gray-600">{latestWarmMoment ? `${latestWarmMoment.childName}说：“${latestWarmMoment.content}”` : '孩子可以在手表上用语音记录爸爸妈妈的闪光时刻'}</p>{dailyParentReport && <p className="mt-2 text-xs text-emerald-700">今日报告：{dailyParentReport.changeSummary}</p>}</div>
+          <div className="flex-1"><h3 className="text-lg font-bold text-gray-900">亲子双向成长</h3><p className="mt-1 text-sm text-gray-600">{childHighlights[0]?.praise || '今天还没有新的孩子成长记录'}</p><p className="mt-1 text-xs text-rose-600">爸妈成长：{latestWarmMoment ? `${latestWarmMoment.childName}说：“${latestWarmMoment.content}”` : dailyParentReport?.praise || '今天还没有新的暖心记录'}</p></div>
           <span className="text-sm font-medium text-rose-600">查看暖心记录与双向报告 →</span>
         </div>
       </button>

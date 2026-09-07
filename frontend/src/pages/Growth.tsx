@@ -11,7 +11,7 @@ function ReportCard({ report }: { report: GrowthReport }) {
   return (
     <Card className="p-5 border border-emerald-100">
       <div className="flex items-center justify-between gap-3 mb-4">
-        <h3 className="font-bold text-gray-900">{report.audience === 'parent' ? '💛 家长报告' : `🌱 ${report.subjectName}的报告`}</h3>
+        <h3 className="font-bold text-gray-900">{report.audience === 'parent' ? '💛 爸妈成长' : `🌱 孩子成长 · ${report.subjectName}`}</h3>
         <span className="text-xs text-gray-400">{report.periodStart} 至 {report.periodEnd}</span>
       </div>
       <div className="space-y-3 text-sm leading-6">
@@ -66,9 +66,8 @@ export default function Growth() {
 
       {loading ? <div className="py-16 text-center text-gray-400">正在整理成长记录...</div> : (
         <>
-          <section className="grid grid-cols-1 xl:grid-cols-2 gap-5">
-            {[...parentReports, ...childReports].map((report) => <ReportCard key={`${report.audience}-${report.id}`} report={report} />)}
-          </section>
+          <section className="space-y-3"><div><h3 className="text-lg font-bold text-emerald-800">🌱 孩子成长</h3><p className="text-sm text-gray-500">依据积分行为记录，看见孩子自己的进步。</p></div><div className="grid grid-cols-1 xl:grid-cols-2 gap-5">{childReports.map((report) => <ReportCard key={`${report.audience}-${report.id}`} report={report} />)}{childReports.length === 0 && <p className="text-sm text-gray-400">暂无孩子成长报告</p>}</div></section>
+          <section className="space-y-3"><div><h3 className="text-lg font-bold text-rose-700">💛 爸妈成长</h3><p className="text-sm text-gray-500">依据孩子记录的暖心时刻，看见爸爸妈妈的改变。</p></div><div className="grid grid-cols-1 xl:grid-cols-2 gap-5">{parentReports.map((report) => <ReportCard key={`${report.audience}-${report.id}`} report={report} />)}{parentReports.length === 0 && <p className="text-sm text-gray-400">暂无爸妈成长报告</p>}</div></section>
           <Card className="p-5">
             <h3 className="font-bold text-gray-900 mb-1">孩子眼中的家长暖心时刻</h3>
             <p className="text-sm text-gray-500 mb-4">这里只保留孩子说出的具体感受，不评分、不排名。</p>

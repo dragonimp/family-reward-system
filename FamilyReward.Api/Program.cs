@@ -872,8 +872,9 @@ app.MapGet("/api/growth-reports", async (HttpRequest request, IHttpClientFactory
     var audience = request.Query.String("audience").Equals("parent", StringComparison.OrdinalIgnoreCase) ? "parent" : "child";
     var childId = request.Query.Int("childId");
     var reports = await EnsureParentGrowthReports(connectionString, access.Profile!.AppUserId, audience, period, childId);
-    for (var index = 0; index < reports.Count; index++)
-        reports[index] = await TryGenerateAiGrowthReport(connectionString, configStore, httpClientFactory, access.Profile.AppUserId, reports[index], request.HttpContext.RequestAborted);
+    if (!request.Query.String("ai").Equals("false", StringComparison.OrdinalIgnoreCase))
+        for (var index = 0; index < reports.Count; index++)
+            reports[index] = await TryGenerateAiGrowthReport(connectionString, configStore, httpClientFactory, access.Profile.AppUserId, reports[index], request.HttpContext.RequestAborted);
     return Results.Json(new { period, audience, reports });
 });
 
@@ -1342,8 +1343,7 @@ app.MapGet("/watch", () =>
                 document.getElementById('watch-report').innerHTML = report ? `
                   <p><b>✨ ${escapeText(report.praise)}</b></p>
                   <p>${escapeText(report.nextStep)}</p>
-                  <p>${escapeText(report.changeSummary)}</p>
-                  <p class="source-note">来自 ${Number(report.sourceCount) || 0} 条具体记录</p>` : '<p>今天还没有可展示的报告</p>';
+                  <p class="source-note">继续加油，每一点进步都值得被看见。</p>` : '<p>今天也要开心成长。</p>';
                 const child = (score.children || [])[0] || {};
                 document.getElementById('updated-at').textContent = new Date(score.updatedAt).toLocaleTimeString('zh-CN', { hour12: false, hour: '2-digit', minute: '2-digit' });
                 document.getElementById('child-name').textContent = child.name || '暂无孩子';
@@ -2877,20 +2877,25 @@ static async Task<Dictionary<string, object?>> EnsureGrowthReport(string connect
             descriptions.Add(reader.String("description"));
         }
     }
-    var praise = descriptions.Count == 0
-        ? $"{subjectName}，今天还没有新的记录，愿意一起留意生活本身就很珍贵。"
-        : $"做得好的点：{subjectName}留下了{descriptions.Count}条真实记录，尤其是“{descriptions[0]}”。";
-    var nextStep = descriptions.Count == 0 ? "接下来可以试试：记录一个让自己感到温暖或有进步的小瞬间。" : "接下来可以试试：延续其中一件小事，并说说当时的感受。";
-    var summary = descriptions.Count < 2 ? "变化总结：记录正在从一个小瞬间开始积累。" : $"变化总结：这段时间持续记录了{descriptions.Count}个具体瞬间，比单看积分更能看见成长。";
+    var isChildReport = audience == "child";
+    var praise = isChildReport
+        ? descriptions.Count == 0 ? $"{subjectName}，今天也在认真成长。" : $"{subjectName}，你今天“{descriptions[0]}”，很棒！"
+        : descriptions.Count == 0 ? "今天还没有新的暖心记录。" : $"孩子看见了爸妈的闪光：{descriptions[0]}。";
+    var nextStep = isChildReport
+        ? descriptions.Count == 0 ? "明天继续发现一个小进步吧。" : "继续保持，你的努力被看见了。"
+        : descriptions.Count == 0 ? "多听听彼此今天最开心的小事。" : "继续把这份耐心和温暖留在日常里。";
+    var summary = isChildReport
+        ? descriptions.Count < 2 ? "每一个小行动都在积累成长。" : $"今天记录了{descriptions.Count}个成长瞬间。"
+        : descriptions.Count < 2 ? "爸妈和孩子正在一起积累温暖。" : $"孩子记录了{descriptions.Count}个爸妈的暖心瞬间。";
     await using var upsert = new NpgsqlCommand("""
         INSERT INTO growth_reports (parent_app_user_id, child_profile_key, audience, period_type, period_start, period_end, praise, next_step, change_summary, source_refs, generated_by, updated_at)
         VALUES (@owner, @profile, @audience, @period, @start, @end, @praise, @next, @summary, @sources::jsonb, 'rules', CURRENT_TIMESTAMP)
         ON CONFLICT (parent_app_user_id, child_profile_key, audience, period_type, period_start) DO UPDATE SET
           period_end = EXCLUDED.period_end,
-          praise = CASE WHEN growth_reports.source_refs IS DISTINCT FROM EXCLUDED.source_refs THEN EXCLUDED.praise ELSE growth_reports.praise END,
-          next_step = CASE WHEN growth_reports.source_refs IS DISTINCT FROM EXCLUDED.source_refs THEN EXCLUDED.next_step ELSE growth_reports.next_step END,
-          change_summary = CASE WHEN growth_reports.source_refs IS DISTINCT FROM EXCLUDED.source_refs THEN EXCLUDED.change_summary ELSE growth_reports.change_summary END,
-          generated_by = CASE WHEN growth_reports.source_refs IS DISTINCT FROM EXCLUDED.source_refs THEN 'rules' ELSE growth_reports.generated_by END,
+          praise = CASE WHEN growth_reports.source_refs IS DISTINCT FROM EXCLUDED.source_refs OR growth_reports.generated_by NOT IN ('ai-v2', 'ai-fallback-v2') THEN EXCLUDED.praise ELSE growth_reports.praise END,
+          next_step = CASE WHEN growth_reports.source_refs IS DISTINCT FROM EXCLUDED.source_refs OR growth_reports.generated_by NOT IN ('ai-v2', 'ai-fallback-v2') THEN EXCLUDED.next_step ELSE growth_reports.next_step END,
+          change_summary = CASE WHEN growth_reports.source_refs IS DISTINCT FROM EXCLUDED.source_refs OR growth_reports.generated_by NOT IN ('ai-v2', 'ai-fallback-v2') THEN EXCLUDED.change_summary ELSE growth_reports.change_summary END,
+          generated_by = CASE WHEN growth_reports.source_refs IS DISTINCT FROM EXCLUDED.source_refs OR growth_reports.generated_by NOT IN ('ai-v2', 'ai-fallback-v2') THEN 'rules' ELSE growth_reports.generated_by END,
           source_refs = EXCLUDED.source_refs, updated_at = CURRENT_TIMESTAMP
         RETURNING id, praise, next_step, change_summary, source_refs::text AS source_refs, generated_by, generated_at, updated_at
         """, conn);
@@ -2927,7 +2932,7 @@ static async Task<Dictionary<string, object?>> TryGenerateAiGrowthReport(
     CancellationToken cancellationToken)
 {
     var initialGenerator = Convert.ToString(report["generatedBy"], CultureInfo.InvariantCulture) ?? "";
-    if (initialGenerator is "ai" or "ai-fallback") return report;
+    if (initialGenerator is "ai-v2" or "ai-fallback-v2") return report;
     string? sessionId = null;
     string? username = null;
     string? webAppBotId = null;
@@ -2953,9 +2958,12 @@ static async Task<Dictionary<string, object?>> TryGenerateAiGrowthReport(
         }, username, cancellationToken);
         if (session is null) return report;
         sessionId = session.Id;
+        var audienceStyle = string.Equals(Convert.ToString(report["audience"], CultureInfo.InvariantCulture), "child", StringComparison.Ordinal)
+            ? "写给孩子本人，用第二人称、儿童能懂的短句，以具体鼓励为主；每项不超过40字。"
+            : "写给家长，体现孩子与爸妈彼此看见、共同成长；每项不超过60字。";
         var prompt = $"""
             你是家加分的亲子共同成长记录助手。请根据下面已有报告草稿润色，严格只返回 JSON 对象，字段为 praise、nextStep、changeSummary。
-            要求：每项不超过80字；结构分别体现“做得好的点”“接下来可以试试”“变化总结”；温暖、具体、非诊断式；禁止星级、分项评分、好/不好判断、孩子或家长间排名；不得增加草稿之外的事实。
+            要求：{audienceStyle}温暖、具体、非诊断式；禁止星级、分项评分、好/不好判断、孩子或家长间排名；不得增加草稿之外的事实。
             对象：{report["subjectName"]}；周期：{report["periodStart"]}至{report["periodEnd"]}；来源记录数：{report["sourceCount"]}。
             草稿：{report["praise"]} {report["nextStep"]} {report["changeSummary"]}
             """;
@@ -2990,10 +2998,10 @@ static async Task<Dictionary<string, object?>> TryGenerateAiGrowthReport(
         var summary = generated?.String("changeSummary").Trim() ?? "";
         if (praise.Length is < 4 or > 160 || nextStep.Length is < 4 or > 160 || summary.Length is < 4 or > 160) return report;
         await using var updateConn = await OpenConnection(connectionString);
-        await using var update = new NpgsqlCommand("UPDATE growth_reports SET praise=@praise, next_step=@next, change_summary=@summary, generated_by='ai', generated_at=CURRENT_TIMESTAMP, updated_at=CURRENT_TIMESTAMP WHERE id=@id", updateConn);
+        await using var update = new NpgsqlCommand("UPDATE growth_reports SET praise=@praise, next_step=@next, change_summary=@summary, generated_by='ai-v2', generated_at=CURRENT_TIMESTAMP, updated_at=CURRENT_TIMESTAMP WHERE id=@id", updateConn);
         update.Parameters.AddWithValue("praise", praise); update.Parameters.AddWithValue("next", nextStep); update.Parameters.AddWithValue("summary", summary); update.Parameters.AddWithValue("id", GetInt(report, "id"));
         await update.ExecuteNonQueryAsync(cancellationToken);
-        report["praise"] = praise; report["nextStep"] = nextStep; report["changeSummary"] = summary; report["generatedBy"] = "ai"; report["generatedAt"] = DateTime.UtcNow.ToString("O");
+        report["praise"] = praise; report["nextStep"] = nextStep; report["changeSummary"] = summary; report["generatedBy"] = "ai-v2"; report["generatedAt"] = DateTime.UtcNow.ToString("O");
     }
     catch { /* Agent unavailable: keep the safe, traceable fallback report. */ }
     finally
@@ -3002,13 +3010,13 @@ static async Task<Dictionary<string, object?>> TryGenerateAiGrowthReport(
         {
             try { await CreateOrbitWebAppClient(httpClientFactory, webAppBotId).UpdateSessionAsync(sessionId, new UpdateOrbitWebAppSessionRequest { IsArchived = true }, username, cancellationToken); } catch { }
         }
-        if (!string.Equals(Convert.ToString(report["generatedBy"], CultureInfo.InvariantCulture), "ai", StringComparison.OrdinalIgnoreCase))
+        if (!string.Equals(Convert.ToString(report["generatedBy"], CultureInfo.InvariantCulture), "ai-v2", StringComparison.OrdinalIgnoreCase))
         {
-            report["generatedBy"] = "ai-fallback";
+            report["generatedBy"] = "ai-fallback-v2";
             try
             {
                 await using var fallbackConn = await OpenConnection(connectionString);
-                await using var fallback = new NpgsqlCommand("UPDATE growth_reports SET generated_by='ai-fallback', generated_at=CURRENT_TIMESTAMP WHERE id=@id AND generated_by <> 'ai'", fallbackConn);
+                await using var fallback = new NpgsqlCommand("UPDATE growth_reports SET generated_by='ai-fallback-v2', generated_at=CURRENT_TIMESTAMP WHERE id=@id AND generated_by <> 'ai-v2'", fallbackConn);
                 fallback.Parameters.AddWithValue("id", GetInt(report, "id"));
                 await fallback.ExecuteNonQueryAsync();
             }
@@ -4605,7 +4613,7 @@ static async Task<object> McpAdjustScore(string connectionString, JsonObject arg
         ["points"] = Math.Abs(delta.Value),
         ["category"] = arguments.String("category", delta > 0 ? "奖励" : "扣分"),
         ["description"] = arguments.String("description", $"积分{(direction == "+" ? "增加" : "扣减")}"),
-        ["date"] = arguments.String("date", DateTime.Today.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture))
+        ["date"] = arguments.String("date", DateOnly.FromDateTime(DateTime.UtcNow.AddHours(8)).ToString("yyyy-MM-dd", CultureInfo.InvariantCulture))
     };
     var tx = await CreateTransaction(connectionString, txBody, parentAppUserId: ResolveMcpParentAppUserId(arguments));
     if (tx.ContainsKey("error"))
@@ -4706,7 +4714,7 @@ static async Task<object> McpApplyMatchingRule(string connectionString, JsonObje
         ["category"] = Convert.ToString(best.Rule["category"], CultureInfo.InvariantCulture) ?? "规则记分",
         ["description"] = $"{Convert.ToString(best.Rule["name"], CultureInfo.InvariantCulture)}：{behavior}",
         ["notes"] = arguments.String("notes"),
-        ["date"] = arguments.String("date", DateTime.Today.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)),
+        ["date"] = arguments.String("date", DateOnly.FromDateTime(DateTime.UtcNow.AddHours(8)).ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)),
         ["idempotency_key"] = idempotencyKey
     };
     var tx = await CreateTransaction(connectionString, txBody, parentAppUserId: parentAppUserId);
@@ -4808,7 +4816,7 @@ static async Task<object> McpLogScoreOperation(string connectionString, JsonObje
         ["category"] = arguments.String("category", "积分调整"),
         ["description"] = arguments.String("description", $"积分{(direction == "+" ? "增加" : "扣减")}"),
         ["notes"] = arguments.String("notes"),
-        ["date"] = arguments.String("date", DateTime.Today.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture))
+        ["date"] = arguments.String("date", DateOnly.FromDateTime(DateTime.UtcNow.AddHours(8)).ToString("yyyy-MM-dd", CultureInfo.InvariantCulture))
     };
     var tx = await CreateTransaction(connectionString, txBody, parentAppUserId: ResolveMcpParentAppUserId(arguments));
     if (tx.ContainsKey("error"))
@@ -5854,7 +5862,7 @@ static async Task<JsonObject> NormalizeRecordArguments(string connectionString, 
 
     if (!string.IsNullOrWhiteSpace(type)) body["type"] = type;
     if (!allowMissingChild || arguments.ContainsKey("direction") || arguments.ContainsKey("delta")) body["direction"] = direction;
-    if (!allowMissingChild || arguments.ContainsKey("date")) body["date"] = arguments.String("date", DateTime.Today.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture));
+    if (!allowMissingChild || arguments.ContainsKey("date")) body["date"] = arguments.String("date", DateOnly.FromDateTime(DateTime.UtcNow.AddHours(8)).ToString("yyyy-MM-dd", CultureInfo.InvariantCulture));
     if (!allowMissingChild || arguments.ContainsKey("category")) body["category"] = arguments.String("category");
     if (!allowMissingChild || arguments.ContainsKey("description")) body["description"] = arguments.String("description");
     if (!allowMissingChild || arguments.ContainsKey("notes")) body["notes"] = arguments.String("notes");
@@ -5921,7 +5929,7 @@ static async Task<Dictionary<string, object?>> UpdateTransaction(
             RETURNING *
             """, conn, tx);
         cmd.Parameters.AddWithValue("id", id);
-        cmd.Parameters.AddWithValue("date", DateOnly.Parse(body.String("date", Convert.ToString(existing["date"], CultureInfo.InvariantCulture) ?? DateTime.Today.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)), CultureInfo.InvariantCulture));
+        cmd.Parameters.AddWithValue("date", DateOnly.Parse(body.String("date", Convert.ToString(existing["date"], CultureInfo.InvariantCulture) ?? DateOnly.FromDateTime(DateTime.UtcNow.AddHours(8)).ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)), CultureInfo.InvariantCulture));
         cmd.Parameters.AddWithValue("child_id", childId);
         cmd.Parameters.AddWithValue("type", type);
         cmd.Parameters.AddWithValue("direction", direction);
@@ -8974,7 +8982,7 @@ static async Task<Dictionary<string, object?>> CreateTransaction(
             ON CONFLICT (idempotency_key) WHERE idempotency_key IS NOT NULL AND idempotency_key <> '' DO NOTHING
             RETURNING *
             """, conn, tx);
-        cmd.Parameters.AddWithValue("date", DateOnly.Parse(body.String("date", DateTime.Today.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)), CultureInfo.InvariantCulture));
+        cmd.Parameters.AddWithValue("date", DateOnly.Parse(body.String("date", DateOnly.FromDateTime(DateTime.UtcNow.AddHours(8)).ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)), CultureInfo.InvariantCulture));
         cmd.Parameters.AddWithValue("child_id", childId);
         cmd.Parameters.AddWithValue("type", type);
         cmd.Parameters.AddWithValue("direction", direction);

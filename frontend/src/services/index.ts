@@ -78,7 +78,7 @@ export const getGrowthStats = (params?: { familyGroupId?: number }) =>
   http.get<unknown, { children: ChildGrowthStats[] }>('/api/stats/growth', { params });
 export const getWarmMoments = (params?: { childId?: number; limit?: number }) =>
   http.get<unknown, { moments: WarmMoment[] }>('/api/warm-moments', { params });
-export const getGrowthReports = (params: { audience: 'child' | 'parent'; period: 'daily' | 'weekly' | 'monthly'; childId?: number }) =>
+export const getGrowthReports = (params: { audience: 'child' | 'parent'; period: 'daily' | 'weekly' | 'monthly'; childId?: number; ai?: boolean }) =>
   http.get<unknown, { reports: GrowthReport[] }>('/api/growth-reports', { params });
 export const getChildGrowthSettings = (childId: number, params?: { familyGroupId?: number }) =>
   http.get<unknown, { friendLeaderboardEnabled: boolean }>(`/api/children/${childId}/growth-settings`, { params });
