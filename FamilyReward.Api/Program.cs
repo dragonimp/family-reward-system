@@ -1024,7 +1024,7 @@ app.MapGet("/watch", () =>
             body{min-height:100vh;height:100vh;height:100dvh;margin:0;overflow:hidden;background:#dce8e2;color:#102019;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
             .wrap{display:grid;place-items:center;width:100%;height:100%;padding:4px;padding:4px max(4px,env(safe-area-inset-right)) 4px max(4px,env(safe-area-inset-left));overflow:hidden}
             .watch-shell{position:relative;width:calc(100vw - 8px);height:calc(112.5vw - 9px);max-width:307px;max-height:346px;margin:0}
-            @media (orientation:landscape){.watch-shell{width:calc(88.8889vh - 7.1111px);height:calc(100vh - 8px)}}
+            @media (min-aspect-ratio:8/9){.watch-shell{width:calc(88.8889vh - 7.1111px);height:calc(100vh - 8px)}}
             @supports (aspect-ratio:8 / 9){.watch-shell{height:auto;aspect-ratio:8 / 9}}
             @supports (width:min(100px,100%)){.watch-shell{--watch-width:min(calc(100vw - 8px),calc(88.8889vh - 7.1111px),307px);width:var(--watch-width);height:auto;max-width:100%;max-height:100%;aspect-ratio:8 / 9;margin:0}}
             @supports(height:100dvh){@supports (width:min(100px,100%)){.watch-shell{--watch-width:min(calc(100vw - 8px),calc(88.8889dvh - 7.1111px),307px)}}}

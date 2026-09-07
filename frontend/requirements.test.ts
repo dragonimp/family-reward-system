@@ -88,7 +88,7 @@ test('REQ-066 uses one responsive 8:9 portrait watch face with an internal safe 
   const menuRule = watchPage.match(/\.menu-dock\{[^}]+\}/)?.[0] || '';
 
   assert.match(watchPage, /width:calc\(100vw - 8px\);height:calc\(112\.5vw - 9px\)/);
-  assert.match(watchPage, /width:calc\(88\.8889vh - 7\.1111px\);height:calc\(100vh - 8px\)/);
+  assert.match(watchPage, /@media \(min-aspect-ratio:8\/9\)\{\.watch-shell\{width:calc\(88\.8889vh - 7\.1111px\);height:calc\(100vh - 8px\)/);
   assert.match(watchPage, /@supports \(aspect-ratio:8 \/ 9\)/);
   assert.match(watchPage, /aspect-ratio:8 \/ 9/);
   assert.match(watchPage, /--watch-width:min\(calc\(100vw - 8px\),calc\(88\.8889vh - 7\.1111px\),307px\)/);
