@@ -21,6 +21,9 @@
 - 官方要求核对笔记：`09-official-requirements-notes.md`
 - 项目管理外部市场平台模块审计：`10-external-market-platform-module-audit.md`
 - REQ-053 静态测试用例与追踪矩阵：`11-req-053-static-test-cases.md`
+- REQ-057 应用上架材料登记静态测试用例：`12-req-057-static-test-cases.md`
+- REQ-062 VIP 表盘动画静态测试用例：`13-req-062-static-test-cases.md`
+- REQ-066 方形手表表盘静态测试用例：`15-req-066-static-test-cases.md`
 - REQ-055 材料补齐纠正分析：`../../REQ-055-ANALYSIS.md`
 
 ## 当前产品信息
