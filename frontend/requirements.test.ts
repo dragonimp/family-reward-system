@@ -73,23 +73,26 @@ test('Xiaotiancai watch page remains parseable by Android 7.1 and 8.1 WebView', 
   assert.doesNotMatch(watchPage, /Object\.fromEntries/);
   assert.doesNotMatch(watchPage, /catch\s*\{/);
   assert.match(watchPage, /new FormData\(form\)\.forEach/);
-  assert.match(watchPage, /width:calc\(100vw - 52px\)/);
+  assert.match(watchPage, /width:calc\(100vw - 8px\);height:calc\(112\.5vw - 9px\)/);
   assert.match(watchPage, /@supports \(width:min\(100px,100%\)\)/);
   assert.match(watchPage, /-webkit-text-size-adjust:100%/);
   assert.match(watchPage, /screen\.id !== 'bind-panel'/);
   assert.match(watchPage, /#app-panel \.panel:not\(\[data-panel=home\]\)/);
 });
 
-test('REQ-066 uses one responsive square watch face with an internal safe menu', async () => {
+test('REQ-066 uses one responsive 8:9 portrait watch face with an internal safe menu', async () => {
   const api = await readFile(new URL('../FamilyReward.Api/Program.cs', import.meta.url), 'utf8');
   const watchPage = api.slice(api.indexOf('app.MapGet("/watch"'), api.indexOf('app.MapPost("/api/children"'));
   const faceRule = watchPage.match(/\.watch-face\{[^}]+\}/)?.[0] || '';
   const innerRule = watchPage.match(/\.watch-face:before\{[^}]+\}/)?.[0] || '';
   const menuRule = watchPage.match(/\.menu-dock\{[^}]+\}/)?.[0] || '';
 
-  assert.match(watchPage, /width:calc\(100vw - 52px\);height:calc\(100vw - 52px\)/);
-  assert.match(watchPage, /width:calc\(100vmin - 8px\);height:calc\(100vmin - 8px\)/);
-  assert.match(watchPage, /@supports \(aspect-ratio:1 \/ 1\)/);
+  assert.match(watchPage, /width:calc\(100vw - 8px\);height:calc\(112\.5vw - 9px\)/);
+  assert.match(watchPage, /width:calc\(88\.8889vh - 7\.1111px\);height:calc\(100vh - 8px\)/);
+  assert.match(watchPage, /@supports \(aspect-ratio:8 \/ 9\)/);
+  assert.match(watchPage, /aspect-ratio:8 \/ 9/);
+  assert.match(watchPage, /--watch-width:min\(calc\(100vw - 8px\),calc\(88\.8889vh - 7\.1111px\),307px\)/);
+  assert.doesNotMatch(watchPage, /aspect-ratio:1 \/ 1|width:calc\(100vmin - 8px\);height:calc\(100vmin - 8px\)/);
   assert.match(watchPage, /@media\(max-width:260px\),\(max-height:260px\)/);
   assert.match(faceRule, /border-radius:0/);
   assert.match(innerRule, /border-radius:0/);
