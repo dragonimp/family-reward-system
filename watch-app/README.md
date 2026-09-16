@@ -1,5 +1,7 @@
 # 家加分手表 app 上架包
 
+Apple Watch 儿童端位于 [`apple/`](apple/README.md)：原生 SwiftUI 独立 watchOS App，支持认证码绑定、积分查询、奖励申请、审批记录与认证码解绑。构建及发布状态见该目录说明。
+
 本目录为 `family-reward-REQ-008` 准备：面向小天才、小米、华为手表的手表端 app 版本。
 
 当前实现采用轻量 Android WebView 壳，统一加载线上手表端入口：
@@ -21,6 +23,7 @@
 ## 目录
 
 - `android/`：Android WebView 手表壳工程，可用于小米、华为以及 Android 系手表渠道打包。
+- `apple/`：Apple Watch 原生工程，最低 watchOS 10.0，可独立联网，无需额外 iPhone App。
 - `platforms/`：三家平台的上架适配配置和审核说明。
 - `store-listing/`：中文上架文案、权限说明、截图清单。
 - `STORE-SUBMISSION-GUIDE.md`：按小天才、小米、华为区分的上架执行手册。
@@ -33,6 +36,8 @@
 node watch-app/scripts/verify-watch-app.mjs
 dotnet build FamilyReward.slnx
 ```
+
+H5 方形表盘的浏览器布局回归：运行 `node watch-app/scripts/preview-watch-layout.mjs`，打开输出的本地地址。页面从当前后端源码提取 H5 标记和样式，验证六种屏幕尺寸的外框边界和 8:9 比例，不访问家庭数据或设备接口。
 
 ## 打包边界
 

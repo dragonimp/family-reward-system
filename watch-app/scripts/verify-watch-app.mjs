@@ -95,7 +95,10 @@ for (const centeredQueryRequirement of [
 for (const responsiveRequirement of [
   "height:100dvh",
   "overflow:hidden",
-  "--watch-size:min(",
+  "--watch-width:min(",
+  "width:var(--watch-width)",
+  "aspect-ratio:8 / 9",
+  "@media (min-aspect-ratio:8/9)",
   "const calculatePanelScale = (availableWidth, availableHeight, contentWidth, contentHeight)",
   "window.addEventListener('orientationchange', fitActivePanel)",
   "window.visualViewport.addEventListener('resize', fitActivePanel)"
@@ -159,13 +162,11 @@ for (const req049Requirement of [
     errors.push(`REQ-049 watch request simplification missing: ${req049Requirement}`);
   }
 }
-const clamp = (min, value, max) => Math.min(max, Math.max(min, value));
-for (const [width, height] of [[194, 368], [240, 240], [320, 360], [466, 466], [368, 194]]) {
-  const vmin = Math.min(width, height) / 100;
-  const menuReserve = clamp(36, 14 * vmin, 52);
-  const shellMargin = clamp(26, 10 * vmin, 38);
-  const faceSize = Math.min(width - menuReserve, height - 8, 346);
-  if (faceSize <= 0 || faceSize + shellMargin > width) {
+// The rectangular 8:9 shell reserves 4px on each edge; the menu is inside it.
+for (const [width, height] of [[192, 192], [194, 368], [240, 240], [320, 360], [466, 466], [368, 194]]) {
+  const shellWidth = Math.min(width - 8, (height - 8) * 8 / 9, 307);
+  const shellHeight = shellWidth * 9 / 8;
+  if (shellWidth <= 0 || shellWidth + 8 > width + 0.01 || shellHeight + 8 > height + 0.01) {
     errors.push(`watch face does not fit representative viewport: ${width}x${height}`);
   }
 }

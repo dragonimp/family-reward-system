@@ -1,0 +1,66 @@
+# Linko-Family 原生 iOS 家长端
+
+SwiftUI 原生界面，iPhone / iOS 17+。版本 1.1.1（3），Bundle ID `net.impx.happylife.parent`，可更新之前的 1.0.0 WebView 测试版。业务页面不包含 WebView。
+
+## 原生功能
+
+- 家庭：列表、切换、新建、邀请码加入、邀请分享。
+- 孩子：列表、姓名/备注编辑、积分/零用钱/物品余额。
+- 奖励：原生录入表单、现有规则选择、奖励/扣除、北京时间日期、服务端幂等记账。
+- 审批：孩子奖励申请及审批备注；跨家庭显示当前家长的申请，避免遗漏。
+- 记录：家长所属孩子的完整记录、分页、已加载内容搜索。
+- 规则：查看公共/个人规则、新建和编辑个人规则。
+- 家庭成员：列表与添加。
+- 成长：原生 Charts 每日记录图、活跃/连续天数、温暖瞬间和周报。
+- 手表：设备列表、输入手表配对码、生成孩子授权码。
+- 账号：家长角色选择、订阅权益只读、退出与清理本机凭据。
+
+网页管理后台、Orbit 智能体对话、支付购买入口尚未提供原生界面；不以嵌入网页冒充原生能力。设备解除绑定、删除成员/规则等操作尚未列入本版原生界面。
+
+## 公共登录/注册
+
+直接依赖 `../../../AgentIdentity/packages/AgentIdentity-iOS` 的 Swift Package **AgentIdentity**。系统认证窗口、注册入口、授权交接、Keychain 和退出登录属于公共用户中心 SDK；业务仓库仅调用。
+
+服务端在 `FamilyReward.Api/Program.cs` 引用公共 `AgentIdentity.Sdk` 的 `AddAgentIdentityNativeLogin` / `MapAgentIdentityNativeLogin`。复用现有用户中心 OAuth 配置和令牌，不建业务认证体系。固定无凭据回调 `linkofamily://login-complete/`，接口地址 `https://happylife.ai.impx.net/auth/native/...`。
+
+协议与复用示例见 [公共 SDK 文档](../../../AgentIdentity/packages/AgentIdentity-iOS/README.md)。登录凭据只保存在本机 Keychain；业务 HTTP 请求带 Bearer，不带可伪造用户身份参数。401 清除登录及业务数据，家庭切换/退出时使旧请求失效。
+
+## 构建与签发
+
+```sh
+bash parent-app/ios/verify.sh   # 模型契约检查、禁止 WebView、模拟器构建、真机 Release 归档
+bash parent-app/ios/archive.sh # 统一团队签名 helper，避免和 MyVnc 构建争用钥匙串
+bash parent-app/ios/export.sh  # 按 build/ExportOptions.plist 导出，独立验证签名/profile/icon
+# 已授权上传时，使用 destination=upload 的本地选项文件：
+HAPPYLIFE_PARENT_EXPORT_OPTIONS="$PWD/parent-app/ios/build/UploadOptions.plist" bash parent-app/ios/export.sh
+```
+
+签名团队 `JQPH54K7SD`；已存在 App Store Connect 应用 `6812475608`；沿用已签发 profile。私钥和本地导出选项不提交。
+
+## 本次验证记录（2026-09-16，北京时间）
+
+- SwiftUI Simulator 构建、Release Archive、App Store 导出与独立 codesign/profile 检查通过。
+- 公共授权 SDK 9 项单元/HTTP 集成测试通过：proof、过期、容量、单次领取、并发、未登录拒绝、Origin/CSRF、无凭据回调。
+- 公共 .NET SDK net8.0/net10.0 与消费 API 构建通过。
+- Atlas `family-reward-TASK-264` 于 08:39:34 完成受控部署；备份 `/opt/backups/family-reward/20260916083854`。
+- 实际线上授权 start=200、pending poll=202、错误 proof=403、非法 challenge=400、未登录 approval=302 到 `/auth/login`。
+- 模拟器已安装启动并截图原生登录页。当前电脑 UI 控制返回 `cgWindowNotFound`，未完成真实用户登录、业务写入与物理 iPhone 验收；以上构建/API 检查不能代替这些验收。
+- Apple 已确认 1.1.0（2）`VALID`、`IN_BETA_TESTING`，且新构建已加入原有内部组。Build ID `03b3ed6a-c977-40cc-8037-622c94cc5c24`；结果写入忽略目录 `build/evidence/native-release-result.json`。
+
+制品：`build/TestFlight/Linko-Family.ipa`。证据：`build/evidence/native-login.png`、`native-backend-deployment.json`。生成物不提交。
+
+## 1.1.1（3）授权修复
+
+- 修复公共授权页 `no-referrer` 与同源 Origin 校验冲突造成的空白 403；保持 Origin/CSRF 校验并返回可理解的失败提示。
+- 成功显示“登录完成，可以关闭窗口”，保留返回客户端与关闭按钮。公共 iOS SDK 独立轮询授权结果，成功后关闭系统认证窗口。
+- 登录和注册等待显示状态及取消按钮；取消会停止网络与浏览器等待、使迟到结果失效，并按 proof 撤销服务端尝试。
+- 公共 .NET SDK 的同一协议已接入 MyVnc 服务端；MyVnc Windows/iOS 共用代码引用 `AgentIdentity.NativeClient`，不再在业务客户端实现挑战和轮询。
+- 本版本的上传及实机验证以独立 release evidence 为准，不能沿用 1.1.0 的通过记录。
+
+- 1.1.1（3）已由 Apple 处理 VALID 并加入原内部测试组（IN_BETA_TESTING）；Build ID `525a9de4-43e1-4bc1-a4c8-04320cbeabf4`，独立证据 `build/evidence/login-fix-release-result.json`。
+
+## 1.1.2（4）规则响应解析修复
+
+修复家庭首页加载孩子后弹出“服务返回的数据格式不正确”：`GET /api/rules` 的正式响应是包含 `rules` 的对象，原生客户端现在明确解析该字段。缺失字段或非数组仍报错，不把异常转换成空列表。新增非空、空列表、缺字段和非法字段类型回归；原生模型检查、Simulator 构建和 Release 归档通过。签发结果见后续发布记录；不将构建通过视为真机验证。
+
+发布结果：2026-09-16 14:41:33 上传成功；Apple build `59db4b52-6c73-4d42-a5a7-2cd70c488667`，版本 1.1.2（4），状态 VALID，已加入既有内部测试组，独立查询为 IN_BETA_TESTING。证据保存在 `build/evidence/rules-fix-build.json`、`rules-fix-beta.json`。真机家庭首页复测尚未执行。

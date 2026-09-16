@@ -41,6 +41,8 @@ export const updateChild = (id: number, data: Partial<Child>) => http.put(`/api/
 export const deleteChild = (id: number, params?: { familyGroupId?: number }) => http.delete(`/api/children/${id}`, { params });
 export const generateChildAuthCode = (id: number, data?: { familyGroupId?: number; expiresInMinutes?: number }) =>
   http.post<unknown, ChildAuthCode>(`/api/children/${id}/auth-code`, data || {});
+export const pairChildWatchDevice = (id: number, code: string) =>
+  http.post<unknown, { deviceId: number; status: string }>(`/api/children/${id}/pair-device`, { code });
 export const getChildWatchDevices = (id: number, params?: { familyGroupId?: number }) =>
   http.get<unknown, ChildWatchDevices>(`/api/children/${id}/devices`, { params });
 export const revokeChildWatchDevice = (childId: number, deviceId: number, params?: { familyGroupId?: number }) =>

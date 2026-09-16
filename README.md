@@ -25,6 +25,14 @@
 - 后端：`http://localhost:5102`
 - 健康检查：`http://localhost:5102/health`
 
+## Linko-Family iOS 家长端
+
+SwiftUI 原生 iPhone 客户端，提供家庭、孩子、积分奖励、审批、记录和成长图表。登录与注册通过公共 AgentIdentity iOS SDK 弹出系统用户中心认证页，业务页面不嵌入网页。功能范围、构建签发及验收记录见 [iOS 家长端](parent-app/ios/README.md)。
+
+```bash
+bash parent-app/ios/verify.sh
+```
+
 ## 手表 app
 
 手表端 H5 入口为 `https://happylife.ai.impx.net/watch`。手表不再走统一账号登录，由家长在 Web 端家庭管理里生成儿童认证码，手表端输入认证码完成设备绑定，后续用设备 token 查询积分和提交积分申请。

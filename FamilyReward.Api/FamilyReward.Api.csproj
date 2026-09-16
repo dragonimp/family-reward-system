@@ -15,6 +15,7 @@
     </PackageReference>
     <PackageReference Include="MailKit" Version="4.14.1" />
     <PackageReference Include="Npgsql" Version="10.0.3" />
+    <PackageReference Include="QRCoder" Version="1.7.0" />
   </ItemGroup>
 
   <ItemGroup>

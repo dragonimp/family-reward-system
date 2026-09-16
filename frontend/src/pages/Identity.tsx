@@ -1,9 +1,10 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 
 export default function Identity() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { user, selectAppRole } = useAuth();
   const [busyRole, setBusyRole] = useState<'parent' | 'child' | null>(null);
   const [error, setError] = useState('');
@@ -19,7 +20,11 @@ export default function Identity() {
         window.location.href = '/watch';
         return;
       }
-      navigate('/dashboard', { replace: true });
+      const from = location.state?.from as { pathname?: string; search?: string } | undefined;
+      const watchCode = new URLSearchParams(from?.search ?? '').get('watchCode') ?? '';
+      const destination = from?.pathname === '/children' && /^[A-HJ-NP-Z2-9]{8}$/.test(watchCode)
+        ? `/children?watchCode=${watchCode}` : '/dashboard';
+      navigate(destination, { replace: true });
     } catch (err) {
       setError(err instanceof Error ? err.message : '身份保存失败');
     } finally {

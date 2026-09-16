@@ -13,6 +13,8 @@ using System.Text.Json;
 using System.Text.Json.Nodes;
 using Npgsql;
 using NpgsqlTypes;
+using Microsoft.AspNetCore.RateLimiting;
+using System.Threading.RateLimiting;
 
 var apiUrls = Environment.GetEnvironmentVariable("FAMILY_REWARD_API_URLS") ?? "http://0.0.0.0:5102";
 var apiUri = new Uri(apiUrls.Replace("0.0.0.0", "localhost", StringComparison.OrdinalIgnoreCase));
@@ -80,6 +82,15 @@ builder.WebHost.ConfigureKestrel(options =>
     }
 });
 
+builder.Services.AddSingleton(new WatchPairingSessions());
+builder.Services.AddRateLimiter(options =>
+{
+    options.RejectionStatusCode = 429;
+    foreach (var (name, limit) in new[] { ("pair-start", 6), ("pair-poll", 60), ("pair-approve", 10) })
+        options.AddPolicy(name, context => RateLimitPartition.GetFixedWindowLimiter(
+            context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+            _ => new FixedWindowRateLimiterOptions { PermitLimit = limit, Window = TimeSpan.FromMinutes(1), QueueLimit = 0 }));
+});
 builder.Services.AddOpenApi();
 builder.Services.ConfigureHttpJsonOptions(options =>
 {
@@ -101,6 +112,7 @@ builder.Services.AddAgentIdentityJwtCookieAuthentication(new AgentIdentityOption
     LogoutCompletedPath = "/auth/logged-out"
 });
 builder.Services.AddAgentIdentityFeedbackClient(builder.Configuration);
+builder.Services.AddAgentIdentityNativeLogin();
 
 var app = builder.Build();
 
@@ -113,9 +125,11 @@ app.UseForwardedHeaders(new ForwardedHeadersOptions
 {
     ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto | ForwardedHeaders.XForwardedHost
 });
+app.UseRateLimiter();
 app.UseCors();
 app.UseAgentIdentity();
 app.MapAgentIdentityAuthEndpoints();
+app.MapAgentIdentityNativeLogin(new Uri("https://happylife.ai.impx.net"), new Uri("linkofamily://login-complete"), "Linko-Family");
 
 var connectionString = BuildConnectionString(builder.Configuration);
 await InitDatabase(connectionString);
@@ -817,6 +831,69 @@ app.MapPost("/api/watch/requests", async (JsonObject body, HttpRequest request) 
         : Results.Created($"/api/watch/requests/{GetInt(result, "id")}", result);
 });
 
+app.MapPost("/api/watch/pairing", async (JsonObject body, HttpRequest request, WatchPairingSessions sessions) =>
+{
+    request.HttpContext.Response.Headers.CacheControl = "no-store";
+    var challenge = await sessions.Start(GetPublicBaseUrl(request), Truncate(body.String("deviceName", "手表"), 240), Truncate(body.String("platform"), 80));
+    return challenge is null ? Results.Json(new { error = "请稍后再试" }, statusCode: 429) : Results.Json(challenge);
+}).RequireRateLimiting("pair-start");
+
+app.MapGet("/api/watch/pairing", async (HttpRequest request, WatchPairingSessions sessions) =>
+{
+    request.HttpContext.Response.Headers.CacheControl = "no-store";
+    var token = GetWatchDeviceToken(request);
+    if (token.Length != 64) return Results.Unauthorized();
+    if (await sessions.IsPending(token)) return Results.Json(new { status = "pending" });
+    // Read the durable binding even after a service restart or a lost approval response.
+    var binding = await RequireWatchDeviceBinding(connectionString, request, touch: false);
+    return binding.Error is null ? Results.Json(new { status = "approved" })
+        : Results.Json(new { status = "expired" });
+}).RequireRateLimiting("pair-poll");
+
+app.MapPost("/api/children/{id:int}/pair-device", async (int id, JsonObject body, HttpRequest request, WatchPairingSessions sessions) =>
+{
+    if (!AgentIdentityAuthorizationExtensions.IsUserIdentity(request.HttpContext.User)
+        || FirstClaim(request, ClaimTypes.NameIdentifier, "sub") is null)
+        return Results.Json(new { error = "请先登录家长账号" }, statusCode: 401);
+    var profile = await GetOrCreateAppUserProfile(connectionString, request, "pc", null, autoCreate: false);
+    if (profile.Role != "parent" || !await IsAppUserBusinessActive(connectionString, profile.UnifiedUserId))
+        return Results.Json(new { error = "请使用有效的家长账号" }, statusCode: 403);
+    var owner = profile.AppUserId;
+    var group = await ResolveChildFamilyGroupId(connectionString, request, body, id, owner);
+    if (await GetParentOwnedChild(connectionString, id, group, owner) is null)
+        return Results.Json(new { error = "只能为自己名下的孩子绑定设备" }, statusCode: 403);
+    try
+    {
+        var result = await sessions.Approve(body.String("code"), owner, id, async session =>
+        {
+            await using var conn = await OpenConnection(connectionString);
+            await using var tx = await conn.BeginTransactionAsync();
+            var child = await GetChildForFamily(conn, tx, id, group, owner);
+            if (child is null) throw new UnauthorizedAccessException();
+            await using var insert = new NpgsqlCommand("""
+                INSERT INTO watch_device_bindings
+                    (child_id, family_group_id, child_profile_key, parent_app_user_id, device_token_hash, device_name, platform, user_agent)
+                VALUES (@child, @group, @profile, @owner, @hash, @name, @platform, '') RETURNING id
+                """, conn, tx);
+            insert.Parameters.AddWithValue("child", id);
+            insert.Parameters.AddWithValue("group", group);
+            insert.Parameters.AddWithValue("profile", Convert.ToString(child["profileKey"], CultureInfo.InvariantCulture) ?? "");
+            insert.Parameters.AddWithValue("owner", owner);
+            insert.Parameters.AddWithValue("hash", session.TokenHash);
+            insert.Parameters.AddWithValue("name", session.DeviceName);
+            insert.Parameters.AddWithValue("platform", session.Platform);
+            var deviceId = Convert.ToInt32(await insert.ExecuteScalarAsync(), CultureInfo.InvariantCulture);
+            await tx.CommitAsync();
+            return deviceId;
+        });
+        return result.Error is null ? Results.Json(new { deviceId = result.DeviceId, status = "approved" })
+            : Results.BadRequest(new { error = result.Error });
+    }
+    catch (UnauthorizedAccessException) { return Results.Json(new { error = "只能为自己名下的孩子绑定设备" }, statusCode: 403); }
+    catch (PostgresException ex) when (ex.SqlState == PostgresErrorCodes.UniqueViolation)
+    { return Results.Conflict(new { error = "该孩子已绑定设备，请先由家长解绑现有设备" }); }
+}).RequireRateLimiting("pair-approve");
+
 app.MapPost("/api/watch/device-bind", async (JsonObject body, HttpRequest request) =>
 {
     var result = await BindWatchDevice(connectionString, body, request);
@@ -1064,6 +1141,7 @@ app.MapGet("/watch", () =>
             .requests{list-style:none;margin:0;padding:0;display:grid;gap:5px}.requests li{display:grid;grid-template-columns:1fr auto;gap:6px;border-top:1px solid #e3ebe6;padding-top:5px;color:#25362c;font-size:11px}.requests span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.requests b{color:#71601b;white-space:nowrap}.empty,.empty-row{color:#64746a;text-align:center;font-size:12px}.code{text-align:center;letter-spacing:3px;font-size:22px;font-weight:900;text-transform:uppercase}.hidden{display:none!important}.warm-shortcut{width:100%;margin-top:6px;border:1px solid #f2cfd7;border-radius:9px;background:#fff1f5;color:#8b3650;padding:6px;font-size:11px;font-weight:900}.report-card{display:grid;gap:6px;border:1px solid #dce7df;border-radius:9px;background:#fff;padding:8px;font-size:11px;line-height:1.4}.report-card b{color:#16643a}.report-card p{margin:0}.source-note{color:#6b776f;font-size:10px}
             .friend-code{margin:5px 0;border:1px solid #cfe1d4;border-radius:8px;background:#fff;padding:8px;text-align:center}.friend-code b{display:block;color:#102019;font-size:22px;letter-spacing:3px}.friend-code span{display:block;margin-top:2px;color:#637268;font-size:10px}.compact-list{list-style:none;margin:0;padding:0;display:grid;gap:5px}.compact-list li{display:grid;grid-template-columns:auto 1fr auto;gap:5px;align-items:center;border:1px solid #e0e9e3;border-radius:8px;background:rgba(255,255,255,.9);padding:5px 6px;font-size:11px}.compact-list li.empty-row{display:block;text-align:center}.compact-list em{font-style:normal;font-weight:900;color:#5e6a63}.compact-list span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.compact-list b{color:#0c6f3b;white-space:nowrap}.leaderboard-banner{margin:0 0 6px;border:1px solid #e6c856;border-radius:8px;background:#fff7ca;padding:6px;text-align:center;color:#765817;font-size:11px;font-weight:900}.leaderboard-list li{min-height:34px;border-color:#d8dfc2;background:#fffdf2}.leaderboard-list li:first-child{border-color:#e5b72f;background:#fff2ad}.leaderboard-list li:nth-child(2){border-color:#b9c3c7;background:#f3f6f7}.leaderboard-list li:nth-child(3){border-color:#d29b6c;background:#fff0e2}.rank-icon{display:grid;place-items:center;width:24px;height:24px;font-size:17px}.face-grid{display:grid;gap:6px}.face-option{display:flex;align-items:center;justify-content:space-between;width:100%;border:1px solid #d8e4dc;border-radius:8px;background:#fff;padding:7px;color:#17231b;font-size:12px;font-weight:900}.face-option.active{border-color:#1f7a48;background:#e7f5ec;color:#0c6f3b}.face-swatch{width:22px;height:22px;border-radius:50%;border:1px solid #becdc4}.swatch-world{background:linear-gradient(135deg,#b9e0b3 0 45%,#f6f0d3 45% 65%,#96c66d 65%)}.swatch-hellokitty{background:linear-gradient(145deg,#ffeaf3,#ffd7e8)}.swatch-starlight{background:linear-gradient(145deg,#10233b,#8bd0d4)}.swatch-dinosaur{background:linear-gradient(145deg,#d7f3cb,#3d8655)}.swatch-rainbow{background:linear-gradient(145deg,#ff9cab,#ffd56a,#76c8f2,#bca2ee)}.swatch-space{background:linear-gradient(145deg,#10142f,#145f7a)}
             @media(max-width:260px),(max-height:260px){.screen{inset:12px}.panel h1,.panel h2{font-size:16px}.rules{gap:4px}input,textarea{font-size:13px;padding:6px}}
+            #bind-panel{overflow-y:auto;align-items:flex-start}#bind-panel .panel{flex-shrink:0;overflow:visible;transform:none}
             @media(prefers-reduced-motion:reduce){.panel{will-change:auto}.watch-face.face-meteor:after,.watch-face.face-snow:after,.watch-face.face-flowers:after,.watch-face.face-night:after,.watch-face.face-pixel:after{animation:none}}
           </style>
         </head>
@@ -1074,14 +1152,12 @@ app.MapGet("/watch", () =>
                 <div class="topline"><span class="brand">家加分</span><span id="updated-at"></span></div>
                 <section class="screen" id="bind-panel">
                   <div class="panel active">
-                    <div class="bind-title">设备绑定</div>
-                    <p class="bind-sub">儿童认证码登录</p>
-                    <form id="bind-form">
-                      <label for="auth-code">认证码</label>
-                      <input id="auth-code" name="code" class="code" maxlength="12" autocomplete="one-time-code" placeholder="输入">
-                      <button class="submit" type="submit">绑定</button>
-                      <p id="bind-msg" class="msg"></p>
-                    </form>
+                    <div id="bind-title" class="bind-title">设备绑定</div>
+                    <p id="bind-sub" class="bind-sub">请家长扫码或输入设备码</p>
+                    <canvas id="pair-qr" aria-label="家长扫码绑定二维码" style="display:none;width:110px;height:110px;image-rendering:pixelated;background:white;margin:4px auto"></canvas>
+                    <div id="pair-code" style="font:700 20px monospace;letter-spacing:2px;text-align:center"></div>
+                    <button id="pair-start" class="submit" type="button">获取设备码</button>
+                    <p id="bind-msg" class="msg"></p>
                   </div>
                 </section>
                 <section class="screen hidden" id="app-panel">
@@ -1220,7 +1296,6 @@ app.MapGet("/watch", () =>
           <script>
             const form = document.getElementById('request-form');
             const msg = document.getElementById('msg');
-            const bindForm = document.getElementById('bind-form');
             const bindMsg = document.getElementById('bind-msg');
             const tokenKey = 'happylife_watch_device_token';
             const previewChildId = new URLSearchParams(location.search).get('previewChildId') || '';
@@ -1271,7 +1346,7 @@ app.MapGet("/watch", () =>
                 const panel = screen.querySelector('.panel.active');
                 if (!panel) return;
                 panel.style.setProperty('--panel-scale', '1');
-                if (screen.id !== 'bind-panel' && !panel.matches('[data-panel="home"],[data-panel="menu"]')) return;
+                if (screen.id === 'bind-panel' || !panel.matches('[data-panel="home"],[data-panel="menu"]')) return;
                 const scale = calculatePanelScale(
                   Math.max(1, screen.clientWidth - 2),
                   Math.max(1, screen.clientHeight - 2),
@@ -1299,11 +1374,11 @@ app.MapGet("/watch", () =>
             const fetchJson = async (url, options = {}) => {
               const response = await fetch(url, options);
               const payload = await response.json().catch(() => ({}));
-              if (!response.ok) throw new Error(payload.error || '请求失败');
+              if (!response.ok) { const error = new Error(payload.error || '请求失败'); error.status = response.status; throw error; }
               return payload;
             };
             const load = async () => {
-              if (!isPreview && !token()) { showBound(false); return; }
+              if (!isPreview && !token()) { showBound(false); await beginPairing(); return; }
               try {
                 let score;
                 let rulesPayload;
@@ -1369,27 +1444,79 @@ app.MapGet("/watch", () =>
                   <li><span>${escapeText(item.childName)} · ${escapeText(item.title)}</span><b>${escapeText(item.statusText)}</b></li>`).join('') || '<li class="empty-row">暂无申请</li>';
                 fitActivePanel();
               } catch (error) {
-                localStorage.removeItem(tokenKey);
-                showBound(false);
-                bindMsg.textContent = error.message || '请重新绑定';
+                if (error.status === 401) {
+                  localStorage.removeItem(tokenKey);
+                  showBound(false);
+                  await beginPairing();
+                } else {
+                  showBound(false);
+                  document.getElementById('bind-title').textContent = '连接暂时不可用';
+                  document.getElementById('bind-sub').textContent = isPreview ? '请稍后重试预览' : '设备绑定已保留，请检查网络';
+                  document.getElementById('pair-qr').style.display = 'none';
+                  document.getElementById('pair-code').textContent = '';
+                  document.getElementById('pair-start').classList.remove('hidden');
+                  document.getElementById('pair-start').textContent = '重新连接';
+                  bindMsg.textContent = error.message || '请稍后重试';
+                }
+
               }
             };
-            bindForm.addEventListener('submit', async (event) => {
-              event.preventDefault();
-              bindMsg.textContent = '正在绑定...';
-              try {
-                const payload = await fetchJson('/api/watch/device-bind', {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({ code: document.getElementById('auth-code').value, deviceName: navigator.userAgent })
-                });
-                localStorage.setItem(tokenKey, payload.deviceToken);
-                bindMsg.textContent = '';
-                await load();
-              } catch (error) {
-                bindMsg.textContent = error.message || '绑定失败';
+            const pairingKey = 'happylife_watch_pending_pairing';
+            let pairing = null;
+            try { pairing = JSON.parse(localStorage.getItem(pairingKey) || 'null'); } catch { localStorage.removeItem(pairingKey); }
+            let pairingBusy = false;
+            let pairingExpired = false;
+            const drawPairing = () => {
+              document.getElementById('bind-title').textContent = '设备绑定';
+              document.getElementById('bind-sub').textContent = '请家长扫码或输入设备码';
+              document.getElementById('pair-start').textContent = '获取设备码';
+              const canvas = document.getElementById('pair-qr');
+              canvas.style.display = pairing && !pairingExpired ? 'block' : 'none';
+              document.getElementById('pair-code').textContent = pairing && !pairingExpired ? pairing.code.slice(0, 4) + ' ' + pairing.code.slice(4) : '';
+              document.getElementById('pair-start').classList.toggle('hidden', !!pairing && !pairingExpired);
+              if (pairing && !pairingExpired) {
+                const rows = pairing.qrModules;
+                canvas.width = canvas.height = rows.length * 4;
+                const context = canvas.getContext('2d');
+                context.fillStyle = '#fff'; context.fillRect(0, 0, canvas.width, canvas.height);
+                context.fillStyle = '#000';
+                rows.forEach((row, y) => row.forEach((dark, x) => { if (dark) context.fillRect(x * 4, y * 4, 4, 4); }));
               }
-            });
+              fitActivePanel();
+            };
+            const beginPairing = async () => {
+              if (isPreview || token() || pairingBusy) return;
+              if (pairing && !pairingExpired) { drawPairing(); return; }
+              pairingBusy = true;
+              try {
+                const challenge = await fetchJson('/api/watch/pairing', {
+                  method: 'POST', headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ deviceName: navigator.userAgent, platform: 'h5' })
+                });
+                localStorage.setItem(pairingKey, JSON.stringify(challenge));
+                pairing = challenge; pairingExpired = false;
+                bindMsg.textContent = '10分钟有效，等待家长确认';
+                drawPairing();
+              } catch (error) { bindMsg.textContent = error.message || '获取失败，请重试'; }
+              finally { pairingBusy = false; }
+            };
+            document.getElementById('pair-start').addEventListener('click', () => token() || isPreview ? load() : beginPairing());
+            setInterval(async () => {
+              if (document.hidden || isPreview || token() || !pairing || pairingExpired || pairingBusy) return;
+              pairingBusy = true;
+              try {
+                const result = await fetchJson('/api/watch/pairing', { headers: { 'X-Watch-Device-Token': pairing.deviceToken } });
+                if (result.status === 'approved') {
+                  localStorage.setItem(tokenKey, pairing.deviceToken);
+                  localStorage.removeItem(pairingKey); pairing = null;
+                  await load();
+                } else if (result.status === 'expired') {
+                  pairingExpired = true;
+                  bindMsg.textContent = '设备码已过期，请重新获取'; drawPairing();
+                } else { bindMsg.textContent = '等待家长选择孩子并确认'; }
+              } catch { bindMsg.textContent = '网络暂时不可用，正在等待恢复'; }
+              finally { pairingBusy = false; }
+            }, 5000);
             form.addEventListener('submit', async (event) => {
               event.preventDefault();
               if (blockPreviewWrite(msg)) return;
@@ -11341,3 +11468,5 @@ public sealed record WatchDeviceBinding(
     string TokenHash,
     string DeviceName,
     string Platform);
+
+public partial class Program { }

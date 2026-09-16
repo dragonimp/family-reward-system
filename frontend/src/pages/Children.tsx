@@ -1,3 +1,5 @@
+import WatchPairingForm from '../components/WatchPairingForm';
+import { useSearchParams } from 'react-router-dom';
 import { Card } from '../components/Card';
 import { Modal } from '../components/Modal';
 import type { Child, ChildFriend, ChildFriendNotification, HouseholdMember, HouseholdRole, WatchDeviceBinding } from '../types';
@@ -64,6 +66,8 @@ export default function Children() {
   const [formData, setFormData] = useState<ChildForm>({ name: '', score: 0, cash: 0, items: 0 });
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [childToDelete, setChildToDelete] = useState<number | null>(null);
+  const [searchParams] = useSearchParams();
+  const scannedWatchCode = searchParams.get('watchCode') ?? '';
   const [deviceChild, setDeviceChild] = useState<Child | null>(null);
   const [authCode, setAuthCode] = useState<{ code: string; expiresAt: string } | null>(null);
   const [devices, setDevices] = useState<WatchDeviceBinding[]>([]);
@@ -393,6 +397,8 @@ export default function Children() {
         </button>
       </div>
 
+      <WatchPairingForm key={scannedWatchCode} children={children} initialCode={scannedWatchCode} />
+
       <div role="tablist" aria-label="家庭成员类型" className="flex w-fit rounded-lg border border-gray-200 bg-white p-1">
         <button
           type="button"
@@ -703,6 +709,8 @@ export default function Children() {
         }
       >
         <div className="space-y-4">
+          {deviceChild && <WatchPairingForm key={deviceChild.id} children={[deviceChild]} fixedChild={deviceChild}
+            onBound={() => { void getChildWatchDevices(deviceChild.id).then(result => setDevices(result.devices || [])).catch(() => showToast('绑定成功，设备列表请重新打开查看')); }} />}
           {authCode && (
             <div className="rounded-lg border border-green-200 bg-green-50 p-4 text-center">
               <div className="text-sm text-green-700">儿童认证码</div>
