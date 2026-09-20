@@ -2376,31 +2376,13 @@ app.MapGet("/api/agentfree/sessions", async (IHttpClientFactory httpClientFactor
         var userName = GetUnifiedUsername(request);
         var config = await configStore.LoadAsync();
         var webAppBotId = ResolveFamilyRewardWebAppBotId(config, request.Query.String("webAppBotId"));
-        var agents = await GetFamilyRewardAgentFreeAgents(httpClientFactory, userName, webAppBotId, request.HttpContext.RequestAborted);
-        var authorizedAgentIds = agents
-            .OfType<JsonObject>()
-            .Select(item => item.Int("id"))
-            .Where(id => id.HasValue)
-            .Select(id => id!.Value)
-            .ToHashSet();
         var requestedAgentId = request.Query.Int("agentId");
-        if (requestedAgentId.HasValue && !authorizedAgentIds.Contains(requestedAgentId.Value))
-        {
-            return Results.Json(new { error = "无权访问该智能体会话" }, statusCode: StatusCodes.Status403Forbidden);
-        }
-        if (authorizedAgentIds.Count == 0) return Results.Json(new JsonArray());
-        var sessions = await CreateOrbitWebAppClient(httpClientFactory, webAppBotId).GetSessionsAsync(
+        var sessions = await CreateOrbitWebAppClient(httpClientFactory, webAppBotId).GetAuthorizedSessionsAsync(
             userName,
-            gatewayType: "WebApp",
             agentId: requestedAgentId,
             limit: request.Query.Int("limit") is int requestedLimit ? Math.Clamp(requestedLimit, 1, 500) : null,
             cancellationToken: request.HttpContext.RequestAborted);
-        var familySessions = FilterFamilyRewardAgentFreeSessions(sessions, authorizedAgentIds);
-        return Results.Json(await FilterReadableFamilyRewardAgentFreeSessions(
-            httpClientFactory,
-            familySessions,
-            userName,
-            request.HttpContext.RequestAborted));
+        return Results.Json(sessions);
     }
     catch (Exception ex)
     {
@@ -3274,39 +3256,6 @@ static async Task<OrbitWebAppSession?> GetFamilyRewardAgentFreeSessionForBot(
     var session = await CreateOrbitWebAppClient(httpClientFactory, webAppBotId)
         .GetSessionAsync(sessionId, userName, cancellationToken);
     return session is not null && authorizedAgentIds.Contains(session.AgentId) ? session : null;
-}
-
-static List<OrbitWebAppSession> FilterFamilyRewardAgentFreeSessions(
-    IEnumerable<OrbitWebAppSession> sessions,
-    IReadOnlySet<int> authorizedAgentIds)
-{
-    return sessions
-        .Where(session => authorizedAgentIds.Contains(session.AgentId) && !session.IsArchived)
-        .ToList();
-}
-
-static async Task<List<OrbitWebAppSession>> FilterReadableFamilyRewardAgentFreeSessions(
-    IHttpClientFactory httpClientFactory,
-    IEnumerable<OrbitWebAppSession> sessions,
-    string userName,
-    CancellationToken cancellationToken)
-{
-    var result = new List<OrbitWebAppSession>();
-    foreach (var item in sessions)
-    {
-        var sessionId = item.Id;
-        if (string.IsNullOrWhiteSpace(sessionId)) continue;
-        try
-        {
-            var session = await CreateOrbitWebAppClient(httpClientFactory)
-                .GetSessionAsync(sessionId, userName, cancellationToken);
-            if (session?.AgentId == item.AgentId && !session.IsArchived) result.Add(item);
-        }
-        catch (Exception ex) when (IsAgentFreeAccessDenied(ex))
-        {
-        }
-    }
-    return result;
 }
 
 static bool IsAgentFreeAccessDenied(Exception ex) =>
