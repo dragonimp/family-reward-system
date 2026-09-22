@@ -7,7 +7,7 @@ options="${HAPPYLIFE_PARENT_EXPORT_OPTIONS:-$PWD/build/ExportOptions.plist}"
 [[ -x "$export_helper" ]] || { echo 'Shared Apple team export helper is unavailable.' >&2; exit 2; }
 [[ -f "$options" ]] || { echo 'Prepare build/ExportOptions.plist with the authorized team ID.' >&2; exit 2; }
 # The shared helper owns the keychain lock; never wrap it a second time.
-"$export_helper" "$PWD/build/Linko-Family-signed.xcarchive" "$options" "$PWD/build/TestFlight"
+"$export_helper" "$PWD/build/Linko Family-signed.xcarchive" "$options" "$PWD/build/TestFlight"
 if [[ "$(/usr/libexec/PlistBuddy -c 'Print :destination' "$options")" == export ]]; then
-  python3 verify-ipa.py "$PWD/build/TestFlight/Linko-Family.ipa"
+  python3 verify-ipa.py "$PWD/build/TestFlight/Linko Family.ipa"
 fi

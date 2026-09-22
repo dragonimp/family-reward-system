@@ -13,9 +13,9 @@ fi
 : "${APPLE_SIGNING_KEYCHAIN:?Missing signing keychain}"
 xcodebuild -project HappyLifeParent.xcodeproj -scheme HappyLifeParent \
   -configuration Release -destination 'generic/platform=iOS' \
-  -archivePath "$PWD/build/Linko-Family-signed.xcarchive" \
+  -archivePath "$PWD/build/Linko Family-signed.xcarchive" \
   -derivedDataPath "$PWD/build/DerivedData" CODE_SIGNING_ALLOWED=NO archive
-app="$PWD/build/Linko-Family-signed.xcarchive/Products/Applications/Linko-Family.app"
+app="$PWD/build/Linko Family-signed.xcarchive/Products/Applications/Linko Family.app"
 # This supplies the team's identity to the archive; export must still embed
 # an App Store provisioning profile for this app before it is distributable.
 codesign --force --sign "$APPLE_SIGNING_IDENTITY" --keychain "$APPLE_SIGNING_KEYCHAIN" \

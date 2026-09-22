@@ -39,5 +39,22 @@ struct EditorSpec: Identifiable {
     var method = "POST"
     var fields: [FormField]
     var fixed: [String: Any] = [:]
+    var scansWatchCode = false
     var showsReceipt = false
+}
+
+enum WatchPairingCode {
+    static func parse(_ text: String) -> String? {
+        var value = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        if let url = URLComponents(string: value), url.scheme != nil {
+            guard url.scheme == "https", url.host == "happylife.ai.impx.net",
+                  url.path == "/children", url.user == nil, url.password == nil,
+                  url.port == nil || url.port == 443,
+                  let codes = url.queryItems?.filter({ $0.name == "watchCode" }),
+                  codes.count == 1, let code = codes.first?.value else { return nil }
+            value = code
+        }
+        value = value.components(separatedBy: .whitespacesAndNewlines).joined().replacingOccurrences(of: "-", with: "").uppercased()
+        return value.range(of: "^[A-HJ-NP-Z2-9]{8}$", options: .regularExpression) != nil ? value : nil
+    }
 }

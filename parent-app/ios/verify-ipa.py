@@ -10,19 +10,19 @@ import zipfile
 from pathlib import Path
 
 if len(sys.argv) != 2:
-    raise SystemExit("Usage: verify-ipa.py Linko-Family.ipa")
+    raise SystemExit("Usage: verify-ipa.py Linko Family.ipa")
 ipa = Path(sys.argv[1])
 with tempfile.TemporaryDirectory(prefix="happylife-parent-ipa-") as directory:
     with zipfile.ZipFile(ipa) as archive:
         archive.extractall(directory)
-    app = Path(directory) / "Payload/Linko-Family.app"
+    app = Path(directory) / "Payload/Linko Family.app"
     subprocess.run(["codesign", "--verify", "--deep", "--strict", str(app)], check=True)
     info = plistlib.loads((app / "Info.plist").read_bytes())
     expected = "net.impx.happylife.parent"
     signature = subprocess.run(["codesign", "-dv", str(app)], capture_output=True, text=True, check=True)
     fields = dict(line.split("=", 1) for line in signature.stderr.splitlines() if "=" in line)
     assert info["CFBundleIdentifier"] == expected
-    assert info["CFBundleDisplayName"] == "Linko-Family"
+    assert info["CFBundleDisplayName"] == "Linko Family"
     assert any("linkofamily" in item.get("CFBundleURLSchemes", []) for item in info.get("CFBundleURLTypes", []))
     frameworks = subprocess.run(["xcrun", "otool", "-L", str(app / info["CFBundleExecutable"])], capture_output=True, text=True, check=True).stdout
     assert "SwiftUI.framework" in frameworks and "AuthenticationServices.framework" in frameworks

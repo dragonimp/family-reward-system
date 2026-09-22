@@ -64,3 +64,7 @@ HAPPYLIFE_PARENT_EXPORT_OPTIONS="$PWD/parent-app/ios/build/UploadOptions.plist" 
 修复家庭首页加载孩子后弹出“服务返回的数据格式不正确”：`GET /api/rules` 的正式响应是包含 `rules` 的对象，原生客户端现在明确解析该字段。缺失字段或非数组仍报错，不把异常转换成空列表。新增非空、空列表、缺字段和非法字段类型回归；原生模型检查、Simulator 构建和 Release 归档通过。签发结果见后续发布记录；不将构建通过视为真机验证。
 
 发布结果：2026-09-16 14:41:33 上传成功；Apple build `59db4b52-6c73-4d42-a5a7-2cd70c488667`，版本 1.1.2（4），状态 VALID，已加入既有内部测试组，独立查询为 IN_BETA_TESTING。证据保存在 `build/evidence/rules-fix-build.json`、`rules-fix-beta.json`。真机家庭首页复测尚未执行。
+
+## 1.1.3（5）：扫码绑定与名称调整
+
+应用显示名及产物名改为 `Linko Family`，Bundle ID 保持不变。孩子详情 → 连接手表新增原生相机扫描按钮，读取正式 `/children?watchCode=` 二维码或有效设备码，回填后仍由家长确认绑定。保留手动输入；支持取消，对无权限、不支持、扫描中断和无效二维码提供提示。新增相机用途说明及二维码解析回归测试。发布前提交并推送源码，再构建签发。公共 Swift SDK 对应 AgentIdentity GitHub main 提交 `2ac21a2097676181b2f626e24d633d821fa6e4ac`；该目录需保持与此提交一致。发布状态以 Apple 独立查询和 Atlas 发布记录为准，真机扫码尚待验收。

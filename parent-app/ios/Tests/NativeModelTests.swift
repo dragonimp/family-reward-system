@@ -15,6 +15,11 @@ import Foundation
         precondition(empty.isEmpty)
         do { _ = try Record.list(["error": "denied"], key: "rules"); fatalError("Missing rules must fail") } catch is APIError {}
         do { _ = try Record.list(["rules": "invalid"], key: "rules"); fatalError("Invalid rules must fail") } catch is APIError {}
+        precondition(WatchPairingCode.parse("abcd-2345") == "ABCD2345")
+        precondition(WatchPairingCode.parse("https://happylife.ai.impx.net/children?watchCode=ABCD2345") == "ABCD2345")
+        for invalid in ["ABCD1234", "123", "https://evil.test/children?watchCode=ABCD2345", "https://happylife.ai.impx.net/children?watchCode=ABCD2345&watchCode=EFGH2345", "https://happylife.ai.impx.net/other?watchCode=ABCD2345", "https://user@happylife.ai.impx.net/children?watchCode=ABCD2345"] {
+            precondition(WatchPairingCode.parse(invalid) == nil)
+        }
         print("Native API model checks passed")
     }
 }

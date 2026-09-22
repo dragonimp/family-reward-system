@@ -15,5 +15,5 @@ xcodebuild -project HappyLifeParent.xcodeproj -scheme HappyLifeParent \
   -derivedDataPath "$PWD/build/DerivedData" CODE_SIGN_IDENTITY=- build
 xcodebuild -project HappyLifeParent.xcodeproj -scheme HappyLifeParent \
   -configuration Release -destination 'generic/platform=iOS' \
-  -archivePath "$PWD/build/Linko-Family.xcarchive" \
+  -archivePath "$PWD/build/Linko Family.xcarchive" \
   -derivedDataPath "$PWD/build/DerivedData" CODE_SIGNING_ALLOWED=NO archive

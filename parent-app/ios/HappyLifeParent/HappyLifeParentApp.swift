@@ -18,7 +18,7 @@ struct FamilyRoot: View {
                 NavigationStack {
                     VStack(spacing: 24) {
                         Image(systemName: "person.2.circle.fill").font(.system(size: 64)).foregroundStyle(.teal)
-                        Text("欢迎使用 Linko-Family").font(.title2.bold())
+                        Text("欢迎使用 Linko Family").font(.title2.bold())
                         if store.loading { ProgressView("正在读取家庭身份…") }
                         else if store.profile?.flag("needsRole") == true {
                             Text("选择家长身份，管理家庭与孩子的成长记录。")
@@ -27,7 +27,7 @@ struct FamilyRoot: View {
                             Text("此账号是孩子身份，请使用家长账号登录。")
                         } else { Button("重新加载") { Task { await store.load() } } }
                         Button("退出登录") { store.logout() }
-                    }.padding().navigationTitle("Linko-Family")
+                    }.padding().navigationTitle("Linko Family")
                 }
             }
         }
@@ -49,7 +49,7 @@ struct FamilyRoot: View {
                 Button { signIn(false) } label: { HStack { Spacer(); if identity.isBusy { ProgressView() }; Text("用户中心登录").bold(); Spacer() }.padding(.vertical, 8) }.buttonStyle(.borderedProminent).disabled(identity.isBusy)
                 Button("注册用户中心账号") { signIn(true) }.frame(maxWidth: .infinity).disabled(identity.isBusy)
                 Text("登录和注册在系统认证窗口中完成。登录后自动返回 App。").font(.footnote).foregroundStyle(.secondary)
-            }.padding(28).navigationTitle("Linko-Family")
+            }.padding(28).navigationTitle("Linko Family")
         }
     }
     private func signIn(_ register: Bool) {
@@ -132,7 +132,7 @@ struct ChildDetail: View {
             }
             Section("手表与成长") {
                 NavigationLink("手表设备") { RemoteRecords(store: store, title: "手表设备", path: "/api/children/\(child.id)/devices?\(store.scope)", mode: .devices) }
-                Button("连接手表") { editor = EditorSpec(title: "连接孩子手表", path: "/api/children/\(child.id)/pair-device", fields: [.init(key: "code", title: "手表上显示的配对码")]) }
+                Button("连接手表") { editor = EditorSpec(title: "连接孩子手表", path: "/api/children/\(child.id)/pair-device", fields: [.init(key: "code", title: "手表上显示的配对码")], scansWatchCode: true) }
                 Button("生成孩子授权码") { editor = EditorSpec(title: "生成孩子授权码", path: "/api/children/\(child.id)/auth-code", fields: [], fixed: ["familyGroupId": store.groupID, "expiresInMinutes": 10], showsReceipt: true) }
                 NavigationLink("温暖瞬间") { RemoteRecords(store: store, title: "温暖瞬间", path: "/api/warm-moments?childId=\(child.id)&limit=30", mode: .moments) }
                 NavigationLink("成长周报") { RemoteRecords(store: store, title: "成长周报", path: "/api/growth-reports?childId=\(child.id)&audience=parent&period=weekly&ai=false", mode: .reports) }
@@ -250,14 +250,14 @@ struct AccountView: View {
     var body: some View {
         NavigationStack {
             List {
-                Section { Label(store.profile?.text("username") ?? "家长", systemImage: "person.crop.circle.fill"); LabeledContent("身份", value: "家长"); LabeledContent("应用", value: "Linko-Family") }
+                Section { Label(store.profile?.text("username") ?? "家长", systemImage: "person.crop.circle.fill"); LabeledContent("身份", value: "家长"); LabeledContent("应用", value: "Linko Family") }
                 Section {
                     NavigationLink("订阅权益") { RemoteRecords(store: store, title: "订阅权益", path: "/api/subscription", mode: .subscription) }
                     LabeledContent("版本", value: "\(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "") (\(Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? ""))")
                     Text("家庭数据与网页版同步。登录由用户中心提供，凭据保存在本机钥匙串。").font(.footnote).foregroundStyle(.secondary)
                 }
                 Button("退出当前账号", role: .destructive) { logout = true }
-            }.navigationTitle("我的").confirmationDialog("退出 Linko-Family？", isPresented: $logout, titleVisibility: .visible) { Button("退出登录", role: .destructive) { store.logout() } } message: { Text("本机登录凭据将清除。用户中心的浏览器登录状态由用户中心管理。") }
+            }.navigationTitle("我的").confirmationDialog("退出 Linko Family？", isPresented: $logout, titleVisibility: .visible) { Button("退出登录", role: .destructive) { store.logout() } } message: { Text("本机登录凭据将清除。用户中心的浏览器登录状态由用户中心管理。") }
         }
     }
 }
@@ -269,6 +269,7 @@ struct NativeEditor: View {
     @State private var values: [String: String] = [:]
     @State private var saving = false
     @State private var error: String?
+    @State private var scanning = false
     @State private var receipt: Record?
     @State private var saved = false
     var body: some View {
@@ -282,10 +283,15 @@ struct NativeEditor: View {
                         TextField(field.title, text: Binding(get: { values[field.key] ?? field.initial }, set: { values[field.key] = $0 }))
                             .keyboardType(field.numeric ? .numbersAndPunctuation : .default)
                     }
+                    if spec.scansWatchCode {
+                        Button("扫描手表二维码", systemImage: "qrcode.viewfinder") { scanning = true }.disabled(saving)
+                    }
                     if spec.fields.isEmpty { Text("确认后生成临时授权码，有效期 10 分钟。") }
                     if let error { Text(error).foregroundStyle(.red) }
                     Button(saving ? "正在提交…" : "确认") { Task { await save() } }.disabled(saving || !valid)
                 }
+            }.sheet(isPresented: $scanning) {
+                WatchCodeScanner { code in values["code"] = code; error = nil }
             }.navigationTitle(spec.title).navigationBarTitleDisplayMode(.inline)
                 .toolbar { ToolbarItem(placement: .cancellationAction) { Button(saved ? "完成" : "取消") { dismiss() }.disabled(saving) } }.interactiveDismissDisabled(saving)
         }
@@ -298,6 +304,10 @@ struct NativeEditor: View {
         for field in spec.fields {
             let text = (values[field.key] ?? field.initial).trimmingCharacters(in: .whitespacesAndNewlines)
             if field.numeric { body[field.key] = Double(text) } else { body[field.key] = text }
+        }
+        if spec.scansWatchCode {
+            guard let code = WatchPairingCode.parse(values["code"] ?? "") else { error = "请输入手表上显示的 8 位设备码。"; return }
+            body["code"] = code
         }
         do {
             let result = try await store.call(spec.path, method: spec.method, body: body)
