@@ -17,3 +17,19 @@ xcodebuild -project HappyLifeParent.xcodeproj -scheme HappyLifeParent \
   -configuration Release -destination 'generic/platform=iOS' \
   -archivePath "$PWD/build/Linko Family.xcarchive" \
   -derivedDataPath "$PWD/build/DerivedData" CODE_SIGNING_ALLOWED=NO archive
+
+python3 - <<'PY_CHECK'
+import plistlib
+from pathlib import Path
+app = Path('build/Linko Family.xcarchive/Products/Applications/Linko Family.app')
+phone = plistlib.loads((app/'Info.plist').read_bytes())
+watch = plistlib.loads((app/'Watch/Linko Family Watch.app/Info.plist').read_bytes())
+assert watch['WKApplication']
+assert watch['WKCompanionAppBundleIdentifier'] == phone['CFBundleIdentifier']
+assert watch['CFBundleIdentifier'].startswith(phone['CFBundleIdentifier'] + '.')
+assert watch['WKRunsIndependentlyOfCompanionApp'] is True
+assert not watch.get('WKWatchOnly', False)
+assert watch['CFBundleVersion'] == phone['CFBundleVersion']
+assert watch['CFBundleShortVersionString'] == phone['CFBundleShortVersionString']
+print('PASS: archived independent companion Watch app and matching iPhone version')
+PY_CHECK

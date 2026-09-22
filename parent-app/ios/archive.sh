@@ -19,5 +19,7 @@ app="$PWD/build/Linko Family-signed.xcarchive/Products/Applications/Linko Family
 # This supplies the team's identity to the archive; export must still embed
 # an App Store provisioning profile for this app before it is distributable.
 codesign --force --sign "$APPLE_SIGNING_IDENTITY" --keychain "$APPLE_SIGNING_KEYCHAIN" \
+  --identifier net.impx.happylife.parent.watchkitapp "$app/Watch/Linko Family Watch.app"
+codesign --force --sign "$APPLE_SIGNING_IDENTITY" --keychain "$APPLE_SIGNING_KEYCHAIN" \
   --identifier net.impx.happylife.parent "$app"
 codesign --verify --deep --strict "$app"

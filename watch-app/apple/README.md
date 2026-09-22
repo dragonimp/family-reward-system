@@ -1,3 +1,5 @@
+> 发布入口调整：后续使用 `parent-app/ios` 的统一 Linko Family 工程，Watch 可独立运行。旧独立“家加分”（ASC 6812457571）按用户要求停用测试分发。以下独立工程与发布记录保留历史参考，不能作为新版发布入口。详见 `../../parent-app/ios/README.md`（从仓库根目录查看）。
+
 # 家加分 Apple Watch 儿童端
 
 原生 SwiftUI 独立 watchOS App，最低 watchOS 10.0。复用已有 `/api/watch/*` 设备接口，不新增登录体系、不改变家庭数据或服务端部署。Apple Watch 可自行联网使用，无需安装配套 iPhone App。

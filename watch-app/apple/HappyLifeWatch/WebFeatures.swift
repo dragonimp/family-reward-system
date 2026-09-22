@@ -105,7 +105,7 @@ struct FaceSettingsView: View {
     @EnvironmentObject private var store: WatchStore
     var body: some View {
         List {
-            Text("设置家加分 App 内的主题外观。")
+            Text("设置Linko Family App 内的主题外观。")
                 .font(.footnote).foregroundStyle(.secondary)
             ForEach(store.settings?.availableFaces ?? []) { face in
                 Button {

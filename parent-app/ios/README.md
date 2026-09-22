@@ -68,3 +68,11 @@ HAPPYLIFE_PARENT_EXPORT_OPTIONS="$PWD/parent-app/ios/build/UploadOptions.plist" 
 ## 1.1.3（5）：扫码绑定与名称调整
 
 应用显示名及产物名改为 `Linko Family`，Bundle ID 保持不变。孩子详情 → 连接手表新增原生相机扫描按钮，读取正式 `/children?watchCode=` 二维码或有效设备码，回填后仍由家长确认绑定。保留手动输入；支持取消，对无权限、不支持、扫描中断和无效二维码提供提示。新增相机用途说明及二维码解析回归测试。发布前提交并推送源码，再构建签发。公共 Swift SDK 对应 AgentIdentity GitHub main 提交 `2ac21a2097676181b2f626e24d633d821fa6e4ac`；该目录需保持与此提交一致。发布状态以 Apple 独立查询和 Atlas 发布记录为准，真机扫码尚待验收。
+
+## 1.2.0（6）：配套且独立的 Apple Watch
+
+统一入口为本目录 HappyLifeParent scheme；归档同时包含 iPhone 和 Watch App。Watch Target 直接引用 `watch-app/apple/HappyLifeWatch` 源文件及资产，不复制业务实现。新手表 Bundle ID 为 `net.impx.happylife.parent.watchkitapp`，配套 iPhone 为 `net.impx.happylife.parent`；`WKRunsIndependentlyOfCompanionApp=true`，不设置 `WKWatchOnly`。手表直接联网并保留独立钥匙串和扫码绑定，不共享家长令牌。
+
+新 Watch 标识与旧独立“家加分”不是同一安装身份，旧版用户需要安装新版并重新绑定；服务端家庭和孩子数据不迁移、不删除。旧 Watch App（ASC 6812457571）的测试构建在统一版本内部可安装后按用户要求停用。旧工程保留历史用途，后续发布仅使用统一入口。
+
+发布前运行 `verify.sh` 及 `watch-app/apple/tests/WatchAPITests.swift` 接口回归，提交推送到 GitHub 后从相同源码归档。`archive.sh` 从内到外签名，导出配置必须包含父应用和新 Watch 标识的 App Store profiles；`verify-ipa.py` 验证嵌入手表、独立运行配置、两端版本及签名。配置/编译验证不替代真机安装、家庭设置手表独立安装和绑定验收。TestFlight 申请不等于正式 App Store 上架。
