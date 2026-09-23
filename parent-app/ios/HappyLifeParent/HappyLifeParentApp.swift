@@ -131,7 +131,7 @@ struct ChildDetail: View {
                 Button("修改姓名与备注") { editor = EditorSpec(title: "修改孩子资料", path: "/api/children/\(child.id)", method: "PUT", fields: [.init(key: "name", title: "姓名", initial: current.text("name")), .init(key: "note", title: "备注", initial: current.text("note"), required: false)]) }
             }
             Section("手表与成长") {
-                NavigationLink("手表设备") { RemoteRecords(store: store, title: "手表设备", path: "/api/children/\(child.id)/devices?\(store.scope)", mode: .devices) }
+                NavigationLink("手表设备") { RemoteRecords(store: store, title: "手表设备", path: "/api/children/\(child.id)/devices?\(store.scope)", mode: .devices, childID: child.id) }
                 Button("连接手表") { editor = EditorSpec(title: "连接孩子手表", path: "/api/children/\(child.id)/pair-device", fields: [.init(key: "code", title: "手表上显示的配对码")], scansWatchCode: true) }
                 Button("生成孩子授权码") { editor = EditorSpec(title: "生成孩子授权码", path: "/api/children/\(child.id)/auth-code", fields: [], fixed: ["familyGroupId": store.groupID, "expiresInMinutes": 10], showsReceipt: true) }
                 NavigationLink("温暖瞬间") { RemoteRecords(store: store, title: "温暖瞬间", path: "/api/warm-moments?childId=\(child.id)&limit=30", mode: .moments) }
@@ -373,10 +373,13 @@ struct RemoteRecords: View {
     let title: String
     let path: String
     let mode: RemoteMode
+    var childID: Int? = nil
     @State private var object: Record?
     @State private var rows: [Record] = []
     @State private var loading = true
     @State private var error: String?
+    @State private var deviceToUnbind: Record?
+    @State private var unbinding = false
     var body: some View {
         List {
             if loading { ProgressView("正在加载…") }
@@ -397,6 +400,10 @@ struct RemoteRecords: View {
                     case .devices:
                         Text(row.text("deviceName")).font(.headline); Text(row.flag("active") ? "已连接" : "已解绑").foregroundStyle(.secondary)
                         Text("最近在线：" + beijingDate(row.text("lastSeenAt"))).font(.caption)
+                        if row.flag("active") && childID != nil {
+                            Button("解除绑定", role: .destructive) { deviceToUnbind = row }
+                                .disabled(unbinding)
+                        }
                     case .moments:
                         Text(row.text("content")); Text(row.text("parentDisplayName") + " · " + beijingDate(row.text("createdAt"))).font(.caption).foregroundStyle(.secondary)
                     case .reports:
@@ -410,6 +417,23 @@ struct RemoteRecords: View {
             }
             if !loading && error == nil && rows.isEmpty && mode != .invite && mode != .subscription { Text("暂无记录").foregroundStyle(.secondary) }
         }.navigationTitle(title).task { await load() }.refreshable { await load() }
+            .confirmationDialog("解除这只手表与当前孩子的绑定？", isPresented: Binding(
+                get: { deviceToUnbind != nil }, set: { if !$0 { deviceToUnbind = nil } }), titleVisibility: .visible) {
+                Button("解除绑定", role: .destructive) {
+                    guard let device = deviceToUnbind else { return }
+                    deviceToUnbind = nil
+                    Task { await unbind(device) }
+                }
+                Button("取消", role: .cancel) { deviceToUnbind = nil }
+            } message: { Text("解绑后手表将退出当前孩子，需重新扫码才能使用。") }
+    }
+    private func unbind(_ device: Record) async {
+        guard let childID else { return }
+        unbinding = true; defer { unbinding = false }
+        do {
+            _ = try await store.call("/api/children/\(childID)/devices/\(device.id)?\(store.scope)", method: "DELETE")
+            await load()
+        } catch { self.error = error.localizedDescription }
     }
     private func load() async {
         loading = true; error = nil; rows = []; object = nil

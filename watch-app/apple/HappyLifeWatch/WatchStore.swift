@@ -2,6 +2,10 @@ import SwiftUI
 
 @MainActor
 final class WatchStore: ObservableObject {
+    private struct PendingTransfer: Codable {
+        let previousToken: String
+        let challenge: PairingChallenge
+    }
     @Published private(set) var pairing: PairingChallenge?
     @Published private(set) var pairingMessage = "请家长扫码，或在家庭管理中输入设备码"
     @Published private(set) var pairingExpired = false
@@ -38,22 +42,30 @@ final class WatchStore: ObservableObject {
         guard !ready else { return }
         await perform {
             let credential = try self.readCredential()
-            if let credential, credential.hasPrefix("pairing:") {
+            if let credential, credential.hasPrefix("transfer:") {
+                let pending = try JSONDecoder().decode(PendingTransfer.self, from: Data(credential.dropFirst(9).utf8))
+                self.token = pending.previousToken
+                self.pairing = pending.challenge
+            } else if let credential, credential.hasPrefix("pairing:") {
                 self.pairing = try JSONDecoder().decode(PairingChallenge.self, from: Data(credential.dropFirst(8).utf8))
             } else { self.token = credential }
             self.ready = true
-            if self.token != nil { try await self.load() }
+            if self.token != nil && self.pairing == nil { try await self.load() }
         }
     }
 
     func beginPairing() async {
-        guard token == nil, pairing == nil || pairingExpired else { return }
+        guard pairing == nil || pairingExpired else { return }
         await perform {
-            let challenge: PairingChallenge = try await self.api.call("pairing", body: [
+            let challenge: PairingChallenge = try await self.api.call("pairing", token: self.token, body: [
                 "deviceName": "Apple Watch", "platform": "watchos"])
             // Persist the private token before showing its public code. A restart can recover approval.
-            let saved = String(decoding: try JSONEncoder().encode(challenge), as: UTF8.self)
-            try self.saveCredential("pairing:" + saved)
+            if let previousToken = self.token {
+                let pending = PendingTransfer(previousToken: previousToken, challenge: challenge)
+                try self.saveCredential("transfer:" + String(decoding: try JSONEncoder().encode(pending), as: UTF8.self))
+            } else {
+                try self.saveCredential("pairing:" + String(decoding: try JSONEncoder().encode(challenge), as: UTF8.self))
+            }
             self.pairing = challenge
             self.pairingExpired = false
             self.pairingMessage = "请家长扫码，或在家庭管理中输入设备码"
@@ -61,7 +73,7 @@ final class WatchStore: ObservableObject {
     }
 
     func pollPairing() async {
-        guard token == nil, let challenge = pairing, !busy, !pairingExpired else { return }
+        guard let challenge = pairing, !busy, !pairingExpired else { return }
         do {
             let result: PairingStatus = try await api.call("pairing", token: challenge.deviceToken)
             guard !Task.isCancelled else { return }

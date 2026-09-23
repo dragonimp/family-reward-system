@@ -68,9 +68,22 @@ using (var restartedFactory = new PairingFactory()) {
 }
 var next = await Json(await anonymous.PostAsJsonAsync("/api/watch/pairing", new { deviceName = "Second watch" }));
 Check((await parent.PostAsJsonAsync(path, new { code = next["code"]!.GetValue<string>() })).StatusCode == HttpStatusCode.Conflict, "second device accepted");
-await Json(await parent.DeleteAsync($"/api/children/{id}/devices/{first["deviceId"]!.GetValue<int>()}"));
-Check((await Json(await watch.GetAsync("/api/watch/pairing")))["status"]!.GetValue<string>() == "expired", "revoked recovery");
-Console.WriteLine("PASS: HTTP flow, authenticated parent, spoofed headers rejected, foreign child rejected, concurrent confirmation, actual child score, one-device limit, revocation");
+var secondChild = await Json(await parent.PostAsJsonAsync("/api/children", new { name = "Transfer target", familyGroupId = groups[0]!["id"]!.GetValue<int>() }));
+var secondId = secondChild["id"]!.GetValue<int>();
+var transfer = await Json(await watch.PostAsJsonAsync("/api/watch/pairing", new { deviceName = "Integration Watch", platform = "watchos" }));
+var transferToken = transfer["deviceToken"]!.GetValue<string>();
+var transferred = await Json(await parent.PostAsJsonAsync($"/api/children/{secondId}/pair-device", new { code = transfer["code"]!.GetValue<string>() }));
+Check((await watch.GetAsync("/api/watch/score")).StatusCode == HttpStatusCode.Unauthorized, "old child binding survived transfer");
+using var movedWatch = factory.CreateClient();
+movedWatch.DefaultRequestHeaders.Add("X-Watch-Device-Token", transferToken);
+Check((await Json(await movedWatch.GetAsync("/api/watch/score")))["children"]![0]!["id"]!.GetValue<int>() == secondId, "new child binding missing");
+await Json(await parent.PostAsJsonAsync(path, new { code = next["code"]!.GetValue<string>() }));
+var failedTransfer = await Json(await movedWatch.PostAsJsonAsync("/api/watch/pairing", new { deviceName = "Integration Watch", platform = "watchos" }));
+Check((await parent.PostAsJsonAsync(path, new { code = failedTransfer["code"]!.GetValue<string>() })).StatusCode == HttpStatusCode.Conflict, "occupied child accepted");
+Check((await Json(await movedWatch.GetAsync("/api/watch/score")))["children"]![0]!["id"]!.GetValue<int>() == secondId, "failed transfer revoked existing binding");
+await Json(await parent.DeleteAsync($"/api/children/{secondId}/devices/{transferred["deviceId"]!.GetValue<int>()}"));
+Check((await Json(await movedWatch.GetAsync("/api/watch/pairing")))["status"]!.GetValue<string>() == "expired", "revoked recovery");
+Console.WriteLine("PASS: HTTP flow, authenticated parent, spoofed headers rejected, foreign child rejected, concurrent confirmation, transfer revokes old binding, failed transfer rolls back, one-device limit, revocation");
 
 sealed class PairingFactory : WebApplicationFactory<familyapi::Program>
 {

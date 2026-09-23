@@ -10,7 +10,7 @@ struct HappyLifeWatchApp: App {
             WatchHomeView().environmentObject(store)
                 .task { await store.start() }
                 .onChange(of: scenePhase) { _, phase in
-                    if phase == .active && store.ready && store.token != nil { Task { await store.refresh() } }
+                    if phase == .active && store.ready && store.token != nil && store.pairing == nil { Task { await store.refresh() } }
                 }
         }
     }
@@ -53,6 +53,7 @@ struct WatchHomeView: View {
                         NavigationLink("好友积分榜", destination: FriendsView(leaderboard: true))
                     }
                     NavigationLink("表盘设置", destination: FaceSettingsView())
+                    NavigationLink("更换绑定孩子", destination: WatchPairingView())
                     NavigationLink("设备解绑", destination: UnbindView())
                     Button("刷新") { Task { await store.refresh() } }
                 }
@@ -71,8 +72,13 @@ struct WatchHomeView: View {
 struct WatchPairingView: View {
     @EnvironmentObject private var store: WatchStore
     @Environment(\.scenePhase) private var phase
+    @Environment(\.dismiss) private var dismiss
     var body: some View {
         Section {
+            if store.pairing == nil && store.token != nil {
+                Text("已完成绑定").font(.headline)
+                Button("返回") { dismiss() }
+            }
             if let challenge = store.pairing, !store.pairingExpired {
                 Canvas { context, size in
                     let rows = challenge.qrModules
@@ -93,8 +99,8 @@ struct WatchPairingView: View {
                     .minimumScaleFactor(0.6).lineLimit(1)
                 Text("设备码 · 10 分钟内有效").font(.caption2)
             }
-            Text(store.pairingMessage).font(.footnote)
-            if store.pairing == nil || store.pairingExpired {
+            if store.pairing != nil || store.token == nil { Text(store.pairingMessage).font(.footnote) }
+            if (store.pairing == nil && store.token == nil) || store.pairingExpired {
                 Button(store.pairingExpired ? "刷新设备码" : "获取设备码") {
                     Task { await store.beginPairing() }
                 }
@@ -103,7 +109,7 @@ struct WatchPairingView: View {
         .task(id: phase) {
             guard phase == .active else { return }
             if store.pairing == nil { await store.beginPairing() }
-            while !Task.isCancelled && store.token == nil {
+            while !Task.isCancelled && store.pairing != nil {
                 await store.pollPairing()
                 do { try await Task.sleep(for: .seconds(5)) } catch { return }
             }

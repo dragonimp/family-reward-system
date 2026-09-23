@@ -10,20 +10,21 @@ public sealed class WatchPairingSessions(TimeProvider? clock = null)
     private readonly Dictionary<string, Session> sessions = new();
     private readonly SemaphoreSlim gate = new(1, 1);
     public sealed record Challenge(string Code, string DeviceToken, DateTimeOffset ExpiresAt, string VerificationUrl, bool[][] QrModules);
-    public sealed class Session(string code, string tokenHash, DateTimeOffset expiresAt, string name, string platform)
+    public sealed class Session(string code, string tokenHash, DateTimeOffset expiresAt, string name, string platform, string? previousTokenHash)
     {
         public string Code { get; } = code;
         public string TokenHash { get; } = tokenHash;
         public DateTimeOffset ExpiresAt { get; } = expiresAt;
         public string DeviceName { get; } = name;
         public string Platform { get; } = platform;
+        public string? PreviousTokenHash { get; } = previousTokenHash;
         public string? Owner { get; set; }
         public int ChildId { get; set; }
         public int? DeviceId { get; set; }
     }
     public static string Hash(string token) => Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(token))).ToLowerInvariant();
     public static string Normalize(string code) => code.Trim().Replace("-", "").Replace(" ", "").ToUpperInvariant();
-    public async Task<Challenge?> Start(string origin, string name, string platform)
+    public async Task<Challenge?> Start(string origin, string name, string platform, string? previousTokenHash = null)
     {
         await gate.WaitAsync();
         try
@@ -39,7 +40,7 @@ public sealed class WatchPairingSessions(TimeProvider? clock = null)
             var url = origin.TrimEnd('/') + "/children?watchCode=" + code;
             using var generator = new QRCodeGenerator();
             using var qr = generator.CreateQrCode(url, QRCodeGenerator.ECCLevel.M);
-            sessions.Add(code, new Session(code, Hash(token), expiry, name, platform));
+            sessions.Add(code, new Session(code, Hash(token), expiry, name, platform, previousTokenHash));
             return new(code, token, expiry, url, qr.ModuleMatrix.Select(row => row.Cast<bool>().ToArray()).ToArray());
         }
         finally { gate.Release(); }

@@ -834,7 +834,15 @@ app.MapPost("/api/watch/requests", async (JsonObject body, HttpRequest request) 
 app.MapPost("/api/watch/pairing", async (JsonObject body, HttpRequest request, WatchPairingSessions sessions) =>
 {
     request.HttpContext.Response.Headers.CacheControl = "no-store";
-    var challenge = await sessions.Start(GetPublicBaseUrl(request), Truncate(body.String("deviceName", "手表"), 240), Truncate(body.String("platform"), 80));
+    string? previousTokenHash = null;
+    var previousToken = GetWatchDeviceToken(request);
+    if (!string.IsNullOrWhiteSpace(previousToken))
+    {
+        var previousBinding = await RequireWatchDeviceBinding(connectionString, request, touch: false);
+        if (previousBinding.Error is not null) return previousBinding.Error;
+        previousTokenHash = HashSecret(previousToken);
+    }
+    var challenge = await sessions.Start(GetPublicBaseUrl(request), Truncate(body.String("deviceName", "手表"), 240), Truncate(body.String("platform"), 80), previousTokenHash);
     return challenge is null ? Results.Json(new { error = "请稍后再试" }, statusCode: 429) : Results.Json(challenge);
 }).RequireRateLimiting("pair-start");
 
@@ -870,6 +878,17 @@ app.MapPost("/api/children/{id:int}/pair-device", async (int id, JsonObject body
             await using var tx = await conn.BeginTransactionAsync();
             var child = await GetChildForFamily(conn, tx, id, group, owner);
             if (child is null) throw new UnauthorizedAccessException();
+            if (session.PreviousTokenHash is not null)
+            {
+                await using var revoke = new NpgsqlCommand("""
+                    UPDATE watch_device_bindings
+                    SET revoked_at = CURRENT_TIMESTAMP
+                    WHERE device_token_hash = @previous_hash AND revoked_at IS NULL
+                    """, conn, tx);
+                revoke.Parameters.AddWithValue("previous_hash", session.PreviousTokenHash);
+                if (await revoke.ExecuteNonQueryAsync() != 1)
+                    throw new InvalidOperationException("手表原绑定已失效，请在手表上重新获取设备码");
+            }
             await using var insert = new NpgsqlCommand("""
                 INSERT INTO watch_device_bindings
                     (child_id, family_group_id, child_profile_key, parent_app_user_id, device_token_hash, device_name, platform, user_agent)
@@ -890,6 +909,7 @@ app.MapPost("/api/children/{id:int}/pair-device", async (int id, JsonObject body
             : Results.BadRequest(new { error = result.Error });
     }
     catch (UnauthorizedAccessException) { return Results.Json(new { error = "只能为自己名下的孩子绑定设备" }, statusCode: 403); }
+    catch (InvalidOperationException ex) { return Results.Conflict(new { error = ex.Message }); }
     catch (PostgresException ex) when (ex.SqlState == PostgresErrorCodes.UniqueViolation)
     { return Results.Conflict(new { error = "该孩子已绑定设备，请先由家长解绑现有设备" }); }
 }).RequireRateLimiting("pair-approve");

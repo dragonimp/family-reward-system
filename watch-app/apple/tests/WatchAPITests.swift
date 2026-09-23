@@ -162,6 +162,30 @@ struct WatchAPITests {
         StubProtocol.handler = { _ in (200, #"{"status":"expired"}"#) }
         await pairingStore.pollPairing()
         precondition(pairingStore.pairingExpired && pairingStore.token == nil)
-        print("PASS: QR pairing, pending Keychain restore, offline recovery, private polling header, approval and expiration")
+        let transferStore = WatchStore(api: api, readCredential: { persisted },
+            saveCredential: { persisted = $0 }, clearCredential: { persisted = nil })
+        StubProtocol.handler = { request in try success(request) }
+        await transferStore.start()
+        StubProtocol.handler = { request in
+            precondition(request.httpMethod == "POST" && request.url!.lastPathComponent == "pairing")
+            precondition(request.value(forHTTPHeaderField: "X-Watch-Device-Token") == "private-device-token")
+            return (200, #"{"code":"WXYZ2345","deviceToken":"replacement-token","expiresAt":"2026-09-16T00:10:00Z","verificationUrl":"https://example.test/children?watchCode=WXYZ2345","qrModules":[[true,false],[false,true]]}"#)
+        }
+        await transferStore.beginPairing()
+        precondition(transferStore.token == "private-device-token" && persisted!.hasPrefix("transfer:"))
+        let restoredTransfer = WatchStore(api: api, readCredential: { persisted },
+            saveCredential: { persisted = $0 }, clearCredential: { persisted = nil })
+        await restoredTransfer.start()
+        precondition(restoredTransfer.token == "private-device-token" && restoredTransfer.pairing?.code == "WXYZ2345")
+        StubProtocol.handler = { request in
+            if request.url!.lastPathComponent == "pairing" {
+                precondition(request.value(forHTTPHeaderField: "X-Watch-Device-Token") == "replacement-token")
+                return (200, #"{"status":"approved"}"#)
+            }
+            return try success(request)
+        }
+        await restoredTransfer.pollPairing()
+        precondition(restoredTransfer.token == "replacement-token" && persisted == "replacement-token")
+        print("PASS: QR pairing, pending Keychain restore, transfer with old-token proof, offline recovery, approval and expiration")
     }
 }
