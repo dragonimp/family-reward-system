@@ -73,9 +73,10 @@ struct WatchPairingView: View {
     @EnvironmentObject private var store: WatchStore
     @Environment(\.scenePhase) private var phase
     @Environment(\.dismiss) private var dismiss
+    @State private var completed = false
     var body: some View {
         Section {
-            if store.pairing == nil && store.token != nil {
+            if completed {
                 Text("已完成绑定").font(.headline)
                 Button("返回") { dismiss() }
             }
@@ -99,16 +100,19 @@ struct WatchPairingView: View {
                     .minimumScaleFactor(0.6).lineLimit(1)
                 Text("设备码 · 10 分钟内有效").font(.caption2)
             }
-            if store.pairing != nil || store.token == nil { Text(store.pairingMessage).font(.footnote) }
-            if (store.pairing == nil && store.token == nil) || store.pairingExpired {
+            if !completed { Text(store.pairingMessage).font(.footnote) }
+            if (store.pairing == nil && !completed) || store.pairingExpired {
                 Button(store.pairingExpired ? "刷新设备码" : "获取设备码") {
                     Task { await store.beginPairing() }
                 }
             }
         }
-        .task(id: phase) {
+        .onChange(of: store.token) { _, token in
+            if token != nil && store.pairing == nil { completed = true }
+        }
+        .task(id: "\(phase == .active):\(store.pairing?.code ?? "")") {
             guard phase == .active else { return }
-            if store.pairing == nil { await store.beginPairing() }
+            if store.pairing == nil && store.token == nil { await store.beginPairing() }
             while !Task.isCancelled && store.pairing != nil {
                 await store.pollPairing()
                 do { try await Task.sleep(for: .seconds(5)) } catch { return }
