@@ -2,6 +2,23 @@ import SwiftUI
 import AgentIdentity
 import Charts
 
+private struct ReadablePage: ViewModifier {
+    let maxWidth: CGFloat
+
+    func body(content: Content) -> some View {
+        content
+            .frame(maxWidth: maxWidth)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .background(Color(uiColor: .systemGroupedBackground))
+    }
+}
+
+private extension View {
+    func readablePage(maxWidth: CGFloat = 860) -> some View {
+        modifier(ReadablePage(maxWidth: maxWidth))
+    }
+}
+
 @main struct LinkoFamilyApp: App {
     @StateObject private var store = FamilyStore()
     var body: some Scene { WindowGroup { FamilyRoot(store: store, identity: store.identity).tint(.teal) } }
@@ -49,7 +66,7 @@ struct FamilyRoot: View {
                 Button { signIn(false) } label: { HStack { Spacer(); if identity.isBusy { ProgressView() }; Text("用户中心登录").bold(); Spacer() }.padding(.vertical, 8) }.buttonStyle(.borderedProminent).disabled(identity.isBusy)
                 Button("注册用户中心账号") { signIn(true) }.frame(maxWidth: .infinity).disabled(identity.isBusy)
                 Text("登录和注册在系统认证窗口中完成。登录后自动返回 App。").font(.footnote).foregroundStyle(.secondary)
-            }.padding(28).navigationTitle("Linko Family")
+            }.padding(28).frame(maxWidth: 560).frame(maxWidth: .infinity).navigationTitle("Linko Family")
         }
     }
     private func signIn(_ register: Bool) {
@@ -102,7 +119,7 @@ struct FamilyHome: View {
                     if store.groupID != 0 { NavigationLink { RemoteRecords(store: store, title: "家庭邀请", path: "/api/family-groups/\(store.groupID)/invite", mode: .invite) } label: { Label("邀请家人", systemImage: "qrcode") } }
                 }
                 if store.loading { ProgressView("正在更新…") }
-            }.navigationTitle(store.selectedFamily).refreshable { await store.load() }
+            }.readablePage().navigationTitle(store.selectedFamily).refreshable { await store.load() }
                 .sheet(item: $editor) { NativeEditor(store: store, spec: $0) }
         }
     }
@@ -138,7 +155,7 @@ struct ChildDetail: View {
                 NavigationLink("成长周报") { RemoteRecords(store: store, title: "成长周报", path: "/api/growth-reports?childId=\(child.id)&audience=parent&period=weekly&ai=false", mode: .reports) }
                 NavigationLink("好友") { RemoteRecords(store: store, title: "孩子的好友", path: "/api/children/\(child.id)/friends?\(store.scope)", mode: .friends) }
             }
-        }.navigationTitle(current.text("name"))
+        }.readablePage().navigationTitle(current.text("name"))
             .sheet(item: $editor) { NativeEditor(store: store, spec: $0) }
             .sheet(isPresented: $rewarding) { RewardEditor(store: store, child: current) }
     }
@@ -162,7 +179,7 @@ struct ApprovalList: View {
                         }
                     }.padding(.vertical, 6)
                 }
-            }.navigationTitle("奖励审批").refreshable { await store.load() }.sheet(item: $editor) { NativeEditor(store: store, spec: $0) }
+            }.readablePage().navigationTitle("奖励审批").refreshable { await store.load() }.sheet(item: $editor) { NativeEditor(store: store, spec: $0) }
         }
     }
 }
@@ -185,7 +202,7 @@ struct LedgerView: View {
                 if store.transactions.count < store.ledgerTotal {
                     Button(more ? "正在加载…" : "加载更多") { Task { more = true; defer { more = false }; do { try await store.loadLedger(page: store.ledgerPage + 1) } catch { store.error = error.localizedDescription } } }.disabled(more)
                 }
-            }.navigationTitle("积分与奖励记录").searchable(text: $filter, prompt: "搜索已加载的孩子、内容、类别").refreshable { await store.load() }
+            }.readablePage().navigationTitle("积分与奖励记录").searchable(text: $filter, prompt: "搜索已加载的孩子、内容、类别").refreshable { await store.load() }
         }
     }
 }
@@ -206,7 +223,7 @@ struct GrowthView: View {
                     }
                 }
                 if store.growth.isEmpty { ContentUnavailableView("暂无成长统计", systemImage: "chart.bar", description: Text("记录孩子的日常进步，积累成长轨迹。")) }
-            }.navigationTitle("成长足迹").refreshable { await store.load() }
+            }.readablePage().navigationTitle("成长足迹").refreshable { await store.load() }
         }
     }
     private func metric(_ title: String, _ value: String) -> some View { VStack(alignment: .leading, spacing: 5) { Text(value).font(.title2.bold()).foregroundStyle(.teal); Text(title).font(.caption).foregroundStyle(.secondary) } }
@@ -225,7 +242,7 @@ struct RulesView: View {
                     if !rule.flag("isPublic") { Button("编辑") { edit(rule) } }
                 }.padding(.vertical, 5)
             }
-        }.navigationTitle("奖励与行为规则").searchable(text: $search)
+        }.readablePage().navigationTitle("奖励与行为规则").searchable(text: $search)
             .toolbar { Button("添加", systemImage: "plus") { edit(nil) } }.sheet(item: $editor) { NativeEditor(store: store, spec: $0) }
     }
     private func edit(_ row: Record?) {
@@ -241,7 +258,7 @@ struct MembersView: View {
                 VStack(alignment: .leading) { Text(row.text("displayName")).font(.headline); Text(row.text("note")).foregroundStyle(.secondary) }
             }
             Button("添加家庭成员", systemImage: "person.badge.plus") { editor = EditorSpec(title: "添加家庭成员", path: "/api/family-members", fields: [.init(key: "displayName", title: "称呼"), .init(key: "note", title: "备注", required: false)], fixed: ["role":"other"]) }
-        }.navigationTitle("家庭成员").sheet(item: $editor) { NativeEditor(store: store, spec: $0) }
+        }.readablePage().navigationTitle("家庭成员").sheet(item: $editor) { NativeEditor(store: store, spec: $0) }
     }
 }
 struct AccountView: View {
@@ -257,7 +274,7 @@ struct AccountView: View {
                     Text("家庭数据与网页版同步。登录由用户中心提供，凭据保存在本机钥匙串。").font(.footnote).foregroundStyle(.secondary)
                 }
                 Button("退出当前账号", role: .destructive) { logout = true }
-            }.navigationTitle("我的").confirmationDialog("退出 Linko Family？", isPresented: $logout, titleVisibility: .visible) { Button("退出登录", role: .destructive) { store.logout() } } message: { Text("本机登录凭据将清除。用户中心的浏览器登录状态由用户中心管理。") }
+            }.readablePage().navigationTitle("我的").confirmationDialog("退出 Linko Family？", isPresented: $logout, titleVisibility: .visible) { Button("退出登录", role: .destructive) { store.logout() } } message: { Text("本机登录凭据将清除。用户中心的浏览器登录状态由用户中心管理。") }
         }
     }
 }
@@ -290,7 +307,7 @@ struct NativeEditor: View {
                     if let error { Text(error).foregroundStyle(.red) }
                     Button(saving ? "正在提交…" : "确认") { Task { await save() } }.disabled(saving || !valid)
                 }
-            }.sheet(isPresented: $scanning) {
+            }.readablePage(maxWidth: 720).sheet(isPresented: $scanning) {
                 WatchCodeScanner { code in values["code"] = code; error = nil }
             }.navigationTitle(spec.title).navigationBarTitleDisplayMode(.inline)
                 .toolbar { ToolbarItem(placement: .cancellationAction) { Button(saved ? "完成" : "取消") { dismiss() }.disabled(saving) } }.interactiveDismissDisabled(saving)
@@ -350,7 +367,7 @@ struct RewardEditor: View {
                 if let error { Text(error).foregroundStyle(.red) }
                 Button(saving ? "正在保存…" : attempted ? "核对并重试同一笔记录" : "保存记录") { Task { await save() } }.disabled(saving || !valid)
                 Text("重试会使用同一个记录编号，避免重复记分。提交后请以服务端记录为准。").font(.footnote).foregroundStyle(.secondary)
-            }.navigationTitle("记录奖励").toolbar { ToolbarItem(placement: .cancellationAction) { Button("关闭") { dismiss() }.disabled(saving) } }.interactiveDismissDisabled(saving)
+            }.readablePage(maxWidth: 720).navigationTitle("记录奖励").toolbar { ToolbarItem(placement: .cancellationAction) { Button("关闭") { dismiss() }.disabled(saving) } }.interactiveDismissDisabled(saving)
         }
     }
     private var valid: Bool { !description.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && !category.isEmpty && (kind == "items" ? !item.isEmpty : (Double(amount)?.isFinite == true && (Double(amount) ?? 0) > 0)) }
@@ -416,7 +433,7 @@ struct RemoteRecords: View {
                 }.padding(.vertical, 5)
             }
             if !loading && error == nil && rows.isEmpty && mode != .invite && mode != .subscription { Text("暂无记录").foregroundStyle(.secondary) }
-        }.navigationTitle(title).task { await load() }.refreshable { await load() }
+        }.readablePage().navigationTitle(title).task { await load() }.refreshable { await load() }
             .confirmationDialog("解除这只手表与当前孩子的绑定？", isPresented: Binding(
                 get: { deviceToUnbind != nil }, set: { if !$0 { deviceToUnbind = nil } }), titleVisibility: .visible) {
                 Button("解除绑定", role: .destructive) {
