@@ -63,6 +63,18 @@ import AgentIdentity
         // Clear old family data before loading the selected scope.
         children = []; requests = []; transactions = []; growth = []; rules = []; members = []
         children = try Record.list(await call("/api/children?\(scope)"))
+        if let overview = try? await call("/api/credit/overview") as? [String: Any],
+           let creditRows = overview["children"] as? [[String: Any]] {
+            let creditByProfile = Dictionary(creditRows.compactMap { row -> (String, [String: Any])? in
+                guard let key = row["profileKey"] as? String else { return nil }
+                return (key, row)
+            }, uniquingKeysWith: { first, _ in first })
+            children = children.map { child in
+                let key = child.text("profileKey")
+                guard let credit = creditByProfile[key] else { return child }
+                return Record(fields: child.fields.merging(credit) { _, new in new })
+            }
+        }
         rules = try Record.list(await call("/api/rules"), key: "rules")
         let approval = try await call("/api/reward-requests?limit=50") as? [String: Any]
         requests = try Record.list(approval?["requests"] as Any)

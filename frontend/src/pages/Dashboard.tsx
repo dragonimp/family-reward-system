@@ -3,7 +3,7 @@ import type { Child, GrowthReport, Transaction, WarmMoment } from '../types';
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useFamilyGroup } from '../contexts/FamilyGroupContext';
-import { getChildren, getGrowthReports, getTransactions, getWarmMoments } from '../services';
+import { getChildren, getCreditOverview, getGrowthReports, getTransactions, getWarmMoments } from '../services';
 
 interface ChildCardProps {
   child: Child;
@@ -37,7 +37,7 @@ function ChildCard({ child, index }: ChildCardProps) {
       </div>
       
       {/* 数据卡片 */}
-      <div className="grid grid-cols-3 gap-2">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
         <div className="bg-white/70 rounded-xl p-2 text-center">
           <p className="text-xs text-gray-500 mb-0.5">积分</p>
           <p className="text-lg font-bold text-blue-600">{child.score ?? 0}</p>
@@ -50,6 +50,10 @@ function ChildCard({ child, index }: ChildCardProps) {
           <p className="text-xs text-gray-500 mb-0.5">物品</p>
           <p className="text-lg font-bold text-amber-600">{child.items ?? 0}</p>
         </div>
+        {child.creditEnabled !== undefined && <div className="bg-white/70 rounded-xl p-2 text-center">
+          <p className="text-xs text-gray-500 mb-0.5">守约信用</p>
+          <p className="text-lg font-bold text-teal-700">{child.creditEnabled ? child.creditScore : '未开通'}</p>
+        </div>}
       </div>
     </div>
   );
@@ -164,7 +168,9 @@ export default function Dashboard() {
 
       const ch = Array.isArray(childrenRes) ? childrenRes : childrenRes?.data;
       if (ch) {
-        setChildren(ch as Child[]);
+        const overview = await getCreditOverview().catch(() => null);
+        const scores = new Map((overview?.children || []).map(item => [item.profileKey, item]));
+        setChildren((ch as Child[]).map(child => ({ ...child, ...(scores.get(child.profileKey || child.profile_key || '') || {}) })));
       }
       
       // 交易数据 - 兼容后端 {data: {items}} 和直接 {items} 两种形状
