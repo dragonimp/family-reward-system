@@ -112,6 +112,10 @@ builder.Services.AddAgentIdentityJwtCookieAuthentication(new AgentIdentityOption
     CookieName = Environment.GetEnvironmentVariable("AGENTIDENTITY_COOKIE_NAME") ?? "happylife_access_token",
     LogoutCompletedPath = "/auth/logged-out"
 });
+var releaseControlApplicationId = builder.Configuration["AtlasRelease:ControlApplicationId"];
+builder.Services.AddAtlasReleaseDrain();
+if (!string.IsNullOrWhiteSpace(releaseControlApplicationId))
+    builder.Services.AddAtlasReleaseDrainControl(releaseControlApplicationId);
 builder.Services.AddAgentIdentityFeedbackClient(builder.Configuration);
 builder.Services.AddAgentIdentityNativeLogin();
 builder.Services.AddSingleton(ReleaseRuntimeIdentity.Capture("family-points", AppContext.BaseDirectory));
@@ -130,9 +134,12 @@ app.UseForwardedHeaders(new ForwardedHeadersOptions
 app.UseRateLimiter();
 app.UseCors();
 app.UseAgentIdentity();
+app.UseAtlasReleaseDrain(context => HttpMethods.IsGet(context.Request.Method) && context.Request.Path == "/health");
 app.MapAgentIdentityAuthEndpoints();
 app.MapAgentIdentityNativeLogin(new Uri("https://happylife.ai.impx.net"), new Uri("linkofamily://login-complete"), "Linko-Family");
 app.MapAtlasReleaseVersion();
+if (!string.IsNullOrWhiteSpace(releaseControlApplicationId))
+    app.MapAtlasReleaseDrain(ReleaseDrainExtensions.UpgradeControlPolicy);
 
 var connectionString = BuildConnectionString(builder.Configuration);
 await VerifyDatabaseSchema(connectionString);
