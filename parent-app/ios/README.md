@@ -1,11 +1,12 @@
 # Linko-Family 原生 iOS 家长端
 
-SwiftUI 原生界面，iPhone、iPad / iOS 17+。当前工程版本 1.2.0（9），Bundle ID `net.impx.happylife.parent`。业务页面不包含 WebView。
+SwiftUI 原生界面，iPhone、iPad / iOS 17+。当前工程版本 1.2.0（10），Bundle ID `net.impx.happylife.parent`。业务页面不包含 WebView。
 
 ## 原生功能
 
 - 家庭：列表、切换、新建、邀请码加入、邀请分享。
 - 孩子：列表、姓名/备注编辑、积分/零用钱/物品余额。
+- 守约信用：孩子分数、约定、家长确认、调整、撤销和异议处理；独立于可兑换积分。
 - 奖励：原生录入表单、现有规则选择、奖励/扣除、北京时间日期、服务端幂等记账。
 - 审批：孩子奖励申请及审批备注；跨家庭显示当前家长的申请，避免遗漏。
 - 记录：家长所属孩子的完整记录、分页、已加载内容搜索。
@@ -88,3 +89,7 @@ HAPPYLIFE_PARENT_EXPORT_OPTIONS="$PWD/parent-app/ios/build/UploadOptions.plist" 
 ## 1.2.0（9）：iPad 适配
 
 家长端增加原生 iPad 设备族、竖屏与横屏方向及 iPad 图标。登录内容在宽屏居中；列表与编辑表单限制阅读宽度，避免在 13 英寸屏幕上横向拉满。配套 Watch 构建号同步为 9。iPad 真实业务页面、TestFlight 和 Apple 审核状态以本次独立验证与发布记录为准。
+
+## 1.2.0（10）：守约信用分
+
+家长端在孩子资料中查看和管理守约信用分。与本次上线的 API、Web 和手表页面使用同一孩子档案；配套 Watch 构建号同步为 10。上线结果以 Apple 构建处理与内部测试组读回为准。
