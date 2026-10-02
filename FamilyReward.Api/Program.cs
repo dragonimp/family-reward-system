@@ -151,9 +151,9 @@ app.MapCreditScoreEndpoints(connectionString,
     {
         if (request.HttpContext.User.Identity?.IsAuthenticated != true)
             return (null, Results.Json(new { error = "请先通过用户中心登录", code = "login_required" }, statusCode: StatusCodes.Status401Unauthorized));
-        if (request.Headers.ContainsKey("X-App-User-Role") || request.Headers.ContainsKey("X-App-User-Id"))
-            return (null, Results.Json(new { error = "请使用用户中心身份访问守约信用", code = "trusted_identity_required" }, statusCode: StatusCodes.Status403Forbidden));
-        var access = await RequireParentProfile(connectionString, request);
+        if (string.IsNullOrWhiteSpace(FirstClaim(request, ClaimTypes.NameIdentifier, "sub", "user_id", "uid")))
+            return (null, Results.Json(new { error = "登录凭证缺少用户 ID", code = "identity_required" }, statusCode: StatusCodes.Status403Forbidden));
+        var access = await RequireParentProfile(connectionString, request, allowHeaderOverride: false);
         return (access.Profile?.AppUserId, access.Error);
     },
     async request =>
@@ -7260,14 +7260,14 @@ static (string? Username, IResult? Error) RequireXiaotiancaiEmailOperator(HttpRe
     return (username, null);
 }
 
-static async Task<(AppUserProfile? Profile, IResult? Error)> RequireParentProfile(string connectionString, HttpRequest request)
+static async Task<(AppUserProfile? Profile, IResult? Error)> RequireParentProfile(string connectionString, HttpRequest request, bool allowHeaderOverride = true)
 {
     var headerRole = request.Headers.TryGetValue("X-App-User-Role", out var roleHeader) ? NormalizeAppRole(roleHeader.ToString()) : "";
-    if (headerRole == "child")
+    if (allowHeaderOverride && headerRole == "child")
     {
         return (null, Results.Json(new { error = "孩子账号只能使用手表端积分查询和积分申请功能", code = "child_forbidden" }, statusCode: StatusCodes.Status403Forbidden));
     }
-    if (headerRole == "parent" && request.Headers.TryGetValue("X-App-User-Id", out var appUserId) && !string.IsNullOrWhiteSpace(appUserId.ToString()))
+    if (allowHeaderOverride && headerRole == "parent" && request.Headers.TryGetValue("X-App-User-Id", out var appUserId) && !string.IsNullOrWhiteSpace(appUserId.ToString()))
     {
         return (new AppUserProfile(GetUnifiedUserId(request), GetUnifiedUsername(request), "pc", "parent", appUserId.ToString().Trim(), null, null, false), null);
     }
