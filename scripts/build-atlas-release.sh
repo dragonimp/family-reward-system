@@ -16,7 +16,20 @@ green_login_commit="f4fa8f7323a4e904d564c6c27c28fa9290aa0d18"
 git -C "$identity_root" merge-base --is-ancestor "$green_login_commit" HEAD || { echo 'AgentIdentity SDK does not include the green native login page.' >&2; exit 2; }
 git -C "$identity_root" diff --quiet HEAD -- src/AgentIdentity.Sdk || { echo 'AgentIdentity SDK has uncommitted source changes.' >&2; exit 2; }
 dotnet publish "$root/FamilyReward.Api/FamilyReward.Api.csproj" -c Release -r linux-x64 --self-contained false -p:SharedProjectsRoot="$shared_projects_root" -o "$stage/api"
-npm --prefix "$root/frontend" run build -- --outDir "$stage/web"
+rsync -a --exclude=node_modules --exclude=dist "$root/frontend/" "$stage/frontend/"
+node - "$stage/frontend/package.json" "$shared_projects_root" <<'NODE'
+const fs = require('fs');
+const [manifestPath, sharedRoot] = process.argv.slice(2);
+const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+manifest.dependencies['@agentfree/webapp-chat'] = `file:${sharedRoot}/AgentFree/packages/agentfree-webapp-chat`;
+fs.writeFileSync(manifestPath, JSON.stringify(manifest, null, 2) + '\n');
+NODE
+(
+  cd "$stage/frontend"
+  npm install --package-lock-only --ignore-scripts
+  npm ci
+  npm run build -- --outDir "$stage/web"
+)
 mkdir -p "$stage/api/migrations"
 cp "$root/scripts/migrations/"*.sql "$stage/api/migrations/"
 cp "$root/scripts/run-db-migrations.sh" "$stage/api/migrations/run-db-migrations.sh"
