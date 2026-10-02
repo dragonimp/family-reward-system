@@ -149,6 +149,10 @@ await configStore.LoadAsync();
 app.MapCreditScoreEndpoints(connectionString,
     async request =>
     {
+        if (request.HttpContext.User.Identity?.IsAuthenticated != true)
+            return (null, Results.Json(new { error = "请先通过用户中心登录", code = "login_required" }, statusCode: StatusCodes.Status401Unauthorized));
+        if (request.Headers.ContainsKey("X-App-User-Role") || request.Headers.ContainsKey("X-App-User-Id"))
+            return (null, Results.Json(new { error = "请使用用户中心身份访问守约信用", code = "trusted_identity_required" }, statusCode: StatusCodes.Status403Forbidden));
         var access = await RequireParentProfile(connectionString, request);
         return (access.Profile?.AppUserId, access.Error);
     },
