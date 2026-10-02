@@ -1,6 +1,7 @@
 using AgentIdentity.Sdk;
 using AgentDash.Payment.Client;
 using Goldfish.WebAppSdk;
+using Atlas.Releases;
 using Microsoft.AspNetCore.HttpOverrides;
 using System.Data;
 using System.Globalization;
@@ -113,6 +114,7 @@ builder.Services.AddAgentIdentityJwtCookieAuthentication(new AgentIdentityOption
 });
 builder.Services.AddAgentIdentityFeedbackClient(builder.Configuration);
 builder.Services.AddAgentIdentityNativeLogin();
+builder.Services.AddSingleton(ReleaseRuntimeIdentity.Capture("family-points", AppContext.BaseDirectory));
 
 var app = builder.Build();
 
@@ -130,6 +132,7 @@ app.UseCors();
 app.UseAgentIdentity();
 app.MapAgentIdentityAuthEndpoints();
 app.MapAgentIdentityNativeLogin(new Uri("https://happylife.ai.impx.net"), new Uri("linkofamily://login-complete"), "Linko-Family");
+app.MapAtlasReleaseVersion();
 
 var connectionString = BuildConnectionString(builder.Configuration);
 await VerifyDatabaseSchema(connectionString);

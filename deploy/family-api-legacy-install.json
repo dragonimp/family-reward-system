@@ -1,0 +1,26 @@
+{
+  "application": {
+    "appCode": "family-points",
+    "atlasOrigin": "https://home.ai.impx.net",
+    "serviceOrigin": "http://127.0.0.1:5102",
+    "serviceUnit": "family-reward-api.service",
+    "architecture": "x64",
+    "fileName": "family-points-api.tar.gz",
+    "currentPointer": "/opt/Atlas/downloads/family-points-api/current",
+    "releaseDirectory": "/opt/Atlas/downloads/family-points-api/releases",
+    "updaterStateDirectory": "/opt/Atlas/updater-state/family-points-api",
+    "credentialsFile": "/etc/atlas/releases/family-points-upgrader.json",
+    "payloadLayout": "service",
+    "artifactPlatform": "linux",
+    "allowLoopbackHttp": true
+  },
+  "entryPoint": "FamilyReward.Api.dll",
+  "dotnetPath": "/usr/bin/dotnet",
+  "arguments": [],
+  "environmentFiles": [
+    "/etc/family-reward.env",
+    "/etc/agent-secrets/application-feedback.env",
+    "/etc/agent-secrets/family-reward-payment.env",
+    "/etc/agent-secrets/xiaotiancai-email.env"
+  ]
+}
