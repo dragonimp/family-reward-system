@@ -31,5 +31,7 @@ assert watch['WKRunsIndependentlyOfCompanionApp'] is True
 assert not watch.get('WKWatchOnly', False)
 assert watch['CFBundleVersion'] == phone['CFBundleVersion']
 assert watch['CFBundleShortVersionString'] == phone['CFBundleShortVersionString']
-print('PASS: archived independent companion Watch app and matching iPhone version')
+assert phone['UIDeviceFamily'] == [1, 2]
+assert 'UIInterfaceOrientationLandscapeLeft' in phone['UISupportedInterfaceOrientations~ipad']
+print('PASS: archived iPhone/iPad app and independent companion Watch with matching version')
 PY_CHECK

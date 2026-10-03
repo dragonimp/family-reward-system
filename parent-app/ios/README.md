@@ -1,6 +1,6 @@
 # Linko-Family 原生 iOS 家长端
 
-SwiftUI 原生界面，iPhone / iOS 17+。版本 1.1.1（3），Bundle ID `net.impx.happylife.parent`，可更新之前的 1.0.0 WebView 测试版。业务页面不包含 WebView。
+SwiftUI 原生界面，iPhone、iPad / iOS 17+。当前工程版本 1.2.0（9），Bundle ID `net.impx.happylife.parent`。业务页面不包含 WebView。
 
 ## 原生功能
 
@@ -84,3 +84,7 @@ HAPPYLIFE_PARENT_EXPORT_OPTIONS="$PWD/parent-app/ios/build/UploadOptions.plist" 
 ## 1.2.0（8）：换绑页面轮询修复
 
 已绑定手表主动打开换绑页时，手动获取设备码后立即轮询确认结果；网络失败仍可重试获取设备码。此构建替代（7）作为正式审核候选。
+
+## 1.2.0（9）：iPad 适配
+
+家长端增加原生 iPad 设备族、竖屏与横屏方向及 iPad 图标。登录内容在宽屏居中；列表与编辑表单限制阅读宽度，避免在 13 英寸屏幕上横向拉满。配套 Watch 构建号同步为 9。iPad 真实业务页面、TestFlight 和 Apple 审核状态以本次独立验证与发布记录为准。
