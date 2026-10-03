@@ -1,5 +1,5 @@
 import http from './api';
-import type { Child } from '../types';
+import type { Child, CreditDetail } from '../types';
 import type { FamilyGroup, FamilyGroupInvite, HouseholdMember, JoinFamilyGroupResult } from '../types';
 import type {
   ChildAuthCode,
@@ -35,6 +35,19 @@ export const updateHouseholdMember = (id: number, data: Pick<HouseholdMember, 'd
 export const deleteHouseholdMember = (id: number) => http.delete(`/api/family-members/${id}`);
 
 export const getChildren = (params?: { familyGroupId?: number; ownedOnly?: boolean }) => http.get('/api/children', { params });
+export const getCreditOverview = () => http.get<unknown, { children: Array<{ profileKey: string; creditEnabled: boolean; creditScore: number | null }> }>('/api/credit/overview');
+export const getChildCredit = (childId: number) => http.get<unknown, CreditDetail>(`/api/children/${childId}/credit`);
+export const enableChildCredit = (childId: number) => http.post<unknown, CreditDetail>(`/api/children/${childId}/credit/enable`, {});
+export const createCreditCommitment = (childId: number, data: { title: string; dueAt: string; requestId: string }) =>
+  http.post<unknown, CreditDetail>(`/api/children/${childId}/credit/commitments`, data);
+export const resolveCreditCommitment = (childId: number, commitmentId: number, data: { action: 'completed' | 'overdue'; note?: string }) =>
+  http.post<unknown, CreditDetail>(`/api/children/${childId}/credit/commitments/${commitmentId}/resolve`, data);
+export const adjustChildCredit = (childId: number, data: { reasonCode: string; delta: number; note: string; requestId: string }) =>
+  http.post<unknown, CreditDetail>(`/api/children/${childId}/credit/adjustments`, data);
+export const reverseCreditEvent = (childId: number, eventId: number, note: string) =>
+  http.post<unknown, CreditDetail>(`/api/children/${childId}/credit/events/${eventId}/reverse`, { note });
+export const resolveCreditDispute = (childId: number, disputeId: number, data: { action: 'accepted' | 'rejected'; response: string }) =>
+  http.post<unknown, CreditDetail>(`/api/children/${childId}/credit/disputes/${disputeId}/resolve`, data);
 export const getChild = (id: number) => http.get(`/api/children/${id}`);
 export const createChild = (data: Partial<Child>) => http.post('/api/children', data);
 export const updateChild = (id: number, data: Partial<Child>) => http.put(`/api/children/${id}`, data);

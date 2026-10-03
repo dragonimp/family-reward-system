@@ -129,7 +129,9 @@ struct ChildRow: View {
     var body: some View {
         HStack(spacing: 14) {
             Text(String(child.text("name").prefix(1))).font(.title2.bold()).frame(width: 48, height: 48).background(.teal.opacity(0.12), in: RoundedRectangle(cornerRadius: 16)).foregroundStyle(.teal)
-            VStack(alignment: .leading, spacing: 5) { Text(child.text("name")).font(.headline); Text("\(child.amount("score")) 积分 · ¥\(child.amount("cash"))").font(.subheadline).foregroundStyle(.secondary) }
+            VStack(alignment: .leading, spacing: 5) { Text(child.text("name")).font(.headline); Text("\(child.amount("score")) 积分 · ¥\(child.amount("cash"))").font(.subheadline).foregroundStyle(.secondary)
+                if child.has("creditEnabled") { Text("守约信用 \(child.flag("creditEnabled") ? child.amount("creditScore") : "未开通")").font(.caption).foregroundStyle(.teal) }
+            }
             Spacer()
         }.padding(.vertical, 5)
     }
@@ -145,6 +147,7 @@ struct ChildDetail: View {
             Section { ChildRow(child: current); Button("记录奖励 / 扣分", systemImage: "plus.circle.fill") { rewarding = true } }
             Section("孩子资料") {
                 LabeledContent("积分", value: current.amount("score")); LabeledContent("零用钱", value: "¥" + current.amount("cash")); LabeledContent("物品", value: current.amount("items"))
+                NavigationLink("守约信用分") { CreditView(store: store, child: current) }
                 Button("修改姓名与备注") { editor = EditorSpec(title: "修改孩子资料", path: "/api/children/\(child.id)", method: "PUT", fields: [.init(key: "name", title: "姓名", initial: current.text("name")), .init(key: "note", title: "备注", initial: current.text("note"), required: false)]) }
             }
             Section("手表与成长") {

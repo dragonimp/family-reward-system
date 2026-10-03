@@ -1,11 +1,12 @@
 import WatchPairingForm from '../components/WatchPairingForm';
-import { useSearchParams } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { Card } from '../components/Card';
 import { Modal } from '../components/Modal';
 import type { Child, ChildFriend, ChildFriendNotification, HouseholdMember, HouseholdRole, WatchDeviceBinding } from '../types';
 import { useState, useEffect, useCallback } from 'react';
 import {
   getChildren,
+  getCreditOverview,
   createChild,
   updateChild,
   deleteChild,
@@ -90,7 +91,10 @@ export default function Children() {
     try {
       if (!silent) setLoading(true);
       const res = await getChildren({ ownedOnly: true });
-      setChildren(Array.isArray(res) ? res : res?.data || []);
+      const rows: Child[] = Array.isArray(res) ? res : res?.data || [];
+      const overview = await getCreditOverview().catch(() => null);
+      const scores = new Map((overview?.children || []).map(item => [item.profileKey, item]));
+      setChildren(rows.map(child => ({ ...child, ...(scores.get(child.profileKey || child.profile_key || '') || {}) })));
     } catch (error) {
       console.error('加载失败:', error);
       setChildren([]);
@@ -458,6 +462,7 @@ export default function Children() {
               <tr className="border-b border-gray-200 bg-gray-50/50">
                 <th className="text-left py-4 px-4 text-gray-500 font-medium">姓名</th>
                 <th className="text-center py-4 px-4 text-gray-500 font-medium">当前积分</th>
+                <th className="text-center py-4 px-4 text-gray-500 font-medium">守约信用</th>
                 <th className="text-center py-4 px-4 text-gray-500 font-medium">现金余额</th>
                 <th className="text-center py-4 px-4 text-gray-500 font-medium">物品数</th>
                 <th className="text-center py-4 px-4 text-gray-500 font-medium">操作</th>
@@ -480,6 +485,7 @@ export default function Children() {
                       ⭐ {child.score}
                     </span>
                   </td>
+                  <td className="py-4 px-4 text-center"><Link to={`/credit/${child.id}`} className="font-medium text-emerald-700">{child.creditEnabled ? `${child.creditScore} / 100` : '未开通'}</Link></td>
                   <td className="py-4 px-4 text-center">
                     <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-sm font-medium bg-green-100 text-green-700">
                       💰 ¥{child.cash}
@@ -495,6 +501,7 @@ export default function Children() {
                       <button onClick={() => openEditModal(child)} className="text-[#4A90D9] hover:text-[#3A7BC8] text-sm font-medium">
                         编辑
                       </button>
+                      <Link to={`/credit/${child.id}`} className="text-emerald-700 hover:text-emerald-900 text-sm font-medium">信用分</Link>
                       <button onClick={() => openDeviceModal(child)} className="text-[#16A085] hover:text-[#0E7D67] text-sm font-medium">
                         手表
                       </button>

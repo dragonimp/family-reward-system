@@ -112,6 +112,10 @@ builder.Services.AddAgentIdentityJwtCookieAuthentication(new AgentIdentityOption
     CookieName = Environment.GetEnvironmentVariable("AGENTIDENTITY_COOKIE_NAME") ?? "happylife_access_token",
     LogoutCompletedPath = "/auth/logged-out"
 });
+var releaseControlApplicationId = builder.Configuration["AtlasRelease:ControlApplicationId"];
+builder.Services.AddAtlasReleaseDrain();
+if (!string.IsNullOrWhiteSpace(releaseControlApplicationId))
+    builder.Services.AddAtlasReleaseDrainControl(releaseControlApplicationId);
 builder.Services.AddAgentIdentityFeedbackClient(builder.Configuration);
 builder.Services.AddAgentIdentityNativeLogin();
 builder.Services.AddSingleton(ReleaseRuntimeIdentity.Capture("family-points", AppContext.BaseDirectory));
@@ -130,14 +134,33 @@ app.UseForwardedHeaders(new ForwardedHeadersOptions
 app.UseRateLimiter();
 app.UseCors();
 app.UseAgentIdentity();
+app.UseAtlasReleaseDrain(context => HttpMethods.IsGet(context.Request.Method) && context.Request.Path == "/health");
 app.MapAgentIdentityAuthEndpoints();
 app.MapAgentIdentityNativeLogin(new Uri("https://happylife.ai.impx.net"), new Uri("linkofamily://login-complete"), "Linko-Family");
 app.MapAtlasReleaseVersion();
+if (!string.IsNullOrWhiteSpace(releaseControlApplicationId))
+    app.MapAtlasReleaseDrain(ReleaseDrainExtensions.UpgradeControlPolicy);
 
 var connectionString = BuildConnectionString(builder.Configuration);
 await VerifyDatabaseSchema(connectionString);
 var configStore = new SystemConfigStore(connectionString, app.Environment.ContentRootPath);
 await configStore.LoadAsync();
+
+app.MapCreditScoreEndpoints(connectionString,
+    async request =>
+    {
+        if (request.HttpContext.User.Identity?.IsAuthenticated != true)
+            return (null, Results.Json(new { error = "请先通过用户中心登录", code = "login_required" }, statusCode: StatusCodes.Status401Unauthorized));
+        if (string.IsNullOrWhiteSpace(FirstClaim(request, ClaimTypes.NameIdentifier, "sub", "user_id", "uid")))
+            return (null, Results.Json(new { error = "登录凭证缺少用户 ID", code = "identity_required" }, statusCode: StatusCodes.Status403Forbidden));
+        var access = await RequireParentProfile(connectionString, request, allowHeaderOverride: false);
+        return (access.Profile?.AppUserId, access.Error);
+    },
+    async request =>
+    {
+        var access = await RequireWatchDeviceBinding(connectionString, request);
+        return (access.Binding?.ChildProfileKey, access.Error);
+    });
 
 app.MapGet("/health", () => Results.Json(new
 {
@@ -1201,6 +1224,7 @@ app.MapGet("/watch", () =>
                       <div><p class="menu-group-title">积分</p><div class="menu-grid">
                         <button class="menu-card" type="button" data-view="request"><span class="menu-icon">⭐</span><span>积分申请</span></button>
                         <button class="menu-card" type="button" data-view="points-detail"><span class="menu-icon">🏅</span><span>积分详情</span></button>
+                        <button class="menu-card" type="button" data-view="credit"><span class="menu-icon">🤝</span><span>守约信用</span></button>
                       </div></div>
                       <div><p class="menu-group-title">好友</p><div class="menu-grid">
                         <button class="menu-card" type="button" data-view="friend-add"><span class="menu-icon">👥</span><span>添加好友</span></button>
@@ -1239,6 +1263,14 @@ app.MapGet("/watch", () =>
                     </div>
                     <label>最近申请</label>
                     <ul class="requests" id="requests"></ul>
+                  </div>
+                  <div class="panel" data-panel="credit">
+                    <button class="back-menu" type="button">‹ 返回菜单</button>
+                    <h2>守约信用</h2>
+                    <div class="detail-metrics"><div class="detail-metric"><b id="credit-score">--</b><span>信用分</span></div></div>
+                    <label>我的约定</label><ul class="compact-list" id="credit-commitments"></ul>
+                    <label>最近记录</label><ul class="compact-list" id="credit-events"></ul>
+                    <p id="credit-msg" class="msg"></p>
                   </div>
                   <div class="panel" data-panel="friend-add">
                     <button class="back-menu" type="button">‹ 返回菜单</button>
@@ -1393,6 +1425,7 @@ app.MapGet("/watch", () =>
               document.getElementById('menu').classList.toggle('hidden', view !== 'home');
               if (push && (!history.state || history.state.watchView !== view)) history.pushState({ watchView: view }, '', location.href);
               fitActivePanel();
+              if (view === 'credit') refreshCredit().catch((error) => { document.getElementById('credit-msg').textContent = error.message || '加载失败'; });
             };
             const fetchJson = async (url, options = {}) => {
               const response = await fetch(url, options);
@@ -1400,6 +1433,36 @@ app.MapGet("/watch", () =>
               if (!response.ok) { const error = new Error(payload.error || '请求失败'); error.status = response.status; throw error; }
               return payload;
             };
+            const renderCredit = (credit) => {
+              document.getElementById('credit-score').textContent = credit.enabled ? String(credit.score) : '未开通';
+              document.getElementById('credit-commitments').innerHTML = (credit.commitments || []).map((item) => `
+                <li><span>${escapeText(item.title)} · ${escapeText(new Date(item.dueAt).toLocaleDateString('zh-CN'))}</span>
+                ${['open','overdue'].includes(item.status) && !isPreview ? `<button type="button" data-credit-complete="${item.id}">申请确认</button>` : `<b>${escapeText(({open:'进行中',pending:'待家长确认',overdue:'已逾期',late_pending:'补救待确认',completed:'已完成'})[item.status] || item.status)}</b>`}</li>`).join('') || '<li class="empty-row">还没有约定</li>';
+              document.getElementById('credit-events').innerHTML = (credit.events || []).slice(0, 5).map((item) => `
+                <li><span>${escapeText(item.note || item.reasonCode)}</span><b>${item.delta > 0 ? '+' : ''}${item.delta}</b>
+                ${item.delta < 0 && !isPreview && !(credit.disputes || []).some((dispute) => dispute.eventId === item.id) ? `<button type="button" data-credit-dispute="${item.id}">异议</button>` : ''}</li>`).join('') || '<li class="empty-row">还没有记录</li>';
+            };
+            const refreshCredit = async () => {
+              if (isPreview) { renderCredit({ enabled: false }); return; }
+              renderCredit(await fetchJson('/api/watch/credit', { headers: authHeaders() }));
+            };
+            document.querySelector('[data-panel="credit"]').addEventListener('click', async (event) => {
+              const complete = event.target.closest('[data-credit-complete]');
+              const dispute = event.target.closest('[data-credit-dispute]');
+              if (!complete && !dispute) return;
+              const message = document.getElementById('credit-msg');
+              if (blockPreviewWrite(message)) return;
+              try {
+                if (complete) await fetchJson('/api/watch/credit/commitments/' + encodeURIComponent(complete.dataset.creditComplete) + '/complete', { method: 'POST', headers: authHeaders() });
+                if (dispute) {
+                  const reason = prompt('请写下你的异议（至少 2 字）');
+                  if (!reason) return;
+                  await fetchJson('/api/watch/credit/events/' + encodeURIComponent(dispute.dataset.creditDispute) + '/dispute', { method: 'POST', headers: { 'Content-Type': 'application/json', ...authHeaders() }, body: JSON.stringify({ reason }) });
+                }
+                message.textContent = complete ? '已申请家长确认' : '异议已提交';
+                await refreshCredit();
+              } catch (error) { message.textContent = error.message || '操作失败'; }
+            });
             const load = async () => {
               if (!isPreview && !token()) { showBound(false); await beginPairing(); return; }
               try {
@@ -7197,14 +7260,14 @@ static (string? Username, IResult? Error) RequireXiaotiancaiEmailOperator(HttpRe
     return (username, null);
 }
 
-static async Task<(AppUserProfile? Profile, IResult? Error)> RequireParentProfile(string connectionString, HttpRequest request)
+static async Task<(AppUserProfile? Profile, IResult? Error)> RequireParentProfile(string connectionString, HttpRequest request, bool allowHeaderOverride = true)
 {
     var headerRole = request.Headers.TryGetValue("X-App-User-Role", out var roleHeader) ? NormalizeAppRole(roleHeader.ToString()) : "";
-    if (headerRole == "child")
+    if (allowHeaderOverride && headerRole == "child")
     {
         return (null, Results.Json(new { error = "孩子账号只能使用手表端积分查询和积分申请功能", code = "child_forbidden" }, statusCode: StatusCodes.Status403Forbidden));
     }
-    if (headerRole == "parent" && request.Headers.TryGetValue("X-App-User-Id", out var appUserId) && !string.IsNullOrWhiteSpace(appUserId.ToString()))
+    if (allowHeaderOverride && headerRole == "parent" && request.Headers.TryGetValue("X-App-User-Id", out var appUserId) && !string.IsNullOrWhiteSpace(appUserId.ToString()))
     {
         return (new AppUserProfile(GetUnifiedUserId(request), GetUnifiedUsername(request), "pc", "parent", appUserId.ToString().Trim(), null, null, false), null);
     }

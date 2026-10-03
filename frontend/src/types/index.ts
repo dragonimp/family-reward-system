@@ -9,12 +9,53 @@ export interface Child {
   profile_key?: string;
   name: string;
   score?: number;
+  creditEnabled?: boolean;
+  creditScore?: number | null;
   cash?: number;
   items?: number;
   parentNames?: string;
   avatar?: string;
   createdAt?: string;
   updatedAt?: string;
+}
+
+export interface CreditCommitment {
+  id: number;
+  title: string;
+  dueAt: string;
+  status: 'open' | 'pending' | 'overdue' | 'late_pending' | 'completed';
+  completionRequestedAt?: string | null;
+  resolvedAt?: string | null;
+}
+
+export interface CreditEvent {
+  id: number;
+  commitmentId?: number | null;
+  reasonCode: string;
+  delta: number;
+  scoreBefore: number;
+  scoreAfter: number;
+  note: string;
+  reversalOfEventId?: number | null;
+  createdAt: string;
+}
+
+export interface CreditDispute {
+  id: number;
+  eventId: number;
+  reason: string;
+  status: 'pending' | 'accepted' | 'rejected';
+  parentResponse: string;
+  createdAt: string;
+}
+
+export interface CreditDetail {
+  enabled: boolean;
+  score: number | null;
+  version: number;
+  commitments: CreditCommitment[];
+  events: CreditEvent[];
+  disputes: CreditDispute[];
 }
 
 export interface WarmMoment {

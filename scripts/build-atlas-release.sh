@@ -30,6 +30,11 @@ NODE
   npm ci
   npm run build -- --outDir "$stage/web"
 )
+node - "$stage/web/version.json" "$app_code" "$version" <<'NODE'
+const fs = require('fs');
+const [file, appCode, releaseVersion] = process.argv.slice(2);
+fs.writeFileSync(file, JSON.stringify({ appCode, version: releaseVersion }) + '\n');
+NODE
 mkdir -p "$stage/api/migrations"
 cp "$root/scripts/migrations/"*.sql "$stage/api/migrations/"
 cp "$root/scripts/run-db-migrations.sh" "$stage/api/migrations/run-db-migrations.sh"
