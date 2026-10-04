@@ -1,6 +1,6 @@
 # Linko-Family 原生 iOS 家长端
 
-SwiftUI 原生界面，iPhone、iPad / iOS 17+。当前工程版本 1.2.2（11），Bundle ID `net.impx.happylife.parent`。业务页面不包含 WebView。
+SwiftUI 原生界面，iPhone、iPad / iOS 17+。当前工程版本 1.2.3（12），Bundle ID `net.impx.happylife.parent`。业务页面不包含 WebView。
 
 ## 原生功能
 
@@ -17,6 +17,10 @@ SwiftUI 原生界面，iPhone、iPad / iOS 17+。当前工程版本 1.2.2（11�
 - 账号：家长角色选择、订阅权益只读、退出与清理本机凭据。
 
 网页管理后台、支付购买入口尚未提供原生界面；不以嵌入网页冒充原生能力。删除成员/规则等操作尚未列入本版原生界面。
+
+## 1.2.3（12）：AI 对话键盘
+
+点击消息区、空状态或错误提示可收起输入键盘；滚动消息时也可交互式收起键盘。发送消息或切换对话后键盘会收起。
 
 ## 1.2.2（11）：余额刷新与 AI 对话
 

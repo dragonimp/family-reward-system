@@ -11,13 +11,22 @@ struct FamilyChatView: View {
     @State private var draft = ""
     @State private var busy = false
     @State private var error: String?
+    @FocusState private var composerFocused: Bool
 
     var body: some View {
         NavigationStack {
             VStack(spacing: 0) {
-                if let error { Text(error).foregroundStyle(.red).padding() }
+                if let error {
+                    Text(error).foregroundStyle(.red).padding()
+                        .frame(maxWidth: .infinity)
+                        .contentShape(Rectangle())
+                        .onTapGesture { composerFocused = false }
+                }
                 if agents.isEmpty && !busy {
                     ContentUnavailableView("暂无可用智能体", systemImage: "bubble.left.and.bubble.right", description: Text("请在家庭积分应用中授权智能体后刷新。"))
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .contentShape(Rectangle())
+                        .onTapGesture { composerFocused = false }
                 } else {
                     ScrollViewReader { proxy in
                         ScrollView {
@@ -32,11 +41,16 @@ struct FamilyChatView: View {
                                 }
                                 if busy { ProgressView("正在等待回复…").frame(maxWidth: .infinity, alignment: .leading) }
                             }.padding()
-                        }.onChange(of: messages.count) { _, count in if count > 0 { proxy.scrollTo(count - 1, anchor: .bottom) } }
+                        }
+                        .scrollDismissesKeyboard(.interactively)
+                        .contentShape(Rectangle())
+                        .simultaneousGesture(TapGesture().onEnded { composerFocused = false })
+                        .onChange(of: messages.count) { _, count in if count > 0 { proxy.scrollTo(count - 1, anchor: .bottom) } }
                     }
                 }
                 HStack(alignment: .bottom) {
                     TextField("输入消息", text: $draft, axis: .vertical).lineLimit(1...5).textFieldStyle(.roundedBorder)
+                        .focused($composerFocused)
                     Button("发送", systemImage: "arrow.up.circle.fill") { Task { await send() } }
                         .labelStyle(.iconOnly).font(.title2)
                         .disabled(busy || agents.isEmpty || draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
@@ -45,10 +59,10 @@ struct FamilyChatView: View {
             .navigationTitle("AI 对话")
             .toolbar {
                 Menu {
-                    Button("新建对话", systemImage: "plus") { sessionID = nil; messages = []; error = nil }
+                    Button("新建对话", systemImage: "plus") { composerFocused = false; sessionID = nil; messages = []; error = nil }
                     ForEach(Array(sessions.enumerated()), id: \.offset) { _, session in
                         if let id = session["id"] as? String {
-                            Button(session["name"] as? String ?? "对话") { Task { await open(id) } }
+                            Button(session["name"] as? String ?? "对话") { composerFocused = false; Task { await open(id) } }
                         }
                     }
                 } label: { Image(systemName: "clock.arrow.circlepath") }
@@ -78,6 +92,7 @@ struct FamilyChatView: View {
     private func send() async {
         let message = draft.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !message.isEmpty, let agent = agents.first else { return }
+        composerFocused = false
         busy = true; error = nil
         defer { busy = false }
         do {
