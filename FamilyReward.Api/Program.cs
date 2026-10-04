@@ -1602,7 +1602,7 @@ app.MapGet("/watch", () =>
             };
             const pairingKey = 'happylife_watch_pending_pairing';
             let pairing = null;
-            try { pairing = JSON.parse(localStorage.getItem(pairingKey) || 'null'); } catch { localStorage.removeItem(pairingKey); }
+            try { pairing = JSON.parse(localStorage.getItem(pairingKey) || 'null'); } catch (error) { localStorage.removeItem(pairingKey); }
             let pairingBusy = false;
             let pairingExpired = false;
             const drawPairing = () => {
@@ -1653,7 +1653,7 @@ app.MapGet("/watch", () =>
                   pairingExpired = true;
                   bindMsg.textContent = '设备码已过期，请重新获取'; drawPairing();
                 } else { bindMsg.textContent = '等待家长选择孩子并确认'; }
-              } catch { bindMsg.textContent = '网络暂时不可用，正在等待恢复'; }
+              } catch (error) { bindMsg.textContent = '网络暂时不可用，正在等待恢复'; }
               finally { pairingBusy = false; }
             }, 5000);
             form.addEventListener('submit', async (event) => {

@@ -42,7 +42,7 @@ test('mobile assistant reuses the complete AgentFree WebApp chat surface', async
   assert.match(backend, /var requestedAgentId = body\.Int\("agentId"\)/);
   assert.match(backend, /\["agentId"\] = session\.AgentId/);
   assert.match(backend, /\["AgentId"\] = session\.AgentId/);
-  assert.match(backend, /GetSessionsAsync\(/);
+  assert.match(backend, /GetAuthorizedSessionsAsync\(/);
   assert.match(backend, /GetSessionMessagesAsync\(/);
   assert.match(backend, /GetSessionTimelineAsync\(/);
   assert.match(backend, /GetSessionQueueAsync\(/);

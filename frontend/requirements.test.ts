@@ -42,20 +42,21 @@ test('REQ-030 exposes one watch menu with six icon destinations and voice fallba
 });
 
 test('REQ-067 adds unrated parent warm moments and traceable dual growth reports', async () => {
-  const [api, dashboard, growth, stats] = await Promise.all([
+  const [api, schema, dashboard, growth, stats] = await Promise.all([
     readFile(new URL('../FamilyReward.Api/Program.cs', import.meta.url), 'utf8'),
+    readFile(new URL('../scripts/migrations/20261002-family-schema-v1.sql', import.meta.url), 'utf8'),
     readFile(new URL('./src/pages/Dashboard.tsx', import.meta.url), 'utf8'),
     readFile(new URL('./src/pages/Growth.tsx', import.meta.url), 'utf8'),
     readFile(new URL('./src/pages/Stats.tsx', import.meta.url), 'utf8'),
   ]);
 
-  assert.match(api, /CREATE TABLE IF NOT EXISTS parent_warm_moments/);
-  assert.doesNotMatch(api.slice(api.indexOf('CREATE TABLE IF NOT EXISTS parent_warm_moments'), api.indexOf('CREATE INDEX IF NOT EXISTS idx_parent_warm_moments')), /rating|score|good|bad/i);
+  assert.match(schema, /CREATE TABLE IF NOT EXISTS parent_warm_moments/);
+  assert.doesNotMatch(schema.slice(schema.indexOf('CREATE TABLE IF NOT EXISTS parent_warm_moments'), schema.indexOf('CREATE INDEX IF NOT EXISTS idx_parent_warm_moments')), /rating|score|good|bad/i);
   assert.match(api, /data-view="warm-moment"/);
   assert.match(api, /data-speech-target="warm-content"/);
-  assert.match(api, /friend_leaderboard_enabled BOOLEAN NOT NULL DEFAULT FALSE/);
-  assert.match(api, /CHECK \(period_type IN \('daily', 'weekly', 'monthly'\)\)/);
-  assert.match(api, /source_refs JSONB/);
+  assert.match(schema, /friend_leaderboard_enabled BOOLEAN NOT NULL DEFAULT FALSE/);
+  assert.match(schema, /CHECK \(period_type IN \('daily', 'weekly', 'monthly'\)\)/);
+  assert.match(schema, /source_refs JSONB/);
   assert.match(dashboard, /getGrowthReports\(\{ audience: 'parent', period: 'daily', ai: false \}\)/);
   assert.match(dashboard, /getGrowthReports\(\{ audience: 'child', period: 'daily', ai: false \}\)/);
   assert.match(api, /request\.Query\.String\("ai"\)\.Equals\("false"/);
@@ -89,7 +90,7 @@ test('Xiaotiancai watch page remains parseable by Android 7.1 and 8.1 WebView', 
   assert.match(watchPage, /width:calc\(100vw - 8px\);height:calc\(112\.5vw - 9px\)/);
   assert.match(watchPage, /@supports \(width:min\(100px,100%\)\)/);
   assert.match(watchPage, /-webkit-text-size-adjust:100%/);
-  assert.match(watchPage, /screen\.id !== 'bind-panel'/);
+  assert.match(watchPage, /screen\.id === 'bind-panel'/);
   assert.match(watchPage, /#app-panel \.panel:not\(\[data-panel=home\]\)/);
 });
 
@@ -217,7 +218,7 @@ test('REQ-033 streams mobile family agent responses without waiting for the full
   assert.match(agentApi, /\/api\/agentfree\/chat\/stream/);
   assert.match(agentApi, /credentials: 'include'/);
   assert.match(api, /\/api\/agentfree\/sessions/);
-  assert.match(api, /GetSessionsAsync/);
+  assert.match(api, /GetAuthorizedSessionsAsync/);
   assert.match(api, /CreateSessionAsync/);
   assert.match(api, /OpenChatStreamAsync/);
   assert.match(api, /gatewayBaseUrl/);
@@ -260,13 +261,14 @@ test('REQ-062 keeps VIP watch-face animation decorative and accessible', async (
 });
 
 test('REQ-036 scopes personal rule templates to a parent across web, watch and MCP', async () => {
-  const [api, page] = await Promise.all([
+  const [api, schema, page] = await Promise.all([
     readFile(new URL('../FamilyReward.Api/Program.cs', import.meta.url), 'utf8'),
+    readFile(new URL('../scripts/migrations/20261002-family-schema-v1.sql', import.meta.url), 'utf8'),
     readFile(new URL('./src/pages/Rules.tsx', import.meta.url), 'utf8'),
   ]);
-  assert.match(api, /CREATE TABLE IF NOT EXISTS user_rule_templates/);
-  assert.match(api, /CREATE TABLE IF NOT EXISTS user_rule_template_items/);
-  assert.match(api, /owner_app_user_id/);
+  assert.match(schema, /CREATE TABLE IF NOT EXISTS user_rule_templates/);
+  assert.match(schema, /CREATE TABLE IF NOT EXISTS user_rule_template_items/);
+  assert.match(schema, /owner_app_user_id/);
   assert.match(api, /GetRules\(connectionString, binding\.Binding!\.ParentAppUserId\)/);
   assert.match(api, /allowed\.Add\("username"\)/);
   assert.match(api, /ResolveMcpParentAppUserId/);
@@ -275,14 +277,15 @@ test('REQ-036 scopes personal rule templates to a parent across web, watch and M
 });
 
 test('REQ-039 supports redline rules and ordered watch rewards', async () => {
-  const [api, page] = await Promise.all([
+  const [api, schema, page] = await Promise.all([
     readFile(new URL('../FamilyReward.Api/Program.cs', import.meta.url), 'utf8'),
+    readFile(new URL('../scripts/migrations/20261002-family-schema-v1.sql', import.meta.url), 'utf8'),
     readFile(new URL('./src/pages/Rules.tsx', import.meta.url), 'utf8'),
   ]);
   assert.match(api, /NormalizeRulePoints/);
   assert.match(api, /\["isRedLine"\] = points < 0/);
-  assert.match(api, /source_redline_id INTEGER/);
-  assert.match(api, /INSERT INTO rules \(name, category, points, cash_cny, description, source_redline_id\)/);
+  assert.match(schema, /source_redline_id INTEGER/);
+  assert.match(api, /INSERT INTO rules \(name, category, points, cash_cny, description, owner_app_user_id\)/);
   assert.match(api, /FROM redlines/);
   assert.match(api, /GetDecimal\(rule, "points"\) > 0/);
   assert.match(api, /\.Take\(8\)/);
@@ -404,12 +407,13 @@ test('REQ-040 organizes circle management into four tabs', async () => {
 });
 
 test('REQ-050/051/052 separates circle and household member management', async () => {
-  const [layout, familyPage, services, types, api] = await Promise.all([
+  const [layout, familyPage, services, types, api, schema] = await Promise.all([
     readFile(new URL('./src/components/Layout.tsx', import.meta.url), 'utf8'),
     readFile(new URL('./src/pages/Children.tsx', import.meta.url), 'utf8'),
     readFile(new URL('./src/services/index.ts', import.meta.url), 'utf8'),
     readFile(new URL('./src/types/index.ts', import.meta.url), 'utf8'),
     readFile(new URL('../FamilyReward.Api/Program.cs', import.meta.url), 'utf8'),
+    readFile(new URL('../scripts/migrations/20261002-family-schema-v1.sql', import.meta.url), 'utf8'),
   ]);
   assert.match(layout, /label: '圈子管理'/);
   assert.match(layout, /label: '家庭管理'/);
@@ -421,7 +425,7 @@ test('REQ-050/051/052 separates circle and household member management', async (
   }
   assert.match(types, /interface HouseholdMember/);
   assert.match(services, /api\/family-members/);
-  assert.match(api, /CREATE TABLE IF NOT EXISTS household_members/);
-  assert.match(api, /owner_parent_app_user_id/);
+  assert.match(schema, /CREATE TABLE IF NOT EXISTS household_members/);
+  assert.match(schema, /owner_parent_app_user_id/);
   assert.match(api, /当前用户不能从家庭成员中删除/);
 });
