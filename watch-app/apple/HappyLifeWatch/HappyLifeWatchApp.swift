@@ -47,6 +47,7 @@ struct WatchHomeView: View {
                     NavigationLink("申请奖励", destination: RulesView())
                     NavigationLink("申请记录", destination: RequestsView())
                     NavigationLink("爸爸妈妈的闪光时刻", destination: WarmMomentView())
+                    NavigationLink("亲子互动", destination: WatchConnectionsView())
                     NavigationLink("今日鼓励", destination: GrowthView())
                     NavigationLink("我的好友", destination: FriendsView())
                     if store.settings?.friendLeaderboardEnabled == true {
@@ -190,5 +191,109 @@ struct UnbindView: View {
                 }
             }.disabled(code.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
         }.disabled(store.busy).navigationTitle("设备解绑")
+    }
+}
+
+struct WatchConnectionsView: View {
+    @EnvironmentObject private var store: WatchStore
+    @State private var kind = "special_time"
+    @State private var intent = "share"
+    @State private var title = ""
+    @State private var requestID = UUID()
+    var body: some View {
+        List {
+            Section("想和家长说") {
+                Picker("方式", selection: $kind) {
+                    Text("十分钟陪伴").tag("special_time")
+                    Text("先听我说").tag("listen")
+                    Text("吵架后重连").tag("reconnect")
+                    Text("家庭小会议").tag("meeting")
+                }
+                if kind == "listen" {
+                    Picker("我希望", selection: $intent) {
+                        Text("只想说说").tag("share")
+                        Text("想要安慰").tag("comfort")
+                        Text("一起想办法").tag("ideas")
+                    }
+                }
+                TextField(kind == "special_time" ? "想一起做什么" : "想聊什么", text: $title)
+                    .onChange(of: title) { _, _ in requestID = UUID() }
+                Button("告诉家长") {
+                    Task {
+                        if await store.createConnection(kind: kind, title: title.trimmingCharacters(in: .whitespacesAndNewlines),
+                                                        intent: kind == "listen" ? intent : "", requestID: requestID) {
+                            title = ""; requestID = UUID()
+                        }
+                    }
+                }.disabled(title.trimmingCharacters(in: .whitespacesAndNewlines).count < 2)
+            }
+            Section("我们的互动") {
+                if store.connections?.threads.isEmpty != false { Text("还没有记录") }
+                ForEach(store.connections?.threads ?? []) { thread in
+                    NavigationLink {
+                        WatchConnectionDetail(id: thread.id)
+                    } label: {
+                        VStack(alignment: .leading) {
+                            Text(thread.title)
+                            Text(thread.status).font(.caption2).foregroundStyle(.secondary)
+                        }
+                    }
+                }
+                Button("刷新") { Task { await store.loadSection("connections") } }
+            }
+            Text("这里不计积分，也不评分。").font(.footnote).foregroundStyle(.secondary)
+        }.disabled(store.busy).navigationTitle("亲子互动")
+            .task { await store.loadSection("connections") }
+    }
+}
+
+struct WatchConnectionDetail: View {
+    @EnvironmentObject private var store: WatchStore
+    let id: Int64
+    @State private var type = "message"
+    @State private var content = ""
+    @State private var requestID = UUID()
+    private var thread: WatchConnection? { store.connections?.threads.first { $0.id == id } }
+    var body: some View {
+        List {
+            if let thread {
+                Text(thread.title).font(.headline)
+                if thread.kind == "listen" {
+                    Text(["share": "只想说说", "comfort": "想要安慰", "ideas": "一起想办法"][thread.intent] ?? "先听我说")
+                }
+                if let time = thread.scheduledAt { Text("约定时间：\(time)").font(.footnote) }
+                if !thread.trialPlan.isEmpty { Text("本周试行：\(thread.trialPlan)") }
+                ForEach(store.connections?.entries.filter { $0.connectionId == id } ?? []) { entry in
+                    VStack(alignment: .leading) {
+                        Text(entry.authorRole == "child" ? "我说" : "家长说").font(.caption2).foregroundStyle(.secondary)
+                        Text(entry.content)
+                    }
+                }
+                if thread.status != "completed" && thread.status != "cancelled" {
+                    Picker("记录", selection: $type) {
+                        Text("想说的话").tag("message")
+                        if thread.kind == "reconnect" { Text("我的感受").tag("feeling"); Text("我的期待").tag("hope") }
+                        if thread.kind == "meeting" { Text("我的提议").tag("proposal") }
+                        if thread.status == "trial" || thread.kind == "special_time" { Text("复盘").tag("reflection") }
+                    }
+                    TextField("说说你的想法", text: $content).onChange(of: content) { _, _ in requestID = UUID() }
+                    Button("发送") {
+                        Task {
+                            if await store.addConnectionEntry(id: id, type: type,
+                                content: content.trimmingCharacters(in: .whitespacesAndNewlines), requestID: requestID) {
+                                content = ""; requestID = UUID()
+                            }
+                        }
+                    }.disabled(content.trimmingCharacters(in: .whitespacesAndNewlines).count < 2)
+                    if thread.kind == "special_time" && thread.status == "scheduled" ||
+                       thread.kind == "listen" && thread.status == "open" ||
+                       thread.kind == "reconnect" && thread.status == "open" {
+                        Button("完成互动") { Task { await store.completeConnection(id: id) } }
+                    }
+                }
+                Button("刷新") { Task { await store.loadSection("connections") } }
+            } else { Text("正在读取记录…") }
+        }.disabled(store.busy).navigationTitle("我们的话")
+            .task { await store.loadSection("connections") }
     }
 }

@@ -19,6 +19,7 @@ final class WatchStore: ObservableObject {
     @Published private(set) var friendCode: FriendCode?
     @Published private(set) var parents: [ParentOption] = []
     @Published private(set) var growth: GrowthReport?
+    @Published private(set) var connections: ConnectionResponse?
     @Published private(set) var busy = false
     @Published private(set) var ready = false
     @Published var message: String?
@@ -145,6 +146,8 @@ final class WatchStore: ObservableObject {
             case "growth":
                 let response: GrowthResponse = try await self.api.call("growth-report", token: token)
                 self.growth = response.report
+            case "connections":
+                self.connections = try await self.api.call("family-connections", token: token)
             default:
                 self.settings = try await self.api.call("settings", token: token)
                 self.face = self.settings?.watchFace ?? "world"
@@ -178,6 +181,37 @@ final class WatchStore: ObservableObject {
             self.message = "已保存，爸爸妈妈会看到这份温暖"
         }
         return saved
+    }
+
+    func createConnection(kind: String, title: String, intent: String, requestID: UUID) async -> Bool {
+        var saved = false
+        await perform {
+            guard let token = self.token else { return }
+            self.connections = try await self.api.call("family-connections", token: token, body: [
+                "kind": kind, "title": title, "intent": intent, "requestId": requestID.uuidString])
+            saved = true
+            self.message = "已告诉家长，可以一起慢慢聊"
+        }
+        return saved
+    }
+
+    func addConnectionEntry(id: Int64, type: String, content: String, requestID: UUID) async -> Bool {
+        var saved = false
+        await perform {
+            guard let token = self.token else { return }
+            self.connections = try await self.api.call("family-connections/\(id)/entries", token: token, body: [
+                "type": type, "content": content, "requestId": requestID.uuidString])
+            saved = true
+        }
+        return saved
+    }
+
+    func completeConnection(id: Int64) async {
+        await perform {
+            guard let token = self.token else { return }
+            self.connections = try await self.api.call("family-connections/\(id)/transition", token: token,
+                                                       body: ["action": "complete"])
+        }
     }
 
     func setFace(_ face: WatchFace) async {
@@ -215,6 +249,7 @@ final class WatchStore: ObservableObject {
         friendCode = nil
         parents = []
         growth = nil
+        connections = nil
         try clearCredential()
     }
 

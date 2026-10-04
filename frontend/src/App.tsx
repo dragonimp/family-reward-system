@@ -8,6 +8,7 @@ import TransactionsPage from './pages/Transactions';
 import RulesPage from './pages/Rules';
 import StatsPage from './pages/Stats';
 import GrowthPage from './pages/Growth';
+import FamilyConnectionsPage from './pages/FamilyConnections';
 import SettingsPage from './pages/Settings';
 import AssistantPage from './pages/Assistant';
 import IdentityPage from './pages/Identity';
@@ -53,6 +54,7 @@ export default function App() {
                         <Route path="/rules" element={<RulesPage />} />
                         <Route path="/stats" element={<StatsPage />} />
                         <Route path="/growth" element={<GrowthPage />} />
+                        <Route path="/family-connections" element={<FamilyConnectionsPage />} />
                         <Route path="/settings" element={<SettingsPage />} />
                         <Route path="/virtual-watch" element={<VirtualWatchPage />} />
                         <Route path="/xiaotiancai-device-test" element={<XiaotiancaiDeviceTestApplicationPage />} />

@@ -119,6 +119,7 @@ struct FamilyHome: View {
                 Section {
                     NavigationLink { RulesView(store: store) } label: { Label("奖励与行为规则", systemImage: "star.square.fill") }
                     NavigationLink { GrowthView(store: store) } label: { Label("成长足迹", systemImage: "chart.xyaxis.line") }
+                    NavigationLink { FamilyConnectionsView(store: store) } label: { Label("亲子互动", systemImage: "heart.text.square") }
                     NavigationLink { MembersView(store: store) } label: { Label("家庭成员", systemImage: "person.3.fill") }
                     if store.groupID != 0 { NavigationLink { RemoteRecords(store: store, title: "家庭邀请", path: "/api/family-groups/\(store.groupID)/invite", mode: .invite) } label: { Label("邀请家人", systemImage: "qrcode") } }
                 }
@@ -477,4 +478,174 @@ func beijingDate(_ raw: String) -> String {
     guard let date else { return raw }
     let formatter = DateFormatter(); formatter.locale = Locale(identifier: "zh_CN"); formatter.timeZone = TimeZone(identifier: "Asia/Shanghai"); formatter.dateFormat = "yyyy-MM-dd HH:mm（北京时间）"
     return formatter.string(from: date)
+}
+
+private let connectionKinds = [
+    ("special_time", "孩子决定的十分钟"), ("listen", "先听我说"),
+    ("reconnect", "吵架后的重连"), ("meeting", "家庭小会议")
+]
+
+struct FamilyConnectionsView: View {
+    @ObservedObject var store: FamilyStore
+    @State private var threads: [Record] = []
+    @State private var entries: [Record] = []
+    @State private var childID = 0
+    @State private var kind = "special_time"
+    @State private var intent = "share"
+    @State private var title = ""
+    @State private var requestID = UUID()
+    @State private var busy = false
+    @State private var error: String?
+
+    var body: some View {
+        List {
+            Section {
+                Text("听见彼此，留出陪伴时间。互动记录不计积分、不评分。")
+                    .font(.footnote).foregroundStyle(.secondary)
+                Picker("孩子", selection: $childID) {
+                    Text("请选择").tag(0)
+                    ForEach(store.children) { child in Text(child.text("name")).tag(child.id) }
+                }
+                Picker("互动方式", selection: $kind) {
+                    ForEach(connectionKinds, id: \.0) { item in Text(item.1).tag(item.0) }
+                }
+                if kind == "listen" {
+                    Picker("希望怎样被倾听", selection: $intent) {
+                        Text("只想说说").tag("share")
+                        Text("想要安慰").tag("comfort")
+                        Text("一起想办法").tag("ideas")
+                    }
+                }
+                TextField("这次想聊什么或一起做什么", text: $title).onChange(of: title) { _, _ in requestID = UUID() }
+                Button("发起互动") {
+                    Task { await write("/api/family-connections", [
+                        "childId": childID, "kind": kind, "title": title.trimmingCharacters(in: .whitespacesAndNewlines),
+                        "intent": kind == "listen" ? intent : "", "requestId": requestID.uuidString
+                    ]) { title = ""; requestID = UUID() } }
+                }.disabled(busy || childID == 0 || title.trimmingCharacters(in: .whitespacesAndNewlines).count < 2)
+            } header: { Text("开始一段互动") }
+            Section("互动记录") {
+                if threads.isEmpty { Text("暂无记录，孩子也可以从手表发起。") }
+                ForEach(threads) { thread in
+                    NavigationLink {
+                        FamilyConnectionDetail(store: store, thread: thread,
+                            entries: entries.filter { $0.int("connectionId") == thread.id }, reload: load)
+                    } label: {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(connectionKinds.first { $0.0 == thread.text("kind") }?.1 ?? thread.text("kind")).font(.headline)
+                            Text("\(thread.text("childName")) · \(thread.text("title"))").font(.subheadline)
+                            Text(thread.text("status")).font(.caption).foregroundStyle(.secondary)
+                        }
+                    }
+                }
+            }
+        }.readablePage().navigationTitle("亲子互动").refreshable { await load() }
+            .task { if childID == 0 { childID = store.children.first?.id ?? 0 }; await load() }
+            .disabled(busy)
+            .alert("操作提示", isPresented: Binding(get: { error != nil }, set: { if !$0 { error = nil } })) {
+                Button("知道了") { error = nil }
+            } message: { Text(error ?? "") }
+    }
+    private func load() async {
+        do {
+            let response = try await store.call("/api/family-connections")
+            threads = try Record.list(response, key: "threads")
+            entries = try Record.list(response, key: "entries")
+        } catch { self.error = error.localizedDescription }
+    }
+    private func write(_ path: String, _ body: [String: Any], done: @escaping () -> Void) async {
+        busy = true; defer { busy = false }
+        do { _ = try await store.call(path, method: "POST", body: body); done(); await load() }
+        catch { self.error = error.localizedDescription }
+    }
+}
+
+struct FamilyConnectionDetail: View {
+    @ObservedObject var store: FamilyStore
+    let thread: Record
+    let entries: [Record]
+    let reload: () async -> Void
+    @State private var latest: Record?
+    @State private var latestEntries: [Record]?
+    private var current: Record { latest ?? thread }
+    private var shownEntries: [Record] { latestEntries ?? entries }
+    @State private var type = "message"
+    @State private var content = ""
+    @State private var requestID = UUID()
+    @State private var schedule = Date().addingTimeInterval(3600)
+    @State private var plan = ""
+    @State private var busy = false
+    @State private var error: String?
+    private var active: Bool { !["completed", "cancelled"].contains(current.text("status")) }
+    var body: some View {
+        List {
+            Section {
+                Text(current.text("title"))
+                if current.text("kind") == "listen" {
+                    Text("孩子希望：\(["share": "只想说说", "comfort": "想要安慰", "ideas": "一起想办法"][current.text("intent")] ?? "先听听")")
+                }
+                if current.has("scheduledAt") { Text("约定时间：\(beijingDate(current.text("scheduledAt")))") }
+                if !current.text("trialPlan").isEmpty { Text("本周试行：\(current.text("trialPlan"))") }
+            }
+            Section("彼此说的话") {
+                ForEach(shownEntries) { entry in
+                    VStack(alignment: .leading, spacing: 5) {
+                        Text("\(entry.text("authorRole") == "child" ? "孩子" : "家长") · \(entry.text("type"))")
+                            .font(.caption).foregroundStyle(.secondary)
+                        Text(entry.text("content"))
+                    }
+                }
+            }
+            if active {
+                Section("记录想法") {
+                    Picker("内容", selection: $type) {
+                        Text("想说的话").tag("message")
+                        if current.text("kind") == "reconnect" { Text("我的感受").tag("feeling"); Text("我的期待").tag("hope") }
+                        if current.text("kind") == "meeting" { Text("我的提议").tag("proposal") }
+                        if current.text("status") == "trial" || current.text("kind") == "special_time" { Text("复盘").tag("reflection") }
+                    }
+                    TextField("温和地写下想表达的内容", text: $content, axis: .vertical)
+                        .lineLimit(2...5).onChange(of: content) { _, _ in requestID = UUID() }
+                    Button("发送") { Task { await write("entries", ["type": type, "content": content, "requestId": requestID.uuidString]) { content = ""; requestID = UUID() } } }
+                        .disabled(busy || content.trimmingCharacters(in: .whitespacesAndNewlines).count < 2)
+                }
+                Section("下一步") {
+                    if current.text("kind") == "special_time" && current.text("status") == "open" {
+                        DatePicker("专心陪伴时间", selection: $schedule, in: Date()...Date().addingTimeInterval(90 * 86400))
+                        Button("约定时间") { Task { await write("transition", ["action": "schedule", "scheduledAt": ISO8601DateFormatter().string(from: schedule)]) {} } }
+                    }
+                    if current.text("kind") == "meeting" && current.text("status") == "open" {
+                        TextField("双方提出想法后，写下本周试行安排", text: $plan, axis: .vertical)
+                        Button("开始一周试行") { Task { await write("transition", ["action": "start_trial", "plan": plan]) {} } }
+                            .disabled(plan.trimmingCharacters(in: .whitespacesAndNewlines).count < 2)
+                    }
+                    if current.text("kind") == "meeting" && current.text("status") == "trial" {
+                        Button("七天后完成复盘") { Task { await write("transition", ["action": "review"]) {} } }
+                    } else if current.text("kind") != "meeting" && (current.text("kind") != "special_time" || current.text("status") == "scheduled") {
+                        Button("完成互动") { Task { await write("transition", ["action": "complete"]) {} } }
+                    }
+                    Button("取消互动", role: .destructive) { Task { await write("transition", ["action": "cancel"]) {} } }
+                }
+            }
+        }.readablePage().navigationTitle("亲子互动").disabled(busy).task { await loadLocal() }
+            .alert("操作提示", isPresented: Binding(get: { error != nil }, set: { if !$0 { error = nil } })) {
+                Button("知道了") { error = nil }
+            } message: { Text(error ?? "") }
+    }
+    private func loadLocal() async {
+        do {
+            let response = try await store.call("/api/family-connections")
+            let threads = try Record.list(response, key: "threads")
+            let entries = try Record.list(response, key: "entries")
+            latest = threads.first { $0.id == thread.id }
+            latestEntries = entries.filter { $0.int("connectionId") == thread.id }
+        } catch { self.error = error.localizedDescription }
+    }
+    private func write(_ endpoint: String, _ body: [String: Any], done: @escaping () -> Void) async {
+        busy = true; defer { busy = false }
+        do {
+            _ = try await store.call("/api/family-connections/\(current.id)/\(endpoint)", method: "POST", body: body)
+            done(); await loadLocal(); await reload()
+        } catch { self.error = error.localizedDescription }
+    }
 }

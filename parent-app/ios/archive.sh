@@ -14,7 +14,7 @@ fi
 xcodebuild -project HappyLifeParent.xcodeproj -scheme HappyLifeParent \
   -configuration Release -destination 'generic/platform=iOS' \
   -archivePath "$PWD/build/Linko Family-signed.xcarchive" \
-  -derivedDataPath "$PWD/build/DerivedData" CODE_SIGNING_ALLOWED=NO archive
+  -derivedDataPath "$PWD/build/DerivedData" CODE_SIGNING_ALLOWED=NO IPHONEOS_DEPLOYMENT_TARGET=17.0 archive
 app="$PWD/build/Linko Family-signed.xcarchive/Products/Applications/Linko Family.app"
 # This supplies the team's identity to the archive; export must still embed
 # an App Store provisioning profile for this app before it is distributable.

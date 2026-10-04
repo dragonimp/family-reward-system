@@ -9,6 +9,7 @@ const navItems = [
   { path: '/dashboard', label: '仪表盘', icon: '📊' },
   { path: '/reward', label: '积分操作', icon: '⭐' },
   { path: '/growth', label: '共同成长', icon: '💛' },
+  { path: '/family-connections', label: '亲子互动', icon: '🤝' },
   { path: '/stats', label: '成长趋势', icon: '🌱' },
 ];
 

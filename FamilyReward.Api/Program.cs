@@ -162,6 +162,20 @@ app.MapCreditScoreEndpoints(connectionString,
         return (access.Binding?.ChildProfileKey, access.Error);
     });
 
+app.MapFamilyConnectionEndpoints(connectionString,
+    async request =>
+    {
+        if (request.HttpContext.User.Identity?.IsAuthenticated != true)
+            return (null, Results.Json(new { error = "请先通过用户中心登录" }, statusCode: 401));
+        var access = await RequireParentProfile(connectionString, request, allowHeaderOverride: false);
+        return (access.Profile?.AppUserId, access.Error);
+    },
+    async request =>
+    {
+        var access = await RequireWatchDeviceBinding(connectionString, request);
+        return (access.Binding?.ChildProfileKey, access.Binding?.ParentAppUserId, access.Error);
+    });
+
 app.MapGet("/health", () => Results.Json(new
 {
     status = "ok",
@@ -1232,6 +1246,7 @@ app.MapGet("/watch", () =>
                       </div></div>
                       <div><p class="menu-group-title">共同成长</p><div class="menu-grid">
                         <button class="menu-card" type="button" data-view="warm-moment"><span class="menu-icon">💛</span><span>暖心时刻</span></button>
+                        <button class="menu-card" type="button" data-view="family-connections"><span class="menu-icon">🤝</span><span>亲子互动</span></button>
                         <button class="menu-card" type="button" data-view="growth-report"><span class="menu-icon">🌱</span><span>今日鼓励</span></button>
                       </div></div>
                       <div><p class="menu-group-title">设置</p><div class="menu-grid">
@@ -1310,6 +1325,27 @@ app.MapGet("/watch", () =>
                     <button class="back-menu" type="button">‹ 返回菜单</button>
                     <h2>今日鼓励</h2>
                     <div class="report-card" id="watch-report"><p>正在准备今天的鼓励...</p></div>
+                  </div>
+                  <div class="panel" data-panel="family-connections">
+                    <button class="back-menu" type="button">‹ 返回菜单</button>
+                    <h2>亲子互动</h2>
+                    <p class="source-note">说说心里话，不计积分，也不评分。</p>
+                    <form id="connection-form">
+                      <label for="connection-kind">想和家长做什么</label>
+                      <select id="connection-kind" name="kind"><option value="special_time">孩子决定的十分钟</option><option value="listen">先听我说</option><option value="reconnect">吵架后的重连</option><option value="meeting">家庭小会议</option></select>
+                      <select id="connection-intent" name="intent" class="hidden"><option value="share">只想说说</option><option value="comfort">想要安慰</option><option value="ideas">一起想办法</option></select>
+                      <label for="connection-title">这次想聊什么</label>
+                      <div class="input-action"><textarea id="connection-title" name="title" maxlength="160" placeholder="写下或说出你的想法"></textarea><button class="voice-btn" type="button" data-speech-target="connection-title" aria-label="语音输入想法">🎙</button></div>
+                      <button class="submit" type="submit">告诉家长</button>
+                    </form>
+                    <p id="connection-msg" class="msg"></p>
+                    <ul class="compact-list" id="connection-list"></ul>
+                    <form id="connection-entry-form">
+                      <label for="connection-thread">继续聊</label><select id="connection-thread" name="thread"></select>
+                      <select id="connection-entry-type" name="type"><option value="message">想说的话</option><option value="feeling">我的感受</option><option value="hope">我的期待</option><option value="proposal">我的提议</option><option value="reflection">复盘</option></select>
+                      <div class="input-action"><textarea id="connection-content" name="content" maxlength="500" placeholder="写下感受或期待"></textarea><button class="voice-btn" type="button" data-speech-target="connection-content" aria-label="语音输入内容">🎙</button></div>
+                      <button class="submit" type="submit">发送给家长</button>
+                    </form>
                   </div>
                   <div class="panel" data-panel="settings">
                     <button class="back-menu" type="button">‹ 返回菜单</button>
@@ -1426,12 +1462,29 @@ app.MapGet("/watch", () =>
               if (push && (!history.state || history.state.watchView !== view)) history.pushState({ watchView: view }, '', location.href);
               fitActivePanel();
               if (view === 'credit') refreshCredit().catch((error) => { document.getElementById('credit-msg').textContent = error.message || '加载失败'; });
+              if (view === 'family-connections') refreshConnections().catch((error) => { document.getElementById('connection-msg').textContent = error.message || '加载失败'; });
             };
             const fetchJson = async (url, options = {}) => {
               const response = await fetch(url, options);
               const payload = await response.json().catch(() => ({}));
               if (!response.ok) { const error = new Error(payload.error || '请求失败'); error.status = response.status; throw error; }
               return payload;
+            };
+            const renderConnections = (payload) => {
+              const threads = payload.threads || [];
+              const entries = payload.entries || [];
+              const labels = { special_time: '孩子决定的十分钟', listen: '先听我说', reconnect: '吵架后的重连', meeting: '家庭小会议' };
+              document.getElementById('connection-list').innerHTML = threads.map((thread) => `
+                <li><span><b>${escapeText(labels[thread.kind] || thread.kind)}</b> · ${escapeText(thread.title)}
+                <small>${escapeText(thread.status)}${thread.trialPlan ? ' · 本周试行：' + escapeText(thread.trialPlan) : ''}</small>
+                ${(entries.filter((entry) => entry.connectionId === thread.id)).map((entry) => `<small>${entry.authorRole === 'child' ? '我' : '家长'}：${escapeText(entry.content)}</small>`).join('')}
+                </span></li>`).join('') || '<li class="empty-row"><span>还没有互动记录</span></li>';
+              document.getElementById('connection-thread').innerHTML = threads.filter((thread) => !['completed','cancelled'].includes(thread.status))
+                .map((thread) => `<option value="${thread.id}">${escapeText(thread.title)}</option>`).join('');
+            };
+            const refreshConnections = async () => {
+              if (isPreview) { renderConnections({ threads: [], entries: [] }); return; }
+              renderConnections(await fetchJson('/api/watch/family-connections', { headers: authHeaders() }));
             };
             const renderCredit = (credit) => {
               document.getElementById('credit-score').textContent = credit.enabled ? String(credit.score) : '未开通';
@@ -1647,6 +1700,50 @@ app.MapGet("/watch", () =>
                 warmMsg.textContent = '已保存，爸爸妈妈会看到这份温暖';
                 await load();
               } catch (error) { warmMsg.textContent = error.message || '保存失败'; }
+            });
+            let connectionRequestId = crypto.randomUUID();
+            let connectionEntryRequestId = crypto.randomUUID();
+            document.getElementById('connection-kind').addEventListener('change', (event) => {
+              document.getElementById('connection-intent').classList.toggle('hidden', event.target.value !== 'listen');
+              connectionRequestId = crypto.randomUUID();
+            });
+            document.getElementById('connection-title').addEventListener('input', () => { connectionRequestId = crypto.randomUUID(); });
+            document.getElementById('connection-content').addEventListener('input', () => { connectionEntryRequestId = crypto.randomUUID(); });
+            document.getElementById('connection-form').addEventListener('submit', async (event) => {
+              event.preventDefault();
+              const message = document.getElementById('connection-msg');
+              if (blockPreviewWrite(message)) return;
+              const kind = document.getElementById('connection-kind').value;
+              const title = document.getElementById('connection-title').value.trim();
+              if (title.length < 2) { message.textContent = '请至少写两个字'; return; }
+              try {
+                const result = await fetchJson('/api/watch/family-connections', {
+                  method: 'POST', headers: { 'Content-Type': 'application/json', ...authHeaders() },
+                  body: JSON.stringify({ kind, title, intent: kind === 'listen' ? document.getElementById('connection-intent').value : '', requestId: connectionRequestId })
+                });
+                document.getElementById('connection-title').value = '';
+                connectionRequestId = crypto.randomUUID();
+                renderConnections(result);
+                message.textContent = '已告诉家长，可以一起慢慢聊';
+              } catch (error) { message.textContent = error.message || '提交失败'; }
+            });
+            document.getElementById('connection-entry-form').addEventListener('submit', async (event) => {
+              event.preventDefault();
+              const message = document.getElementById('connection-msg');
+              if (blockPreviewWrite(message)) return;
+              const id = document.getElementById('connection-thread').value;
+              const content = document.getElementById('connection-content').value.trim();
+              if (!id || content.length < 2) { message.textContent = '请选择互动并写至少两个字'; return; }
+              try {
+                const result = await fetchJson('/api/watch/family-connections/' + encodeURIComponent(id) + '/entries', {
+                  method: 'POST', headers: { 'Content-Type': 'application/json', ...authHeaders() },
+                  body: JSON.stringify({ type: document.getElementById('connection-entry-type').value, content, requestId: connectionEntryRequestId })
+                });
+                document.getElementById('connection-content').value = '';
+                connectionEntryRequestId = crypto.randomUUID();
+                renderConnections(result);
+                message.textContent = '已发给家长';
+              } catch (error) { message.textContent = error.message || '发送失败'; }
             });
             document.getElementById('unbind').addEventListener('click', async () => {
               const unbindMsg = document.getElementById('unbind-msg');

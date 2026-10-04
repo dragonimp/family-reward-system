@@ -12,11 +12,11 @@ fi
 plutil -lint HappyLifeParent/Info.plist HappyLifeParent.xcodeproj/project.pbxproj
 xcodebuild -project HappyLifeParent.xcodeproj -scheme HappyLifeParent \
   -configuration Debug -destination 'generic/platform=iOS Simulator' \
-  -derivedDataPath "$PWD/build/DerivedData" CODE_SIGN_IDENTITY=- build
+  -derivedDataPath "$PWD/build/DerivedData" CODE_SIGN_IDENTITY=- IPHONEOS_DEPLOYMENT_TARGET=17.0 build
 xcodebuild -project HappyLifeParent.xcodeproj -scheme HappyLifeParent \
   -configuration Release -destination 'generic/platform=iOS' \
   -archivePath "$PWD/build/Linko Family.xcarchive" \
-  -derivedDataPath "$PWD/build/DerivedData" CODE_SIGNING_ALLOWED=NO archive
+  -derivedDataPath "$PWD/build/DerivedData" CODE_SIGNING_ALLOWED=NO IPHONEOS_DEPLOYMENT_TARGET=17.0 archive
 
 python3 - <<'PY_CHECK'
 import plistlib

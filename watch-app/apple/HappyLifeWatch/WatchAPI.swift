@@ -56,6 +56,24 @@ struct FriendCode: Decodable { let code: String; let expiresAt: String }
 struct ParentOptions: Decodable { let parents: [ParentOption] }
 struct ParentOption: Decodable, Identifiable { let id: Int; let roleLabel: String }
 struct GrowthResponse: Decodable { let report: GrowthReport? }
+struct ConnectionResponse: Decodable { let threads: [WatchConnection]; let entries: [WatchConnectionEntry] }
+struct WatchConnection: Decodable, Identifiable {
+    let id: Int64
+    let kind: String
+    let title: String
+    let intent: String
+    let status: String
+    let scheduledAt: String?
+    let reviewAt: String?
+    let trialPlan: String
+}
+struct WatchConnectionEntry: Decodable, Identifiable {
+    let id: Int64
+    let connectionId: Int64
+    let authorRole: String
+    let type: String
+    let content: String
+}
 struct GrowthReport: Decodable { let praise: String; let nextStep: String }
 struct APIError: LocalizedError {
     let status: Int

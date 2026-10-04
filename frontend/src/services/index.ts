@@ -35,6 +35,22 @@ export const updateHouseholdMember = (id: number, data: Pick<HouseholdMember, 'd
 export const deleteHouseholdMember = (id: number) => http.delete(`/api/family-members/${id}`);
 
 export const getChildren = (params?: { familyGroupId?: number; ownedOnly?: boolean }) => http.get('/api/children', { params });
+export type ConnectionKind = 'special_time' | 'listen' | 'reconnect' | 'meeting';
+export type ConnectionEntryType = 'message' | 'feeling' | 'hope' | 'proposal' | 'reflection';
+export interface ConnectionThread {
+  id: number; childProfileKey: string; childName: string; kind: ConnectionKind; title: string;
+  intent: string; status: string; scheduledAt: string | null; reviewAt: string | null;
+  trialPlan: string; createdBy: string; createdAt: string; updatedAt: string;
+}
+export interface ConnectionEntry { id: number; connectionId: number; authorRole: 'child' | 'parent'; type: ConnectionEntryType; content: string; createdAt: string }
+export interface ConnectionsPayload { threads: ConnectionThread[]; entries: ConnectionEntry[] }
+export const getFamilyConnections = () => http.get<unknown, ConnectionsPayload>('/api/family-connections');
+export const createFamilyConnection = (data: { childId: number; kind: ConnectionKind; title: string; intent: string; requestId: string }) =>
+  http.post<unknown, ConnectionsPayload>('/api/family-connections', data);
+export const addFamilyConnectionEntry = (id: number, data: { type: ConnectionEntryType; content: string; requestId: string }) =>
+  http.post<unknown, ConnectionsPayload>(`/api/family-connections/${id}/entries`, data);
+export const transitionFamilyConnection = (id: number, data: { action: string; scheduledAt?: string; plan?: string }) =>
+  http.post<unknown, ConnectionsPayload>(`/api/family-connections/${id}/transition`, data);
 export const getCreditOverview = () => http.get<unknown, { children: Array<{ profileKey: string; creditEnabled: boolean; creditScore: number | null }> }>('/api/credit/overview');
 export const getChildCredit = (childId: number) => http.get<unknown, CreditDetail>(`/api/children/${childId}/credit`);
 export const enableChildCredit = (childId: number) => http.post<unknown, CreditDetail>(`/api/children/${childId}/credit/enable`, {});
