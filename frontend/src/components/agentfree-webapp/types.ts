@@ -28,6 +28,7 @@ export interface Session {
   userId?: number
   userName?: string
   name: string
+  isArchived?: boolean
   gatewayType?: string
   gatewayTypeLabel?: string
   isResponding?: boolean

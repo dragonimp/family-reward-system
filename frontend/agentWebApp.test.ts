@@ -25,7 +25,8 @@ test('mobile assistant reuses the complete AgentFree WebApp chat surface', async
   assert.match(cleanChat, /export \{ CleanChatView as default \} from '@agentfree\/webapp-chat'/);
   assert.doesNotMatch(cleanChat, /streamChat\(/);
   assert.match(api, /\/api\/agentfree\/chat\/stream/);
-  assert.match(api, /getSessions = \(gatewayType\?: string, user\?: string, agentId\?: number, limit\?: number\)/);
+  assert.match(api, /getSessions = \(gatewayType\?: string, user\?: string, agentId\?: number, limit\?: number, _webAppBotId\?: string, includeArchived = false\)/);
+  assert.match(api, /includeArchived: includeArchived \|\| undefined/);
   assert.match(api, /agentId: agentId \|\| undefined,[\s\S]*limit: limit \|\| undefined,[\s\S]*webAppBotId: getWebAppBotId\(\)/);
   assert.match(api, /readCurrentAppProfile/);
   assert.match(api, /AGENTFREE_REQUEST_TIMEOUT_MS = 10 \* 60 \* 1000/);
@@ -43,6 +44,7 @@ test('mobile assistant reuses the complete AgentFree WebApp chat surface', async
   assert.match(backend, /\["agentId"\] = session\.AgentId/);
   assert.match(backend, /\["AgentId"\] = session\.AgentId/);
   assert.match(backend, /GetAuthorizedSessionsAsync\(/);
+  assert.match(backend, /includeArchived: string\.Equals\(request\.Query\.String\("includeArchived"\)/);
   assert.match(backend, /GetSessionMessagesAsync\(/);
   assert.match(backend, /GetSessionTimelineAsync\(/);
   assert.match(backend, /GetSessionQueueAsync\(/);

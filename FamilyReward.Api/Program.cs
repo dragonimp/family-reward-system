@@ -2564,6 +2564,7 @@ app.MapGet("/api/agentfree/sessions", async (IHttpClientFactory httpClientFactor
             userName,
             agentId: requestedAgentId,
             limit: request.Query.Int("limit") is int requestedLimit ? Math.Clamp(requestedLimit, 1, 500) : null,
+            includeArchived: string.Equals(request.Query.String("includeArchived"), "true", StringComparison.OrdinalIgnoreCase),
             cancellationToken: request.HttpContext.RequestAborted);
         return Results.Json(sessions);
     }

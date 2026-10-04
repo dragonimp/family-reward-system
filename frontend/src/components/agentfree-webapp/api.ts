@@ -76,13 +76,14 @@ export const getAgents = (
   }),
 }))
 
-export const getSessions = (gatewayType?: string, user?: string, agentId?: number, limit?: number) => wrap(http.get<unknown, Session[]>('/api/agentfree/sessions', {
+export const getSessions = (gatewayType?: string, user?: string, agentId?: number, limit?: number, _webAppBotId?: string, includeArchived = false) => wrap(http.get<unknown, Session[]>('/api/agentfree/sessions', {
   ...agentFreeRequestConfig({
     gatewayType: gatewayType && gatewayType !== 'All' ? gatewayType : undefined,
     user: user || undefined,
     agentId: agentId || undefined,
     limit: limit || undefined,
     webAppBotId: getWebAppBotId(),
+    includeArchived: includeArchived || undefined,
   }),
 }))
 
