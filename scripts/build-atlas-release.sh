@@ -17,11 +17,17 @@ git -C "$identity_root" merge-base --is-ancestor "$green_login_commit" HEAD || {
 git -C "$identity_root" diff --quiet HEAD -- src/AgentIdentity.Sdk || { echo 'AgentIdentity SDK has uncommitted source changes.' >&2; exit 2; }
 dotnet publish "$root/FamilyReward.Api/FamilyReward.Api.csproj" -c Release -r linux-x64 --self-contained false -p:SharedProjectsRoot="$shared_projects_root" -o "$stage/api"
 rsync -a --exclude=node_modules --exclude=dist "$root/frontend/" "$stage/frontend/"
-node - "$stage/frontend/package.json" "$shared_projects_root" <<'NODE'
+mkdir -p "$stage/shared-sdk"
+git -C "$shared_projects_root/AgentFree" archive HEAD packages/agentfree-webapp-chat | tar -x -C "$stage/shared-sdk"
+shared_chat_package="$stage/shared-sdk/packages/agentfree-webapp-chat"
+[[ -s "$shared_chat_package/dist/index.js" && -s "$shared_chat_package/dist/index.d.ts" ]] || {
+  echo 'Committed AgentFree WebApp chat package is incomplete.' >&2; exit 1;
+}
+node - "$stage/frontend/package.json" "$shared_chat_package" <<'NODE'
 const fs = require('fs');
-const [manifestPath, sharedRoot] = process.argv.slice(2);
+const [manifestPath, chatPackage] = process.argv.slice(2);
 const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
-manifest.dependencies['@agentfree/webapp-chat'] = `file:${sharedRoot}/AgentFree/packages/agentfree-webapp-chat`;
+manifest.dependencies['@agentfree/webapp-chat'] = `file:${chatPackage}`;
 fs.writeFileSync(manifestPath, JSON.stringify(manifest, null, 2) + '\n');
 NODE
 (

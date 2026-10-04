@@ -31,20 +31,51 @@ export default function FamilyConnections() {
   const [error, setError] = useState('');
   const createId = useRef(crypto.randomUUID());
   const entryIds = useRef<Record<number, string>>({});
+  const busyRef = useRef(false);
+  const refreshSerial = useRef(0);
 
-  const refresh = useCallback(async () => {
-    const [result, payload] = await Promise.all([getChildren({ ownedOnly: true }), getFamilyConnections()]);
-    const list = (Array.isArray(result) ? result : result?.data || []) as Child[];
-    setChildren(list); setData(payload);
-    setChildId(current => current || list[0]?.id || 0);
+  const refresh = useCallback(async (includeChildren = false) => {
+    if (busyRef.current) return;
+    const serial = ++refreshSerial.current;
+    try {
+      const [result, payload] = await Promise.all([
+        includeChildren ? getChildren({ ownedOnly: true }) : Promise.resolve(null),
+        getFamilyConnections(),
+      ]);
+      if (serial !== refreshSerial.current || busyRef.current) return;
+      if (result !== null) {
+        const list = (Array.isArray(result) ? result : result?.data || []) as Child[];
+        setChildren(list);
+        setChildId(current => list.some(child => child.id === current) ? current : list[0]?.id || 0);
+      }
+      setData(payload);
+      setError('');
+    } catch (e) {
+      if (serial === refreshSerial.current) setError(e instanceof Error ? e.message : '刷新失败，请重试');
+    }
   }, []);
-  useEffect(() => { refresh().catch(e => setError(e.message)); }, [refresh]);
+  useEffect(() => {
+    const serial = refreshSerial;
+    void refresh(true);
+    const refreshWhenVisible = () => { if (!document.hidden) void refresh(); };
+    document.addEventListener('visibilitychange', refreshWhenVisible);
+    window.addEventListener('focus', refreshWhenVisible);
+    const timer = window.setInterval(refreshWhenVisible, 20_000);
+    return () => {
+      window.clearInterval(timer);
+      document.removeEventListener('visibilitychange', refreshWhenVisible);
+      window.removeEventListener('focus', refreshWhenVisible);
+      serial.current++;
+    };
+  }, [refresh]);
 
   const act = async (action: () => Promise<ConnectionsPayload>, done?: () => void) => {
+    busyRef.current = true;
+    refreshSerial.current++;
     setBusy(true); setError('');
-    try { setData(await action()); done?.(); }
+    try { const payload = await action(); refreshSerial.current++; setData(payload); done?.(); }
     catch (e) { setError(e instanceof Error ? e.message : '操作失败，请重试'); }
-    finally { setBusy(false); }
+    finally { busyRef.current = false; setBusy(false); }
   };
   return <div className="mx-auto max-w-4xl space-y-5 p-4 pb-24 sm:p-6">
     <header><h2 className="text-2xl font-bold">💛 亲子互动</h2><p className="text-sm text-gray-600">把倾听、陪伴和修复留在家庭里。这些记录不计积分，也不评分。</p></header>
@@ -75,12 +106,12 @@ export default function FamilyConnections() {
           {thread.trialPlan && <p className="rounded-lg bg-amber-50 p-3 text-sm">本周试行：{thread.trialPlan} · {thread.reviewAt && `复盘时间 ${new Date(thread.reviewAt).toLocaleDateString('zh-CN')}`}</p>}
           {entries.map(entry => <div key={entry.id} className="rounded-lg bg-gray-50 p-3 text-sm"><b>{entry.authorRole === 'child' ? '孩子' : '家长'} · {entryLabels[entry.type]}</b><p className="mt-1 whitespace-pre-wrap">{entry.content}</p></div>)}
           {active && <>
-            <div className="flex gap-2"><select aria-label="记录类型" className="rounded-lg border p-2" value={entryType} onChange={e => setEntryTypes({ ...entryTypes, [thread.id]: e.target.value as ConnectionEntryType })}>
+            <div className="flex flex-col gap-2 sm:flex-row"><select aria-label="记录类型" className="rounded-lg border p-2" value={entryType} onChange={e => setEntryTypes(current => ({ ...current, [thread.id]: e.target.value as ConnectionEntryType }))}>
               {(['message', ...(thread.kind === 'reconnect' ? ['feeling', 'hope'] : []), ...(thread.kind === 'meeting' ? ['proposal'] : []), ...(thread.status === 'trial' || thread.kind === 'special_time' ? ['reflection'] : [])] as ConnectionEntryType[]).map(type => <option key={type} value={type}>{entryLabels[type]}</option>)}
-            </select><input aria-label="写下内容" className="min-w-0 flex-1 rounded-lg border p-2" maxLength={500} value={drafts[thread.id] || ''} onChange={e => { setDrafts({ ...drafts, [thread.id]: e.target.value }); entryIds.current[thread.id] = crypto.randomUUID(); }} placeholder="温和地写下你想表达的内容" />
-              <button disabled={busy || (drafts[thread.id] || '').trim().length < 2} className="rounded-lg bg-rose-100 px-3 text-rose-800 disabled:opacity-50" onClick={() => act(() => addFamilyConnectionEntry(thread.id, { type: entryType, content: drafts[thread.id].trim(), requestId: entryIds.current[thread.id] ||= crypto.randomUUID() }), () => { setDrafts({ ...drafts, [thread.id]: '' }); entryIds.current[thread.id] = crypto.randomUUID(); })}>发送</button></div>
-            {thread.kind === 'special_time' && thread.status === 'open' && <div className="flex gap-2"><input aria-label="约定陪伴时间" type="datetime-local" className="rounded-lg border p-2" value={dates[thread.id] || ''} onChange={e => setDates({ ...dates, [thread.id]: e.target.value })} /><button disabled={busy || !dates[thread.id]} onClick={() => act(() => transitionFamilyConnection(thread.id, { action: 'schedule', scheduledAt: new Date(dates[thread.id]).toISOString() }))} className="text-rose-700">约定时间</button></div>}
-            {thread.kind === 'meeting' && thread.status === 'open' && <div className="flex gap-2"><input aria-label="一周试行安排" maxLength={500} className="min-w-0 flex-1 rounded-lg border p-2" placeholder="双方各提一个想法后，写下本周试行安排" value={plans[thread.id] || ''} onChange={e => setPlans({ ...plans, [thread.id]: e.target.value })}/><button disabled={busy || (plans[thread.id] || '').trim().length < 2} onClick={() => act(() => transitionFamilyConnection(thread.id, { action: 'start_trial', plan: plans[thread.id].trim() }))} className="text-rose-700">开始试行</button></div>}
+            </select><input aria-label="写下内容" className="min-w-0 flex-1 rounded-lg border p-2" maxLength={500} value={drafts[thread.id] || ''} onChange={e => { setDrafts(current => ({ ...current, [thread.id]: e.target.value })); entryIds.current[thread.id] = crypto.randomUUID(); }} placeholder="温和地写下你想表达的内容" />
+              <button disabled={busy || (drafts[thread.id] || '').trim().length < 2} className="rounded-lg bg-rose-100 px-3 py-2 text-rose-800 disabled:opacity-50" onClick={() => act(() => addFamilyConnectionEntry(thread.id, { type: entryType, content: drafts[thread.id].trim(), requestId: entryIds.current[thread.id] ||= crypto.randomUUID() }), () => { setDrafts(current => ({ ...current, [thread.id]: '' })); entryIds.current[thread.id] = crypto.randomUUID(); })}>发送</button></div>
+            {thread.kind === 'special_time' && thread.status === 'open' && <div className="flex flex-col gap-2 sm:flex-row"><input aria-label="约定陪伴时间" type="datetime-local" className="min-w-0 rounded-lg border p-2" value={dates[thread.id] || ''} onChange={e => setDates(current => ({ ...current, [thread.id]: e.target.value }))} /><button disabled={busy || !dates[thread.id]} onClick={() => act(() => transitionFamilyConnection(thread.id, { action: 'schedule', scheduledAt: new Date(dates[thread.id]).toISOString() }))} className="px-2 py-2 text-rose-700">约定时间</button></div>}
+            {thread.kind === 'meeting' && thread.status === 'open' && <div className="flex flex-col gap-2 sm:flex-row"><input aria-label="一周试行安排" maxLength={500} className="min-w-0 flex-1 rounded-lg border p-2" placeholder="双方各提一个想法后，写下本周试行安排" value={plans[thread.id] || ''} onChange={e => setPlans(current => ({ ...current, [thread.id]: e.target.value }))}/><button disabled={busy || (plans[thread.id] || '').trim().length < 2} onClick={() => act(() => transitionFamilyConnection(thread.id, { action: 'start_trial', plan: plans[thread.id].trim() }))} className="px-2 py-2 text-rose-700">开始试行</button></div>}
             <div className="flex gap-4 text-sm">
               {(thread.kind === 'meeting' ? thread.status === 'trial' : thread.kind === 'special_time' ? thread.status === 'scheduled' : thread.status === 'open') && <button disabled={busy} className="text-rose-700" onClick={() => act(() => transitionFamilyConnection(thread.id, { action: thread.kind === 'meeting' ? 'review' : 'complete' }))}>{thread.kind === 'meeting' ? '七天后完成复盘' : '完成互动'}</button>}
               <button disabled={busy} className="text-gray-500" onClick={() => act(() => transitionFamilyConnection(thread.id, { action: 'cancel' }))}>取消</button>
@@ -89,6 +120,6 @@ export default function FamilyConnections() {
         </article>;
       })}
     </section>
-    <button className="text-sm text-rose-700" onClick={() => refresh().catch(e => setError(e.message))}>刷新互动记录</button>
+    <div className="flex items-center gap-3 text-sm"><button className="text-rose-700" onClick={() => void refresh(true)}>刷新互动记录</button><span className="text-gray-500">页面打开时自动更新</span></div>
   </div>;
 }
