@@ -20,6 +20,7 @@ import AgentIdentity
     @Published var ledgerPage = 1
     @Published var ledgerTotal = 0
     private var revision = UUID()
+    private var lastRefresh = Date.distantPast
     var scope: String { groupID == 0 ? "" : "familyGroupId=\(groupID)" }
     var ready: Bool { profile?.text("role") == "parent" && profile?.flag("needsRole") == false }
     var selectedFamily: String { groups.first(where: { $0.id == groupID })?.text("name") ?? "我的家庭" }
@@ -43,6 +44,22 @@ import AgentIdentity
         }
         return value
     }
+    func streamChat(sessionID: String, message: String) async throws {
+        guard let token = identity.accessToken else { throw APIError.message("请先登录用户中心。") }
+        let current = revision
+        var request = URLRequest(url: URL(string: "/api/agentfree/chat/stream", relativeTo: base)!.absoluteURL)
+        request.httpMethod = "POST"
+        request.timeoutInterval = 600
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try JSONSerialization.data(withJSONObject: ["sessionId": sessionID, "message": message, "attachments": []])
+        let (stream, response) = try await session.bytes(for: request)
+        guard let response = response as? HTTPURLResponse, response.url?.host == base.host else { throw APIError.message("对话响应无效。") }
+        guard (200..<300).contains(response.statusCode) else { throw APIError.message("对话请求失败（\(response.statusCode)）。") }
+        for try await _ in stream.lines {
+            guard current == revision, token == identity.accessToken else { throw CancellationError() }
+        }
+    }
     func load() async {
         guard identity.isAuthenticated else { return }
         revision = UUID()
@@ -62,19 +79,7 @@ import AgentIdentity
     func loadFamily() async throws {
         // Clear old family data before loading the selected scope.
         children = []; requests = []; transactions = []; growth = []; rules = []; members = []
-        children = try Record.list(await call("/api/children?\(scope)"))
-        if let overview = try? await call("/api/credit/overview") as? [String: Any],
-           let creditRows = overview["children"] as? [[String: Any]] {
-            let creditByProfile = Dictionary(creditRows.compactMap { row -> (String, [String: Any])? in
-                guard let key = row["profileKey"] as? String else { return nil }
-                return (key, row)
-            }, uniquingKeysWith: { first, _ in first })
-            children = children.map { child in
-                let key = child.text("profileKey")
-                guard let credit = creditByProfile[key] else { return child }
-                return Record(fields: child.fields.merging(credit) { _, new in new })
-            }
-        }
+        children = try await fetchChildren()
         rules = try Record.list(await call("/api/rules"), key: "rules")
         let approval = try await call("/api/reward-requests?limit=50") as? [String: Any]
         requests = try Record.list(approval?["requests"] as Any)
@@ -84,6 +89,47 @@ import AgentIdentity
             let stats = try await call("/api/stats/growth?\(scope)") as? [String: Any]
             growth = try Record.list(stats?["children"] as Any)
         }
+        lastRefresh = Date()
+    }
+    private func fetchChildren(strictCredit: Bool = false) async throws -> [Record] {
+        var result = try Record.list(await call("/api/children?\(scope)"))
+        let creditRows: [[String: Any]]
+        do {
+            let overview = try await call("/api/credit/overview") as? [String: Any]
+            guard let rows = overview?["children"] as? [[String: Any]] else { throw APIError.message("信用分数据格式不正确。") }
+            creditRows = rows
+        } catch {
+            if strictCredit { throw error }
+            return result.map { Record(fields: $0.fields.merging(["creditUnavailable": true]) { _, new in new }) }
+        }
+        let creditByProfile = Dictionary(creditRows.compactMap { row -> (String, [String: Any])? in
+            guard let key = row["profileKey"] as? String else { return nil }
+            return (key, row)
+        }, uniquingKeysWith: { first, _ in first })
+        result = result.map { child in
+            let key = child.text("profileKey")
+            guard let credit = creditByProfile[key] else { return child }
+            return Record(fields: child.fields.merging(credit) { _, new in new })
+        }
+        return result
+    }
+    func refreshBalancesAndLedger() async throws {
+        let current = revision
+        let updated = try await fetchChildren(strictCredit: true)
+        let ledger = try await call("/api/transactions?page=1&pageSize=30") as? [String: Any]
+        guard let data = ledger?["data"] as? [String: Any] else { throw APIError.message("无法读取最新积分记录。") }
+        let items = try Record.list(data["items"] as Any)
+        guard current == revision else { throw CancellationError() }
+        children = updated
+        transactions = items
+        ledgerPage = 1
+        ledgerTotal = (data["total"] as? NSNumber)?.intValue ?? 0
+        lastRefresh = Date()
+    }
+    func refreshIfStale() async {
+        guard ready, Date().timeIntervalSince(lastRefresh) > 5 else { return }
+        do { try await refreshBalancesAndLedger() }
+        catch is CancellationError {} catch { self.error = error.localizedDescription }
     }
     func loadLedger(page: Int) async throws {
         let result = try await call("/api/transactions?page=\(page)&pageSize=30") as? [String: Any]

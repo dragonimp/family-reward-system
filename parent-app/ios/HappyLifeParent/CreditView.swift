@@ -144,6 +144,7 @@ struct CreditView: View {
                 _ = try await store.call(endpoint, method: "POST", body: body)
                 after?()
                 await reload()
+                try await store.refreshBalancesAndLedger()
             } catch { message = error.localizedDescription }
         }
     }

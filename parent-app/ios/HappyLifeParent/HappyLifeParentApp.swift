@@ -21,7 +21,10 @@ private extension View {
 
 @main struct LinkoFamilyApp: App {
     @StateObject private var store = FamilyStore()
-    var body: some Scene { WindowGroup { FamilyRoot(store: store, identity: store.identity).tint(.teal) } }
+    @Environment(\.scenePhase) private var scenePhase
+    var body: some Scene { WindowGroup { FamilyRoot(store: store, identity: store.identity).tint(.teal).onChange(of: scenePhase) { _, phase in
+        if phase == .active { Task { await store.refreshIfStale() } }
+    } } }
 }
 
 struct FamilyRoot: View {
@@ -79,7 +82,7 @@ struct FamilyRoot: View {
             FamilyHome(store: store).tabItem { Label("家庭", systemImage: "house.fill") }
             ApprovalList(store: store).tabItem { Label("审批", systemImage: "checkmark.bubble.fill") }.badge(store.requests.filter { $0.text("status") == "pending" }.count)
             LedgerView(store: store).tabItem { Label("记录", systemImage: "list.bullet.rectangle") }
-            GrowthView(store: store).tabItem { Label("成长", systemImage: "chart.xyaxis.line") }
+            FamilyChatView(store: store).tabItem { Label("AI 对话", systemImage: "bubble.left.and.bubble.right.fill") }
             AccountView(store: store).tabItem { Label("我的", systemImage: "person.crop.circle") }
         }
     }
@@ -115,6 +118,7 @@ struct FamilyHome: View {
                 } header: { Text("孩子 · \(store.children.count)") }
                 Section {
                     NavigationLink { RulesView(store: store) } label: { Label("奖励与行为规则", systemImage: "star.square.fill") }
+                    NavigationLink { GrowthView(store: store) } label: { Label("成长足迹", systemImage: "chart.xyaxis.line") }
                     NavigationLink { MembersView(store: store) } label: { Label("家庭成员", systemImage: "person.3.fill") }
                     if store.groupID != 0 { NavigationLink { RemoteRecords(store: store, title: "家庭邀请", path: "/api/family-groups/\(store.groupID)/invite", mode: .invite) } label: { Label("邀请家人", systemImage: "qrcode") } }
                 }
@@ -130,7 +134,7 @@ struct ChildRow: View {
         HStack(spacing: 14) {
             Text(String(child.text("name").prefix(1))).font(.title2.bold()).frame(width: 48, height: 48).background(.teal.opacity(0.12), in: RoundedRectangle(cornerRadius: 16)).foregroundStyle(.teal)
             VStack(alignment: .leading, spacing: 5) { Text(child.text("name")).font(.headline); Text("\(child.amount("score")) 积分 · ¥\(child.amount("cash"))").font(.subheadline).foregroundStyle(.secondary)
-                if child.has("creditEnabled") { Text("守约信用 \(child.flag("creditEnabled") ? child.amount("creditScore") : "未开通")").font(.caption).foregroundStyle(.teal) }
+                Text("守约信用分：\(child.flag("creditUnavailable") ? "暂不可用" : child.flag("creditEnabled") ? child.amount("creditScore") + " / 100" : "未开通")").font(.subheadline.weight(.medium)).foregroundStyle(.teal)
             }
             Spacer()
         }.padding(.vertical, 5)
@@ -158,7 +162,8 @@ struct ChildDetail: View {
                 NavigationLink("成长周报") { RemoteRecords(store: store, title: "成长周报", path: "/api/growth-reports?childId=\(child.id)&audience=parent&period=weekly&ai=false", mode: .reports) }
                 NavigationLink("好友") { RemoteRecords(store: store, title: "孩子的好友", path: "/api/children/\(child.id)/friends?\(store.scope)", mode: .friends) }
             }
-        }.readablePage().navigationTitle(current.text("name"))
+        }.readablePage().navigationTitle(current.text("name")).refreshable { await store.load() }
+            .task { await store.refreshIfStale() }
             .sheet(item: $editor) { NativeEditor(store: store, spec: $0) }
             .sheet(isPresented: $rewarding) { RewardEditor(store: store, child: current) }
     }
@@ -382,7 +387,7 @@ struct RewardEditor: View {
             requestBody = ["child_id": child.id, "type": kind, "direction": direction, "points": kind == "points" ? Double(amount) ?? 0 : 0, "cash_cny": kind == "cash" ? Double(amount) ?? 0 : 0, "items": item, "description": description, "category": category, "date": formatter.string(from: date), "idempotency_key": idempotency]
         }
         attempted = true
-        do { _ = try await store.call("/api/transactions", method: "POST", body: requestBody); await store.load(); dismiss() }
+        do { _ = try await store.call("/api/transactions", method: "POST", body: requestBody); try await store.refreshBalancesAndLedger(); dismiss() }
         catch { self.error = error.localizedDescription + " 可重试同一笔记录，或关闭后在记录页核对。" }
     }
 }
