@@ -2738,7 +2738,7 @@ app.MapPut("/api/agentfree/sessions/{id}", async (string id, JsonObject body, IH
             id,
             new UpdateOrbitWebAppSessionRequest
             {
-                Name = body.String("name"),
+                Name = string.IsNullOrWhiteSpace(body.String("name")) ? null : body.String("name").Trim(),
                 IsArchived = body["isArchived"]?.GetValue<bool?>()
             },
             userName,

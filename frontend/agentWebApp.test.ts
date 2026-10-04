@@ -52,6 +52,7 @@ test('mobile assistant reuses the complete AgentFree WebApp chat surface', async
   assert.doesNotMatch(backend, /获取智能体会话队列失败/);
   assert.match(backend, /CreateSessionAsync\(/);
   assert.match(backend, /UpdateSessionAsync\(/);
+  assert.match(backend, /Name = string\.IsNullOrWhiteSpace\(body\.String\("name"\)\) \? null : body\.String\("name"\)\.Trim\(\)/);
   assert.match(backend, /ResetSessionContextAsync\(/);
   assert.match(backend, /RespondInteractionAsync\(/);
   assert.doesNotMatch(backend, /SendAgentFreeJson/);
