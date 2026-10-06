@@ -1,6 +1,6 @@
 # Linko-Family 原生 iOS 家长端
 
-SwiftUI 原生界面，iPhone、iPad / iOS 17+。当前工程版本 1.2.5（14），Bundle ID `net.impx.happylife.parent`。业务页面不包含 WebView。
+SwiftUI 原生界面，iPhone、iPad / iOS 17+。当前工程版本 1.2.6（15），Bundle ID `net.impx.happylife.parent`。业务页面不包含 WebView。
 
 ## 原生功能
 
@@ -18,6 +18,10 @@ SwiftUI 原生界面，iPhone、iPad / iOS 17+。当前工程版本 1.2.5（14�
 ## 1.2.4（13）：亲子互动
 
 家长和孩子在 iPhone / iPad、Apple Watch 上共同完成四条亲子互动流程。记录独立于积分和守约信用分。会议首版限一个孩子与其绑定家长，具体状态与隐私边界见 `docs/FAMILY-CONNECTIONS.md`。
+
+## 1.2.6（15）：亲子成长图标
+
+iPhone、iPad 和随包 Apple Watch 图标统一为亲子人物、爱心与积分星星；TestFlight 图标取自本版 iOS 安装包。设计源图见 `../../assets/brand/family-icon-master.png`。
 
 ## 1.2.5（14）：智能体实例与会话管理
 

@@ -8,14 +8,18 @@
   "scope": "https://happylife.ai.impx.net/watch",
   "display": "standalone",
   "orientation": "portrait",
-  "theme_color": "#16643a",
-  "background_color": "#eef5ef",
-  "categories": ["kids", "education", "lifestyle"],
+  "theme_color": "#4A90D9",
+  "background_color": "#F7F9FC",
+  "categories": [
+    "kids",
+    "education",
+    "lifestyle"
+  ],
   "icons": [
     {
-      "src": "https://happylife.ai.impx.net/watch/icon.svg",
-      "sizes": "any",
-      "type": "image/svg+xml",
+      "src": "https://happylife.ai.impx.net/watch/icon.png",
+      "sizes": "512x512",
+      "type": "image/png",
       "purpose": "any maskable"
     }
   ]
