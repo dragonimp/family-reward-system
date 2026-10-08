@@ -1,5 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
+export PATH="/opt/homebrew/opt/node@24/bin:/Users/wengzhishan/.local/npm-global/bin:$PATH"
+command -v npm >/dev/null && command -v node >/dev/null || {
+  echo 'The trusted Mac Node.js toolchain is unavailable.' >&2
+  exit 2
+}
 
 : "${ATLAS_RELEASE_VERSION:?Atlas must provide the immutable release version}"
 : "${ATLAS_SOURCE_COMMIT:?Atlas must provide the requested source commit}"
