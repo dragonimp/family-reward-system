@@ -42,19 +42,24 @@ struct DearSocialView: View {
         NavigationStack {
             List {
                 Section {
-                    Text("亲近的人，日常的事").font(.headline)
-                    Text("和孩子一起成长，和家人保持联系，和朋友分享相聚时刻。")
+                    Text("相聚时刻").font(.title2.bold())
+                    Text("与家人、朋友共同安排活动，分享照片和生活日常。")
                         .font(.subheadline).foregroundStyle(.secondary)
                     if !error.isEmpty { Text(error).foregroundStyle(.red) }
                     if !notice.isEmpty { Text(notice).foregroundStyle(.teal) }
                 }
-                if store.ready {
-                    Section("亲密关系") {
-                        NavigationLink { FamilyConnectionsView(store: store) } label: { Label("和孩子 · 倾听与陪伴", systemImage: "heart") }
-                        NavigationLink { GenealogyView(store: store) } label: { Label("和家人 · 家族族谱", systemImage: "person.3") }
+                if invitations.contains(where: { !$0.flag("joined") }) {
+                    Section("待确认的活动邀请") {
+                        ForEach(invitations.filter { !$0.flag("joined") }) { invitation in
+                            HStack {
+                                Text(invitation.text("activityTitle"))
+                                Spacer()
+                                Button("确认加入") { run { try await accept(invitation) } }.disabled(busy)
+                            }
+                        }
                     }
                 }
-                Section("共同生活空间") {
+                Section("生活空间") {
                     if spaces.isEmpty { Text("创建一个空间，邀请家人或朋友参加活动。").foregroundStyle(.secondary) }
                     else {
                         Picker("当前空间", selection: $spaceId) {
@@ -70,7 +75,7 @@ struct DearSocialView: View {
                         .font(.caption).foregroundStyle(.secondary)
                 }
                 if selectedSpace != nil {
-                    Section("共同活动") {
+                    Section("活动") {
                         if activities.isEmpty { Text("还没有活动").foregroundStyle(.secondary) }
                         else {
                             Picker("选择活动", selection: $activityId) {
@@ -98,7 +103,7 @@ struct DearSocialView: View {
                         Text("对方确认加入后，才能看到活动中分享的照片。")
                             .font(.caption).foregroundStyle(.secondary)
                     }
-                    Section("共同相册") {
+                    Section("照片分享 · \(selectedActivity.text("title"))") {
                         if photos.isEmpty { Text("还没有分享的照片").foregroundStyle(.secondary) }
                         ForEach(photos) { photo in
                             HStack(spacing: 12) {
@@ -116,7 +121,7 @@ struct DearSocialView: View {
                         Button("刷新相册") { run { try await loadPhotos() } }.disabled(busy)
                         Link("分享照片与获取原图", destination: URL(string: "https://linko.ai.impx.net/")!)
                     }
-                    Section("生活日常 · \(selectedActivity.text("title"))") {
+                    Section("生活分享 · \(selectedActivity.text("title"))") {
                         Text("只向这场活动的成员展示。")
                             .font(.caption).foregroundStyle(.secondary)
                         TextEditor(text: $momentDraft).frame(minHeight: 76)
@@ -176,23 +181,13 @@ struct DearSocialView: View {
                         }
                     }
                 }
-                if invitations.contains(where: { !$0.flag("joined") }) {
-                    Section("收到的邀请") {
-                        ForEach(invitations.filter { !$0.flag("joined") }) { invitation in
-                            HStack {
-                                Text(invitation.text("activityTitle"))
-                                Spacer()
-                                Button("确认加入") { run { try await accept(invitation) } }.disabled(busy)
-                            }
-                        }
-                    }
-                }
                 if showLogout {
                     Section { Link("隐私政策与支持", destination: URL(string: "https://happylife.ai.impx.net/legal/linko-family-privacy.html")!) }
                 }
             }
             .listStyle(.insetGrouped)
-            .navigationTitle("Linko Dear")
+            .readablePage()
+            .navigationTitle("活动与分享")
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) { Button("刷新", systemImage: "arrow.clockwise") { run { try await load() } }.disabled(busy) }
                 if showLogout { ToolbarItem(placement: .topBarLeading) { Button("退出") { store.logout() } } }

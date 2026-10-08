@@ -13,7 +13,7 @@ private struct ReadablePage: ViewModifier {
     }
 }
 
-private extension View {
+extension View {
     func readablePage(maxWidth: CGFloat = 860) -> some View {
         modifier(ReadablePage(maxWidth: maxWidth))
     }
@@ -81,10 +81,9 @@ struct FamilyRoot: View {
     }
     private var main: some View {
         TabView {
-            DearSocialView(store: store).tabItem { Label("日常", systemImage: "heart.text.square.fill") }
             FamilyHome(store: store).tabItem { Label("家庭", systemImage: "house.fill") }
-            ApprovalList(store: store).tabItem { Label("审批", systemImage: "checkmark.bubble.fill") }.badge(store.requests.filter { $0.text("status") == "pending" }.count)
-            LedgerView(store: store).tabItem { Label("记录", systemImage: "list.bullet.rectangle") }
+                .badge(store.requests.filter { $0.text("status") == "pending" }.count)
+            DearSocialView(store: store).tabItem { Label("活动", systemImage: "photo.on.rectangle.angled") }
             FamilyChatView(store: store).tabItem { Label("AI 对话", systemImage: "bubble.left.and.bubble.right.fill") }
             AccountView(store: store).tabItem { Label("我的", systemImage: "person.crop.circle") }
         }
@@ -94,9 +93,17 @@ struct FamilyRoot: View {
 struct FamilyHome: View {
     @ObservedObject var store: FamilyStore
     @State private var editor: EditorSpec?
+    private var pendingRequests: Int { store.requests.filter { $0.text("status") == "pending" }.count }
     var body: some View {
         NavigationStack {
             List {
+                Section {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("一起照顾每一天").font(.title2.bold())
+                        Text("孩子成长、奖励审批和积分记录，都在这里。")
+                            .font(.subheadline).foregroundStyle(.secondary)
+                    }.padding(.vertical, 8)
+                }
                 Section {
                     if store.groups.isEmpty { Text("创建或加入一个家庭，开始记录成长。").foregroundStyle(.secondary) }
                     else {
@@ -110,6 +117,26 @@ struct FamilyHome: View {
                         Button("加入家庭", systemImage: "person.badge.plus") { editor = EditorSpec(title: "加入家庭", path: "/api/family-groups/join", fields: [.init(key: "inviteCode", title: "邀请码")]) }
                     }.buttonStyle(.borderless)
                 } header: { Text("一起成长") }
+                Section("待办与记录") {
+                    NavigationLink { ApprovalList(store: store) } label: {
+                        HStack {
+                            Label("奖励审批", systemImage: "checkmark.bubble.fill")
+                            Spacer()
+                            if pendingRequests > 0 {
+                                Text("\(pendingRequests) 待处理")
+                                    .font(.caption.bold()).foregroundStyle(.orange)
+                            }
+                        }
+                    }
+                    NavigationLink { LedgerView(store: store) } label: {
+                        HStack {
+                            Label("积分与奖励记录", systemImage: "list.bullet.rectangle")
+                            Spacer()
+                            Text("共 \(store.ledgerTotal) 条")
+                                .font(.caption).foregroundStyle(.secondary)
+                        }
+                    }
+                }
                 Section {
                     ForEach(store.children) { child in
                         NavigationLink { ChildDetail(store: store, child: child) } label: { ChildRow(child: child) }
@@ -119,7 +146,7 @@ struct FamilyHome: View {
                         editor = EditorSpec(title: "添加孩子", path: "/api/children", fields: [.init(key: "name", title: "孩子姓名"), .init(key: "note", title: "备注", required: false)], fixed: store.groupID == 0 ? [:] : ["familyGroupId": store.groupID])
                     }
                 } header: { Text("孩子 · \(store.children.count)") }
-                Section {
+                Section("家庭与成长") {
                     NavigationLink { RulesView(store: store) } label: { Label("奖励与行为规则", systemImage: "star.square.fill") }
                     NavigationLink { GrowthView(store: store) } label: { Label("成长足迹", systemImage: "chart.xyaxis.line") }
                     NavigationLink { FamilyConnectionsView(store: store) } label: { Label("亲子互动", systemImage: "heart.text.square") }
@@ -128,7 +155,7 @@ struct FamilyHome: View {
                     if store.groupID != 0 { NavigationLink { RemoteRecords(store: store, title: "家庭邀请", path: "/api/family-groups/\(store.groupID)/invite", mode: .invite) } label: { Label("邀请家人", systemImage: "qrcode") } }
                 }
                 if store.loading { ProgressView("正在更新…") }
-            }.readablePage().navigationTitle(store.selectedFamily).refreshable { await store.load() }
+            }.listStyle(.insetGrouped).readablePage().navigationTitle(store.selectedFamily).refreshable { await store.load() }
                 .sheet(item: $editor) { NativeEditor(store: store, spec: $0) }
         }
     }
@@ -178,22 +205,20 @@ struct ApprovalList: View {
     @ObservedObject var store: FamilyStore
     @State private var editor: EditorSpec?
     var body: some View {
-        NavigationStack {
-            List {
-                if store.requests.isEmpty { ContentUnavailableView("暂无申请", systemImage: "checkmark.bubble", description: Text("孩子从手表提交的奖励申请会显示在这里。")) }
-                ForEach(store.requests) { row in
-                    VStack(alignment: .leading, spacing: 8) {
-                        HStack { Text(row.text("childName")).font(.headline); Spacer(); Text(row.text("statusText")).font(.caption).foregroundStyle(.secondary) }
-                        Text(row.text("title")); Text("\(row.amount("points")) 积分 · \(row.text("category"))").foregroundStyle(.teal)
-                        if !row.text("note").isEmpty { Text(row.text("note")).font(.subheadline) }
-                        Text(beijingDate(row.text("requestedAt"))).font(.caption).foregroundStyle(.secondary)
-                        if row.text("status") == "pending" {
-                            Button("批准申请") { editor = EditorSpec(title: "批准 \(row.text("childName")) 的申请", path: "/api/reward-requests/\(row.id)/approve", fields: [.init(key: "reviewNote", title: "给孩子的话", required: false)], fixed: ["familyGroupId": row.int("familyGroupId")]) }.buttonStyle(.bordered)
-                        }
-                    }.padding(.vertical, 6)
-                }
-            }.readablePage().navigationTitle("奖励审批").refreshable { await store.load() }.sheet(item: $editor) { NativeEditor(store: store, spec: $0) }
-        }
+        List {
+            if store.requests.isEmpty { ContentUnavailableView("暂无申请", systemImage: "checkmark.bubble", description: Text("孩子从手表提交的奖励申请会显示在这里。")) }
+            ForEach(store.requests) { row in
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack { Text(row.text("childName")).font(.headline); Spacer(); Text(row.text("statusText")).font(.caption).foregroundStyle(.secondary) }
+                    Text(row.text("title")); Text("\(row.amount("points")) 积分 · \(row.text("category"))").foregroundStyle(.teal)
+                    if !row.text("note").isEmpty { Text(row.text("note")).font(.subheadline) }
+                    Text(beijingDate(row.text("requestedAt"))).font(.caption).foregroundStyle(.secondary)
+                    if row.text("status") == "pending" {
+                        Button("批准申请") { editor = EditorSpec(title: "批准 \(row.text("childName")) 的申请", path: "/api/reward-requests/\(row.id)/approve", fields: [.init(key: "reviewNote", title: "给孩子的话", required: false)], fixed: ["familyGroupId": row.int("familyGroupId")]) }.buttonStyle(.bordered)
+                    }
+                }.padding(.vertical, 6)
+            }
+        }.listStyle(.insetGrouped).readablePage().navigationTitle("奖励审批").refreshable { await store.load() }.sheet(item: $editor) { NativeEditor(store: store, spec: $0) }
     }
 }
 struct LedgerView: View {
@@ -201,22 +226,20 @@ struct LedgerView: View {
     @State private var filter = ""
     @State private var more = false
     var body: some View {
-        NavigationStack {
-            List {
-                Section { Text("我的孩子 · 共 \(store.ledgerTotal) 条").foregroundStyle(.secondary) }
-                ForEach(store.transactions.filter { filter.isEmpty || ($0.text("childName") + $0.text("description") + $0.text("category")).localizedCaseInsensitiveContains(filter) }) { row in
-                    VStack(alignment: .leading, spacing: 7) {
-                        HStack { Text(row.text("childName")).font(.headline); Spacer(); Text(row.amount("amount") + (row.text("type") == "cash" ? " 元" : row.text("type") == "item" ? " 件" : " 分")).foregroundStyle(row.number("amount") >= 0 ? .teal : .orange).font(.headline.monospacedDigit()) }
-                        Text(row.text("description")); Text("\(row.text("date")) · \(row.text("category"))").font(.caption).foregroundStyle(.secondary)
-                        if !row.text("notes").isEmpty { Text(row.text("notes")).font(.caption) }
-                    }.padding(.vertical, 4)
-                }
-                if store.transactions.isEmpty { ContentUnavailableView("还没有记录", systemImage: "list.bullet.rectangle", description: Text("从孩子详情中记录奖励与扣分。")) }
-                if store.transactions.count < store.ledgerTotal {
-                    Button(more ? "正在加载…" : "加载更多") { Task { more = true; defer { more = false }; do { try await store.loadLedger(page: store.ledgerPage + 1) } catch { store.error = error.localizedDescription } } }.disabled(more)
-                }
-            }.readablePage().navigationTitle("积分与奖励记录").searchable(text: $filter, prompt: "搜索已加载的孩子、内容、类别").refreshable { await store.load() }
-        }
+        List {
+            Section { Text("我的孩子 · 共 \(store.ledgerTotal) 条").foregroundStyle(.secondary) }
+            ForEach(store.transactions.filter { filter.isEmpty || ($0.text("childName") + $0.text("description") + $0.text("category")).localizedCaseInsensitiveContains(filter) }) { row in
+                VStack(alignment: .leading, spacing: 7) {
+                    HStack { Text(row.text("childName")).font(.headline); Spacer(); Text(row.amount("amount") + (row.text("type") == "cash" ? " 元" : row.text("type") == "item" ? " 件" : " 分")).foregroundStyle(row.number("amount") >= 0 ? .teal : .orange).font(.headline.monospacedDigit()) }
+                    Text(row.text("description")); Text("\(row.text("date")) · \(row.text("category"))").font(.caption).foregroundStyle(.secondary)
+                    if !row.text("notes").isEmpty { Text(row.text("notes")).font(.caption) }
+                }.padding(.vertical, 4)
+            }
+            if store.transactions.isEmpty { ContentUnavailableView("还没有记录", systemImage: "list.bullet.rectangle", description: Text("从孩子详情中记录奖励与扣分。")) }
+            if store.transactions.count < store.ledgerTotal {
+                Button(more ? "正在加载…" : "加载更多") { Task { more = true; defer { more = false }; do { try await store.loadLedger(page: store.ledgerPage + 1) } catch { store.error = error.localizedDescription } } }.disabled(more)
+            }
+        }.listStyle(.insetGrouped).readablePage().navigationTitle("积分与奖励记录").searchable(text: $filter, prompt: "搜索已加载的孩子、内容、类别").refreshable { await store.load() }
     }
 }
 struct GrowthView: View {
