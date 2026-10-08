@@ -33,7 +33,7 @@ struct WatchCodeScanner: View {
                 let allowed = await AVCaptureDevice.requestAccess(for: .video)
                 guard !Task.isCancelled else { return }
                 guard allowed, DataScannerViewController.isAvailable else {
-                    message = "请在系统设置中允许 Linko Family 使用相机，或返回手动输入设备码。"; return
+                    message = "请在系统设置中允许 Linko Dear 使用相机，或返回手动输入设备码。"; return
                 }
                 ready = true
             }

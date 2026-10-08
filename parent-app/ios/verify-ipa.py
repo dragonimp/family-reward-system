@@ -22,7 +22,7 @@ with tempfile.TemporaryDirectory(prefix="happylife-parent-ipa-") as directory:
     signature = subprocess.run(["codesign", "-dv", str(app)], capture_output=True, text=True, check=True)
     fields = dict(line.split("=", 1) for line in signature.stderr.splitlines() if "=" in line)
     assert info["CFBundleIdentifier"] == expected
-    assert info["CFBundleDisplayName"] == "Linko Family"
+    assert info["CFBundleDisplayName"] == "Linko Dear"
     assert any("linkofamily" in item.get("CFBundleURLSchemes", []) for item in info.get("CFBundleURLTypes", []))
     frameworks = subprocess.run(["xcrun", "otool", "-L", str(app / info["CFBundleExecutable"])], capture_output=True, text=True, check=True).stdout
     assert "SwiftUI.framework" in frameworks and "AuthenticationServices.framework" in frameworks
@@ -48,7 +48,7 @@ with tempfile.TemporaryDirectory(prefix="happylife-parent-ipa-") as directory:
     assert wi["WKCompanionAppBundleIdentifier"] == expected
     assert wi["WKRunsIndependentlyOfCompanionApp"] is True
     assert wi.get("WKWatchOnly") is not True
-    assert wi["CFBundleDisplayName"] == "Linko Family"
+    assert wi["CFBundleDisplayName"] == "Linko Dear"
     assert wi["CFBundleShortVersionString"] == info["CFBundleShortVersionString"]
     assert wi["CFBundleVersion"] == info["CFBundleVersion"]
     subprocess.run(["codesign", "--verify", "--deep", "--strict", str(watch)], check=True)

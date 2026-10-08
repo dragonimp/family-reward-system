@@ -255,7 +255,7 @@ export default function Dashboard() {
       {/* 页面标题 */}
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-2xl font-bold text-gray-900">🏠 家加分</h2>
+          <h2 className="text-2xl font-bold text-gray-900">🏠 Linko Dear · 家庭成长</h2>
           <p className="text-sm text-gray-500 mt-1">记录每个孩子的成长瞬间</p>
         </div>
         <button

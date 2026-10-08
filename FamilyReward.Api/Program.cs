@@ -103,6 +103,8 @@ builder.Services.AddCors(options =>
         policy.AllowAnyOrigin().AllowAnyHeader().AllowAnyMethod());
 });
 builder.Services.AddHttpClient();
+builder.Services.AddHttpClient("dear-social-sso", client => client.Timeout = TimeSpan.FromSeconds(15));
+builder.Services.AddHttpClient("dear-social-api", client => client.Timeout = TimeSpan.FromSeconds(45));
 builder.Services.AddHttpClient("agent-pay");
 builder.Services.AddSingleton<XiaotiancaiDeviceTestEmailService>();
 builder.Services.AddAgentIdentityJwtCookieAuthentication(new AgentIdentityOptions
@@ -137,6 +139,7 @@ app.UseAgentIdentity();
 app.UseAtlasReleaseDrain(context => HttpMethods.IsGet(context.Request.Method) && context.Request.Path == "/health");
 app.MapAgentIdentityAuthEndpoints();
 app.MapAgentIdentityNativeLogin(new Uri("https://happylife.ai.impx.net"), new Uri("linkofamily://login-complete"), "Linko-Family");
+app.MapLinkoSocialGateway();
 app.MapAtlasReleaseVersion();
 if (!string.IsNullOrWhiteSpace(releaseControlApplicationId))
     app.MapAtlasReleaseDrain(ReleaseDrainExtensions.UpgradeControlPolicy);

@@ -34,20 +34,22 @@ struct FamilyRoot: View {
         Group {
             if !identity.isAuthenticated { login }
             else if store.ready { main }
+            else if store.profile?.text("role") == "child" { DearSocialView(store: store, showLogout: true) }
             else {
                 NavigationStack {
                     VStack(spacing: 24) {
                         Image(systemName: "person.2.circle.fill").font(.system(size: 64)).foregroundStyle(.teal)
-                        Text("欢迎使用 Linko Family").font(.title2.bold())
+                        Text("欢迎使用 Linko Dear").font(.title2.bold())
                         if store.loading { ProgressView("正在读取家庭身份…") }
                         else if store.profile?.flag("needsRole") == true {
                             Text("选择家长身份，管理家庭与孩子的成长记录。")
                             Button("我是家长") { Task { await store.selectParent() } }.buttonStyle(.borderedProminent)
+                            NavigationLink("先进入生活日常") { DearSocialView(store: store) }
                         } else if store.profile?.text("role") == "child" {
                             Text("此账号是孩子身份，请使用家长账号登录。")
                         } else { Button("重新加载") { Task { await store.load() } } }
                         Button("退出登录") { store.logout() }
-                    }.padding().navigationTitle("Linko Family")
+                    }.padding().navigationTitle("Linko Dear")
                 }
             }
         }
@@ -69,7 +71,7 @@ struct FamilyRoot: View {
                 Button { signIn(false) } label: { HStack { Spacer(); if identity.isBusy { ProgressView() }; Text("用户中心登录").bold(); Spacer() }.padding(.vertical, 8) }.buttonStyle(.borderedProminent).disabled(identity.isBusy)
                 Button("注册用户中心账号") { signIn(true) }.frame(maxWidth: .infinity).disabled(identity.isBusy)
                 Text("登录和注册在系统认证窗口中完成。登录后自动返回 App。").font(.footnote).foregroundStyle(.secondary)
-            }.padding(28).frame(maxWidth: 560).frame(maxWidth: .infinity).navigationTitle("Linko Family")
+            }.padding(28).frame(maxWidth: 560).frame(maxWidth: .infinity).navigationTitle("Linko Dear")
         }
     }
     private func signIn(_ register: Bool) {
@@ -79,6 +81,7 @@ struct FamilyRoot: View {
     }
     private var main: some View {
         TabView {
+            DearSocialView(store: store).tabItem { Label("日常", systemImage: "heart.text.square.fill") }
             FamilyHome(store: store).tabItem { Label("家庭", systemImage: "house.fill") }
             ApprovalList(store: store).tabItem { Label("审批", systemImage: "checkmark.bubble.fill") }.badge(store.requests.filter { $0.text("status") == "pending" }.count)
             LedgerView(store: store).tabItem { Label("记录", systemImage: "list.bullet.rectangle") }
@@ -277,14 +280,15 @@ struct AccountView: View {
     var body: some View {
         NavigationStack {
             List {
-                Section { Label(store.profile?.text("username") ?? "家长", systemImage: "person.crop.circle.fill"); LabeledContent("身份", value: "家长"); LabeledContent("应用", value: "Linko Family") }
+                Section { Label(store.profile?.text("username") ?? "家长", systemImage: "person.crop.circle.fill"); LabeledContent("身份", value: "家长"); LabeledContent("应用", value: "Linko Dear") }
                 Section {
                     NavigationLink("订阅权益") { RemoteRecords(store: store, title: "订阅权益", path: "/api/subscription", mode: .subscription) }
+                    Link("隐私政策与支持", destination: URL(string: "https://happylife.ai.impx.net/legal/linko-family-privacy.html")!)
                     LabeledContent("版本", value: "\(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "") (\(Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? ""))")
                     Text("家庭数据与网页版同步。登录由用户中心提供，凭据保存在本机钥匙串。").font(.footnote).foregroundStyle(.secondary)
                 }
                 Button("退出当前账号", role: .destructive) { logout = true }
-            }.readablePage().navigationTitle("我的").confirmationDialog("退出 Linko Family？", isPresented: $logout, titleVisibility: .visible) { Button("退出登录", role: .destructive) { store.logout() } } message: { Text("本机登录凭据将清除。用户中心的浏览器登录状态由用户中心管理。") }
+            }.readablePage().navigationTitle("我的").confirmationDialog("退出 Linko Dear？", isPresented: $logout, titleVisibility: .visible) { Button("退出登录", role: .destructive) { store.logout() } } message: { Text("本机登录凭据将清除。用户中心的浏览器登录状态由用户中心管理。") }
         }
     }
 }

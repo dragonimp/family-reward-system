@@ -8,7 +8,7 @@ export default function IdentityGate({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (profileReady && appProfile?.role === 'child' && location.pathname !== '/identity') {
-      window.location.replace('/watch');
+      window.location.replace('/dear');
     }
   }, [appProfile?.role, location.pathname, profileReady]);
 
@@ -27,7 +27,7 @@ export default function IdentityGate({ children }: { children: ReactNode }) {
   if (appProfile.role === 'child') {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[#F7F9FC] text-gray-500">
-        正在进入手表端...
+        正在进入 Linko Dear...
       </div>
     );
   }

@@ -1,5 +1,7 @@
-# 家加分
-家加分 — 管理孩子积分、现金和物品奖励
+# Linko Dear
+Linko Dear 把孩子成长、家族关系和亲友的共同生活放在一处。原有家加分积分与奖励数据继续保留。
+
+共同生活空间、活动、邀请和活动照片复用 Linko Social 服务；接入边界见 [Linko Dear 说明](docs/LINKO-DEAR.md)。
 
 当前产品基线：**V0.8**（2026-09-02）。版本范围和后续演进边界见 [V0.8 版本记录](docs/releases/V0.8.md)。
 
@@ -25,7 +27,7 @@
 - 后端：`http://localhost:5102`
 - 健康检查：`http://localhost:5102/health`
 
-## Linko-Family iOS 家长端
+## Linko Dear iOS
 
 SwiftUI 原生 iPhone 客户端，提供家庭、孩子、积分奖励、审批、记录和成长图表。登录与注册通过公共 AgentIdentity iOS SDK 弹出系统用户中心认证页，业务页面不嵌入网页。功能范围、构建签发及验收记录见 [iOS 家长端](parent-app/ios/README.md)。
 

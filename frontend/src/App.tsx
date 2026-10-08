@@ -4,6 +4,7 @@ import ChildrenPage from './pages/Children';
 import CreditPage from './pages/Credit';
 import FamilyGroupsPage from './pages/FamilyGroups';
 import GenealogyPage from './pages/Genealogy';
+import DearSocialPage from './pages/DearSocial';
 import RewardPage from './pages/Reward';
 import TransactionsPage from './pages/Transactions';
 import RulesPage from './pages/Rules';
@@ -29,6 +30,10 @@ export default function App() {
     <BrowserRouter>
       <AuthProvider>
         <Routes>
+          <Route
+            path="/dear"
+            element={<ProtectedRoute><DearSocialPage /></ProtectedRoute>}
+          />
           <Route
             path="/identity"
             element={

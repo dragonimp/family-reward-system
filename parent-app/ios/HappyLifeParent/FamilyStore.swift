@@ -44,6 +44,20 @@ import AgentIdentity
         }
         return value
     }
+    func authenticatedImage(_ path: String) async throws -> UIImage {
+        guard let token = identity.accessToken else { throw APIError.message("请先登录用户中心。") }
+        let current = revision
+        var request = URLRequest(url: URL(string: path, relativeTo: base)!.absoluteURL)
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        request.timeoutInterval = 30
+        let (data, response) = try await session.data(for: request)
+        guard current == revision, token == identity.accessToken,
+              let response = response as? HTTPURLResponse, response.url?.host == base.host,
+              response.statusCode == 200, let image = UIImage(data: data) else {
+            throw APIError.message("无法读取照片预览。")
+        }
+        return image
+    }
     func streamChat(sessionID: String, message: String) async throws {
         guard let token = identity.accessToken else { throw APIError.message("请先登录用户中心。") }
         let current = revision
