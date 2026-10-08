@@ -2,6 +2,11 @@
 set -euo pipefail
 
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+export PATH="/opt/homebrew/opt/node@24/bin:/Users/wengzhishan/.local/npm-global/bin:$PATH"
+command -v npm >/dev/null && command -v node >/dev/null || {
+  echo 'The trusted Mac Node.js toolchain is unavailable.' >&2
+  exit 2
+}
 : "${ATLAS_MERGE_COMMIT:?Atlas source integration must provide the merged commit}"
 [[ "$(git -C "$root" rev-parse HEAD)" == "$ATLAS_MERGE_COMMIT" ]] || {
   echo 'Build worktree does not match the Atlas merge commit.' >&2
