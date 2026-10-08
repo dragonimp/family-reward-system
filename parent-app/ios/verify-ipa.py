@@ -10,7 +10,7 @@ import zipfile
 from pathlib import Path
 
 if len(sys.argv) != 2:
-    raise SystemExit("Usage: verify-ipa.py Linko Family.ipa")
+    raise SystemExit("Usage: verify-ipa.py Linko Dear.ipa")
 ipa = Path(sys.argv[1])
 with tempfile.TemporaryDirectory(prefix="happylife-parent-ipa-") as directory:
     with zipfile.ZipFile(ipa) as archive:

@@ -9,5 +9,5 @@ options="${HAPPYLIFE_PARENT_EXPORT_OPTIONS:-$PWD/build/ExportOptions.plist}"
 # The shared helper owns the keychain lock; never wrap it a second time.
 "$export_helper" "$PWD/build/Linko Family-signed.xcarchive" "$options" "$PWD/build/TestFlight"
 if [[ "$(/usr/libexec/PlistBuddy -c 'Print :destination' "$options")" == export ]]; then
-  python3 verify-ipa.py "$PWD/build/TestFlight/Linko Family.ipa"
+  python3 verify-ipa.py "$PWD/build/TestFlight/Linko Dear.ipa"
 fi
