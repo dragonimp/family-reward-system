@@ -13,10 +13,11 @@ if [[ "$mode" == source ]]; then
   [[ "$ATLAS_SOURCE_BRANCH" =~ ^[A-Za-z0-9._/-]{1,120}$ && "$ATLAS_TARGET_BRANCH" =~ ^[A-Za-z0-9._/-]{1,120}$ ]] || exit 2
   [[ "$ATLAS_SOURCE_COMMIT" =~ ^[0-9a-f]{40}$ && "$ATLAS_PROJECT_CODE" == family-reward ]] || exit 2
   ssh -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=10 \
-    "wengzhishan@$host" bash -s -- "$ATLAS_SOURCE_BRANCH" "$ATLAS_TARGET_BRANCH" "$ATLAS_SOURCE_COMMIT" "$ATLAS_PROJECT_CODE" <<'REMOTE'
+    "wengzhishan@$host" bash -s -- "$ATLAS_SOURCE_BRANCH" "$ATLAS_TARGET_BRANCH" "$ATLAS_SOURCE_COMMIT" "$ATLAS_PROJECT_CODE" "${ATLAS_DRY_RUN:-0}" <<'REMOTE'
 set -euo pipefail
 export ATLAS_WORKTREE=/Users/wengzhishan/Projects/family-reward-system
 export ATLAS_SOURCE_BRANCH="$1" ATLAS_TARGET_BRANCH="$2" ATLAS_SOURCE_COMMIT="$3" ATLAS_PROJECT_CODE="$4"
+export ATLAS_DRY_RUN="$5"
 exec bash /Users/wengzhishan/Projects/Atlas/scripts/atlas-source-integration.sh
 REMOTE
 else
