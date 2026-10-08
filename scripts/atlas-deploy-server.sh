@@ -1,33 +1,43 @@
 #!/usr/bin/env bash
 set -euo pipefail
-ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-if [[ "${ATLAS_DRY_RUN:-0}" == "1" ]]; then
-  printf '{"summary":"服务器部署预检查通过","evidence":"standard_deploy_entrypoint"}\n'
-  exit 0
-fi
-# A bounded static legal-page release: no service restart, database or other assets.
-if [[ "${1:-}" == --linko-family-legal ]]; then
-  git -C "$ROOT_DIR" diff --quiet HEAD -- frontend/public/legal/linko-family-privacy.html
-  revision="$(git -C "$ROOT_DIR" rev-parse HEAD)"
-  remote_revision="$(git -C "$ROOT_DIR" ls-remote origin refs/heads/main | cut -f1)"
-  [[ "$revision" == "$remote_revision" ]] || { echo 'Release commit must match GitHub main' >&2; exit 1; }
-  stage="/tmp/linko-family-legal-$revision.html"
-  scp "$ROOT_DIR/frontend/public/legal/linko-family-privacy.html" "zz.impx.net:$stage"
-  ssh zz.impx.net bash -s -- "$stage" "$revision" <<'REMOTE'
-set -euo pipefail
-stage="$1"
-revision="$2"
-target=/var/www/happylife/frontend/static/legal/linko-family-privacy.html
-sudo mkdir -p "/opt/backups/family-reward/legal-$revision"
-if sudo test -f "$target"; then sudo cp -a "$target" "/opt/backups/family-reward/legal-$revision/"; fi
-sudo install -o www-data -g www-data -m 644 "$stage" "$target.new"
-sudo mv "$target.new" "$target"
-rm "$stage"
-REMOTE
-  curl -fsS https://happylife.ai.impx.net/legal/linko-family-privacy.html | cmp - "$ROOT_DIR/frontend/public/legal/linko-family-privacy.html"
-  echo "Verified legal page release $revision"
-  exit 0
-fi
-exec "$ROOT_DIR/scripts/deploy-production.sh" "$@"
-printf '{"summary":"服务器部署完成","evidence":"standard_deploy_entrypoint"}\n'
 
+: "${ATLAS_RELEASE_VERSION:?Atlas must provide the immutable release version}"
+: "${ATLAS_SOURCE_COMMIT:?Atlas must provide the requested source commit}"
+version="$ATLAS_RELEASE_VERSION"
+source_commit="$ATLAS_SOURCE_COMMIT"
+[[ "$version" =~ ^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$ && "$version" != latest ]] || exit 2
+[[ "$source_commit" =~ ^[0-9a-f]{40}$ ]] || exit 2
+root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+[[ "$root" == /Users/wengzhishan/Projects/family-reward-system ]] || {
+  echo 'Atlas deployment adapter must run from the trusted project repository.' >&2
+  exit 2
+}
+git -C "$root" fetch --no-tags origin refs/heads/main:refs/remotes/origin/main
+merge_commit="$(git -C "$root" rev-parse refs/remotes/origin/main)"
+git -C "$root" merge-base --is-ancestor "$source_commit" "$merge_commit" || {
+  echo 'The published target branch does not contain the requested source commit.' >&2
+  exit 2
+}
+
+scratch="$(mktemp -d "$HOME/.codex/worktrees/family-reward-atlas-deploy.XXXXXXXX")"
+checkout="$scratch/source"
+cleanup() {
+  if [[ -d "$checkout" ]] && [[ "$(git -C "$checkout" rev-parse HEAD 2>/dev/null || true)" == "$merge_commit" ]] \
+      && [[ -z "$(git -C "$checkout" status --porcelain --untracked-files=all 2>/dev/null || true)" ]]; then
+    git -C "$root" worktree remove "$checkout" || true
+  fi
+  if [[ ! -e "$checkout" ]]; then rmdir "$scratch" 2>/dev/null || true; fi
+}
+trap cleanup EXIT
+git -C "$root" worktree add --detach "$checkout" "$merge_commit" >&2
+ATLAS_SOURCE_ROOT=/Users/wengzhishan/Projects/Atlas \
+FAMILY_REWARD_SHARED_PROJECTS_ROOT=/Users/wengzhishan/Projects \
+  bash "$checkout/scripts/build-atlas-release.sh" "$version" "$scratch/release" >&2
+
+stage="/opt/Atlas/release-staging/family-points-pipeline/$version"
+ssh -o BatchMode=yes root@zz.impx.net "test ! -e '$stage' && mkdir -p '$stage'"
+scp -q "$scratch/release/bundle.json" "$scratch/release/family-points-api.tar.gz" \
+  "$scratch/release/family-points-web.tar.gz" "$scratch/release/family-points-server.tar.gz" \
+  "$checkout/scripts/atlas-activate-server.sh" "root@zz.impx.net:$stage/"
+ssh -o BatchMode=yes root@zz.impx.net \
+  "bash '$stage/atlas-activate-server.sh' '$version' '$source_commit' '$stage'"
