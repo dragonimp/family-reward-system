@@ -28,6 +28,16 @@ else
     "wengzhishan@$host" bash -s -- "$ATLAS_RELEASE_VERSION" "$ATLAS_SOURCE_COMMIT" <<'REMOTE'
 set -euo pipefail
 export ATLAS_RELEASE_VERSION="$1" ATLAS_SOURCE_COMMIT="$2"
-exec bash /Users/wengzhishan/Projects/family-reward-system/scripts/atlas-deploy-server.sh
+root=/Users/wengzhishan/Projects/family-reward-system
+git -C "$root" fetch --no-tags origin refs/heads/main:refs/remotes/origin/main
+merge_commit="$(git -C "$root" rev-parse refs/remotes/origin/main)"
+git -C "$root" merge-base --is-ancestor "$ATLAS_SOURCE_COMMIT" "$merge_commit"
+# The checked-out main worktree can lag behind GitHub. Run the adapter from the
+# exact merged revision without touching the user's current checkout.
+adapter="$(mktemp "$root/scripts/.atlas-deploy.XXXXXXXX")"
+trap 'rm -f "$adapter"' EXIT
+git -C "$root" show "$merge_commit:scripts/atlas-deploy-server.sh" > "$adapter"
+chmod 700 "$adapter"
+bash "$adapter"
 REMOTE
 fi
