@@ -284,6 +284,37 @@ export interface HouseholdMember {
   updatedAt: string;
 }
 
+export interface GenealogyTree {
+  id: number;
+  name: string;
+  surname: string;
+  description: string;
+  role: 'owner' | 'member';
+  peopleCount: number;
+  memberCount?: number;
+}
+
+export interface GenealogyDiscovery { id: number; name: string; surname: string }
+export interface GenealogyJoinRequest { id: number; displayName: string; accountName: string; message: string; createdAt: string }
+export interface MyGenealogyJoinRequest { id: number; treeId: number; treeName: string; status: 'pending' | 'approved' | 'rejected'; createdAt: string }
+export interface GenealogyPerson {
+  id: number;
+  displayName: string;
+  generationLabel: string;
+  branchName: string;
+  note: string;
+  isLinked: boolean;
+  isSelf: boolean;
+}
+export interface GenealogyRelationship {
+  id: number;
+  fromPersonId: number;
+  toPersonId: number;
+  kind: 'parent' | 'spouse';
+  fromName: string;
+  toName: string;
+}
+
 // 交易记录类型
 export interface Transaction {
   id: number;

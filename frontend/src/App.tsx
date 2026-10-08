@@ -3,6 +3,7 @@ import Dashboard from './pages/Dashboard';
 import ChildrenPage from './pages/Children';
 import CreditPage from './pages/Credit';
 import FamilyGroupsPage from './pages/FamilyGroups';
+import GenealogyPage from './pages/Genealogy';
 import RewardPage from './pages/Reward';
 import TransactionsPage from './pages/Transactions';
 import RulesPage from './pages/Rules';
@@ -47,6 +48,7 @@ export default function App() {
                         <Route path="/" element={<Navigate to="/dashboard" replace />} />
                         <Route path="/dashboard" element={<Dashboard />} />
                         <Route path="/family-groups" element={<FamilyGroupsPage />} />
+                        <Route path="/genealogy" element={<GenealogyPage />} />
                         <Route path="/children" element={<ChildrenPage />} />
                         <Route path="/credit/:childId" element={<CreditPage />} />
                         <Route path="/reward" element={<RewardPage />} />

@@ -1,6 +1,7 @@
 import http from './api';
 import type { Child, CreditDetail } from '../types';
 import type { FamilyGroup, FamilyGroupInvite, HouseholdMember, JoinFamilyGroupResult } from '../types';
+import type { GenealogyDiscovery, GenealogyJoinRequest, GenealogyPerson, GenealogyRelationship, GenealogyTree, MyGenealogyJoinRequest } from '../types';
 import type {
   ChildAuthCode,
   ChildFriendNotificationsPayload,
@@ -33,6 +34,22 @@ export const createHouseholdMember = (data: Pick<HouseholdMember, 'displayName' 
 export const updateHouseholdMember = (id: number, data: Pick<HouseholdMember, 'displayName' | 'role' | 'note'>) =>
   http.put<unknown, HouseholdMember>(`/api/family-members/${id}`, data);
 export const deleteHouseholdMember = (id: number) => http.delete(`/api/family-members/${id}`);
+
+export const getGenealogies = () => http.get<unknown, GenealogyTree[]>('/api/genealogies');
+export const discoverGenealogies = (q: string) => http.get<unknown, GenealogyDiscovery[]>('/api/genealogies/discover', { params: { q } });
+export const getMyGenealogyJoinRequests = () => http.get<unknown, MyGenealogyJoinRequest[]>('/api/genealogies/my-join-requests');
+export const createGenealogy = (data: { name: string; surname: string; description: string }) => http.post<unknown, GenealogyTree>('/api/genealogies', data);
+export const getGenealogy = (id: number) => http.get<unknown, GenealogyTree>(`/api/genealogies/${id}`);
+export const requestGenealogyJoin = (id: number, data: { displayName: string; message: string }) => http.post(`/api/genealogies/${id}/join-requests`, data);
+export const getGenealogyJoinRequests = (id: number) => http.get<unknown, GenealogyJoinRequest[]>(`/api/genealogies/${id}/join-requests`);
+export const decideGenealogyJoin = (id: number, requestId: number, decision: 'approve' | 'reject', personId?: number) => http.post(`/api/genealogies/${id}/join-requests/${requestId}/decision`, { decision, ...(personId ? { personId } : {}) });
+export const getGenealogyPeople = (id: number, q = '') => http.get<unknown, { people: GenealogyPerson[]; hasMore: boolean }>(`/api/genealogies/${id}/people`, { params: { q } });
+export const getGenealogyPerson = (id: number, personId: number) => http.get<unknown, GenealogyPerson>(`/api/genealogies/${id}/people/${personId}`);
+export const createGenealogyPerson = (id: number, data: Pick<GenealogyPerson, 'displayName' | 'generationLabel' | 'branchName' | 'note'>) => http.post<unknown, GenealogyPerson>(`/api/genealogies/${id}/people`, data);
+export const updateGenealogyPerson = (id: number, personId: number, data: Pick<GenealogyPerson, 'displayName' | 'generationLabel' | 'branchName' | 'note'>) => http.put<unknown, GenealogyPerson>(`/api/genealogies/${id}/people/${personId}`, data);
+export const getGenealogyRelationships = (id: number) => http.get<unknown, GenealogyRelationship[]>(`/api/genealogies/${id}/relationships`);
+export const createGenealogyRelationship = (id: number, data: { fromPersonId: number; toPersonId: number; kind: 'parent' | 'spouse' }) => http.post(`/api/genealogies/${id}/relationships`, data);
+export const deleteGenealogyRelationship = (id: number, relationId: number) => http.delete(`/api/genealogies/${id}/relationships/${relationId}`);
 
 export const getChildren = (params?: { familyGroupId?: number; ownedOnly?: boolean }) => http.get('/api/children', { params });
 export type ConnectionKind = 'special_time' | 'listen' | 'reconnect' | 'meeting';

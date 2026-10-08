@@ -15,6 +15,7 @@ const navItems = [
 
 const manageItems = [
   { path: '/family-groups', label: '圈子管理', icon: '👥' },
+  { path: '/genealogy', label: '家族族谱', icon: '🌳' },
   { path: '/children', label: '家庭管理', icon: '🏠' },
   { path: '/rules', label: '规则管理', icon: '📋' },
   { path: '/settings', label: '系统设置', icon: '⚙️' },

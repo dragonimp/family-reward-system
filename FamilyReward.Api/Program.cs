@@ -176,6 +176,16 @@ app.MapFamilyConnectionEndpoints(connectionString,
         return (access.Binding?.ChildProfileKey, access.Binding?.ParentAppUserId, access.Error);
     });
 
+app.MapGenealogyEndpoints(connectionString, async request =>
+{
+    if (request.HttpContext.User.Identity?.IsAuthenticated != true)
+        return (null, null, Results.Json(new { error = "请先通过用户中心登录" }, statusCode: 401));
+    if (string.IsNullOrWhiteSpace(FirstClaim(request, ClaimTypes.NameIdentifier, "sub", "user_id", "uid")))
+        return (null, null, Results.Json(new { error = "登录凭证缺少用户 ID" }, statusCode: 403));
+    var access = await RequireParentProfile(connectionString, request, allowHeaderOverride: false);
+    return (access.Profile?.AppUserId, access.Profile?.Username, access.Error);
+});
+
 app.MapGet("/health", () => Results.Json(new
 {
     status = "ok",

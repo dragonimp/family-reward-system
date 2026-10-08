@@ -120,6 +120,7 @@ struct FamilyHome: View {
                     NavigationLink { RulesView(store: store) } label: { Label("奖励与行为规则", systemImage: "star.square.fill") }
                     NavigationLink { GrowthView(store: store) } label: { Label("成长足迹", systemImage: "chart.xyaxis.line") }
                     NavigationLink { FamilyConnectionsView(store: store) } label: { Label("亲子互动", systemImage: "heart.text.square") }
+                    NavigationLink { GenealogyView(store: store) } label: { Label("家族族谱", systemImage: "person.3.sequence.fill") }
                     NavigationLink { MembersView(store: store) } label: { Label("家庭成员", systemImage: "person.3.fill") }
                     if store.groupID != 0 { NavigationLink { RemoteRecords(store: store, title: "家庭邀请", path: "/api/family-groups/\(store.groupID)/invite", mode: .invite) } label: { Label("邀请家人", systemImage: "qrcode") } }
                 }

@@ -1,6 +1,6 @@
 # Linko-Family 原生 iOS 家长端
 
-SwiftUI 原生界面，iPhone、iPad / iOS 17+。当前工程版本 1.2.6（15），Bundle ID `net.impx.happylife.parent`。业务页面不包含 WebView。
+SwiftUI 原生界面，iPhone、iPad / iOS 17+。当前工程版本 1.2.7（16），Bundle ID `net.impx.happylife.parent`。业务页面不包含 WebView。
 
 ## 原生功能
 
@@ -14,6 +14,10 @@ SwiftUI 原生界面，iPhone、iPad / iOS 17+。当前工程版本 1.2.6（15�
 - 家庭成员：列表与添加。
 - 成长：原生 Charts 每日记录图、活跃/连续天数、温暖瞬间和周报。
 - 亲子互动：十分钟陪伴、先听我说、吵架后重连、家庭小会议；孩子可从配套 Watch 发起和回复。
+
+## 1.2.7（16）：家族族谱
+
+原生 iPhone / iPad 入口位于家庭页。支持建立族谱、名称或姓氏搜索、加入申请与状态查看、管理员审核与关联已有未认领人物、成员搜索、人物资料、父母/子女/配偶关系及维护。数据通过 FamilyStore 现有用户中心身份访问族谱 API，读写后重新读取服务端结果，下拉可刷新。族谱与积分家庭圈子独立，详细权限边界见 `docs/GENEALOGY.md`。
 
 ## 1.2.4（13）：亲子互动
 
