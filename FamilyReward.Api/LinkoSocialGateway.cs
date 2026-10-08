@@ -4,7 +4,7 @@ using AgentIdentity.NativeClient;
 
 internal static class LinkoSocialGateway
 {
-    private static readonly string[] Methods = ["GET", "POST", "PATCH"];
+    private static readonly string[] Methods = ["GET", "POST", "PATCH", "DELETE"];
 
     public static void MapLinkoSocialGateway(this WebApplication app)
     {
@@ -77,6 +77,9 @@ internal static class LinkoSocialGateway
         {
             if (s.Length == 4) return method == "PATCH";
             if (s.Length == 5 && s[4] == "invites") return method == "GET";
+            if (s.Length == 5 && s[4] == "moments") return method is "GET" or "POST";
+            if (s.Length == 5 && s[4] == "members") return method == "GET";
+            if (s.Length == 6 && s[4] == "moments" && Guid.TryParse(s[5], out _)) return method == "DELETE";
             if (s.Length == 6 && s[4] == "invites" && s[5] is "link" or "username") return method == "POST";
             if (s.Length == 8 && s[4] == "invites" && s[5] == "username" && s[7] == "accept" &&
                 s[6].Length is > 0 and <= 200 && s[6].All(c => !char.IsControl(c) && c is not ('/' or '\\' or '?' or '#'))) return method == "POST";
@@ -84,6 +87,10 @@ internal static class LinkoSocialGateway
             if (s.Length == 7 && s[4] == "native-photos" && Guid.TryParse(s[5], out _) && s[6] == "thumbnail") return method == "GET";
         }
         if (s.Length == 3 && s[0] == "invites" && s[1] == "username" && s[2] == "pending") return method == "GET";
+        if (s.Length == 1 && s[0] == "relationships") return method == "GET";
+        if (s.Length == 2 && s[0] == "relationships" && s[1] == "requests") return method == "POST";
+        if (s.Length == 2 && s[0] == "relationships" && Guid.TryParse(s[1], out _)) return method == "DELETE";
+        if (s.Length == 3 && s[0] == "relationships" && Guid.TryParse(s[1], out _) && s[2] == "accept") return method == "POST";
         if (s.Length == 4 && s[0] == "invites" && s[1] == "link" && s[3] == "accept" &&
             s[2].Length is > 0 and <= 128 && s[2].All(c => char.IsAsciiLetterOrDigit(c) || c is '-' or '_')) return method == "POST";
         return false;

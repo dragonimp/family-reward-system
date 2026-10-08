@@ -3,6 +3,7 @@ import SwiftUI
 private struct DearRecord: Identifiable {
     let data: [String: Any]
     var id: String { text("id") }
+    var subject: String { text("subject") }
     func text(_ key: String) -> String { data[key] as? String ?? "" }
     func flag(_ key: String) -> Bool { data[key] as? Bool ?? false }
     static func list(_ value: Any) throws -> [DearRecord] {
@@ -17,12 +18,17 @@ struct DearSocialView: View {
     @State private var spaces: [DearRecord] = []
     @State private var activities: [DearRecord] = []
     @State private var photos: [DearRecord] = []
+    @State private var moments: [DearRecord] = []
+    @State private var activityMembers: [DearRecord] = []
+    @State private var relationships: [DearRecord] = []
     @State private var invitations: [DearRecord] = []
     @State private var spaceId = ""
     @State private var activityId = ""
     @State private var spaceName = ""
     @State private var activityName = ""
     @State private var inviteUsername = ""
+    @State private var momentDraft = ""
+    @State private var momentRequestID = UUID()
     @State private var inviteLink = ""
     @State private var error = ""
     @State private var notice = ""
@@ -110,6 +116,65 @@ struct DearSocialView: View {
                         Button("刷新相册") { run { try await loadPhotos() } }.disabled(busy)
                         Link("分享照片与获取原图", destination: URL(string: "https://linko.ai.impx.net/")!)
                     }
+                    Section("生活日常 · \(selectedActivity.text("title"))") {
+                        Text("只向这场活动的成员展示。")
+                            .font(.caption).foregroundStyle(.secondary)
+                        TextEditor(text: $momentDraft).frame(minHeight: 76)
+                            .accessibilityLabel("写下生活日常")
+                            .onChange(of: momentDraft) { _, _ in momentRequestID = UUID() }
+                        Button("发布日常") { run { try await publishMoment() } }
+                            .disabled(busy || momentDraft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || momentDraft.count > 1000)
+                        ForEach(moments) { moment in
+                            VStack(alignment: .leading, spacing: 6) {
+                                Text(moment.text("authorName")).font(.subheadline.bold())
+                                Text(moment.text("text")).textSelection(.enabled)
+                                if moment.flag("canDelete") {
+                                    Button("删除我的记录", role: .destructive) { run { try await deleteMoment(moment) } }.font(.caption)
+                                }
+                            }.padding(.vertical, 4)
+                        }
+                        if moments.isEmpty { Text("还没有分享的日常。") .foregroundStyle(.secondary) }
+                        Button("刷新日常") { run { try await loadMoments() } }.disabled(busy)
+                    }
+                    Section("活动成员与好友") {
+                        Text("同一活动不会自动建立好友关系，需要对方确认。")
+                            .font(.caption).foregroundStyle(.secondary)
+                        ForEach(activityMembers.filter { !$0.flag("isSelf") }, id: \.subject) { member in
+                            HStack {
+                                Text(member.text("displayName"))
+                                Spacer()
+                                if let relation = relationships.first(where: { $0.text("peerSubject") == member.subject }) {
+                                    Text(relation.text("status") == "accepted" ? "已是朋友" : "待确认")
+                                        .font(.caption).foregroundStyle(.secondary)
+                                } else {
+                                    Button("申请好友") { run { try await requestFriend(member) } }.disabled(busy)
+                                }
+                            }
+                        }
+                        if activityMembers.filter({ !$0.flag("isSelf") }).isEmpty {
+                            Text("邀请其他人参加活动后，可以互相申请好友。") .foregroundStyle(.secondary)
+                        }
+                    }
+                }
+                if !relationships.isEmpty {
+                    Section("我的好友与申请") {
+                        ForEach(relationships) { relation in
+                            HStack {
+                                VStack(alignment: .leading) {
+                                    Text(relation.text("peerName"))
+                                    Text(relation.text("status") == "accepted" ? "朋友" : relation.text("direction") == "incoming" ? "邀请你成为朋友" : "等待对方确认")
+                                        .font(.caption).foregroundStyle(.secondary)
+                                }
+                                Spacer()
+                                if relation.text("status") == "pending" && relation.text("direction") == "incoming" {
+                                    Button("接受") { run { try await acceptFriend(relation) } }.disabled(busy)
+                                }
+                                Button(relation.text("status") == "accepted" ? "解除" : "移除", role: .destructive) {
+                                    run { try await removeFriend(relation) }
+                                }.disabled(busy)
+                            }
+                        }
+                    }
                 }
                 if invitations.contains(where: { !$0.flag("joined") }) {
                     Section("收到的邀请") {
@@ -135,7 +200,7 @@ struct DearSocialView: View {
             .refreshable { try? await load() }
             .task { try? await load() }
             .onChange(of: spaceId) { _, _ in activityId = ""; activities = []; photos = []; run { try await loadActivities() } }
-            .onChange(of: activityId) { _, _ in photos = []; run { try await loadPhotos() } }
+            .onChange(of: activityId) { _, _ in photos = []; moments = []; activityMembers = []; run { try await loadPhotos(); try await loadMoments(); try await loadMembers() } }
         }
     }
 
@@ -149,6 +214,7 @@ struct DearSocialView: View {
         async let pending = store.call(base + "invites/username/pending")
         let loaded = try DearRecord.list(await found)
         invitations = try DearRecord.list(await pending)
+        try await loadRelationships()
         spaces = loaded
         if !loaded.contains(where: { $0.id == spaceId }) { spaceId = loaded.first?.id ?? "" }
         if !spaceId.isEmpty { try await loadActivities() }
@@ -158,11 +224,44 @@ struct DearSocialView: View {
         let loaded = try DearRecord.list(await store.call(base + "tenants/\(spaceId)/activities"))
         activities = loaded
         if !loaded.contains(where: { $0.id == activityId }) { activityId = loaded.first?.id ?? "" }
-        if !activityId.isEmpty { try await loadPhotos() }
+        if !activityId.isEmpty { try await loadPhotos(); try await loadMoments(); try await loadMembers() }
     }
     private func loadPhotos() async throws {
         guard !spaceId.isEmpty, !activityId.isEmpty else { return }
         photos = try DearRecord.list(await store.call(base + "tenants/\(spaceId)/activities/\(activityId)/live/photos"))
+    }
+    private func loadMoments() async throws {
+        guard !spaceId.isEmpty, !activityId.isEmpty else { return }
+        moments = try DearRecord.list(await store.call(base + "tenants/\(spaceId)/activities/\(activityId)/moments"))
+    }
+    private func loadMembers() async throws {
+        guard !spaceId.isEmpty, !activityId.isEmpty else { return }
+        activityMembers = try DearRecord.list(await store.call(base + "tenants/\(spaceId)/activities/\(activityId)/members"))
+    }
+    private func loadRelationships() async throws {
+        relationships = try DearRecord.list(await store.call(base + "relationships"))
+    }
+    private func requestFriend(_ member: DearRecord) async throws {
+        _ = try await store.call(base + "relationships/requests", method: "POST", body: ["targetSubject": member.subject, "tenantId": spaceId, "activityId": activityId])
+        try await loadRelationships(); notice = "好友申请已发出。"
+    }
+    private func acceptFriend(_ relation: DearRecord) async throws {
+        _ = try await store.call(base + "relationships/\(relation.id)/accept", method: "POST", body: [:])
+        try await loadRelationships(); notice = "已确认好友关系。"
+    }
+    private func removeFriend(_ relation: DearRecord) async throws {
+        _ = try await store.call(base + "relationships/\(relation.id)", method: "DELETE")
+        try await loadRelationships(); notice = "关系已移除。"
+    }
+    private func publishMoment() async throws {
+        let body = momentDraft.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !body.isEmpty, body.count <= 1000 else { throw APIError.message("请填写 1 至 1000 字的日常内容。") }
+        _ = try await store.call(base + "tenants/\(spaceId)/activities/\(activityId)/moments", method: "POST", body: ["text": body, "requestId": momentRequestID.uuidString])
+        momentDraft = ""; momentRequestID = UUID(); try await loadMoments(); notice = "日常已发布。"
+    }
+    private func deleteMoment(_ moment: DearRecord) async throws {
+        _ = try await store.call(base + "tenants/\(spaceId)/activities/\(activityId)/moments/\(moment.id)", method: "DELETE")
+        try await loadMoments(); notice = "日常已删除。"
     }
     private func createSpace() async throws {
         let value = try await store.call(base + "tenants", method: "POST", body: ["name": spaceName.trimmingCharacters(in: .whitespacesAndNewlines)])
