@@ -31,6 +31,8 @@ struct DearSocialView: View {
     @State private var momentRequestID = UUID()
     @State private var inviteLink = ""
     @State private var error = ""
+    @State private var activityError = ""
+    @State private var activityLoading = false
     @State private var notice = ""
     @State private var busy = false
 
@@ -75,11 +77,26 @@ struct DearSocialView: View {
                         .font(.caption).foregroundStyle(.secondary)
                 }
                 if selectedSpace != nil {
-                    Section("活动") {
-                        if activities.isEmpty { Text("还没有活动").foregroundStyle(.secondary) }
+                    Section("活动 · \(selectedSpace?.text("name") ?? "")") {
+                        if activityLoading { Text("正在读取已有活动…").foregroundStyle(.secondary) }
+                        if !activityError.isEmpty { Text(activityError).foregroundStyle(.red) }
+                        if activities.isEmpty && !activityLoading && activityError.isEmpty { Text("还没有活动").foregroundStyle(.secondary) }
                         else {
-                            Picker("选择活动", selection: $activityId) {
-                                ForEach(activities) { item in Text(item.text("title")).tag(item.id) }
+                            ForEach(activities) { item in
+                                Button {
+                                    activityId = item.id
+                                } label: {
+                                    HStack {
+                                        VStack(alignment: .leading, spacing: 4) {
+                                            Text(item.text("title")).font(.body.weight(.medium))
+                                            if !item.text("description").isEmpty {
+                                                Text(item.text("description")).font(.caption).foregroundStyle(.secondary).lineLimit(2)
+                                            }
+                                        }
+                                        Spacer()
+                                        if activityId == item.id { Image(systemName: "checkmark.circle.fill").foregroundStyle(.teal) }
+                                    }
+                                }.buttonStyle(.plain)
                             }
                         }
                         HStack {
@@ -192,9 +209,9 @@ struct DearSocialView: View {
                 ToolbarItem(placement: .topBarTrailing) { Button("刷新", systemImage: "arrow.clockwise") { run { try await load() } }.disabled(busy) }
                 if showLogout { ToolbarItem(placement: .topBarLeading) { Button("退出") { store.logout() } } }
             }
-            .refreshable { try? await load() }
-            .task { try? await load() }
-            .onChange(of: spaceId) { _, _ in activityId = ""; activities = []; photos = []; run { try await loadActivities() } }
+            .refreshable { await refresh() }
+            .task { await refresh() }
+            .onChange(of: spaceId) { _, _ in activityId = ""; activities = []; photos = []; activityError = ""; activityLoading = true; run { try await loadActivities() } }
             .onChange(of: activityId) { _, _ in photos = []; moments = []; activityMembers = []; run { try await loadPhotos(); try await loadMoments(); try await loadMembers() } }
         }
     }
@@ -204,22 +221,45 @@ struct DearSocialView: View {
             do { try await work() } catch { self.error = error.localizedDescription }
         }
     }
+    private func refresh() async {
+        do { try await load() }
+        catch is CancellationError {} catch { self.error = error.localizedDescription }
+    }
     private func load() async throws {
-        async let found = store.call(base + "tenants")
-        async let pending = store.call(base + "invites/username/pending")
-        let loaded = try DearRecord.list(await found)
-        invitations = try DearRecord.list(await pending)
-        try await loadRelationships()
+        error = ""
+        let loaded = try DearRecord.list(await store.call(base + "tenants"))
         spaces = loaded
+        let previousSpace = spaceId
         if !loaded.contains(where: { $0.id == spaceId }) { spaceId = loaded.first?.id ?? "" }
-        if !spaceId.isEmpty { try await loadActivities() }
+        if spaceId == previousSpace && !spaceId.isEmpty { try await loadActivities() }
+        do { invitations = try DearRecord.list(await store.call(base + "invites/username/pending")) }
+        catch { self.error = "活动邀请暂时无法读取：\(error.localizedDescription)" }
+        do { try await loadRelationships() }
+        catch { self.error = "好友关系暂时无法读取：\(error.localizedDescription)" }
     }
     private func loadActivities() async throws {
-        guard !spaceId.isEmpty else { return }
-        let loaded = try DearRecord.list(await store.call(base + "tenants/\(spaceId)/activities"))
+        guard !spaceId.isEmpty else { activityLoading = false; return }
+        activityLoading = true
+        defer { activityLoading = false }
+        let requestedSpace = spaceId
+        let loaded: [DearRecord]
+        do { loaded = try DearRecord.list(await store.call(base + "tenants/\(requestedSpace)/activities")) }
+        catch {
+            activityError = "活动读取失败：\(error.localizedDescription)"
+            throw error
+        }
+        guard requestedSpace == spaceId else { return }
         activities = loaded
+        activityError = ""
+        let previousActivity = activityId
         if !loaded.contains(where: { $0.id == activityId }) { activityId = loaded.first?.id ?? "" }
-        if !activityId.isEmpty { try await loadPhotos(); try await loadMoments(); try await loadMembers() }
+        if activityId == previousActivity && !activityId.isEmpty {
+            do { try await loadDetails() }
+            catch { self.error = "活动内容暂时无法读取：\(error.localizedDescription)" }
+        }
+    }
+    private func loadDetails() async throws {
+        try await loadPhotos(); try await loadMoments(); try await loadMembers()
     }
     private func loadPhotos() async throws {
         guard !spaceId.isEmpty, !activityId.isEmpty else { return }

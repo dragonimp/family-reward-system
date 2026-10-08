@@ -107,18 +107,21 @@ export default function DearSocial() {
   const [inviteUrl, setInviteUrl] = useState('');
   const [busy, setBusy] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [activityLoading, setActivityLoading] = useState(false);
+  const [activityError, setActivityError] = useState('');
+  const [refreshIndex, setRefreshIndex] = useState(0);
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
   const selected = activities.find(item => item.id === activityId);
   const chosenSpace = spaces.find(item => item.id === spaceId);
 
   const reload = useCallback(async () => {
-    const [found, pending] = await Promise.all([
-      social<Space[]>('tenants'), social<Invitation[]>('invites/username/pending'),
-    ]);
+    const found = await social<Space[]>('tenants');
     setSpaces(found);
-    setInvitations(pending);
     setSpaceId(previous => found.some(item => item.id === previous) ? previous : found[0]?.id || '');
+    setRefreshIndex(previous => previous + 1);
+    try { setInvitations(await social<Invitation[]>('invites/username/pending')); }
+    catch (e) { setError(e instanceof Error ? `活动邀请暂时无法读取：${e.message}` : '活动邀请暂时无法读取'); }
   }, []);
   useEffect(() => {
     let current = true;
@@ -128,15 +131,18 @@ export default function DearSocial() {
     return () => { current = false; };
   }, [reload]);
   useEffect(() => {
-    if (!spaceId) { setActivities([]); setActivityId(''); return; }
+    if (!spaceId) { setActivities([]); setActivityId(''); setActivityLoading(false); return; }
     let current = true;
+    setActivityLoading(true);
+    setActivityError('');
     void social<Activity[]>(`tenants/${spaceId}/activities`).then(items => {
       if (!current) return;
       setActivities(items);
       setActivityId(previous => items.some(item => item.id === previous) ? previous : items[0]?.id || '');
-    }).catch(e => { if (current) setError(e.message); });
+    }).catch(e => { if (current) { setActivities([]); setActivityError(e.message); } })
+      .finally(() => { if (current) setActivityLoading(false); });
     return () => { current = false; };
-  }, [spaceId]);
+  }, [spaceId, refreshIndex]);
   useEffect(() => {
     if (!spaceId || !activityId) { setPhotos([]); return; }
     let current = true;
@@ -202,7 +208,7 @@ export default function DearSocial() {
         </div>}
       </section>
       {chosenSpace && <section className="grid gap-5 lg:grid-cols-[300px_1fr]">
-        <div className="rounded-2xl bg-white p-5 shadow-sm"><h2 className="text-xl font-bold">{chosenSpace.name} · 活动</h2><div className="mt-4 flex gap-2"><input aria-label="新活动名称" className="min-w-0 flex-1 rounded-xl border p-2" maxLength={200} placeholder="一起做什么？" value={activityName} onChange={e => setActivityName(e.target.value)} /><button disabled={busy || !activityName.trim()} className="rounded-xl bg-teal-700 px-3 text-white disabled:opacity-50" onClick={createActivity}>添加</button></div><div className="mt-4 space-y-2">{activities.map(item => <button key={item.id} className={`w-full rounded-xl p-3 text-left ${activityId === item.id ? 'bg-teal-50 text-teal-800' : 'bg-slate-50'}`} onClick={() => setActivityId(item.id)}>{item.title}</button>)}{activities.length === 0 && <p className="text-sm text-slate-500">尚无活动。创建一个相聚计划吧。</p>}</div></div>
+        <div className="rounded-2xl bg-white p-5 shadow-sm"><h2 className="text-xl font-bold">{chosenSpace.name} · 活动</h2><div className="mt-4 flex gap-2"><input aria-label="新活动名称" className="min-w-0 flex-1 rounded-xl border p-2" maxLength={200} placeholder="一起做什么？" value={activityName} onChange={e => setActivityName(e.target.value)} /><button disabled={busy || !activityName.trim()} className="rounded-xl bg-teal-700 px-3 text-white disabled:opacity-50" onClick={createActivity}>添加</button></div><div className="mt-4 space-y-2">{activityLoading && <p className="text-sm text-slate-500">正在读取已有活动…</p>}{activityError && <p role="alert" className="text-sm text-red-700">{activityError}</p>}{activities.map(item => <button key={item.id} className={`w-full rounded-xl p-3 text-left ${activityId === item.id ? 'bg-teal-50 text-teal-800' : 'bg-slate-50'}`} onClick={() => setActivityId(item.id)}>{item.title}</button>)}{!activityLoading && !activityError && activities.length === 0 && <p className="text-sm text-slate-500">尚无活动。创建一个相聚计划吧。</p>}</div></div>
         <div className="rounded-2xl bg-white p-5 shadow-sm">{selected ? <><h2 className="text-xl font-bold">{selected.title}</h2><p className="text-sm text-slate-500">{selected.description || '共同活动与记忆'}</p><div className="mt-5 space-y-3 rounded-xl bg-slate-50 p-4"><h3 className="font-semibold">邀请家人或朋友</h3><p className="text-xs text-slate-500">邀请需对方确认；照片仅向活动成员展示。</p><div className="flex gap-2"><input aria-label="被邀请人的用户名" className="min-w-0 flex-1 rounded-lg border p-2" placeholder="用户中心用户名" value={inviteUsername} onChange={e => setInviteUsername(e.target.value)} /><button disabled={busy || !inviteUsername.trim()} className="rounded-lg border px-3 disabled:opacity-50" onClick={inviteByName}>邀请</button></div><button disabled={busy} className="text-sm text-teal-700" onClick={makeLink}>生成七天有效的邀请链接</button>{inviteUrl && <input aria-label="活动邀请链接" className="w-full rounded-lg border p-2 text-sm" readOnly value={inviteUrl} onFocus={e => e.target.select()} />}</div><div className="mt-5 flex flex-wrap justify-between gap-2"><h3 className="font-semibold">共同相册</h3><div className="flex gap-3"><button className="text-sm text-teal-700" onClick={refreshPhotos}>刷新照片</button><a className="text-sm text-teal-700" href="https://linko.ai.impx.net/" target="_blank" rel="noopener noreferrer">分享照片与获取原图</a></div></div><div className="mt-3 grid gap-3 sm:grid-cols-2">{photos.map(photo => <article key={photo.id} className="overflow-hidden rounded-xl border"><div className="flex h-40 items-center justify-center bg-slate-100">{photo.thumbnailAvailable ? <img className="h-full w-full object-cover" src={`${gateway}tenants/${spaceId}/activities/${activityId}/native-photos/${photo.id}/thumbnail`} alt={photo.originalFileName} /> : <span className="text-sm text-slate-500">原图保存在分享者设备</span>}</div><div className="p-3 text-sm"><b>{photo.sourceDisplayName}</b><p className="truncate text-slate-500">{photo.originalFileName}</p></div></article>)}{photos.length === 0 && <p className="text-sm text-slate-500">还没有分享的照片。已在 Linko Social 分享的活动照片会显示在这里。</p>}</div></> : <p className="text-slate-500">选择活动查看共同记忆。</p>}</div>
       </section>}
       {spaceId && activityId && <DearMoments key={`${spaceId}:${activityId}`} spaceId={spaceId} activityId={activityId} />}
