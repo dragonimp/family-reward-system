@@ -21,9 +21,9 @@ xcodebuild -project HappyLifeParent.xcodeproj -scheme HappyLifeParent \
 python3 - <<'PY_CHECK'
 import plistlib
 from pathlib import Path
-app = Path('build/Linko Family.xcarchive/Products/Applications/Linko Family.app')
+app = Path('build/Linko Family.xcarchive/Products/Applications/Linko Dear.app')
 phone = plistlib.loads((app/'Info.plist').read_bytes())
-watch = plistlib.loads((app/'Watch/Linko Family Watch.app/Info.plist').read_bytes())
+watch = plistlib.loads((app/'Watch/Linko Dear Watch.app/Info.plist').read_bytes())
 assert watch['WKApplication']
 assert watch['WKCompanionAppBundleIdentifier'] == phone['CFBundleIdentifier']
 assert watch['CFBundleIdentifier'].startswith(phone['CFBundleIdentifier'] + '.')

@@ -15,7 +15,7 @@ ipa = Path(sys.argv[1])
 with tempfile.TemporaryDirectory(prefix="happylife-parent-ipa-") as directory:
     with zipfile.ZipFile(ipa) as archive:
         archive.extractall(directory)
-    app = Path(directory) / "Payload/Linko Family.app"
+    app = Path(directory) / "Payload/Linko Dear.app"
     subprocess.run(["codesign", "--verify", "--deep", "--strict", str(app)], check=True)
     info = plistlib.loads((app / "Info.plist").read_bytes())
     expected = "net.impx.happylife.parent"
@@ -42,7 +42,7 @@ with tempfile.TemporaryDirectory(prefix="happylife-parent-ipa-") as directory:
     assert not profile.get("ProvisionedDevices") and not profile.get("ProvisionsAllDevices")
     assert (app / "Assets.car").is_file()
     assert info["CFBundleIcons"]["CFBundlePrimaryIcon"]["CFBundleIconName"] == "AppIcon"
-    watch = app / "Watch/Linko Family Watch.app"
+    watch = app / "Watch/Linko Dear Watch.app"
     wi = plistlib.loads((watch / "Info.plist").read_bytes())
     assert wi["CFBundleIdentifier"] == expected + ".watchkitapp"
     assert wi["WKCompanionAppBundleIdentifier"] == expected
