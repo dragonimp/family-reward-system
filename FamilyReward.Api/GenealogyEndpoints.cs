@@ -190,7 +190,7 @@ internal static class GenealogyEndpoints
             await using var conn=await Open(cs);
             if(await Role(conn,id,user!) is null) return Missing();
             await using var cmd=new NpgsqlCommand("""
-                SELECT id,display_name,generation_label,branch_name,note,claimed_by IS NOT NULL,claimed_by=@user
+                SELECT id,display_name,generation_label,branch_name,note,claimed_by IS NOT NULL,claimed_by=@user,gender,birth_year,birth_month,birth_day
                 FROM genealogy_people WHERE tree_id=@id AND (@q='' OR strpos(lower(display_name),lower(@q))>0 OR strpos(lower(branch_name),lower(@q))>0)
                 ORDER BY generation_label,display_name,id LIMIT 101
                 """,conn);
@@ -207,12 +207,14 @@ internal static class GenealogyEndpoints
             if(error is not null) return error;
             var name=Text(body,"displayName");var generation=Text(body,"generationLabel");var branch=Text(body,"branchName");var note=Text(body,"note");
             if(!ValidPerson(name,generation,branch,note)) return Bad("姓名需 2–80 字，辈分不超过 40 字，支系不超过 80 字，备注不超过 500 字");
+            if(!GenealogyPersonDetailsParser.TryRead(body,out var details,out var detailsError)) return Bad(detailsError);
             await using var conn=await Open(cs);
             if(await Role(conn,id,user!)!="owner") return Denied();
-            await using var cmd=new NpgsqlCommand("INSERT INTO genealogy_people(tree_id,display_name,generation_label,branch_name,note) VALUES(@id,@name,@generation,@branch,@note) RETURNING id",conn);
+            await using var cmd=new NpgsqlCommand("INSERT INTO genealogy_people(tree_id,display_name,generation_label,branch_name,note,gender,birth_year,birth_month,birth_day) VALUES(@id,@name,@generation,@branch,@note,@gender,@birthYear,@birthMonth,@birthDay) RETURNING id",conn);
             AddPersonParameters(cmd,id,name,generation,branch,note);
+            AddPersonDetailsParameters(cmd,details);
             var personId=(long)(await cmd.ExecuteScalarAsync())!;
-            return Results.Created($"/api/genealogies/{id}/people/{personId}",new { id=personId,displayName=name,generationLabel=generation,branchName=branch,note,isLinked=false,isSelf=false });
+            return Results.Created($"/api/genealogies/{id}/people/{personId}",new { id=personId,displayName=name,generationLabel=generation,branchName=branch,note,gender=details.Gender,birthYear=details.BirthYear,birthMonth=details.BirthMonth,birthDay=details.BirthDay,isLinked=false,isSelf=false });
         });
 
         app.MapGet("/api/genealogies/{id:long}/people/{personId:long}", async (long id,long personId,HttpRequest request) =>
@@ -222,7 +224,7 @@ internal static class GenealogyEndpoints
             await using var conn=await Open(cs);
             if(await Role(conn,id,user!) is null) return Missing();
             await using var cmd=new NpgsqlCommand("""
-                SELECT id,display_name,generation_label,branch_name,note,claimed_by IS NOT NULL,claimed_by=@user
+                SELECT id,display_name,generation_label,branch_name,note,claimed_by IS NOT NULL,claimed_by=@user,gender,birth_year,birth_month,birth_day
                 FROM genealogy_people WHERE tree_id=@id AND id=@person
                 """,conn);
             cmd.Parameters.AddWithValue("id",id);cmd.Parameters.AddWithValue("person",personId);cmd.Parameters.AddWithValue("user",user!);
@@ -236,11 +238,13 @@ internal static class GenealogyEndpoints
             if(error is not null) return error;
             var name=Text(body,"displayName");var generation=Text(body,"generationLabel");var branch=Text(body,"branchName");var note=Text(body,"note");
             if(!ValidPerson(name,generation,branch,note)) return Bad("姓名需 2–80 字，辈分不超过 40 字，支系不超过 80 字，备注不超过 500 字");
+            if(!GenealogyPersonDetailsParser.TryRead(body,out var details,out var detailsError)) return Bad(detailsError);
             await using var conn=await Open(cs);
             if(await Role(conn,id,user!)!="owner") return Denied();
-            await using var cmd=new NpgsqlCommand("UPDATE genealogy_people SET display_name=@name,generation_label=@generation,branch_name=@branch,note=@note,updated_at=CURRENT_TIMESTAMP WHERE tree_id=@id AND id=@person RETURNING id",conn);
+            await using var cmd=new NpgsqlCommand("UPDATE genealogy_people SET display_name=@name,generation_label=@generation,branch_name=@branch,note=@note,gender=CASE WHEN @genderProvided THEN @gender ELSE gender END,birth_year=CASE WHEN @birthProvided THEN @birthYear ELSE birth_year END,birth_month=CASE WHEN @birthProvided THEN @birthMonth ELSE birth_month END,birth_day=CASE WHEN @birthProvided THEN @birthDay ELSE birth_day END,updated_at=CURRENT_TIMESTAMP WHERE tree_id=@id AND id=@person RETURNING id",conn);
             AddPersonParameters(cmd,id,name,generation,branch,note);cmd.Parameters.AddWithValue("person",personId);
-            return await cmd.ExecuteScalarAsync() is null ? Results.NotFound(new { error="成员不存在" }) : Results.Json(new { id=personId,displayName=name,generationLabel=generation,branchName=branch,note });
+            AddPersonDetailsParameters(cmd,details);
+            return await cmd.ExecuteScalarAsync() is null ? Results.NotFound(new { error="成员不存在" }) : Results.Json(new { id=personId,displayName=name,generationLabel=generation,branchName=branch,note,gender=details.Gender,birthYear=details.BirthYear,birthMonth=details.BirthMonth,birthDay=details.BirthDay });
         });
 
         app.MapPost("/api/genealogies/{id:long}/people/{personId:long}/invitations", async (long id,long personId,HttpRequest request) =>
@@ -443,5 +447,14 @@ internal static class GenealogyEndpoints
     private static bool ValidPerson(string name,string generation,string branch,string note) => name.Length is >=2 and <=80 && generation.Length<=40 && branch.Length<=80 && note.Length<=500;
     private static void AddPersonParameters(NpgsqlCommand cmd,long id,string name,string generation,string branch,string note)
     {cmd.Parameters.AddWithValue("id",id);cmd.Parameters.AddWithValue("name",name);cmd.Parameters.AddWithValue("generation",generation);cmd.Parameters.AddWithValue("branch",branch);cmd.Parameters.AddWithValue("note",note);}
-    private static object Person(NpgsqlDataReader reader) => new { id=reader.GetInt64(0),displayName=reader.GetString(1),generationLabel=reader.GetString(2),branchName=reader.GetString(3),note=reader.GetString(4),isLinked=reader.GetBoolean(5),isSelf=!reader.IsDBNull(6) && reader.GetBoolean(6) };
+    private static void AddPersonDetailsParameters(NpgsqlCommand cmd,GenealogyPersonDetails details)
+    {
+        cmd.Parameters.AddWithValue("gender",details.Gender);
+        cmd.Parameters.AddWithValue("birthYear",NpgsqlTypes.NpgsqlDbType.Smallint,(object?)details.BirthYear ?? DBNull.Value);
+        cmd.Parameters.AddWithValue("birthMonth",NpgsqlTypes.NpgsqlDbType.Smallint,(object?)details.BirthMonth ?? DBNull.Value);
+        cmd.Parameters.AddWithValue("birthDay",NpgsqlTypes.NpgsqlDbType.Smallint,(object?)details.BirthDay ?? DBNull.Value);
+        cmd.Parameters.AddWithValue("genderProvided",details.GenderProvided);
+        cmd.Parameters.AddWithValue("birthProvided",details.BirthProvided);
+    }
+    private static object Person(NpgsqlDataReader reader) => new { id=reader.GetInt64(0),displayName=reader.GetString(1),generationLabel=reader.GetString(2),branchName=reader.GetString(3),note=reader.GetString(4),isLinked=reader.GetBoolean(5),isSelf=!reader.IsDBNull(6) && reader.GetBoolean(6),gender=reader.GetString(7),birthYear=reader.IsDBNull(8)?(short?)null:reader.GetInt16(8),birthMonth=reader.IsDBNull(9)?(short?)null:reader.GetInt16(9),birthDay=reader.IsDBNull(10)?(short?)null:reader.GetInt16(10) };
 }

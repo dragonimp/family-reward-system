@@ -127,10 +127,18 @@ struct GenealogyDetailView: View {
     @State private var generation = ""
     @State private var branch = ""
     @State private var note = ""
+    @State private var gender = ""
+    @State private var birthYear = ""
+    @State private var birthMonth = ""
+    @State private var birthDay = ""
     @State private var editName = ""
     @State private var editGeneration = ""
     @State private var editBranch = ""
     @State private var editNote = ""
+    @State private var editGender = ""
+    @State private var editBirthYear = ""
+    @State private var editBirthMonth = ""
+    @State private var editBirthDay = ""
     @State private var editBusy = false
     @State private var editError: String?
     @State private var showAddPerson = false
@@ -184,6 +192,7 @@ struct GenealogyDetailView: View {
                             VStack(alignment: .leading, spacing: 4) {
                                 Text(person.text("displayName")).font(.headline)
                                 Text([person.text("generationLabel"), person.text("branchName")].filter { !$0.isEmpty }.joined(separator: " · ")).font(.caption).foregroundStyle(.secondary)
+                                Text([genderLabel(person.text("gender")), birthdayLabel(person)].filter { $0 != "未填写" }.joined(separator: " · ")).font(.caption).foregroundStyle(.secondary)
                             }
                             Spacer()
                             if person.flag("isSelf") { Text("我").font(.caption).foregroundStyle(.teal) }
@@ -201,6 +210,7 @@ struct GenealogyDetailView: View {
                         TextField("新成员姓名", text: $name)
                         TextField("辈分（可选）", text: $generation)
                         TextField("支系（可选）", text: $branch)
+                        demographicFields(gender: $gender, year: $birthYear, month: $birthMonth, day: $birthDay)
                         TextField("备注（仅成员可见）", text: $note, axis: .vertical).lineLimit(2...4)
                         Button("添加新成员") { Task { await savePerson() } }
                             .disabled(busy || name.trimmingCharacters(in: .whitespacesAndNewlines).count < 2)
@@ -222,6 +232,7 @@ struct GenealogyDetailView: View {
                             TextField("姓名", text: $editName)
                             TextField("辈分（可选）", text: $editGeneration)
                             TextField("支系（可选）", text: $editBranch)
+                            demographicFields(gender: $editGender, year: $editBirthYear, month: $editBirthMonth, day: $editBirthDay)
                             TextField("备注（仅成员可见）", text: $editNote, axis: .vertical).lineLimit(2...4)
                             Button("保存资料") { Task { await saveEdit(person.id) } }
                                 .disabled(editBusy || editName.trimmingCharacters(in: .whitespacesAndNewlines).count < 2)
@@ -229,6 +240,8 @@ struct GenealogyDetailView: View {
                             LabeledContent("姓名", value: person.text("displayName"))
                             if !person.text("generationLabel").isEmpty { LabeledContent("辈分", value: person.text("generationLabel")) }
                             if !person.text("branchName").isEmpty { LabeledContent("支系", value: person.text("branchName")) }
+                            LabeledContent("性别", value: genderLabel(person.text("gender")))
+                            LabeledContent("生日", value: birthdayLabel(person))
                             if !person.text("note").isEmpty { Text(person.text("note")) }
                         }
                     }
@@ -336,11 +349,43 @@ struct GenealogyDetailView: View {
         if decision == "approve", let match = matches[request.id], match > 0 { body["personId"] = match }
         await mutate(base + "/join-requests/\(request.id)/decision", body: body)
     }
+    private func genderLabel(_ gender: String) -> String {
+        switch gender { case "male": return "男"; case "female": return "女"; case "other": return "其他"; default: return "未填写" }
+    }
+    private func birthdayLabel(_ person: Record) -> String {
+        let year = person.int("birthYear")
+        guard year > 0 else { return "未填写" }
+        let month = person.int("birthMonth")
+        guard month > 0 else { return "\(year)年" }
+        let day = person.int("birthDay")
+        return day > 0 ? "\(year)年\(month)月\(day)日" : "\(year)年\(month)月"
+    }
+    @ViewBuilder private func demographicFields(gender: Binding<String>, year: Binding<String>, month: Binding<String>, day: Binding<String>) -> some View {
+        Picker("性别（可选）", selection: gender) {
+            Text("未填写").tag("")
+            Text("男").tag("male")
+            Text("女").tag("female")
+            Text("其他").tag("other")
+        }
+        TextField("出生年（可只填年份）", text: year)
+            .keyboardType(.numberPad)
+            .onChange(of: year.wrappedValue) { _, value in if value.isEmpty { month.wrappedValue = ""; day.wrappedValue = "" } }
+        if !year.wrappedValue.isEmpty {
+            TextField("出生月（可选）", text: month)
+                .keyboardType(.numberPad)
+                .onChange(of: month.wrappedValue) { _, value in if value.isEmpty { day.wrappedValue = "" } }
+        }
+        if !month.wrappedValue.isEmpty { TextField("出生日（可选）", text: day).keyboardType(.numberPad) }
+    }
     private func openPerson(_ person: Record) {
         editName = person.text("displayName")
         editGeneration = person.text("generationLabel")
         editBranch = person.text("branchName")
         editNote = person.text("note")
+        editGender = person.text("gender")
+        editBirthYear = person.int("birthYear") == 0 ? "" : String(person.int("birthYear"))
+        editBirthMonth = person.int("birthMonth") == 0 ? "" : String(person.int("birthMonth"))
+        editBirthDay = person.int("birthDay") == 0 ? "" : String(person.int("birthDay"))
         editError = nil
         relatedPersonID = 0
         invitationURL = nil
@@ -371,13 +416,13 @@ struct GenealogyDetailView: View {
         }
     }
     private func savePerson() async {
-        let body = ["displayName": name.trimmingCharacters(in: .whitespacesAndNewlines), "generationLabel": generation.trimmingCharacters(in: .whitespacesAndNewlines), "branchName": branch.trimmingCharacters(in: .whitespacesAndNewlines), "note": note.trimmingCharacters(in: .whitespacesAndNewlines)]
+        let body = ["displayName": name.trimmingCharacters(in: .whitespacesAndNewlines), "generationLabel": generation.trimmingCharacters(in: .whitespacesAndNewlines), "branchName": branch.trimmingCharacters(in: .whitespacesAndNewlines), "note": note.trimmingCharacters(in: .whitespacesAndNewlines), "gender": gender, "birthYear": birthYear, "birthMonth": birthMonth, "birthDay": birthDay]
         await mutate(base + "/people", body: body)
-        if error == nil { name = ""; generation = ""; branch = ""; note = ""; showAddPerson = false }
+        if error == nil { name = ""; generation = ""; branch = ""; note = ""; gender = ""; birthYear = ""; birthMonth = ""; birthDay = ""; showAddPerson = false }
     }
     private func saveEdit(_ personID: Int) async {
         editBusy = true; editError = nil; defer { editBusy = false }
-        let body = ["displayName": editName.trimmingCharacters(in: .whitespacesAndNewlines), "generationLabel": editGeneration.trimmingCharacters(in: .whitespacesAndNewlines), "branchName": editBranch.trimmingCharacters(in: .whitespacesAndNewlines), "note": editNote.trimmingCharacters(in: .whitespacesAndNewlines)]
+        let body = ["displayName": editName.trimmingCharacters(in: .whitespacesAndNewlines), "generationLabel": editGeneration.trimmingCharacters(in: .whitespacesAndNewlines), "branchName": editBranch.trimmingCharacters(in: .whitespacesAndNewlines), "note": editNote.trimmingCharacters(in: .whitespacesAndNewlines), "gender": editGender, "birthYear": editBirthYear, "birthMonth": editBirthMonth, "birthDay": editBirthDay]
         do {
             _ = try await store.call(base + "/people/\(personID)", method: "PUT", body: body)
             await load()

@@ -303,6 +303,10 @@ export interface GenealogyPerson {
   generationLabel: string;
   branchName: string;
   note: string;
+  gender: '' | 'male' | 'female' | 'other';
+  birthYear: number | null;
+  birthMonth: number | null;
+  birthDay: number | null;
   isLinked: boolean;
   isSelf: boolean;
 }
