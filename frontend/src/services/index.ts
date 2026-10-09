@@ -1,7 +1,7 @@
 import http from './api';
 import type { Child, CreditDetail } from '../types';
 import type { FamilyGroup, FamilyGroupInvite, HouseholdMember, JoinFamilyGroupResult } from '../types';
-import type { GenealogyDiscovery, GenealogyJoinRequest, GenealogyPerson, GenealogyRelationship, GenealogyTree, MyGenealogyJoinRequest } from '../types';
+import type { GenealogyDiscovery, GenealogyInferredRelationship, GenealogyJoinRequest, GenealogyPerson, GenealogyRelationship, GenealogyTree, MyGenealogyJoinRequest } from '../types';
 import type {
   ChildAuthCode,
   ChildFriendNotificationsPayload,
@@ -52,6 +52,7 @@ export const createGenealogyInvitation = (id: number, personId: number) => http.
 export const getGenealogyInvitation = (token: string) => http.get<unknown, GenealogyInvitation>(`/api/genealogies/invitations/${encodeURIComponent(token)}`);
 export const acceptGenealogyInvitation = (token: string) => http.post<unknown, { treeId: number; personId: number }>(`/api/genealogies/invitations/${encodeURIComponent(token)}/accept`);
 export const getGenealogyRelationships = (id: number) => http.get<unknown, GenealogyRelationship[]>(`/api/genealogies/${id}/relationships`);
+export const getGenealogyInferredRelationships = (id: number, personId: number) => http.get<unknown, GenealogyInferredRelationship[]>(`/api/genealogies/${id}/people/${personId}/inferred-relationships`);
 export const createGenealogyRelationship = (id: number, data: { fromPersonId: number; toPersonId: number; kind: 'parent' | 'spouse' }) => http.post(`/api/genealogies/${id}/relationships`, data);
 export const deleteGenealogyRelationship = (id: number, relationId: number) => http.delete(`/api/genealogies/${id}/relationships/${relationId}`);
 

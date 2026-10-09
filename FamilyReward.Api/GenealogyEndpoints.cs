@@ -358,6 +358,32 @@ internal static class GenealogyEndpoints
             return Results.Json(rows);
         });
 
+        app.MapGet("/api/genealogies/{id:long}/people/{personId:long}/inferred-relationships", async (long id,long personId,HttpRequest request) =>
+        {
+            var (user, _, error)=await authorize(request);
+            if(error is not null) return error;
+            await using var conn=await Open(cs);
+            await using var tx=await conn.BeginTransactionAsync(System.Data.IsolationLevel.RepeatableRead);
+            if(await Role(conn,id,user!,tx) is null) return Missing();
+            var names=new Dictionary<long,string>();
+            await using(var people=new NpgsqlCommand("SELECT id,display_name FROM genealogy_people WHERE tree_id=@id",conn,tx))
+            {
+                people.Parameters.AddWithValue("id",id);
+                await using var reader=await people.ExecuteReaderAsync();
+                while(await reader.ReadAsync()) names.Add(reader.GetInt64(0),reader.GetString(1));
+            }
+            if(!names.ContainsKey(personId)) return Results.NotFound(new { error="成员不存在" });
+            var edges=new List<GenealogyBaseRelationship>();
+            await using(var relations=new NpgsqlCommand("SELECT from_person_id,to_person_id,kind FROM genealogy_relationships WHERE tree_id=@id",conn,tx))
+            {
+                relations.Parameters.AddWithValue("id",id);
+                await using var reader=await relations.ExecuteReaderAsync();
+                while(await reader.ReadAsync()) edges.Add(new(reader.GetInt64(0),reader.GetInt64(1),reader.GetString(2)));
+            }
+            await tx.CommitAsync();
+            return Results.Json(GenealogyInference.Infer(personId,names,edges));
+        });
+
         app.MapPost("/api/genealogies/{id:long}/relationships", async (long id,JsonObject body,HttpRequest request) =>
         {
             var (user, _, error)=await authorize(request);

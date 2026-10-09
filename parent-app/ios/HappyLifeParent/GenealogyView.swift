@@ -116,6 +116,9 @@ struct GenealogyDetailView: View {
     @State private var tree: Record?
     @State private var people: [Record] = []
     @State private var relationships: [Record] = []
+    @State private var inferred: [Record] = []
+    @State private var inferenceLoading = false
+    @State private var inferenceError: String?
     @State private var requests: [Record] = []
     @State private var query = ""
     @State private var hasMore = false
@@ -245,6 +248,26 @@ struct GenealogyDetailView: View {
                             }
                         }
                     }
+                    Section("根据已有关系推导") {
+                        Text("由父母与子女关系自动计算，基础关系变化后会更新；缺少性别和年龄时使用中性称谓。")
+                            .font(.caption).foregroundStyle(.secondary)
+                        if inferenceLoading { ProgressView("正在计算…") }
+                        if let inferenceError { Text(inferenceError).foregroundStyle(.red) }
+                        if !inferenceLoading && inferenceError == nil && inferred.isEmpty {
+                            Text("暂无可推导的关系").foregroundStyle(.secondary)
+                        }
+                        ForEach(["sibling", "grandparent", "grandchild", "parentSibling", "siblingChild", "cousin"], id: \.self) { kind in
+                            let matches = inferred.filter { $0.text("kind") == kind }
+                            if !matches.isEmpty {
+                                VStack(alignment: .leading, spacing: 6) {
+                                    Text(inferenceLabel(kind)).font(.caption).foregroundStyle(.secondary)
+                                    ForEach(matches) { item in
+                                        Button(item.text("displayName")) { Task { await selectPerson(item.int("personId")) } }
+                                    }
+                                }
+                            }
+                        }
+                    }
                     if owner {
                         Section("为此人添加关系") {
                             Picker("关系", selection: $relationKind) {
@@ -284,6 +307,7 @@ struct GenealogyDetailView: View {
             tree = Record(fields: try object(await store.call(base)))
             await loadPeople()
             relationships = try Record.list(await store.call(base + "/relationships"))
+            if let selected { await loadInferred(selected.id) }
             requests = owner ? try Record.list(await store.call(base + "/join-requests")) : []
             error = nil
         } catch is CancellationError {} catch { self.error = error.localizedDescription }
@@ -321,6 +345,30 @@ struct GenealogyDetailView: View {
         relatedPersonID = 0
         invitationURL = nil
         selected = person
+        Task { await loadInferred(person.id) }
+    }
+    private func inferenceLabel(_ kind: String) -> String {
+        switch kind {
+        case "sibling": return "兄弟姐妹"
+        case "grandparent": return "祖辈"
+        case "grandchild": return "孙辈"
+        case "parentSibling": return "父母的兄弟姐妹"
+        case "siblingChild": return "兄弟姐妹的子女"
+        case "cousin": return "堂表亲"
+        default: return "亲属"
+        }
+    }
+    private func loadInferred(_ personID: Int) async {
+        guard selected?.id == personID else { return }
+        inferred = []
+        inferenceLoading = true
+        inferenceError = nil
+        do {
+            let values = try Record.list(await store.call(base + "/people/\(personID)/inferred-relationships"))
+            if selected?.id == personID { inferred = values; inferenceLoading = false }
+        } catch {
+            if selected?.id == personID { inferenceError = error.localizedDescription; inferenceLoading = false }
+        }
     }
     private func savePerson() async {
         let body = ["displayName": name.trimmingCharacters(in: .whitespacesAndNewlines), "generationLabel": generation.trimmingCharacters(in: .whitespacesAndNewlines), "branchName": branch.trimmingCharacters(in: .whitespacesAndNewlines), "note": note.trimmingCharacters(in: .whitespacesAndNewlines)]

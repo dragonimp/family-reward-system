@@ -314,6 +314,12 @@ export interface GenealogyRelationship {
   fromName: string;
   toName: string;
 }
+export interface GenealogyInferredRelationship {
+  id: number;
+  personId: number;
+  displayName: string;
+  kind: 'sibling' | 'grandparent' | 'grandchild' | 'parentSibling' | 'siblingChild' | 'cousin';
+}
 
 // 交易记录类型
 export interface Transaction {
