@@ -241,10 +241,11 @@ internal static class GenealogyEndpoints
             if(!GenealogyPersonDetailsParser.TryRead(body,out var details,out var detailsError)) return Bad(detailsError);
             await using var conn=await Open(cs);
             if(await Role(conn,id,user!)!="owner") return Denied();
-            await using var cmd=new NpgsqlCommand("UPDATE genealogy_people SET display_name=@name,generation_label=@generation,branch_name=@branch,note=@note,gender=CASE WHEN @genderProvided THEN @gender ELSE gender END,birth_year=CASE WHEN @birthProvided THEN @birthYear ELSE birth_year END,birth_month=CASE WHEN @birthProvided THEN @birthMonth ELSE birth_month END,birth_day=CASE WHEN @birthProvided THEN @birthDay ELSE birth_day END,updated_at=CURRENT_TIMESTAMP WHERE tree_id=@id AND id=@person RETURNING id",conn);
+            await using var cmd=new NpgsqlCommand("UPDATE genealogy_people SET display_name=@name,generation_label=@generation,branch_name=@branch,note=@note,gender=CASE WHEN @genderProvided THEN @gender ELSE gender END,birth_year=CASE WHEN @birthProvided THEN @birthYear ELSE birth_year END,birth_month=CASE WHEN @birthProvided THEN @birthMonth ELSE birth_month END,birth_day=CASE WHEN @birthProvided THEN @birthDay ELSE birth_day END,updated_at=CURRENT_TIMESTAMP WHERE tree_id=@id AND id=@person RETURNING gender,birth_year,birth_month,birth_day",conn);
             AddPersonParameters(cmd,id,name,generation,branch,note);cmd.Parameters.AddWithValue("person",personId);
             AddPersonDetailsParameters(cmd,details);
-            return await cmd.ExecuteScalarAsync() is null ? Results.NotFound(new { error="成员不存在" }) : Results.Json(new { id=personId,displayName=name,generationLabel=generation,branchName=branch,note,gender=details.Gender,birthYear=details.BirthYear,birthMonth=details.BirthMonth,birthDay=details.BirthDay });
+            await using var reader=await cmd.ExecuteReaderAsync();
+            return !await reader.ReadAsync() ? Results.NotFound(new { error="成员不存在" }) : Results.Json(new { id=personId,displayName=name,generationLabel=generation,branchName=branch,note,gender=reader.GetString(0),birthYear=reader.IsDBNull(1)?(short?)null:reader.GetInt16(1),birthMonth=reader.IsDBNull(2)?(short?)null:reader.GetInt16(2),birthDay=reader.IsDBNull(3)?(short?)null:reader.GetInt16(3) });
         });
 
         app.MapPost("/api/genealogies/{id:long}/people/{personId:long}/invitations", async (long id,long personId,HttpRequest request) =>

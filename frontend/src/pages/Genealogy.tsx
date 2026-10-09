@@ -155,6 +155,11 @@ export default function Genealogy() {
 
   const handleSavePerson = () => run(async () => {
     if (!selectedId) return;
+    if (personForm.birthYear && !/^\d{1,4}$/.test(personForm.birthYear)
+      || personForm.birthMonth && !/^\d{1,2}$/.test(personForm.birthMonth)
+      || personForm.birthDay && !/^\d{1,2}$/.test(personForm.birthDay)) {
+      throw new Error('生日只能输入整数年份、月份和日期');
+    }
     const data = { displayName: personForm.displayName.trim(), generationLabel: personForm.generationLabel.trim(), branchName: personForm.branchName.trim(), note: personForm.note.trim(), gender: personForm.gender, birthYear: personForm.birthYear ? Number(personForm.birthYear) : null, birthMonth: personForm.birthMonth ? Number(personForm.birthMonth) : null, birthDay: personForm.birthDay ? Number(personForm.birthDay) : null };
     if (editingPersonId) await updateGenealogyPerson(selectedId, editingPersonId, data);
     else await createGenealogyPerson(selectedId, data);
