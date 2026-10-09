@@ -1,6 +1,10 @@
 # Linko Dear 原生 iOS
 
-SwiftUI 原生界面，iPhone、iPad / iOS 17+。当前工程版本 1.2.13（22），Bundle ID `net.impx.happylife.parent`。业务页面不包含 WebView。
+SwiftUI 原生界面，iPhone、iPad / iOS 17+。当前工程版本 1.2.14（23），Bundle ID `net.impx.happylife.parent`。业务页面不包含 WebView。
+
+## 1.2.14（23）：绿色关系图标
+
+按 Linko Dear 的关系与生活定位调整图标：绿色背景与同系应用呼应，四个同等尺度的人物节点代表家人、亲友与伙伴，以心形连线表现关系。iPhone、iPad、Watch、TestFlight 和网页资源来自同一主图。
 
 ## 1.2.13（22）：Linko Dear 关系图标
 
