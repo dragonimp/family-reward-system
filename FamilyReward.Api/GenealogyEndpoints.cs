@@ -307,12 +307,13 @@ internal static class GenealogyEndpoints
                 guard.Parameters.AddWithValue("id",foundTree);await guard.ExecuteNonQueryAsync();
             }
             long invitationId,treeId,personId;
-            await using(var invite=new NpgsqlCommand("SELECT id,tree_id,person_id FROM genealogy_person_invitations WHERE token_hash=@hash AND revoked_at IS NULL AND accepted_at IS NULL AND expires_at>CURRENT_TIMESTAMP FOR UPDATE",conn,tx))
+            string inviter;
+            await using(var invite=new NpgsqlCommand("SELECT id,tree_id,person_id,created_by FROM genealogy_person_invitations WHERE token_hash=@hash AND revoked_at IS NULL AND accepted_at IS NULL AND expires_at>CURRENT_TIMESTAMP FOR UPDATE",conn,tx))
             {
                 invite.Parameters.AddWithValue("hash",TokenHash(token));
                 await using var reader=await invite.ExecuteReaderAsync();
                 if(!await reader.ReadAsync()) return Results.Conflict(new { error="邀请已过期、已使用或已撤销" });
-                invitationId=reader.GetInt64(0);treeId=reader.GetInt64(1);personId=reader.GetInt64(2);
+                invitationId=reader.GetInt64(0);treeId=reader.GetInt64(1);personId=reader.GetInt64(2);inviter=reader.GetString(3);
             }
             await using(var person=new NpgsqlCommand("SELECT claimed_by FROM genealogy_people WHERE tree_id=@id AND id=@person FOR UPDATE",conn,tx))
             {
@@ -331,8 +332,8 @@ internal static class GenealogyEndpoints
             {claim.Parameters.AddWithValue("id",treeId);claim.Parameters.AddWithValue("person",personId);await claim.ExecuteNonQueryAsync();}
             await using(var consume=new NpgsqlCommand("UPDATE genealogy_person_invitations SET accepted_by=@user,accepted_at=CURRENT_TIMESTAMP WHERE id=@invite",conn,tx))
             {consume.Parameters.AddWithValue("user",user!);consume.Parameters.AddWithValue("invite",invitationId);await consume.ExecuteNonQueryAsync();}
-            await using(var requestUpdate=new NpgsqlCommand("UPDATE genealogy_join_requests SET status='approved',decided_by=@user,decided_at=CURRENT_TIMESTAMP WHERE tree_id=@id AND app_user_id=@user AND status='pending'",conn,tx))
-            {requestUpdate.Parameters.AddWithValue("id",treeId);requestUpdate.Parameters.AddWithValue("user",user!);await requestUpdate.ExecuteNonQueryAsync();}
+            await using(var requestUpdate=new NpgsqlCommand("UPDATE genealogy_join_requests SET status='approved',decided_by=@inviter,decided_at=CURRENT_TIMESTAMP WHERE tree_id=@id AND app_user_id=@user AND status='pending'",conn,tx))
+            {requestUpdate.Parameters.AddWithValue("id",treeId);requestUpdate.Parameters.AddWithValue("user",user!);requestUpdate.Parameters.AddWithValue("inviter",inviter);await requestUpdate.ExecuteNonQueryAsync();}
             await tx.CommitAsync();
             return Results.Json(new { treeId,personId });
         });
