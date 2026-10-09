@@ -47,6 +47,10 @@ export const getGenealogyPeople = (id: number, q = '') => http.get<unknown, { pe
 export const getGenealogyPerson = (id: number, personId: number) => http.get<unknown, GenealogyPerson>(`/api/genealogies/${id}/people/${personId}`);
 export const createGenealogyPerson = (id: number, data: Pick<GenealogyPerson, 'displayName' | 'generationLabel' | 'branchName' | 'note'>) => http.post<unknown, GenealogyPerson>(`/api/genealogies/${id}/people`, data);
 export const updateGenealogyPerson = (id: number, personId: number, data: Pick<GenealogyPerson, 'displayName' | 'generationLabel' | 'branchName' | 'note'>) => http.put<unknown, GenealogyPerson>(`/api/genealogies/${id}/people/${personId}`, data);
+export interface GenealogyInvitation { treeId: number; personId: number; treeName: string; personName: string; expiresAt: string; available: boolean }
+export const createGenealogyInvitation = (id: number, personId: number) => http.post<unknown, { path: string; expiresAt: string }>(`/api/genealogies/${id}/people/${personId}/invitations`);
+export const getGenealogyInvitation = (token: string) => http.get<unknown, GenealogyInvitation>(`/api/genealogies/invitations/${encodeURIComponent(token)}`);
+export const acceptGenealogyInvitation = (token: string) => http.post<unknown, { treeId: number; personId: number }>(`/api/genealogies/invitations/${encodeURIComponent(token)}/accept`);
 export const getGenealogyRelationships = (id: number) => http.get<unknown, GenealogyRelationship[]>(`/api/genealogies/${id}/relationships`);
 export const createGenealogyRelationship = (id: number, data: { fromPersonId: number; toPersonId: number; kind: 'parent' | 'spouse' }) => http.post(`/api/genealogies/${id}/relationships`, data);
 export const deleteGenealogyRelationship = (id: number, relationId: number) => http.delete(`/api/genealogies/${id}/relationships/${relationId}`);

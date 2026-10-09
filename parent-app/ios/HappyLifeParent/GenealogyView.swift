@@ -131,10 +131,9 @@ struct GenealogyDetailView: View {
     @State private var editBusy = false
     @State private var editError: String?
     @State private var showAddPerson = false
-    @State private var showAddRelation = false
-    @State private var fromID = 0
-    @State private var toID = 0
-    @State private var kind = "parent"
+    @State private var relatedPersonID = 0
+    @State private var relationKind = "parent"
+    @State private var invitationURL: URL?
     @State private var matches: [Int: Int] = [:]
     @State private var busy = false
     @State private var error: String?
@@ -204,14 +203,6 @@ struct GenealogyDetailView: View {
                             .disabled(busy || name.trimmingCharacters(in: .whitespacesAndNewlines).count < 2)
                     }
                 }
-                Section {
-                    DisclosureGroup("建立亲属关系", isExpanded: $showAddRelation) {
-                        Picker("父母或配偶一方", selection: $fromID) { Text("请选择").tag(0); ForEach(people) { Text($0.text("displayName") + " #\($0.id)").tag($0.id) } }
-                        Picker("关系", selection: $kind) { Text("父母 → 子女").tag("parent"); Text("配偶").tag("spouse") }
-                        Picker("子女或配偶另一方", selection: $toID) { Text("请选择").tag(0); ForEach(people) { Text($0.text("displayName") + " #\($0.id)").tag($0.id) } }
-                        Button("添加关系") { Task { await addRelation() } }.disabled(busy || fromID == 0 || toID == 0 || fromID == toID)
-                    }
-                }
             }
         }
         .frame(maxWidth: 860).frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -251,6 +242,33 @@ struct GenealogyDetailView: View {
                                 }
                                 Spacer()
                                 if owner { Button("移除", role: .destructive) { Task { await remove(relation) } }.disabled(busy) }
+                            }
+                        }
+                    }
+                    if owner {
+                        Section("为此人添加关系") {
+                            Picker("关系", selection: $relationKind) {
+                                Text("父母").tag("parent")
+                                Text("子女").tag("child")
+                                Text("配偶").tag("spouse")
+                            }
+                            Picker("另一位成员", selection: $relatedPersonID) {
+                                Text("请选择").tag(0)
+                                ForEach(people.filter { $0.id != person.id }) { other in
+                                    Text(other.text("displayName") + " #\(other.id)").tag(other.id)
+                                }
+                            }
+                            Button("添加关系") { Task { await addRelation(person.id) } }
+                                .disabled(busy || relatedPersonID == 0)
+                        }
+                        Section("邀请本人加入") {
+                            if person.flag("isLinked") {
+                                Text("此人物已绑定用户。").foregroundStyle(.secondary)
+                            } else {
+                                Text("链接有效 7 天，仅可使用一次；重新生成会让旧链接失效。")
+                                    .font(.caption).foregroundStyle(.secondary)
+                                Button("生成邀请链接") { Task { await createInvitation(person.id) } }.disabled(busy)
+                                if let invitationURL { ShareLink("分享邀请链接", item: invitationURL) }
                             }
                         }
                     }
@@ -300,6 +318,8 @@ struct GenealogyDetailView: View {
         editBranch = person.text("branchName")
         editNote = person.text("note")
         editError = nil
+        relatedPersonID = 0
+        invitationURL = nil
         selected = person
     }
     private func savePerson() async {
@@ -316,9 +336,23 @@ struct GenealogyDetailView: View {
             await selectPerson(personID)
         } catch { editError = error.localizedDescription }
     }
-    private func addRelation() async {
-        await mutate(base + "/relationships", body: ["fromPersonId": fromID, "toPersonId": toID, "kind": kind])
-        if error == nil { fromID = 0; toID = 0 }
+    private func addRelation(_ personID: Int) async {
+        guard relatedPersonID > 0 else { return }
+        let from = relationKind == "parent" ? relatedPersonID : personID
+        let to = relationKind == "parent" ? personID : relatedPersonID
+        await mutate(base + "/relationships", body: ["fromPersonId": from, "toPersonId": to, "kind": relationKind == "spouse" ? "spouse" : "parent"])
+        if error == nil { relatedPersonID = 0 }
+    }
+    private func createInvitation(_ personID: Int) async {
+        busy = true; editError = nil; defer { busy = false }
+        do {
+            let result = try object(await store.call(base + "/people/\(personID)/invitations", method: "POST"))
+            guard let path = result["path"] as? String,
+                  let url = URL(string: path, relativeTo: URL(string: "https://happylife.ai.impx.net")!)?.absoluteURL else {
+                throw APIError.message("邀请链接格式不正确")
+            }
+            invitationURL = url
+        } catch { editError = error.localizedDescription }
     }
     private func remove(_ relation: Record) async { await mutate(base + "/relationships/\(relation.id)", method: "DELETE") }
     private func selectPerson(_ id: Int) async {

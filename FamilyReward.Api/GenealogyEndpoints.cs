@@ -1,3 +1,5 @@
+using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json.Nodes;
 using Npgsql;
 
@@ -241,6 +243,100 @@ internal static class GenealogyEndpoints
             return await cmd.ExecuteScalarAsync() is null ? Results.NotFound(new { error="成员不存在" }) : Results.Json(new { id=personId,displayName=name,generationLabel=generation,branchName=branch,note });
         });
 
+        app.MapPost("/api/genealogies/{id:long}/people/{personId:long}/invitations", async (long id,long personId,HttpRequest request) =>
+        {
+            var (user, _, error)=await authorize(request);
+            if(error is not null) return error;
+            await using var conn=await Open(cs);
+            await using var tx=await conn.BeginTransactionAsync();
+            if(await Role(conn,id,user!,tx)!="owner") return Denied();
+            await using(var guard=new NpgsqlCommand("SELECT pg_advisory_xact_lock(@id)",conn,tx))
+            {guard.Parameters.AddWithValue("id",id);await guard.ExecuteNonQueryAsync();}
+            await using(var person=new NpgsqlCommand("SELECT claimed_by FROM genealogy_people WHERE tree_id=@id AND id=@person FOR UPDATE",conn,tx))
+            {
+                person.Parameters.AddWithValue("id",id);person.Parameters.AddWithValue("person",personId);
+                await using var reader=await person.ExecuteReaderAsync();
+                if(!await reader.ReadAsync()) return Results.NotFound(new { error="成员不存在" });
+                if(!reader.IsDBNull(0)) return Results.Conflict(new { error="该成员已关联用户，无需邀请" });
+            }
+            await using(var revoke=new NpgsqlCommand("UPDATE genealogy_person_invitations SET revoked_at=CURRENT_TIMESTAMP WHERE tree_id=@id AND person_id=@person AND revoked_at IS NULL AND accepted_at IS NULL",conn,tx))
+            {revoke.Parameters.AddWithValue("id",id);revoke.Parameters.AddWithValue("person",personId);await revoke.ExecuteNonQueryAsync();}
+            var token=Convert.ToHexString(RandomNumberGenerator.GetBytes(32)).ToLowerInvariant();
+            await using(var insert=new NpgsqlCommand("INSERT INTO genealogy_person_invitations(tree_id,person_id,token_hash,created_by,expires_at) VALUES(@id,@person,@hash,@user,CURRENT_TIMESTAMP+INTERVAL '7 days') RETURNING expires_at",conn,tx))
+            {
+                insert.Parameters.AddWithValue("id",id);insert.Parameters.AddWithValue("person",personId);insert.Parameters.AddWithValue("hash",TokenHash(token));insert.Parameters.AddWithValue("user",user!);
+                var expiresAt=(DateTime)(await insert.ExecuteScalarAsync())!;
+                await tx.CommitAsync();
+                return Results.Json(new { path=$"/genealogy/invite/{token}",expiresAt });
+            }
+        });
+
+        app.MapGet("/api/genealogies/invitations/{token}", async (string token,HttpRequest request) =>
+        {
+            var (_, _, error)=await authorize(request);
+            if(error is not null) return error;
+            if(!ValidToken(token)) return Results.NotFound(new { error="邀请链接无效" });
+            await using var conn=await Open(cs);
+            await using var cmd=new NpgsqlCommand("""
+                SELECT i.tree_id,i.person_id,t.name,p.display_name,i.expires_at,
+                  i.revoked_at IS NULL AND i.accepted_at IS NULL AND i.expires_at>CURRENT_TIMESTAMP AND p.claimed_by IS NULL
+                FROM genealogy_person_invitations i
+                JOIN genealogy_trees t ON t.id=i.tree_id
+                JOIN genealogy_people p ON p.tree_id=i.tree_id AND p.id=i.person_id
+                WHERE i.token_hash=@hash
+                """,conn);
+            cmd.Parameters.AddWithValue("hash",TokenHash(token));
+            await using var reader=await cmd.ExecuteReaderAsync();
+            return await reader.ReadAsync()
+                ? Results.Json(new { treeId=reader.GetInt64(0),personId=reader.GetInt64(1),treeName=reader.GetString(2),personName=reader.GetString(3),expiresAt=reader.GetDateTime(4),available=reader.GetBoolean(5) })
+                : Results.NotFound(new { error="邀请链接无效" });
+        });
+
+        app.MapPost("/api/genealogies/invitations/{token}/accept", async (string token,HttpRequest request) =>
+        {
+            var (user, _, error)=await authorize(request);
+            if(error is not null) return error;
+            if(!ValidToken(token)) return Results.NotFound(new { error="邀请链接无效" });
+            await using var conn=await Open(cs);
+            await using var tx=await conn.BeginTransactionAsync();
+            await using(var lookup=new NpgsqlCommand("SELECT tree_id FROM genealogy_person_invitations WHERE token_hash=@hash",conn,tx))
+            {
+                lookup.Parameters.AddWithValue("hash",TokenHash(token));
+                if(await lookup.ExecuteScalarAsync() is not long foundTree) return Results.Conflict(new { error="邀请已过期、已使用或已撤销" });
+                await using var guard=new NpgsqlCommand("SELECT pg_advisory_xact_lock(@id)",conn,tx);
+                guard.Parameters.AddWithValue("id",foundTree);await guard.ExecuteNonQueryAsync();
+            }
+            long invitationId,treeId,personId;
+            await using(var invite=new NpgsqlCommand("SELECT id,tree_id,person_id FROM genealogy_person_invitations WHERE token_hash=@hash AND revoked_at IS NULL AND accepted_at IS NULL AND expires_at>CURRENT_TIMESTAMP FOR UPDATE",conn,tx))
+            {
+                invite.Parameters.AddWithValue("hash",TokenHash(token));
+                await using var reader=await invite.ExecuteReaderAsync();
+                if(!await reader.ReadAsync()) return Results.Conflict(new { error="邀请已过期、已使用或已撤销" });
+                invitationId=reader.GetInt64(0);treeId=reader.GetInt64(1);personId=reader.GetInt64(2);
+            }
+            await using(var person=new NpgsqlCommand("SELECT claimed_by FROM genealogy_people WHERE tree_id=@id AND id=@person FOR UPDATE",conn,tx))
+            {
+                person.Parameters.AddWithValue("id",treeId);person.Parameters.AddWithValue("person",personId);
+                await using var reader=await person.ExecuteReaderAsync();
+                if(!await reader.ReadAsync() || !reader.IsDBNull(0)) return Results.Conflict(new { error="该成员已经关联其他用户" });
+            }
+            await using(var existing=new NpgsqlCommand("SELECT id FROM genealogy_people WHERE tree_id=@id AND claimed_by=@user",conn,tx))
+            {
+                existing.Parameters.AddWithValue("id",treeId);existing.Parameters.AddWithValue("user",user!);
+                if(await existing.ExecuteScalarAsync() is not null) return Results.Conflict(new { error="你在该族谱已关联其他人物" });
+            }
+            await using(var join=new NpgsqlCommand("INSERT INTO genealogy_tree_users(tree_id,app_user_id,role) VALUES(@id,@user,'member') ON CONFLICT DO NOTHING",conn,tx))
+            {join.Parameters.AddWithValue("id",treeId);join.Parameters.AddWithValue("user",user!);await join.ExecuteNonQueryAsync();}
+            await using(var claim=new NpgsqlCommand("UPDATE genealogy_people SET claimed_by=@user,updated_at=CURRENT_TIMESTAMP WHERE tree_id=@id AND id=@person",conn,tx))
+            {claim.Parameters.AddWithValue("id",treeId);claim.Parameters.AddWithValue("person",personId);await claim.ExecuteNonQueryAsync();}
+            await using(var consume=new NpgsqlCommand("UPDATE genealogy_person_invitations SET accepted_by=@user,accepted_at=CURRENT_TIMESTAMP WHERE id=@invite",conn,tx))
+            {consume.Parameters.AddWithValue("user",user!);consume.Parameters.AddWithValue("invite",invitationId);await consume.ExecuteNonQueryAsync();}
+            await using(var requestUpdate=new NpgsqlCommand("UPDATE genealogy_join_requests SET status='approved',decided_by=@user,decided_at=CURRENT_TIMESTAMP WHERE tree_id=@id AND app_user_id=@user AND status='pending'",conn,tx))
+            {requestUpdate.Parameters.AddWithValue("id",treeId);requestUpdate.Parameters.AddWithValue("user",user!);await requestUpdate.ExecuteNonQueryAsync();}
+            await tx.CommitAsync();
+            return Results.Json(new { treeId,personId });
+        });
+
         app.MapGet("/api/genealogies/{id:long}/relationships", async (long id,HttpRequest request) =>
         {
             var (user, _, error)=await authorize(request);
@@ -315,6 +411,8 @@ internal static class GenealogyEndpoints
     }
     private static string SafeName(string? name) => string.IsNullOrWhiteSpace(name) ? "新成员" : name.Trim()[..Math.Min(name.Trim().Length,80)];
     private static string SafeAccountName(string? name) => string.IsNullOrWhiteSpace(name) ? "未知账号" : name.Trim()[..Math.Min(name.Trim().Length,160)];
+    private static bool ValidToken(string token) => token.Length==64 && token.All(c => c is >= '0' and <= '9' or >= 'a' and <= 'f');
+    private static string TokenHash(string token) => Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(token))).ToLowerInvariant();
     private static bool ValidPerson(string name,string generation,string branch,string note) => name.Length is >=2 and <=80 && generation.Length<=40 && branch.Length<=80 && note.Length<=500;
     private static void AddPersonParameters(NpgsqlCommand cmd,long id,string name,string generation,string branch,string note)
     {cmd.Parameters.AddWithValue("id",id);cmd.Parameters.AddWithValue("name",name);cmd.Parameters.AddWithValue("generation",generation);cmd.Parameters.AddWithValue("branch",branch);cmd.Parameters.AddWithValue("note",note);}
