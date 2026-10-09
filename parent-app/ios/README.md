@@ -1,6 +1,10 @@
 # Linko Dear 原生 iOS
 
-SwiftUI 原生界面，iPhone、iPad / iOS 17+。当前工程版本 1.2.8（17），Bundle ID `net.impx.happylife.parent`。业务页面不包含 WebView。
+SwiftUI 原生界面，iPhone、iPad / iOS 17+。当前工程版本 1.2.12（21），Bundle ID `net.impx.happylife.parent`。业务页面不包含 WebView。
+
+## 1.2.12（21）：族谱成员编辑
+
+点选已有成员后直接在成员资料页修改并保存，始终调用对应人物的更新接口；新增成员和建立亲属关系分别收起，避免将修改误提交为新增。保存后读回成员资料，服务错误会保留在编辑页显示。
 
 ## 1.2.8（17）：Linko Dear
 

@@ -124,7 +124,14 @@ struct GenealogyDetailView: View {
     @State private var generation = ""
     @State private var branch = ""
     @State private var note = ""
-    @State private var editingID = 0
+    @State private var editName = ""
+    @State private var editGeneration = ""
+    @State private var editBranch = ""
+    @State private var editNote = ""
+    @State private var editBusy = false
+    @State private var editError: String?
+    @State private var showAddPerson = false
+    @State private var showAddRelation = false
     @State private var fromID = 0
     @State private var toID = 0
     @State private var kind = "parent"
@@ -164,13 +171,13 @@ struct GenealogyDetailView: View {
                     }
                 }
             }
-            Section("查找家族成员") {
+            Section("家族成员") {
                 HStack {
-                    TextField("姓名或支系", text: $query)
+                    TextField("按姓名或支系查找", text: $query)
                     Button("查找") { Task { await loadPeople() } }.disabled(busy)
                 }
                 ForEach(people) { person in
-                    Button { selected = person } label: {
+                    Button { openPerson(person) } label: {
                         HStack {
                             VStack(alignment: .leading, spacing: 4) {
                                 Text(person.text("displayName")).font(.headline)
@@ -184,40 +191,26 @@ struct GenealogyDetailView: View {
                 }
                 if hasMore { Text("结果超过 100 位，请输入姓名或支系缩小范围。 ").font(.caption).foregroundStyle(.secondary) }
             }
-            if let selected {
-                Section(selected.text("displayName") + " · 亲属关系") {
-                    if !selected.text("note").isEmpty { Text(selected.text("note")) }
-                    ForEach(relationships.filter { $0.int("fromPersonId") == selected.id || $0.int("toPersonId") == selected.id }) { relation in
-                        let selectedIsFrom = relation.int("fromPersonId") == selected.id
-                        let otherID = selectedIsFrom ? relation.int("toPersonId") : relation.int("fromPersonId")
-                        HStack {
-                            VStack(alignment: .leading) {
-                                Text(relation.text("kind") == "spouse" ? "配偶" : selectedIsFrom ? "子女" : "父母").font(.caption).foregroundStyle(.secondary)
-                                Button(selectedIsFrom ? relation.text("toName") : relation.text("fromName")) { Task { await selectPerson(otherID) } }
-                            }
-                            Spacer()
-                            if owner { Button("移除", role: .destructive) { Task { await remove(relation) } }.disabled(busy) }
-                        }
-                    }
-                    if owner { Button("编辑人物") { startEditing(selected) } }
-                }
-            }
             if owner {
-                Section(editingID == 0 ? "补录成员" : "编辑成员") {
-                    TextField("姓名", text: $name)
-                    TextField("辈分（可选）", text: $generation)
-                    TextField("支系（可选）", text: $branch)
-                    TextField("备注（仅成员可见）", text: $note, axis: .vertical).lineLimit(2...4)
-                    HStack {
-                        Button("保存成员") { Task { await savePerson() } }.disabled(busy || name.trimmingCharacters(in: .whitespacesAndNewlines).count < 2)
-                        if editingID != 0 { Button("取消编辑") { clearEditor() } }
+                Section {
+                    DisclosureGroup("新增家族成员", isExpanded: $showAddPerson) {
+                        Text("此处只用于新增；修改已有成员请点选上方姓名。")
+                            .font(.caption).foregroundStyle(.secondary)
+                        TextField("新成员姓名", text: $name)
+                        TextField("辈分（可选）", text: $generation)
+                        TextField("支系（可选）", text: $branch)
+                        TextField("备注（仅成员可见）", text: $note, axis: .vertical).lineLimit(2...4)
+                        Button("添加新成员") { Task { await savePerson() } }
+                            .disabled(busy || name.trimmingCharacters(in: .whitespacesAndNewlines).count < 2)
                     }
                 }
-                Section("建立亲属关系") {
-                    Picker("父母或配偶一方", selection: $fromID) { Text("请选择").tag(0); ForEach(people) { Text($0.text("displayName") + " #\($0.id)").tag($0.id) } }
-                    Picker("关系", selection: $kind) { Text("父母 → 子女").tag("parent"); Text("配偶").tag("spouse") }
-                    Picker("子女或配偶另一方", selection: $toID) { Text("请选择").tag(0); ForEach(people) { Text($0.text("displayName") + " #\($0.id)").tag($0.id) } }
-                    Button("添加关系") { Task { await addRelation() } }.disabled(busy || fromID == 0 || toID == 0 || fromID == toID)
+                Section {
+                    DisclosureGroup("建立亲属关系", isExpanded: $showAddRelation) {
+                        Picker("父母或配偶一方", selection: $fromID) { Text("请选择").tag(0); ForEach(people) { Text($0.text("displayName") + " #\($0.id)").tag($0.id) } }
+                        Picker("关系", selection: $kind) { Text("父母 → 子女").tag("parent"); Text("配偶").tag("spouse") }
+                        Picker("子女或配偶另一方", selection: $toID) { Text("请选择").tag(0); ForEach(people) { Text($0.text("displayName") + " #\($0.id)").tag($0.id) } }
+                        Button("添加关系") { Task { await addRelation() } }.disabled(busy || fromID == 0 || toID == 0 || fromID == toID)
+                    }
                 }
             }
         }
@@ -226,6 +219,47 @@ struct GenealogyDetailView: View {
         .navigationTitle(tree?.text("name") ?? "族谱")
         .refreshable { await load() }
         .task { await load() }
+        .sheet(item: $selected) { person in
+            NavigationStack {
+                Form {
+                    if let editError { Section { Text(editError).foregroundStyle(.red) } }
+                    Section("成员资料") {
+                        if owner {
+                            TextField("姓名", text: $editName)
+                            TextField("辈分（可选）", text: $editGeneration)
+                            TextField("支系（可选）", text: $editBranch)
+                            TextField("备注（仅成员可见）", text: $editNote, axis: .vertical).lineLimit(2...4)
+                            Button("保存资料") { Task { await saveEdit(person.id) } }
+                                .disabled(editBusy || editName.trimmingCharacters(in: .whitespacesAndNewlines).count < 2)
+                        } else {
+                            LabeledContent("姓名", value: person.text("displayName"))
+                            if !person.text("generationLabel").isEmpty { LabeledContent("辈分", value: person.text("generationLabel")) }
+                            if !person.text("branchName").isEmpty { LabeledContent("支系", value: person.text("branchName")) }
+                            if !person.text("note").isEmpty { Text(person.text("note")) }
+                        }
+                    }
+                    Section("亲属关系") {
+                        let related = relationships.filter { $0.int("fromPersonId") == person.id || $0.int("toPersonId") == person.id }
+                        if related.isEmpty { Text("暂无亲属关系").foregroundStyle(.secondary) }
+                        ForEach(related) { relation in
+                            let selectedIsFrom = relation.int("fromPersonId") == person.id
+                            let otherID = selectedIsFrom ? relation.int("toPersonId") : relation.int("fromPersonId")
+                            HStack {
+                                VStack(alignment: .leading) {
+                                    Text(relation.text("kind") == "spouse" ? "配偶" : selectedIsFrom ? "子女" : "父母").font(.caption).foregroundStyle(.secondary)
+                                    Button(selectedIsFrom ? relation.text("toName") : relation.text("fromName")) { Task { await selectPerson(otherID) } }
+                                }
+                                Spacer()
+                                if owner { Button("移除", role: .destructive) { Task { await remove(relation) } }.disabled(busy) }
+                            }
+                        }
+                    }
+                }
+                .navigationTitle(person.text("displayName"))
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar { Button("完成") { selected = nil }.disabled(editBusy) }
+            }
+        }
     }
     private func load() async {
         do {
@@ -260,15 +294,27 @@ struct GenealogyDetailView: View {
         if decision == "approve", let match = matches[request.id], match > 0 { body["personId"] = match }
         await mutate(base + "/join-requests/\(request.id)/decision", body: body)
     }
-    private func startEditing(_ person: Record) {
-        editingID = person.id; name = person.text("displayName"); generation = person.text("generationLabel"); branch = person.text("branchName"); note = person.text("note")
+    private func openPerson(_ person: Record) {
+        editName = person.text("displayName")
+        editGeneration = person.text("generationLabel")
+        editBranch = person.text("branchName")
+        editNote = person.text("note")
+        editError = nil
+        selected = person
     }
-    private func clearEditor() { editingID = 0; name = ""; generation = ""; branch = ""; note = "" }
     private func savePerson() async {
-        let path = editingID == 0 ? base + "/people" : base + "/people/\(editingID)"
         let body = ["displayName": name.trimmingCharacters(in: .whitespacesAndNewlines), "generationLabel": generation.trimmingCharacters(in: .whitespacesAndNewlines), "branchName": branch.trimmingCharacters(in: .whitespacesAndNewlines), "note": note.trimmingCharacters(in: .whitespacesAndNewlines)]
-        await mutate(path, method: editingID == 0 ? "POST" : "PUT", body: body)
-        if error == nil { clearEditor() }
+        await mutate(base + "/people", body: body)
+        if error == nil { name = ""; generation = ""; branch = ""; note = ""; showAddPerson = false }
+    }
+    private func saveEdit(_ personID: Int) async {
+        editBusy = true; editError = nil; defer { editBusy = false }
+        let body = ["displayName": editName.trimmingCharacters(in: .whitespacesAndNewlines), "generationLabel": editGeneration.trimmingCharacters(in: .whitespacesAndNewlines), "branchName": editBranch.trimmingCharacters(in: .whitespacesAndNewlines), "note": editNote.trimmingCharacters(in: .whitespacesAndNewlines)]
+        do {
+            _ = try await store.call(base + "/people/\(personID)", method: "PUT", body: body)
+            await load()
+            await selectPerson(personID)
+        } catch { editError = error.localizedDescription }
     }
     private func addRelation() async {
         await mutate(base + "/relationships", body: ["fromPersonId": fromID, "toPersonId": toID, "kind": kind])
@@ -276,7 +322,7 @@ struct GenealogyDetailView: View {
     }
     private func remove(_ relation: Record) async { await mutate(base + "/relationships/\(relation.id)", method: "DELETE") }
     private func selectPerson(_ id: Int) async {
-        do { selected = Record(fields: try object(await store.call(base + "/people/\(id)"))) }
+        do { openPerson(Record(fields: try object(await store.call(base + "/people/\(id)")))) }
         catch { self.error = error.localizedDescription }
     }
 }
