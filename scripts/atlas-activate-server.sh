@@ -24,14 +24,23 @@ PY
 # Migration changes require the separately audited one-time migration workflow.
 # Never let an application restart apply new SQL by accident.
 python3 - "$stage/family-points-api.tar.gz" /opt/Atlas/downloads/family-points-api-credit/current/migrations <<'PY'
-import hashlib,sys,tarfile
+import hashlib,subprocess,sys,tarfile
 from pathlib import Path
 archive,live=sys.argv[1:]
 with tarfile.open(archive,'r:gz') as tar:
     shipped={Path(m.name).name:hashlib.sha256(tar.extractfile(m).read()).hexdigest()
              for m in tar.getmembers() if m.isfile() and m.name.startswith('./migrations/') and m.name.endswith('.sql')}
 installed={p.name:hashlib.sha256(p.read_bytes()).hexdigest() for p in Path(live).glob('*.sql')}
-if shipped != installed: raise SystemExit('Migration set changed; run the audited one-time migration workflow before deployment.')
+if any(shipped.get(name) != digest for name,digest in installed.items()):
+    raise SystemExit('An installed migration changed or disappeared; deployment stopped.')
+new=set(shipped)-set(installed)
+if new:
+    result=subprocess.run(['runuser','-u','postgres','--','psql','-d','family_rewards','-At','-F','|',
+                           '-c','SELECT migration_id,sha256 FROM family_reward_schema_migrations'],
+                          check=True,capture_output=True,text=True)
+    completed=dict(line.split('|',1) for line in result.stdout.splitlines() if '|' in line)
+    if any(completed.get(Path(name).stem,'').strip() != shipped[name] for name in new):
+        raise SystemExit('New migration lacks a matching audited completion record; deployment stopped.')
 PY
 
 node "$atlas_cli" publish-bundle "$app_id" "$stage/bundle.json" > "$stage/atlas-publish-receipt.json"
