@@ -22,13 +22,11 @@ async function social<T>(path: string, method = 'GET', body?: object): Promise<T
   return value as T;
 }
 
-function DearMoments({ spaceId, activityId }: { spaceId: string; activityId: string }) {
+function DearMoments({ spaceId, activityId, refreshIndex }: { spaceId: string; activityId: string; refreshIndex: number }) {
   const path = `tenants/${spaceId}/activities/${activityId}/moments`;
   const [items, setItems] = useState<Moment[]>([]);
-  const [draft, setDraft] = useState('');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
-  const requestId = useRef(crypto.randomUUID());
   const reload = useCallback(async () => setItems(await social<Moment[]>(path)), [path]);
   useEffect(() => {
     let active = true;
@@ -37,15 +35,7 @@ function DearMoments({ spaceId, activityId }: { spaceId: string; activityId: str
     const timer = window.setInterval(refresh, 20_000);
     window.addEventListener('focus', refresh);
     return () => { active = false; window.clearInterval(timer); window.removeEventListener('focus', refresh); };
-  }, [path]);
-  const publish = async () => {
-    setBusy(true); setError('');
-    try {
-      await social(path, 'POST', { text: draft.trim(), requestId: requestId.current });
-      setDraft(''); requestId.current = crypto.randomUUID(); await reload();
-    } catch (e) { setError(e instanceof Error ? e.message : '发布失败'); }
-    finally { setBusy(false); }
-  };
+  }, [path, refreshIndex]);
   const remove = async (id: string) => {
     setBusy(true); setError('');
     try { await social(`${path}/${id}`, 'DELETE'); await reload(); }
@@ -55,7 +45,6 @@ function DearMoments({ spaceId, activityId }: { spaceId: string; activityId: str
   return <section className="rounded-2xl bg-white p-5 shadow-sm">
     <div className="flex items-center justify-between"><div><h2 className="text-xl font-bold">生活日常</h2><p className="text-sm text-slate-500">只向这场活动的成员展示。</p></div><button className="text-sm text-teal-700" onClick={() => void reload().catch(e => setError(e.message))}>刷新</button></div>
     {error && <p role="alert" className="mt-3 rounded-lg bg-red-50 p-3 text-sm text-red-700">{error}</p>}
-    <div className="mt-4 flex flex-col gap-2 sm:flex-row"><textarea aria-label="写下生活日常" className="min-h-20 min-w-0 flex-1 rounded-xl border p-3" maxLength={1000} placeholder="今天想和大家分享什么？" value={draft} onChange={e => { setDraft(e.target.value); requestId.current = crypto.randomUUID(); }} /><button disabled={busy || !draft.trim()} className="self-end rounded-xl bg-teal-700 px-5 py-2 text-white disabled:opacity-50" onClick={publish}>发布</button></div>
     <div className="mt-4 space-y-3">{items.map(item => <article key={item.id} className="rounded-xl bg-slate-50 p-4"><div className="flex justify-between gap-3 text-sm"><b>{item.authorName}</b><time className="text-slate-500">{new Date(item.createdAt).toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' })}</time></div><p className="mt-2 whitespace-pre-wrap break-words">{item.text}</p>{item.canDelete && <button disabled={busy} className="mt-2 text-xs text-red-700" onClick={() => void remove(item.id)}>删除我的记录</button>}</article>)}{items.length === 0 && <p className="text-sm text-slate-500">还没有分享的日常。</p>}</div>
   </section>;
 }
@@ -108,6 +97,10 @@ export default function DearSocial() {
   const [activityName, setActivityName] = useState('');
   const [inviteUsername, setInviteUsername] = useState('');
   const [inviteUrl, setInviteUrl] = useState('');
+  const [manageOpen, setManageOpen] = useState(false);
+  const [momentDraft, setMomentDraft] = useState('');
+  const momentRequestId = useRef(crypto.randomUUID());
+  const [momentRefreshIndex, setMomentRefreshIndex] = useState(0);
   const [busy, setBusy] = useState(false);
   const [loading, setLoading] = useState(true);
   const [activityLoading, setActivityLoading] = useState(false);
@@ -122,6 +115,13 @@ export default function DearSocial() {
   useEffect(() => {
     if (detailMode) { setSpaceId(routeSpaceId || ''); setActivityId(routeActivityId || ''); }
   }, [detailMode, routeSpaceId, routeActivityId]);
+  useEffect(() => { setManageOpen(false); setInviteUrl(''); setMomentDraft(''); momentRequestId.current = crypto.randomUUID(); }, [routeSpaceId, routeActivityId]);
+  useEffect(() => {
+    if (!manageOpen) return;
+    const onKeyDown = (event: KeyboardEvent) => { if (event.key === 'Escape') setManageOpen(false); };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [manageOpen]);
 
   const reload = useCallback(async () => {
     const found = await social<Space[]>('tenants');
@@ -183,6 +183,14 @@ export default function DearSocial() {
     const invite = await social<{ token: string }>(`tenants/${spaceId}/activities/${activityId}/invites/link`, 'POST', {});
     setInviteUrl(`${window.location.origin}/dear?invite=${encodeURIComponent(invite.token)}`);
   });
+  const publishMoment = () => act(async () => {
+    const text = momentDraft.trim();
+    if (!text || text.length > 1000) throw new Error('请填写 1 至 1000 字的日常内容。');
+    await social(`tenants/${spaceId}/activities/${activityId}/moments`, 'POST', { text, requestId: momentRequestId.current });
+    setMomentDraft(''); momentRequestId.current = crypto.randomUUID();
+    setMomentRefreshIndex(value => value + 1);
+    setMessage('日常已发布。');
+  });
   const acceptLink = () => act(async () => {
     const token = params.get('invite');
     if (!token) return;
@@ -206,11 +214,10 @@ export default function DearSocial() {
       {detailMode ? <>
         <nav aria-label="当前位置" className="text-sm text-slate-600"><Link to="/dear" className="text-teal-700">活动</Link><span className="mx-2">/</span>{chosenSpace?.name || '空间'}<span className="mx-2">/</span>{selected?.title || '活动详情'}</nav>
         {loading || activityLoading ? <p className="rounded-2xl bg-white p-6 text-slate-500">正在读取活动…</p> : activityError ? <p role="alert" className="rounded-2xl bg-red-50 p-6 text-red-700">活动读取失败：{activityError}</p> : !chosenSpace || !selected ? <section className="rounded-2xl bg-white p-6"><p>找不到这场活动，或你尚未加入。</p><Link to="/dear" className="mt-3 inline-block text-teal-700">返回活动列表</Link></section> : <>
-          <section className="rounded-2xl bg-white p-5 shadow-sm"><p className="text-sm text-teal-700">所属空间：{chosenSpace.name}</p><h2 className="mt-1 text-2xl font-bold">{selected.title}</h2><p className="mt-2 text-sm text-slate-500">{selected.description || '一起留下相聚记忆。'}</p></section>
-          <section className="rounded-2xl bg-white p-5 shadow-sm"><h3 className="font-semibold">邀请家人或朋友参加这场活动</h3><p className="mt-1 text-xs text-slate-500">受邀人确认后才能参加；空间本身不代表亲属或好友关系。</p><div className="mt-3 flex gap-2"><input aria-label="被邀请人的用户名" className="min-w-0 flex-1 rounded-lg border p-2" placeholder="用户中心用户名" value={inviteUsername} onChange={e => setInviteUsername(e.target.value)} /><button disabled={busy || !inviteUsername.trim()} className="rounded-lg border px-3 disabled:opacity-50" onClick={inviteByName}>邀请</button></div><button disabled={busy} className="mt-3 text-sm text-teal-700" onClick={makeLink}>生成七天有效的邀请链接</button>{inviteUrl && <input aria-label="活动邀请链接" className="mt-2 w-full rounded-lg border p-2 text-sm" readOnly value={inviteUrl} onFocus={e => e.target.select()} />}</section>
+          <section className="rounded-2xl bg-white p-5 shadow-sm"><div className="flex items-start justify-between gap-3"><div><p className="text-sm text-teal-700">所属空间：{chosenSpace.name}</p><h2 className="mt-1 text-2xl font-bold">{selected.title}</h2><p className="mt-2 text-sm text-slate-500">{selected.description || '一起留下相聚记忆。'}</p></div><button type="button" aria-label="管理活动" onClick={() => setManageOpen(true)} className="shrink-0 rounded-lg border border-teal-200 px-3 py-1.5 text-sm text-teal-700 hover:bg-teal-50">管理</button></div></section>
           <section className="rounded-2xl bg-white p-5 shadow-sm"><div className="flex flex-wrap justify-between gap-2"><div><h3 className="text-xl font-bold">共同相册</h3><p className="text-sm text-slate-500">只向这场活动的成员展示。</p></div><div className="flex gap-3"><button className="text-sm text-teal-700" onClick={refreshPhotos}>刷新照片</button><a className="text-sm text-teal-700" href="https://linko.ai.impx.net/" target="_blank" rel="noopener noreferrer">分享照片与获取原图</a></div></div><div className="mt-3 grid gap-3 sm:grid-cols-2">{photos.map(photo => <article key={photo.id} className="overflow-hidden rounded-xl border"><div className="flex h-40 items-center justify-center bg-slate-100">{photo.thumbnailAvailable ? <img className="h-full w-full object-cover" src={`${gateway}tenants/${spaceId}/activities/${activityId}/native-photos/${photo.id}/thumbnail`} alt={photo.originalFileName} /> : <span className="text-sm text-slate-500">原图保存在分享者设备</span>}</div><div className="p-3 text-sm"><b>{photo.sourceDisplayName}</b><p className="truncate text-slate-500">{photo.originalFileName}</p></div></article>)}{photos.length === 0 && <p className="text-sm text-slate-500">还没有分享的照片。</p>}</div></section>
-          <DearMoments key={`${spaceId}:${activityId}`} spaceId={spaceId} activityId={activityId} />
-          <DearRelationships key={`${spaceId}:${activityId}`} spaceId={spaceId} activityId={activityId} />
+          <DearMoments key={`${spaceId}:${activityId}`} spaceId={spaceId} activityId={activityId} refreshIndex={momentRefreshIndex} />
+          {manageOpen && <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/45 p-4" onMouseDown={event => { if (event.target === event.currentTarget) setManageOpen(false); }}><section role="dialog" aria-modal="true" aria-labelledby="activity-manage-title" className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-white p-5 shadow-2xl"><div className="flex items-center justify-between gap-3"><div><h2 id="activity-manage-title" className="text-xl font-bold">管理 · {selected.title}</h2><p className="text-sm text-slate-500">邀请参加、发布日常和管理好友</p></div><button type="button" onClick={() => setManageOpen(false)} className="rounded-lg border px-3 py-1.5 text-sm">完成</button></div>{error && <p role="alert" className="mt-4 rounded-lg bg-red-50 p-3 text-sm text-red-700">{error}</p>}{message && <p role="status" className="mt-4 rounded-lg bg-teal-50 p-3 text-sm text-teal-800">{message}</p>}<div className="mt-5 space-y-6"><section><h3 className="font-semibold">邀请参加</h3><p className="mt-1 text-xs text-slate-500">受邀人确认后才能参加；空间本身不代表亲属或好友关系。</p><div className="mt-3 flex gap-2"><input aria-label="被邀请人的用户名" className="min-w-0 flex-1 rounded-lg border p-2" placeholder="用户中心用户名" value={inviteUsername} onChange={e => setInviteUsername(e.target.value)} /><button disabled={busy || !inviteUsername.trim()} className="rounded-lg border px-3 disabled:opacity-50" onClick={inviteByName}>邀请</button></div><button disabled={busy} className="mt-3 text-sm text-teal-700" onClick={makeLink}>生成七天有效的邀请链接</button>{inviteUrl && <input aria-label="活动邀请链接" className="mt-2 w-full rounded-lg border p-2 text-sm" readOnly value={inviteUrl} onFocus={e => e.target.select()} />}</section><section className="border-t pt-5"><h3 className="font-semibold">发布日常</h3><textarea aria-label="写下生活日常" className="mt-3 min-h-24 w-full rounded-xl border p-3" maxLength={1000} placeholder="今天想和大家分享什么？" value={momentDraft} onChange={e => { setMomentDraft(e.target.value); momentRequestId.current = crypto.randomUUID(); }} /><button disabled={busy || !momentDraft.trim()} className="mt-2 rounded-xl bg-teal-700 px-5 py-2 text-white disabled:opacity-50" onClick={publishMoment}>发布日常</button></section><DearRelationships key={`${spaceId}:${activityId}`} spaceId={spaceId} activityId={activityId} /></div></section></div>}
         </>}
       </> : <>
         <section className="rounded-2xl bg-white p-5 shadow-sm"><div className="flex flex-wrap justify-between gap-3"><div><h2 className="text-xl font-bold">生活空间</h2><p className="text-sm text-slate-500">空间用来归拢活动；加入某场活动才可查看该场的分享。</p></div><button className="text-sm text-teal-700" onClick={() => void act(reload)}>刷新</button></div>{loading ? <p className="py-6 text-slate-500">正在读取生活空间…</p> : <div className="mt-4 grid gap-3 sm:grid-cols-[1fr_auto]"><select aria-label="选择生活空间" className="rounded-xl border p-3" value={spaceId} onChange={e => setSpaceId(e.target.value)}><option value="">选择空间</option>{spaces.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}</select><div className="flex gap-2"><input aria-label="新空间名称" className="min-w-0 rounded-xl border p-3" maxLength={200} placeholder="例如：周末好友" value={spaceName} onChange={e => setSpaceName(e.target.value)} /><button disabled={busy || !spaceName.trim()} className="rounded-xl bg-teal-700 px-4 text-white disabled:opacity-50" onClick={createSpace}>创建空间</button></div></div>}</section>

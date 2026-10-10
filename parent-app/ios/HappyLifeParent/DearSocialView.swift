@@ -25,6 +25,7 @@ struct DearSocialView: View {
     @State private var spaceId = ""
     @State private var activityId = ""
     @State private var showingActivity = false
+    @State private var showingActivityManagement = false
     @State private var spaceName = ""
     @State private var activityName = ""
     @State private var inviteUsername = ""
@@ -142,7 +143,7 @@ struct DearSocialView: View {
             }
             .refreshable { await refresh() }
             .task { await refresh() }
-            .onChange(of: spaceId) { _, _ in activityId = ""; showingActivity = false; activities = []; photos = []; activityError = ""; activityLoading = true; run { try await loadActivities() } }
+            .onChange(of: spaceId) { _, _ in activityId = ""; showingActivity = false; showingActivityManagement = false; activities = []; photos = []; activityError = ""; activityLoading = true; run { try await loadActivities() } }
             .navigationDestination(isPresented: $showingActivity) { activityDetail }
             .onChange(of: activityId) { _, _ in photos = []; moments = []; activityMembers = []; run { try await loadPhotos(); try await loadMoments(); try await loadMembers() } }
         }
@@ -153,25 +154,21 @@ struct DearSocialView: View {
             if !error.isEmpty { Section { Text(error).foregroundStyle(.red) } }
             if !notice.isEmpty { Section { Text(notice).foregroundStyle(.teal) } }
             Section {
-                Text(selectedSpace?.text("name") ?? "生活空间").font(.caption).foregroundStyle(.teal)
-                Text(selectedActivity?.text("title") ?? "活动详情").font(.title2.bold())
-                Text("邀请、照片、日常和成员仅属于这场活动。")
-                    .font(.caption).foregroundStyle(.secondary)
-            }
-                if let selectedActivity {
-                    Section("邀请参加 · \(selectedActivity.text("title"))") {
-                        HStack {
-                            TextField("用户中心用户名", text: $inviteUsername).textInputAutocapitalization(.never)
-                            Button("邀请") { run { try await inviteByName() } }
-                                .disabled(busy || inviteUsername.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-                        }
-                        Button("生成七天有效的邀请链接") { run { try await createInviteLink() } }.disabled(busy)
-                        if !inviteLink.isEmpty {
-                            ShareLink(item: URL(string: inviteLink)!) { Label("分享邀请链接", systemImage: "square.and.arrow.up") }
-                        }
-                        Text("对方确认加入后，才能看到活动中分享的照片。")
+                HStack(alignment: .top) {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(selectedSpace?.text("name") ?? "生活空间").font(.caption).foregroundStyle(.teal)
+                        Text(selectedActivity?.text("title") ?? "活动详情").font(.title2.bold())
+                        Text("邀请、照片、日常和成员仅属于这场活动。")
                             .font(.caption).foregroundStyle(.secondary)
                     }
+                    Spacer()
+                    Button { showingActivityManagement = true } label: {
+                        Label("管理", systemImage: "ellipsis.circle")
+                            .font(.subheadline)
+                    }.disabled(selectedActivity == nil)
+                }
+            }
+                if let selectedActivity {
                     Section("照片分享 · \(selectedActivity.text("title"))") {
                         if photos.isEmpty { Text("还没有分享的照片").foregroundStyle(.secondary) }
                         ForEach(photos) { photo in
@@ -193,11 +190,6 @@ struct DearSocialView: View {
                     Section("生活分享 · \(selectedActivity.text("title"))") {
                         Text("只向这场活动的成员展示。")
                             .font(.caption).foregroundStyle(.secondary)
-                        TextEditor(text: $momentDraft).frame(minHeight: 76)
-                            .accessibilityLabel("写下生活日常")
-                            .onChange(of: momentDraft) { _, _ in momentRequestID = UUID() }
-                        Button("发布日常") { run { try await publishMoment() } }
-                            .disabled(busy || momentDraft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || momentDraft.count > 1000)
                         ForEach(moments) { moment in
                             VStack(alignment: .leading, spacing: 6) {
                                 Text(moment.text("authorName")).font(.subheadline.bold())
@@ -210,7 +202,7 @@ struct DearSocialView: View {
                         if moments.isEmpty { Text("还没有分享的日常。") .foregroundStyle(.secondary) }
                         Button("刷新日常") { run { try await loadMoments() } }.disabled(busy)
                     }
-                    Section("活动成员与好友") {
+                    Section("活动成员") {
                         Text("同一活动不会自动建立好友关系，需要对方确认。")
                             .font(.caption).foregroundStyle(.secondary)
                         ForEach(activityMembers.filter { !$0.flag("isSelf") }, id: \.subject) { member in
@@ -220,9 +212,7 @@ struct DearSocialView: View {
                                 if let relation = relationships.first(where: { $0.text("peerSubject") == member.subject }) {
                                     Text(relation.text("status") == "accepted" ? "已是朋友" : "待确认")
                                         .font(.caption).foregroundStyle(.secondary)
-                                } else {
-                                    Button("申请好友") { run { try await requestFriend(member) } }.disabled(busy)
-                                }
+                                } else { Text("尚未成为好友").font(.caption).foregroundStyle(.secondary) }
                             }
                         }
                         if activityMembers.filter({ !$0.flag("isSelf") }).isEmpty {
@@ -234,9 +224,59 @@ struct DearSocialView: View {
         .listStyle(.insetGrouped)
         .readablePage()
         .navigationTitle(selectedActivity?.text("title") ?? "活动详情")
+        .sheet(isPresented: $showingActivityManagement) { activityManagement }
+        .onChange(of: activityId) { _, _ in showingActivityManagement = false; inviteLink = ""; inviteUsername = ""; momentDraft = ""; momentRequestID = UUID() }
         .refreshable {
             do { try await loadDetails(); try await loadRelationships() }
             catch { self.error = error.localizedDescription }
+        }
+    }
+
+    private var activityManagement: some View {
+        NavigationStack {
+            Form {
+                if !error.isEmpty { Section { Text(error).foregroundStyle(.red) } }
+                if !notice.isEmpty { Section { Text(notice).foregroundStyle(.teal) } }
+                Section("邀请参加") {
+                    HStack {
+                        TextField("用户中心用户名", text: $inviteUsername).textInputAutocapitalization(.never)
+                        Button("邀请") { run { try await inviteByName() } }
+                            .disabled(busy || inviteUsername.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                    }
+                    Button("生成七天有效的邀请链接") { run { try await createInviteLink() } }.disabled(busy)
+                    if let url = URL(string: inviteLink), url.scheme == "https" {
+                        ShareLink(item: url) { Label("分享邀请链接", systemImage: "square.and.arrow.up") }
+                    }
+                    Text("对方确认加入后才能查看这场活动的分享。")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
+                Section("发布日常") {
+                    TextEditor(text: $momentDraft).frame(minHeight: 90)
+                        .accessibilityLabel("写下生活日常")
+                        .onChange(of: momentDraft) { _, _ in momentRequestID = UUID() }
+                    Button("发布日常") { run { try await publishMoment() } }
+                        .disabled(busy || momentDraft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || momentDraft.count > 1000)
+                }
+                Section("活动成员与好友") {
+                    ForEach(activityMembers.filter { !$0.flag("isSelf") }, id: \.subject) { member in
+                        HStack {
+                            Text(member.text("displayName"))
+                            Spacer()
+                            if let relation = relationships.first(where: { $0.text("peerSubject") == member.subject }) {
+                                Text(relation.text("status") == "accepted" ? "已是朋友" : "待确认")
+                                    .font(.caption).foregroundStyle(.secondary)
+                            } else {
+                                Button("申请好友") { run { try await requestFriend(member) } }.disabled(busy)
+                            }
+                        }
+                    }
+                    if activityMembers.filter({ !$0.flag("isSelf") }).isEmpty {
+                        Text("邀请其他人参加活动后，可以互相申请好友。") .foregroundStyle(.secondary)
+                    }
+                }
+            }
+            .navigationTitle("管理 · \(selectedActivity?.text("title") ?? "活动")")
+            .toolbar { ToolbarItem(placement: .topBarTrailing) { Button("完成") { showingActivityManagement = false } } }
         }
     }
 
