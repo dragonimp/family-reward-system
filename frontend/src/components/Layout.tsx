@@ -15,9 +15,8 @@ const navItems = [
 ];
 
 const manageItems = [
-  { path: '/family-groups', label: '圈子管理', icon: '👥' },
-  { path: '/genealogy', label: '家族族谱', icon: '🌳' },
-  { path: '/children', label: '家庭管理', icon: '🏠' },
+  { path: '/family-groups', label: '群组管理', icon: '👥' },
+  { path: '/children', label: '孩子资料', icon: '🧒' },
   { path: '/rules', label: '规则管理', icon: '📋' },
   { path: '/settings', label: '系统设置', icon: '⚙️' },
   { path: '/xiaotiancai-device-test', label: '真机测试申请', icon: '⌚' },
@@ -25,7 +24,7 @@ const manageItems = [
   { path: '/my-subscription', label: '我的订阅', icon: '💳' },
 ];
 
-const mobileNavItems = [...navItems, ...manageItems];
+const mobileNavItems = [...navItems, { path: '/my/relationships', label: '我的关系', icon: '💚' }, ...manageItems];
 
 interface LayoutProps {
   children: ReactNode;

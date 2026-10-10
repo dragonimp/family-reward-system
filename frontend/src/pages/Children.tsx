@@ -52,8 +52,8 @@ const householdRoleOptions: Array<{ value: HouseholdRole; label: string }> = [
 const householdRoleLabel = (role: HouseholdRole) =>
   householdRoleOptions.find((item) => item.value === role)?.label || '其他';
 
-export default function Children() {
-  const [activeSection, setActiveSection] = useState<'children' | 'members'>('children');
+export default function Children({ mode = 'children' }: { mode?: 'children' | 'members' }) {
+  const activeSection = mode;
   const [children, setChildren] = useState<Child[]>([]);
   const [householdMembers, setHouseholdMembers] = useState<HouseholdMember[]>([]);
   const [membersLoading, setMembersLoading] = useState(true);
@@ -61,7 +61,7 @@ export default function Children() {
   const [editingMember, setEditingMember] = useState<HouseholdMember | null>(null);
   const [memberToDelete, setMemberToDelete] = useState<HouseholdMember | null>(null);
   const [memberForm, setMemberForm] = useState<HouseholdMemberForm>({ displayName: '', role: 'guardian', note: '' });
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(mode === 'children');
   const [showModal, setShowModal] = useState(false);
   const [editingChild, setEditingChild] = useState<Child | null>(null);
   const [formData, setFormData] = useState<ChildForm>({ name: '', score: 0, cash: 0, items: 0 });
@@ -129,12 +129,12 @@ export default function Children() {
   }, []);
 
   useEffect(() => {
-    loadChildren();
-    loadFriendNotifications();
-    loadHouseholdMembers();
-  }, [loadChildren, loadFriendNotifications, loadHouseholdMembers]);
+    if (mode === 'children') { loadChildren(); loadFriendNotifications(); }
+    else loadHouseholdMembers();
+  }, [mode, loadChildren, loadFriendNotifications, loadHouseholdMembers]);
 
   useEffect(() => {
+    if (mode !== 'children') return;
     const interval = window.setInterval(() => {
       loadChildren(true);
       loadFriendNotifications();
@@ -150,7 +150,7 @@ export default function Children() {
       window.clearInterval(interval);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
-  }, [loadChildren, loadFriendNotifications]);
+  }, [mode, loadChildren, loadFriendNotifications]);
 
   const openCreateModal = () => {
     setEditingChild(null);
@@ -388,9 +388,9 @@ export default function Children() {
 
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h2 className="text-2xl font-bold text-gray-900">家庭管理</h2>
+          <h2 className="text-2xl font-bold text-gray-900">{mode === 'members' ? '家庭成员' : '孩子资料'}</h2>
           <p className="text-sm text-gray-500 mt-1">
-            管理当前家长账号下固定的孩子和其他家庭成员，不随圈子切换而改变
+            {mode === 'members' ? '管理真实家庭关系，并与族谱人物明确关联；不随群组切换。' : '管理孩子的资料、积分与设备；群组只用于共同记录成长。'}
           </p>
         </div>
         <button
@@ -401,28 +401,7 @@ export default function Children() {
         </button>
       </div>
 
-      <WatchPairingForm key={scannedWatchCode} children={children} initialCode={scannedWatchCode} />
-
-      <div role="tablist" aria-label="家庭成员类型" className="flex w-fit rounded-lg border border-gray-200 bg-white p-1">
-        <button
-          type="button"
-          role="tab"
-          aria-selected={activeSection === 'children'}
-          onClick={() => setActiveSection('children')}
-          className={`rounded-md px-4 py-2 text-sm font-medium ${activeSection === 'children' ? 'bg-[#4A90D9] text-white' : 'text-gray-600 hover:bg-gray-50'}`}
-        >
-          孩子成员
-        </button>
-        <button
-          type="button"
-          role="tab"
-          aria-selected={activeSection === 'members'}
-          onClick={() => setActiveSection('members')}
-          className={`rounded-md px-4 py-2 text-sm font-medium ${activeSection === 'members' ? 'bg-[#4A90D9] text-white' : 'text-gray-600 hover:bg-gray-50'}`}
-        >
-          其他家庭成员
-        </button>
-      </div>
+      {mode === 'children' && <WatchPairingForm key={scannedWatchCode} children={children} initialCode={scannedWatchCode} />}
 
       {activeSection === 'children' && <>
       {friendNotifications.length > 0 && (

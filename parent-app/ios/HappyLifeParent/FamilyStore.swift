@@ -23,7 +23,7 @@ import AgentIdentity
     private var lastRefresh = Date.distantPast
     var scope: String { groupID == 0 ? "" : "familyGroupId=\(groupID)" }
     var ready: Bool { profile?.text("role") == "parent" && profile?.flag("needsRole") == false }
-    var selectedFamily: String { groups.first(where: { $0.id == groupID })?.text("name") ?? "我的家庭" }
+    var selectedFamily: String { groups.first(where: { $0.id == groupID })?.text("name") ?? "我的群组" }
 
     func call(_ path: String, method: String = "GET", body: [String: Any]? = nil) async throws -> Any {
         guard let token = identity.accessToken else { throw APIError.message("请先登录用户中心。") }

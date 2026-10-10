@@ -19,6 +19,7 @@ import VirtualWatchPage from './pages/VirtualWatch';
 import XiaotiancaiDeviceTestApplicationPage from './pages/XiaotiancaiDeviceTestApplication';
 import AdminPage from './pages/Admin';
 import MySubscriptionPage from './pages/MySubscription';
+import MyRelationshipsPage from './pages/MyRelationships';
 import IdentityGate from './components/IdentityGate';
 import Layout from './components/Layout';
 import ProtectedRoute from './components/ProtectedRoute';
@@ -56,6 +57,8 @@ export default function App() {
                         <Route path="/dashboard" element={<Dashboard />} />
                         <Route path="/family-groups" element={<FamilyGroupsPage />} />
                         <Route path="/genealogy" element={<GenealogyPage />} />
+                        <Route path="/my/relationships" element={<MyRelationshipsPage />} />
+                        <Route path="/my/family-members" element={<ChildrenPage mode="members" />} />
                         <Route path="/children" element={<ChildrenPage />} />
                         <Route path="/credit/:childId" element={<CreditPage />} />
                         <Route path="/reward" element={<RewardPage />} />

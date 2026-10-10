@@ -1,6 +1,6 @@
 import http from './api';
 import type { Child, CreditDetail } from '../types';
-import type { FamilyGroup, FamilyGroupInvite, HouseholdMember, JoinFamilyGroupResult } from '../types';
+import type { FamilyGroup, FamilyGroupInvite, HouseholdGenealogyLink, HouseholdMember, JoinFamilyGroupResult } from '../types';
 import type { GenealogyDiscovery, GenealogyInferredRelationship, GenealogyJoinRequest, GenealogyPerson, GenealogyRelationship, GenealogyTree, MyGenealogyJoinRequest } from '../types';
 import type {
   ChildAuthCode,
@@ -34,6 +34,11 @@ export const createHouseholdMember = (data: Pick<HouseholdMember, 'displayName' 
 export const updateHouseholdMember = (id: number, data: Pick<HouseholdMember, 'displayName' | 'role' | 'note'>) =>
   http.put<unknown, HouseholdMember>(`/api/family-members/${id}`, data);
 export const deleteHouseholdMember = (id: number) => http.delete(`/api/family-members/${id}`);
+export const getHouseholdGenealogyLinks = () => http.get<unknown, HouseholdGenealogyLink[]>('/api/family-members/genealogy-links');
+export const linkHouseholdGenealogyPerson = (memberId: number, treeId: number, personId: number) =>
+  http.put(`/api/family-members/${memberId}/genealogy-links/${treeId}`, { personId });
+export const unlinkHouseholdGenealogyPerson = (memberId: number, treeId: number) =>
+  http.delete(`/api/family-members/${memberId}/genealogy-links/${treeId}`);
 
 export const getGenealogies = () => http.get<unknown, GenealogyTree[]>('/api/genealogies');
 export const discoverGenealogies = (q: string) => http.get<unknown, GenealogyDiscovery[]>('/api/genealogies/discover', { params: { q } });

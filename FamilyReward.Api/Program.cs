@@ -571,6 +571,82 @@ app.MapGet("/api/family-members", async (HttpRequest request) =>
     return Results.Json(await GetHouseholdMembers(conn, access.Profile!.AppUserId));
 });
 
+app.MapGet("/api/family-members/genealogy-links", async (HttpRequest request) =>
+{
+    var access = await RequireParentProfile(connectionString, request);
+    if (access.Error is not null) return access.Error;
+    await using var conn = await OpenConnection(connectionString);
+    await using var cmd = new NpgsqlCommand("""
+        SELECT l.household_member_id, l.tree_id, l.person_id, t.name, p.display_name
+        FROM household_genealogy_links l
+        JOIN genealogy_trees t ON t.id = l.tree_id
+        JOIN genealogy_people p ON p.tree_id = l.tree_id AND p.id = l.person_id
+        JOIN genealogy_tree_users u ON u.tree_id = l.tree_id AND u.app_user_id = @owner
+        WHERE l.owner_parent_app_user_id = @owner
+        ORDER BY t.name, p.display_name
+        """, conn);
+    cmd.Parameters.AddWithValue("owner", access.Profile!.AppUserId);
+    var links = new List<object>();
+    await using var reader = await cmd.ExecuteReaderAsync();
+    while (await reader.ReadAsync()) links.Add(new {
+        householdMemberId = reader.GetInt32(0), treeId = reader.GetInt64(1), personId = reader.GetInt64(2),
+        treeName = reader.GetString(3), personName = reader.GetString(4)
+    });
+    return Results.Json(links);
+});
+
+app.MapPut("/api/family-members/{id:int}/genealogy-links/{treeId:long}", async (int id, long treeId, JsonObject body, HttpRequest request) =>
+{
+    var access = await RequireParentProfile(connectionString, request);
+    if (access.Error is not null) return access.Error;
+    if (!long.TryParse(body["personId"]?.ToString(), out var personId) || personId <= 0)
+        return Results.BadRequest(new { error = "请选择族谱中的人物" });
+    await using var conn = await OpenConnection(connectionString);
+    await using var cmd = new NpgsqlCommand("""
+        INSERT INTO household_genealogy_links(owner_parent_app_user_id, household_member_id, tree_id, person_id)
+        SELECT @owner, m.id, p.tree_id, p.id
+        FROM household_members m
+        JOIN genealogy_tree_users u ON u.tree_id = @tree AND u.app_user_id = @owner
+        JOIN genealogy_people p ON p.tree_id = u.tree_id AND p.id = @person
+        WHERE m.id = @member AND m.owner_parent_app_user_id = @owner
+          AND (NOT m.is_current_user OR p.claimed_by = @owner)
+        ON CONFLICT (household_member_id, tree_id) DO UPDATE
+            SET person_id = EXCLUDED.person_id, updated_at = CURRENT_TIMESTAMP
+        RETURNING household_member_id, tree_id, person_id
+        """, conn);
+    cmd.Parameters.AddWithValue("owner", access.Profile!.AppUserId);
+    cmd.Parameters.AddWithValue("member", id);
+    cmd.Parameters.AddWithValue("tree", treeId);
+    cmd.Parameters.AddWithValue("person", personId);
+    try
+    {
+        await using var reader = await cmd.ExecuteReaderAsync();
+        return await reader.ReadAsync()
+            ? Results.Json(new { householdMemberId = reader.GetInt32(0), treeId = reader.GetInt64(1), personId = reader.GetInt64(2) })
+            : Results.NotFound(new { error = "家庭成员或族谱人物不存在；本人资料只能绑定已认领的自己" });
+    }
+    catch (PostgresException exception) when (exception.SqlState == PostgresErrorCodes.UniqueViolation)
+    {
+        return Results.Conflict(new { error = "该族谱人物已关联另一位家庭成员" });
+    }
+});
+
+app.MapDelete("/api/family-members/{id:int}/genealogy-links/{treeId:long}", async (int id, long treeId, HttpRequest request) =>
+{
+    var access = await RequireParentProfile(connectionString, request);
+    if (access.Error is not null) return access.Error;
+    await using var conn = await OpenConnection(connectionString);
+    await using var cmd = new NpgsqlCommand("""
+        DELETE FROM household_genealogy_links
+        WHERE household_member_id = @member AND tree_id = @tree AND owner_parent_app_user_id = @owner
+        """, conn);
+    cmd.Parameters.AddWithValue("owner", access.Profile!.AppUserId);
+    cmd.Parameters.AddWithValue("member", id);
+    cmd.Parameters.AddWithValue("tree", treeId);
+    return await cmd.ExecuteNonQueryAsync() > 0 ? Results.Json(new { status = "ok" })
+        : Results.NotFound(new { error = "关联不存在" });
+});
+
 app.MapPost("/api/family-members", async (JsonObject body, HttpRequest request) =>
 {
     var access = await RequireParentProfile(connectionString, request);

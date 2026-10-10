@@ -81,7 +81,7 @@ struct FamilyRoot: View {
     }
     private var main: some View {
         TabView {
-            FamilyHome(store: store).tabItem { Label("家庭", systemImage: "house.fill") }
+            FamilyHome(store: store).tabItem { Label("群组", systemImage: "person.3.fill") }
                 .badge(store.requests.filter { $0.text("status") == "pending" }.count)
             DearSocialView(store: store).tabItem { Label("活动", systemImage: "photo.on.rectangle.angled") }
             FamilyChatView(store: store).tabItem { Label("AI 对话", systemImage: "bubble.left.and.bubble.right.fill") }
@@ -105,18 +105,18 @@ struct FamilyHome: View {
                     }.padding(.vertical, 8)
                 }
                 Section {
-                    if store.groups.isEmpty { Text("创建或加入一个家庭，开始记录成长。").foregroundStyle(.secondary) }
+                    if store.groups.isEmpty { Text("创建或加入一个群组，开始共同记录成长。").foregroundStyle(.secondary) }
                     else {
-                        Picker("当前家庭", selection: Binding(get: { store.groupID }, set: { value in Task { await store.chooseGroup(value) } })) {
+                        Picker("当前群组", selection: Binding(get: { store.groupID }, set: { value in Task { await store.chooseGroup(value) } })) {
                             ForEach(store.groups) { Text($0.text("name")).tag($0.id) }
                         }.disabled(store.loading)
                     }
                     HStack {
-                        Button("创建家庭", systemImage: "plus.circle") { editor = EditorSpec(title: "创建家庭", path: "/api/family-groups", fields: [.init(key: "name", title: "家庭名称"), .init(key: "description", title: "家庭简介", required: false)]) }
+                        Button("创建群组", systemImage: "plus.circle") { editor = EditorSpec(title: "创建群组", path: "/api/family-groups", fields: [.init(key: "name", title: "群组名称"), .init(key: "description", title: "群组简介", required: false)]) }
                         Spacer()
-                        Button("加入家庭", systemImage: "person.badge.plus") { editor = EditorSpec(title: "加入家庭", path: "/api/family-groups/join", fields: [.init(key: "inviteCode", title: "邀请码")]) }
+                        Button("加入群组", systemImage: "person.badge.plus") { editor = EditorSpec(title: "加入群组", path: "/api/family-groups/join", fields: [.init(key: "inviteCode", title: "邀请码")]) }
                     }.buttonStyle(.borderless)
-                } header: { Text("一起成长") }
+                } header: { Text("虚拟群组 · 一起成长") }
                 Section("待办与记录") {
                     NavigationLink { ApprovalList(store: store) } label: {
                         HStack {
@@ -146,14 +146,12 @@ struct FamilyHome: View {
                         editor = EditorSpec(title: "添加孩子", path: "/api/children", fields: [.init(key: "name", title: "孩子姓名"), .init(key: "note", title: "备注", required: false)], fixed: store.groupID == 0 ? [:] : ["familyGroupId": store.groupID])
                     }
                 } header: { Text("孩子 · \(store.children.count)") }
-                Section("家庭与成长") {
+                Section("群组成长") {
                     NavigationLink { RulesView(store: store) } label: { Label("奖励与行为规则", systemImage: "star.square.fill") }
                     NavigationLink { GrowthView(store: store) } label: { Label("成长足迹", systemImage: "chart.xyaxis.line") }
                     NavigationLink { FamilyConnectionsView(store: store) } label: { Label("亲子互动", systemImage: "heart.text.square") }
-                    NavigationLink { GenealogyView(store: store) } label: { Label("家族族谱", systemImage: "person.3.sequence.fill") }
-                    NavigationLink { MembersView(store: store) } label: { Label("家庭成员", systemImage: "person.3.fill") }
-                    if store.groupID != 0 { NavigationLink { RemoteRecords(store: store, title: "家庭邀请", path: "/api/family-groups/\(store.groupID)/invite", mode: .invite) } label: { Label("邀请家人", systemImage: "qrcode") } }
                 }
+                if store.groupID != 0 { Section("群组协作") { NavigationLink { RemoteRecords(store: store, title: "群组邀请码", path: "/api/family-groups/\(store.groupID)/invite", mode: .invite) } label: { Label("邀请组员", systemImage: "qrcode") } } }
                 if store.loading { ProgressView("正在更新…") }
             }.listStyle(.insetGrouped).readablePage().navigationTitle(store.selectedFamily).refreshable { await store.load() }
                 .sheet(item: $editor) { NativeEditor(store: store, spec: $0) }
@@ -288,13 +286,123 @@ struct RulesView: View {
 struct MembersView: View {
     @ObservedObject var store: FamilyStore
     @State private var editor: EditorSpec?
+    @State private var links: [Record] = []
+    @State private var trees: [Record] = []
+    @State private var people: [Record] = []
+    @State private var selectedMember: Record?
+    @State private var treeID = 0
+    @State private var personID = 0
+    @State private var query = ""
+    @State private var busy = false
+    @State private var error: String?
     var body: some View {
         List {
-            ForEach(store.members) { row in
-                VStack(alignment: .leading) { Text(row.text("displayName")).font(.headline); Text(row.text("note")).foregroundStyle(.secondary) }
+            Section { Text("这里记录真实家庭成员。可明确关联族谱中的同一人；不会按姓名自动合并或改写亲属关系。")
+                .font(.subheadline).foregroundStyle(.secondary) }
+            if let error { Section { Text(error).foregroundStyle(.red) } }
+            Section("成员") {
+                ForEach(store.members) { row in
+                    VStack(alignment: .leading, spacing: 7) {
+                        Text(row.text("displayName")).font(.headline)
+                        if !row.text("note").isEmpty { Text(row.text("note")).foregroundStyle(.secondary) }
+                        ForEach(Array(links.filter { $0.int("householdMemberId") == row.id }.enumerated()), id: \.offset) { _, link in
+                            HStack {
+                                Label("\(link.text("treeName")) · \(link.text("personName"))", systemImage: "person.line.dotted.person")
+                                    .font(.caption)
+                                Spacer()
+                                Button("解除") { Task { await unlink(row.id, link.int("treeId")) } }
+                                    .font(.caption).disabled(busy)
+                            }
+                        }
+                        Button("关联族谱人物") { selectedMember = row; treeID = 0; personID = 0; people = []; query = "" }
+                            .font(.subheadline)
+                    }.padding(.vertical, 4)
+                }
+                Button("添加家庭成员", systemImage: "person.badge.plus") { editor = EditorSpec(title: "添加家庭成员", path: "/api/family-members", fields: [.init(key: "displayName", title: "称呼"), .init(key: "note", title: "备注", required: false)], fixed: ["role":"other"]) }
             }
-            Button("添加家庭成员", systemImage: "person.badge.plus") { editor = EditorSpec(title: "添加家庭成员", path: "/api/family-members", fields: [.init(key: "displayName", title: "称呼"), .init(key: "note", title: "备注", required: false)], fixed: ["role":"other"]) }
-        }.readablePage().navigationTitle("家庭成员").sheet(item: $editor) { NativeEditor(store: store, spec: $0) }
+        }.readablePage().navigationTitle("家庭成员")
+            .task { await load() }
+            .refreshable { await store.load(); await load() }
+            .sheet(item: $editor) { NativeEditor(store: store, spec: $0) }
+            .sheet(item: $selectedMember) { member in
+                NavigationStack {
+                    Form {
+                        Section { Text("为 \(member.text("displayName")) 选择族谱中的同一人。本人只能关联已绑定自己账号的人物。")
+                            .font(.subheadline).foregroundStyle(.secondary) }
+                        Section("族谱") {
+                            Picker("选择族谱", selection: $treeID) {
+                                Text("请选择").tag(0)
+                                ForEach(trees) { tree in Text(tree.text("name")).tag(tree.id) }
+                            }.onChange(of: treeID) { _, _ in personID = 0; people = []; Task { await loadPeople() } }
+                        }
+                        if treeID > 0 { Section("对应人物") {
+                            HStack { TextField("按姓名或支系查找", text: $query)
+                                Button("查找") { Task { await loadPeople() } } }
+                            Picker("族谱人物", selection: $personID) {
+                                Text("请选择").tag(0)
+                                ForEach(people) { person in Text("\(person.text("displayName")) #\(person.id)").tag(person.id) }
+                            }
+                        } }
+                        if let error { Section { Text(error).foregroundStyle(.red) } }
+                    }
+                    .navigationTitle("关联族谱人物")
+                    .toolbar { ToolbarItem(placement: .cancellationAction) { Button("取消") { selectedMember = nil } }
+                        ToolbarItem(placement: .confirmationAction) { Button("保存") { Task { await link(member.id) } }
+                            .disabled(busy || treeID == 0 || personID == 0) } }
+                }
+            }
+    }
+    private func load() async {
+        do {
+            trees = try Record.list(await store.call("/api/genealogies"))
+            links = try Record.list(await store.call("/api/family-members/genealogy-links"))
+            error = nil
+        } catch { self.error = error.localizedDescription }
+    }
+    private func loadPeople() async {
+        guard treeID > 0 else { return }
+        do {
+            let encoded = query.trimmingCharacters(in: .whitespacesAndNewlines)
+                .addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed.subtracting(CharacterSet(charactersIn: "&=+?#"))) ?? ""
+            people = try Record.list(await store.call("/api/genealogies/\(treeID)/people?q=\(encoded)"), key: "people")
+            error = nil
+        } catch { self.error = error.localizedDescription }
+    }
+    private func link(_ memberID: Int) async {
+        busy = true; error = nil; defer { busy = false }
+        do {
+            _ = try await store.call("/api/family-members/\(memberID)/genealogy-links/\(treeID)", method: "PUT", body: ["personId": personID])
+            links = try Record.list(await store.call("/api/family-members/genealogy-links"))
+            selectedMember = nil
+        } catch { self.error = error.localizedDescription }
+    }
+    private func unlink(_ memberID: Int, _ treeID: Int) async {
+        busy = true; error = nil; defer { busy = false }
+        do {
+            _ = try await store.call("/api/family-members/\(memberID)/genealogy-links/\(treeID)", method: "DELETE")
+            links = try Record.list(await store.call("/api/family-members/genealogy-links"))
+        } catch { self.error = error.localizedDescription }
+    }
+}
+struct FamilyInvitationHub: View {
+    @ObservedObject var store: FamilyStore
+    @State private var trees: [Record] = []
+    @State private var error: String?
+    var body: some View {
+        List {
+            Section {
+                Text("请先在族谱中选择对应的人物，再生成专属邀请链接。对方登录并确认后会绑定该人物。")
+                    .font(.subheadline).foregroundStyle(.secondary)
+            }
+            Section("选择族谱") {
+                ForEach(trees) { tree in
+                    NavigationLink(tree.text("name")) { GenealogyDetailView(store: store, treeID: tree.id) }
+                }
+                if trees.isEmpty { Text("尚未加入族谱，可先到“家族族谱”创建或加入。").foregroundStyle(.secondary) }
+            }
+            if let error { Section { Text(error).foregroundStyle(.red) } }
+        }.readablePage().navigationTitle("邀请家人")
+            .task { do { trees = try Record.list(await store.call("/api/genealogies")); error = nil } catch { self.error = error.localizedDescription } }
     }
 }
 struct AccountView: View {
@@ -304,11 +412,16 @@ struct AccountView: View {
         NavigationStack {
             List {
                 Section { Label(store.profile?.text("username") ?? "家长", systemImage: "person.crop.circle.fill"); LabeledContent("身份", value: "家长"); LabeledContent("应用", value: "Linko Dear") }
+                Section("真实家庭关系") {
+                    NavigationLink { GenealogyView(store: store) } label: { Label("家族族谱", systemImage: "person.3.sequence.fill") }
+                    NavigationLink { MembersView(store: store) } label: { Label("家庭成员", systemImage: "person.3.fill") }
+                    NavigationLink { FamilyInvitationHub(store: store) } label: { Label("邀请家人", systemImage: "envelope.open.fill") }
+                }
                 Section {
                     NavigationLink("订阅权益") { RemoteRecords(store: store, title: "订阅权益", path: "/api/subscription", mode: .subscription) }
                     Link("隐私政策与支持", destination: URL(string: "https://happylife.ai.impx.net/legal/linko-family-privacy.html")!)
                     LabeledContent("版本", value: "\(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "") (\(Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? ""))")
-                    Text("家庭数据与网页版同步。登录由用户中心提供，凭据保存在本机钥匙串。").font(.footnote).foregroundStyle(.secondary)
+                    Text("家庭关系与群组记录均与网页版同步。登录由用户中心提供，凭据保存在本机钥匙串。").font(.footnote).foregroundStyle(.secondary)
                 }
                 Button("退出当前账号", role: .destructive) { logout = true }
             }.readablePage().navigationTitle("我的").confirmationDialog("退出 Linko Dear？", isPresented: $logout, titleVisibility: .visible) { Button("退出登录", role: .destructive) { store.logout() } } message: { Text("本机登录凭据将清除。用户中心的浏览器登录状态由用户中心管理。") }

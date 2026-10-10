@@ -50,7 +50,7 @@ export default function UserMenu({ user, userId, onLogout }: UserMenuProps) {
             <summary className="list-none [&::-webkit-details-marker]:hidden flex items-center justify-between gap-2 px-3 py-2 rounded-md text-sm text-gray-700 hover:bg-gray-50 cursor-pointer select-none">
               <span className="flex items-center gap-2 min-w-0">
                 <HomeOutlined aria-hidden="true" />
-                <span>切换圈子</span>
+                <span>切换群组</span>
               </span>
               <span className="flex items-center gap-2 min-w-0 text-xs text-gray-400">
                 <span className="max-w-[92px] truncate">{loading ? '加载中' : selectedGroup?.name || '未选择'}</span>
@@ -60,7 +60,7 @@ export default function UserMenu({ user, userId, onLogout }: UserMenuProps) {
             <div className="mt-1 mb-2 rounded-md bg-gray-50 p-1">
               {error && <div className="px-2 py-1.5 text-xs text-red-600">{error}</div>}
               {!loading && groups.length === 0 && (
-                <div className="px-2 py-1.5 text-xs text-gray-500">暂无可用圈子</div>
+                <div className="px-2 py-1.5 text-xs text-gray-500">暂无可用群组</div>
               )}
               {groups.map((group) => {
                 const active = group.id === selectedGroupId;
@@ -84,6 +84,9 @@ export default function UserMenu({ user, userId, onLogout }: UserMenuProps) {
             </div>
           </details>
           <div className="my-1 border-t border-gray-100" />
+          <Link to="/my/relationships" onClick={closeMenu} className="flex items-center gap-2 px-3 py-2 rounded-md text-sm text-gray-700 hover:bg-gray-50">
+            <UserOutlined aria-hidden="true" /><span>我的关系</span>
+          </Link>
           <Link to="/settings" onClick={closeMenu} className="flex items-center gap-2 px-3 py-2 rounded-md text-sm text-gray-700 hover:bg-gray-50">
             <SettingOutlined aria-hidden="true" />
             <span>系统设置</span>

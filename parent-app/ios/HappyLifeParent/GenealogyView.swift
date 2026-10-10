@@ -116,6 +116,7 @@ struct GenealogyDetailView: View {
     @State private var tree: Record?
     @State private var people: [Record] = []
     @State private var relationships: [Record] = []
+    @State private var householdLinks: [Record] = []
     @State private var inferred: [Record] = []
     @State private var inferenceLoading = false
     @State private var inferenceError: String?
@@ -230,6 +231,9 @@ struct GenealogyDetailView: View {
                 Form {
                     if let editError { Section { Text(editError).foregroundStyle(.red) } }
                     Section("成员资料") {
+                        if householdLinks.contains(where: { $0.int("treeId") == treeID && $0.int("personId") == person.id }) {
+                            Text("已关联到‘我的’中的家庭成员").foregroundStyle(.green)
+                        }
                         if owner {
                             TextField("姓名", text: $editName)
                             TextField("辈分（可选）", text: $editGeneration)
@@ -322,6 +326,7 @@ struct GenealogyDetailView: View {
             tree = Record(fields: try object(await store.call(base)))
             await loadPeople()
             relationships = try Record.list(await store.call(base + "/relationships"))
+            householdLinks = try Record.list(await store.call("/api/family-members/genealogy-links"))
             if let selected { await loadInferred(selected.id) }
             requests = owner ? try Record.list(await store.call(base + "/join-requests")) : []
             error = nil

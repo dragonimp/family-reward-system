@@ -284,6 +284,14 @@ export interface HouseholdMember {
   updatedAt: string;
 }
 
+export interface HouseholdGenealogyLink {
+  householdMemberId: number;
+  treeId: number;
+  personId: number;
+  treeName: string;
+  personName: string;
+}
+
 export interface GenealogyTree {
   id: number;
   name: string;

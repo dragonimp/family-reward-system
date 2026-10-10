@@ -1,13 +1,14 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import GenealogyBirthdayPicker, { type BirthdayPrecision } from '../components/GenealogyBirthdayPicker';
 import {
   createGenealogy, createGenealogyPerson, createGenealogyRelationship, createGenealogyInvitation, decideGenealogyJoin,
   deleteGenealogyRelationship, discoverGenealogies, getGenealogies, getGenealogy,
-  getGenealogyInferredRelationships, getGenealogyJoinRequests, getGenealogyPeople, getGenealogyPerson, getGenealogyRelationships, getMyGenealogyJoinRequests,
+  getGenealogyInferredRelationships, getGenealogyJoinRequests, getGenealogyPeople, getGenealogyPerson, getGenealogyRelationships, getHouseholdGenealogyLinks, getMyGenealogyJoinRequests,
   requestGenealogyJoin, updateGenealogyPerson,
 } from '../services';
-import type { GenealogyDiscovery, GenealogyInferredRelationship, GenealogyJoinRequest, GenealogyPerson, GenealogyRelationship, GenealogyTree, MyGenealogyJoinRequest } from '../types';
+import type { GenealogyDiscovery, GenealogyInferredRelationship, GenealogyJoinRequest, GenealogyPerson, GenealogyRelationship, GenealogyTree, HouseholdGenealogyLink, MyGenealogyJoinRequest } from '../types';
 
 const emptyPerson = { displayName: '', generationLabel: '', branchName: '', note: '', gender: '' as GenealogyPerson['gender'], birthYear: '', birthMonth: '', birthDay: '', birthPrecision: 'none' as BirthdayPrecision };
 const genderLabel = (gender: GenealogyPerson['gender']) => ({ male: '男', female: '女', other: '其他', '': '未填写' })[gender];
@@ -19,6 +20,7 @@ const inferredKinds = [
 ] as const;
 
 export default function Genealogy() {
+  const [searchParams] = useSearchParams();
   const { user } = useAuth();
   const [trees, setTrees] = useState<GenealogyTree[]>([]);
   const [selectedId, setSelectedId] = useState<number | null>(null);
@@ -27,6 +29,7 @@ export default function Genealogy() {
   const [knownPeople, setKnownPeople] = useState<GenealogyPerson[]>([]);
   const [hasMore, setHasMore] = useState(false);
   const [relationships, setRelationships] = useState<GenealogyRelationship[]>([]);
+  const [householdLinks, setHouseholdLinks] = useState<HouseholdGenealogyLink[]>([]);
   const [inferred, setInferred] = useState<GenealogyInferredRelationship[]>([]);
   const [inferredLoading, setInferredLoading] = useState(false);
   const [inferredError, setInferredError] = useState('');
@@ -62,9 +65,10 @@ export default function Genealogy() {
 
   const refreshTree = useCallback(async (id: number, q = '', shouldApply: () => boolean = () => true) => {
     const detail = await getGenealogy(id);
-    const [peopleResult, links, pending] = await Promise.all([
+    const [peopleResult, links, pending, householdMappings] = await Promise.all([
       getGenealogyPeople(id, q), getGenealogyRelationships(id),
       detail.role === 'owner' ? getGenealogyJoinRequests(id) : Promise.resolve([] as GenealogyJoinRequest[]),
+      getHouseholdGenealogyLinks(),
     ]);
     if (!shouldApply()) return;
     setTree(detail);
@@ -76,6 +80,7 @@ export default function Genealogy() {
     });
     setHasMore(peopleResult.hasMore);
     setRelationships(links);
+    setHouseholdLinks(householdMappings);
     setRequests(pending);
   }, []);
 
@@ -222,6 +227,7 @@ export default function Genealogy() {
     <div>
       <h2 className="text-2xl font-bold text-gray-900">家族族谱</h2>
       <p className="mt-1 text-sm text-gray-600">寻找族谱并申请加入；加入后可查找成员、查看辈分与亲属关系。成员资料仅族谱成员可见。</p>
+      {searchParams.get('invite') === '1' && <p className="mt-2 rounded-xl bg-emerald-50 p-3 text-sm text-emerald-900">请选择族谱和未绑定的人物，在人物资料中生成专属邀请链接。</p>}
     </div>
     {message && <div role="status" className="rounded-xl border border-blue-200 bg-blue-50 p-3 text-sm text-blue-800">{message}</div>}
 
@@ -257,6 +263,7 @@ export default function Genealogy() {
           {canEdit && requests.length > 0 && <section className="rounded-2xl border border-amber-200 bg-amber-50 p-4"><h3 className="font-semibold">待审核加入申请（{requests.length}）</h3><div className="mt-3 space-y-2">{requests.map((item) => <div key={item.id} className="rounded-lg bg-white p-3 text-sm"><div className="flex flex-wrap items-center justify-between gap-2"><b>{item.displayName}</b><div className="flex gap-3"><button type="button" disabled={busy} onClick={() => void handleDecision(item.id, 'approve')} className="text-emerald-700">通过</button><button type="button" disabled={busy} onClick={() => void handleDecision(item.id, 'reject')} className="text-red-600">拒绝</button></div></div><p className="mt-1 text-xs text-gray-500">用户中心账号：{item.accountName}</p>{item.message && <p className="mt-1 text-gray-600">{item.message}</p>}<label className="mt-2 block text-xs text-gray-600">关联已有的人物（可选）<select value={requestMatches[item.id] || 0} onChange={(event) => setRequestMatches({ ...requestMatches, [item.id]: Number(event.target.value) })} className="mt-1 w-full rounded-lg border border-gray-300 px-2 py-1.5 text-sm"><option value={0}>新建本人记录</option>{knownPeople.filter((person) => !person.isLinked).map((person) => <option key={person.id} value={person.id}>{person.displayName} #{person.id}{person.branchName && ` · ${person.branchName}`}</option>)}</select></label></div>)}</div></section>}
           <section className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm"><h3 className="font-semibold">查找家族成员</h3><input aria-label="搜索姓名或支系" value={personQuery} onChange={(event) => setPersonQuery(event.target.value)} placeholder="按姓名或支系搜索" maxLength={80} className="mt-3 w-full rounded-lg border border-gray-300 px-3 py-2" />{loading && <p className="mt-2 text-sm text-gray-500">正在查找…</p>}<div className="mt-4 grid gap-2 sm:grid-cols-2">{people.map((person) => <button type="button" key={person.id} onClick={() => void handleSelectPerson(person.id)} className={`rounded-xl border p-3 text-left ${selectedPersonId === person.id ? 'border-[#4A90D9] bg-blue-50' : 'border-gray-200 hover:bg-gray-50'}`}><span className="font-semibold text-gray-900">{person.displayName}</span>{person.isSelf && <span className="ml-2 rounded bg-emerald-50 px-1.5 py-0.5 text-xs text-emerald-700">我</span>}<span className="mt-1 block text-xs text-gray-500">{[person.generationLabel, person.branchName].filter(Boolean).join(' · ') || '待补充辈分与支系'}</span></button>)}</div>{people.length === 0 && !loading && <p className="mt-3 text-sm text-gray-500">暂无匹配成员</p>}{hasMore && <p className="mt-3 text-xs text-gray-500">结果超过 100 位，请输入姓名或支系缩小范围。</p>}</section>
           {selectedPerson && <section className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm"><div className="flex items-start justify-between gap-2"><div><h3 className="text-lg font-bold">{selectedPerson.displayName}</h3><p className="text-sm text-gray-500">{[selectedPerson.generationLabel, selectedPerson.branchName].filter(Boolean).join(' · ') || '辈分、支系待补充'}</p></div>{canEdit && <button type="button" onClick={() => { setEditingPersonId(selectedPerson.id); setPersonForm({ displayName: selectedPerson.displayName, generationLabel: selectedPerson.generationLabel, branchName: selectedPerson.branchName, note: selectedPerson.note, gender: selectedPerson.gender, birthYear: selectedPerson.birthYear?.toString() ?? '', birthMonth: selectedPerson.birthMonth?.toString() ?? '', birthDay: selectedPerson.birthDay?.toString() ?? '', birthPrecision: selectedPerson.birthDay ? 'date' : selectedPerson.birthMonth ? 'month' : selectedPerson.birthYear ? 'year' : 'none' }); }} className="text-sm text-[#2878c7]">编辑</button>}</div><p className="mt-2 text-sm text-gray-600">性别：{genderLabel(selectedPerson.gender)} · 生日：{birthdayLabel(selectedPerson)}</p>{selectedPerson.note && <p className="mt-2 text-sm text-gray-700">{selectedPerson.note}</p>}<div className="mt-4 grid gap-2 sm:grid-cols-3">{(['parent','child','spouse'] as const).map((kind) => { const values=related.filter((item) => kind === 'parent' ? item.kind === 'parent' && item.toPersonId === selectedPerson.id : kind === 'child' ? item.kind === 'parent' && item.fromPersonId === selectedPerson.id : item.kind === 'spouse'); return <div key={kind} className="rounded-xl bg-gray-50 p-3"><b className="text-sm">{kind === 'parent' ? '父母' : kind === 'child' ? '子女' : '配偶'}</b><div className="mt-2 space-y-1">{values.length ? values.map((item) => { const otherId=item.fromPersonId === selectedPerson.id ? item.toPersonId : item.fromPersonId; return <div key={item.id} className="flex justify-between gap-2 text-sm"><button type="button" onClick={() => void handleSelectPerson(otherId)} className="text-left text-[#2878c7]">{item.fromPersonId === selectedPerson.id ? item.toName : item.fromName}</button>{canEdit && <button type="button" disabled={busy} onClick={() => void handleDeleteRelation(item.id)} className="text-xs text-red-600">移除</button>}</div>; }) : <span className="text-xs text-gray-500">未记录</span>}</div></div>; })}</div>{canEdit && <div className="mt-5 grid gap-4 border-t border-gray-100 pt-4 md:grid-cols-2"><div><h4 className="font-semibold">为 {selectedPerson.displayName} 添加关系</h4><p className="mt-1 text-xs text-gray-500">选择相对于此人的关系和另一位成员。</p><select aria-label="与此人的关系" value={relationKind} onChange={(event) => setRelationKind(event.target.value as 'parent' | 'child' | 'spouse')} className="mt-2 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"><option value="parent">父母</option><option value="child">子女</option><option value="spouse">配偶</option></select><select aria-label="关联的成员" value={relationTarget} onChange={(event) => setRelationTarget(Number(event.target.value))} className="mt-2 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"><option value={0}>选择另一位成员</option>{knownPeople.filter((person) => person.id !== selectedPerson.id).map((person) => <option key={person.id} value={person.id}>{person.displayName} #{person.id}</option>)}</select><button type="button" disabled={busy || !relationTarget} onClick={() => void handleAddRelation()} className="mt-2 rounded-lg bg-emerald-600 px-3 py-2 text-sm text-white disabled:opacity-50">添加关系</button></div><div><h4 className="font-semibold">邀请本人加入</h4>{selectedPerson.isLinked ? <p className="mt-2 text-sm text-gray-500">此人物已绑定用户。</p> : <><p className="mt-1 text-xs text-gray-500">生成专属链接，对方登录后确认，即自动加入族谱并绑定此人物。</p><button type="button" disabled={busy} onClick={() => void handleCreateInvitation()} className="mt-2 rounded-lg bg-emerald-600 px-3 py-2 text-sm text-white disabled:opacity-50">生成并复制邀请链接</button>{invitationUrl && <input aria-label="邀请链接" readOnly value={invitationUrl} onFocus={(event) => event.target.select()} className="mt-2 w-full rounded-lg border border-gray-300 px-3 py-2 text-xs" />}</>}</div></div>}</section>}
+          {selectedPerson && householdLinks.some((link) => link.treeId === selectedId && link.personId === selectedPerson.id) && <section className="rounded-2xl border border-emerald-100 bg-emerald-50 p-4 text-sm text-emerald-900">此族谱人物已关联到“我的关系”中的家庭成员。<a href="/my/relationships" className="ml-2 underline">查看家庭关系</a></section>}
           {selectedPerson && <section className="rounded-2xl border border-emerald-100 bg-white p-5 shadow-sm">
             <h3 className="font-semibold">根据已有关系推导</h3>
             <p className="mt-1 text-xs text-gray-500">由父母与子女关系自动计算，不单独保存；基础关系变化后会更新。缺少性别和年龄信息时使用中性称谓。</p>
