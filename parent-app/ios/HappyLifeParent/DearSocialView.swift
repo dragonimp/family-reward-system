@@ -24,6 +24,7 @@ struct DearSocialView: View {
     @State private var invitations: [DearRecord] = []
     @State private var spaceId = ""
     @State private var activityId = ""
+    @State private var showingActivity = false
     @State private var spaceName = ""
     @State private var activityName = ""
     @State private var inviteUsername = ""
@@ -45,7 +46,7 @@ struct DearSocialView: View {
             List {
                 Section {
                     Text("相聚时刻").font(.title2.bold())
-                    Text("与家人、朋友共同安排活动，分享照片和生活日常。")
+                    Text("空间收纳一组活动；点开活动再查看邀请、相册、日常与成员。")
                         .font(.subheadline).foregroundStyle(.secondary)
                     if !error.isEmpty { Text(error).foregroundStyle(.red) }
                     if !notice.isEmpty { Text(notice).foregroundStyle(.teal) }
@@ -73,7 +74,7 @@ struct DearSocialView: View {
                         Button("创建") { run { try await createSpace() } }
                             .disabled(busy || spaceName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                     }
-                    Text("加入同一空间不等于建立好友关系；活动邀请需对方确认。")
+                    Text("空间只用于归拢活动；参加活动和建立好友关系都需分别确认。")
                         .font(.caption).foregroundStyle(.secondary)
                 }
                 if selectedSpace != nil {
@@ -85,6 +86,7 @@ struct DearSocialView: View {
                             ForEach(activities) { item in
                                 Button {
                                     activityId = item.id
+                                    showingActivity = true
                                 } label: {
                                     HStack {
                                         VStack(alignment: .leading, spacing: 4) {
@@ -94,7 +96,7 @@ struct DearSocialView: View {
                                             }
                                         }
                                         Spacer()
-                                        if activityId == item.id { Image(systemName: "checkmark.circle.fill").foregroundStyle(.teal) }
+                                        Image(systemName: "chevron.right").font(.caption).foregroundStyle(.secondary)
                                     }
                                 }.buttonStyle(.plain)
                             }
@@ -106,6 +108,56 @@ struct DearSocialView: View {
                         }
                     }
                 }
+                Section("好友关系 · 跨空间") {
+                    DisclosureGroup("查看好友与申请") {
+                        if relationships.isEmpty { Text("还没有好友关系或申请。") .foregroundStyle(.secondary) }
+                        ForEach(relationships) { relation in
+                            HStack {
+                                VStack(alignment: .leading) {
+                                    Text(relation.text("peerName"))
+                                    Text(relation.text("status") == "accepted" ? "朋友" : relation.text("direction") == "incoming" ? "邀请你成为朋友" : "等待对方确认")
+                                        .font(.caption).foregroundStyle(.secondary)
+                                }
+                                Spacer()
+                                if relation.text("status") == "pending" && relation.text("direction") == "incoming" {
+                                    Button("接受") { run { try await acceptFriend(relation) } }.disabled(busy)
+                                }
+                                Button(relation.text("status") == "accepted" ? "解除" : "移除", role: .destructive) {
+                                    run { try await removeFriend(relation) }
+                                }.disabled(busy)
+                            }
+                        }
+                    }
+                }
+                if showLogout {
+                    Section { Link("隐私政策与支持", destination: URL(string: "https://happylife.ai.impx.net/legal/linko-family-privacy.html")!) }
+                }
+            }
+            .listStyle(.insetGrouped)
+            .readablePage()
+            .navigationTitle("活动与分享")
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) { Button("刷新", systemImage: "arrow.clockwise") { run { try await load() } }.disabled(busy) }
+                if showLogout { ToolbarItem(placement: .topBarLeading) { Button("退出") { store.logout() } } }
+            }
+            .refreshable { await refresh() }
+            .task { await refresh() }
+            .onChange(of: spaceId) { _, _ in activityId = ""; showingActivity = false; activities = []; photos = []; activityError = ""; activityLoading = true; run { try await loadActivities() } }
+            .navigationDestination(isPresented: $showingActivity) { activityDetail }
+            .onChange(of: activityId) { _, _ in photos = []; moments = []; activityMembers = []; run { try await loadPhotos(); try await loadMoments(); try await loadMembers() } }
+        }
+    }
+
+    private var activityDetail: some View {
+        List {
+            if !error.isEmpty { Section { Text(error).foregroundStyle(.red) } }
+            if !notice.isEmpty { Section { Text(notice).foregroundStyle(.teal) } }
+            Section {
+                Text(selectedSpace?.text("name") ?? "生活空间").font(.caption).foregroundStyle(.teal)
+                Text(selectedActivity?.text("title") ?? "活动详情").font(.title2.bold())
+                Text("邀请、照片、日常和成员仅属于这场活动。")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
                 if let selectedActivity {
                     Section("邀请参加 · \(selectedActivity.text("title"))") {
                         HStack {
@@ -178,41 +230,13 @@ struct DearSocialView: View {
                         }
                     }
                 }
-                if !relationships.isEmpty {
-                    Section("我的好友与申请") {
-                        ForEach(relationships) { relation in
-                            HStack {
-                                VStack(alignment: .leading) {
-                                    Text(relation.text("peerName"))
-                                    Text(relation.text("status") == "accepted" ? "朋友" : relation.text("direction") == "incoming" ? "邀请你成为朋友" : "等待对方确认")
-                                        .font(.caption).foregroundStyle(.secondary)
-                                }
-                                Spacer()
-                                if relation.text("status") == "pending" && relation.text("direction") == "incoming" {
-                                    Button("接受") { run { try await acceptFriend(relation) } }.disabled(busy)
-                                }
-                                Button(relation.text("status") == "accepted" ? "解除" : "移除", role: .destructive) {
-                                    run { try await removeFriend(relation) }
-                                }.disabled(busy)
-                            }
-                        }
-                    }
-                }
-                if showLogout {
-                    Section { Link("隐私政策与支持", destination: URL(string: "https://happylife.ai.impx.net/legal/linko-family-privacy.html")!) }
-                }
-            }
-            .listStyle(.insetGrouped)
-            .readablePage()
-            .navigationTitle("活动与分享")
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) { Button("刷新", systemImage: "arrow.clockwise") { run { try await load() } }.disabled(busy) }
-                if showLogout { ToolbarItem(placement: .topBarLeading) { Button("退出") { store.logout() } } }
-            }
-            .refreshable { await refresh() }
-            .task { await refresh() }
-            .onChange(of: spaceId) { _, _ in activityId = ""; activities = []; photos = []; activityError = ""; activityLoading = true; run { try await loadActivities() } }
-            .onChange(of: activityId) { _, _ in photos = []; moments = []; activityMembers = []; run { try await loadPhotos(); try await loadMoments(); try await loadMembers() } }
+        }
+        .listStyle(.insetGrouped)
+        .readablePage()
+        .navigationTitle(selectedActivity?.text("title") ?? "活动详情")
+        .refreshable {
+            do { try await loadDetails(); try await loadRelationships() }
+            catch { self.error = error.localizedDescription }
         }
     }
 
@@ -252,7 +276,7 @@ struct DearSocialView: View {
         activities = loaded
         activityError = ""
         let previousActivity = activityId
-        if !loaded.contains(where: { $0.id == activityId }) { activityId = loaded.first?.id ?? "" }
+        if !loaded.contains(where: { $0.id == activityId }) { activityId = ""; showingActivity = false }
         if activityId == previousActivity && !activityId.isEmpty {
             do { try await loadDetails() }
             catch { self.error = "活动内容暂时无法读取：\(error.localizedDescription)" }
@@ -306,7 +330,7 @@ struct DearSocialView: View {
     private func createActivity() async throws {
         let value = try await store.call(base + "tenants/\(spaceId)/activities", method: "POST", body: ["title": activityName.trimmingCharacters(in: .whitespacesAndNewlines), "description": ""])
         let item = DearRecord(data: value as? [String: Any] ?? [:])
-        activityName = ""; try await loadActivities(); activityId = item.id; notice = "活动已创建。"
+        activityName = ""; try await loadActivities(); activityId = item.id; showingActivity = true; notice = "活动已创建。"
     }
     private func inviteByName() async throws {
         _ = try await store.call(base + "tenants/\(spaceId)/activities/\(activityId)/invites/username", method: "POST", body: ["username": inviteUsername.trimmingCharacters(in: .whitespacesAndNewlines)])
@@ -323,7 +347,7 @@ struct DearSocialView: View {
         guard let username = me["username"] as? String,
               let safe = username.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) else { throw APIError.message("无法确认用户名。") }
         _ = try await store.call(base + "tenants/\(invitation.text("tenantId"))/activities/\(invitation.text("activityId"))/invites/username/\(safe)/accept", method: "POST", body: [:])
-        try await load(); notice = "已加入共同活动。"
+        try await load(); spaceId = invitation.text("tenantId"); notice = "已加入共同活动，可在所属空间点开查看。"
     }
 }
 

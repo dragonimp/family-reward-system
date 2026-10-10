@@ -38,6 +38,10 @@ export default function App() {
             element={<ProtectedRoute><DearSocialPage /></ProtectedRoute>}
           />
           <Route
+            path="/dear/spaces/:spaceId/activities/:activityId"
+            element={<ProtectedRoute><DearSocialPage /></ProtectedRoute>}
+          />
+          <Route
             path="/identity"
             element={
               <ProtectedRoute>
