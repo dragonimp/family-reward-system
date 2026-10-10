@@ -131,6 +131,7 @@ struct GenealogyDetailView: View {
     @State private var birthYear = ""
     @State private var birthMonth = ""
     @State private var birthDay = ""
+    @State private var birthPrecision = "none"
     @State private var editName = ""
     @State private var editGeneration = ""
     @State private var editBranch = ""
@@ -139,6 +140,7 @@ struct GenealogyDetailView: View {
     @State private var editBirthYear = ""
     @State private var editBirthMonth = ""
     @State private var editBirthDay = ""
+    @State private var editBirthPrecision = "none"
     @State private var editBusy = false
     @State private var editError: String?
     @State private var showAddPerson = false
@@ -210,10 +212,10 @@ struct GenealogyDetailView: View {
                         TextField("新成员姓名", text: $name)
                         TextField("辈分（可选）", text: $generation)
                         TextField("支系（可选）", text: $branch)
-                        demographicFields(gender: $gender, year: $birthYear, month: $birthMonth, day: $birthDay)
+                        demographicFields(gender: $gender, precision: $birthPrecision, year: $birthYear, month: $birthMonth, day: $birthDay)
                         TextField("备注（仅成员可见）", text: $note, axis: .vertical).lineLimit(2...4)
                         Button("添加新成员") { Task { await savePerson() } }
-                            .disabled(busy || name.trimmingCharacters(in: .whitespacesAndNewlines).count < 2)
+                            .disabled(busy || name.trimmingCharacters(in: .whitespacesAndNewlines).count < 2 || !birthdaySelectionComplete(birthPrecision, birthYear, birthMonth, birthDay))
                     }
                 }
             }
@@ -232,10 +234,10 @@ struct GenealogyDetailView: View {
                             TextField("姓名", text: $editName)
                             TextField("辈分（可选）", text: $editGeneration)
                             TextField("支系（可选）", text: $editBranch)
-                            demographicFields(gender: $editGender, year: $editBirthYear, month: $editBirthMonth, day: $editBirthDay)
+                            demographicFields(gender: $editGender, precision: $editBirthPrecision, year: $editBirthYear, month: $editBirthMonth, day: $editBirthDay)
                             TextField("备注（仅成员可见）", text: $editNote, axis: .vertical).lineLimit(2...4)
                             Button("保存资料") { Task { await saveEdit(person.id) } }
-                                .disabled(editBusy || editName.trimmingCharacters(in: .whitespacesAndNewlines).count < 2)
+                                .disabled(editBusy || editName.trimmingCharacters(in: .whitespacesAndNewlines).count < 2 || !birthdaySelectionComplete(editBirthPrecision, editBirthYear, editBirthMonth, editBirthDay))
                         } else {
                             LabeledContent("姓名", value: person.text("displayName"))
                             if !person.text("generationLabel").isEmpty { LabeledContent("辈分", value: person.text("generationLabel")) }
@@ -360,22 +362,53 @@ struct GenealogyDetailView: View {
         let day = person.int("birthDay")
         return day > 0 ? "\(year)年\(month)月\(day)日" : "\(year)年\(month)月"
     }
-    @ViewBuilder private func demographicFields(gender: Binding<String>, year: Binding<String>, month: Binding<String>, day: Binding<String>) -> some View {
+    private func birthdaySelectionComplete(_ precision: String, _ year: String, _ month: String, _ day: String) -> Bool {
+        precision == "none" || (!year.isEmpty && (precision == "year" || !month.isEmpty && (precision == "month" || !day.isEmpty)))
+    }
+    private func calendarDate(_ year: String, _ month: String, _ day: String) -> Date {
+        let calendar = Calendar(identifier: .gregorian)
+        let currentYear = calendar.component(.year, from: Date())
+        return calendar.date(from: DateComponents(year: Int(year) ?? currentYear, month: Int(month) ?? 1, day: Int(day) ?? 1)) ?? Date()
+    }
+    private func applyCalendarDate(_ value: Date, precision: String, year: Binding<String>, month: Binding<String>, day: Binding<String>) {
+        let parts = Calendar(identifier: .gregorian).dateComponents([.year, .month, .day], from: value)
+        year.wrappedValue = String(parts.year ?? 1)
+        month.wrappedValue = precision == "year" ? "" : String(parts.month ?? 1)
+        day.wrappedValue = precision == "date" ? String(parts.day ?? 1) : ""
+    }
+    @ViewBuilder private func demographicFields(gender: Binding<String>, precision: Binding<String>, year: Binding<String>, month: Binding<String>, day: Binding<String>) -> some View {
         Picker("性别（可选）", selection: gender) {
             Text("未填写").tag("")
             Text("男").tag("male")
             Text("女").tag("female")
             Text("其他").tag("other")
         }
-        TextField("出生年（可只填年份）", text: year)
-            .keyboardType(.numberPad)
-            .onChange(of: year.wrappedValue) { _, value in if value.isEmpty { month.wrappedValue = ""; day.wrappedValue = "" } }
-        if !year.wrappedValue.isEmpty {
-            TextField("出生月（可选）", text: month)
-                .keyboardType(.numberPad)
-                .onChange(of: month.wrappedValue) { _, value in if value.isEmpty { day.wrappedValue = "" } }
+        Picker("生日精度", selection: precision) {
+            Text("不填写").tag("none")
+            Text("仅年份").tag("year")
+            Text("年和月").tag("month")
+            Text("完整日期").tag("date")
         }
-        if !month.wrappedValue.isEmpty { TextField("出生日（可选）", text: day).keyboardType(.numberPad) }
+        .onChange(of: precision.wrappedValue) { _, value in
+            if value == "none" { year.wrappedValue = ""; month.wrappedValue = ""; day.wrappedValue = "" }
+            else if value == "year" { month.wrappedValue = ""; day.wrappedValue = "" }
+            else if value == "month" { day.wrappedValue = "" }
+        }
+        if precision.wrappedValue != "none" {
+            let selection = Binding<Date>(
+                get: { calendarDate(year.wrappedValue, month.wrappedValue, day.wrappedValue) },
+                set: { applyCalendarDate($0, precision: precision.wrappedValue, year: year, month: month, day: day) }
+            )
+            DatePicker("从日历选择生日", selection: selection, displayedComponents: .date)
+                .datePickerStyle(.graphical)
+                .environment(\.calendar, Calendar(identifier: .gregorian))
+            Button("选用日历显示的日期") {
+                applyCalendarDate(selection.wrappedValue, precision: precision.wrappedValue, year: year, month: month, day: day)
+            }
+            Text(birthdaySelectionComplete(precision.wrappedValue, year.wrappedValue, month.wrappedValue, day.wrappedValue)
+                ? "仅保存所选精度，未选定的月日不会补值。" : "请在日历中选定生日后保存。")
+                .font(.caption).foregroundStyle(.secondary)
+        }
     }
     private func openPerson(_ person: Record) {
         editName = person.text("displayName")
@@ -386,6 +419,7 @@ struct GenealogyDetailView: View {
         editBirthYear = person.int("birthYear") == 0 ? "" : String(person.int("birthYear"))
         editBirthMonth = person.int("birthMonth") == 0 ? "" : String(person.int("birthMonth"))
         editBirthDay = person.int("birthDay") == 0 ? "" : String(person.int("birthDay"))
+        editBirthPrecision = person.int("birthDay") > 0 ? "date" : person.int("birthMonth") > 0 ? "month" : person.int("birthYear") > 0 ? "year" : "none"
         editError = nil
         relatedPersonID = 0
         invitationURL = nil
@@ -418,7 +452,7 @@ struct GenealogyDetailView: View {
     private func savePerson() async {
         let body = ["displayName": name.trimmingCharacters(in: .whitespacesAndNewlines), "generationLabel": generation.trimmingCharacters(in: .whitespacesAndNewlines), "branchName": branch.trimmingCharacters(in: .whitespacesAndNewlines), "note": note.trimmingCharacters(in: .whitespacesAndNewlines), "gender": gender, "birthYear": birthYear, "birthMonth": birthMonth, "birthDay": birthDay]
         await mutate(base + "/people", body: body)
-        if error == nil { name = ""; generation = ""; branch = ""; note = ""; gender = ""; birthYear = ""; birthMonth = ""; birthDay = ""; showAddPerson = false }
+        if error == nil { name = ""; generation = ""; branch = ""; note = ""; gender = ""; birthYear = ""; birthMonth = ""; birthDay = ""; birthPrecision = "none"; showAddPerson = false }
     }
     private func saveEdit(_ personID: Int) async {
         editBusy = true; editError = nil; defer { editBusy = false }
