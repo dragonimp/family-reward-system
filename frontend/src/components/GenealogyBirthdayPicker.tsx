@@ -1,4 +1,5 @@
 import { DatePicker } from 'antd';
+import { useState } from 'react';
 import zhCN from 'antd/es/date-picker/locale/zh_CN';
 import dayjs, { type Dayjs } from 'dayjs';
 import 'dayjs/locale/zh-cn';
@@ -17,6 +18,7 @@ const calendarValue = (year: string, month: string, day: string) => dayjs('2000-
   .year(Number(year)).month(Number(month || '1') - 1).date(Number(day || '1'));
 
 export default function GenealogyBirthdayPicker({ precision, birthYear, birthMonth, birthDay, onChange }: Props) {
+  const [calendarOpen, setCalendarOpen] = useState(false);
   const parts = { birthYear, birthMonth, birthDay };
   const selected = birthYear && (precision === 'year' || birthMonth && (precision === 'month' || birthDay))
     ? calendarValue(birthYear, birthMonth, birthDay)
@@ -26,6 +28,7 @@ export default function GenealogyBirthdayPicker({ precision, birthYear, birthMon
     : dayjs();
 
   const choose = (value: Dayjs | null) => {
+    setCalendarOpen(false);
     if (!value) { onChange(precision, { birthYear: '', birthMonth: '', birthDay: '' }); return; }
     onChange(precision, {
       birthYear: String(value.year()),
@@ -35,12 +38,13 @@ export default function GenealogyBirthdayPicker({ precision, birthYear, birthMon
   };
 
   const changePrecision = (next: BirthdayPrecision) => {
+    setCalendarOpen(false);
     onChange(next, next === 'none' ? { birthYear: '', birthMonth: '', birthDay: '' }
       : next === 'year' ? { ...parts, birthMonth: '', birthDay: '' }
         : next === 'month' ? { ...parts, birthDay: '' } : parts);
   };
 
-  const pickerProps = { locale: zhCN, value: selected, defaultPickerValue: initial, className: 'w-full', allowClear: true };
+  const pickerProps = { locale: zhCN, value: selected, defaultPickerValue: initial, className: 'w-full', allowClear: true, open: calendarOpen, onOpenChange: setCalendarOpen };
   return <div className="rounded-xl border border-emerald-100 bg-emerald-50/40 p-3">
     <label className="block text-xs font-medium text-gray-700" htmlFor="genealogy-birthday-precision">生日精度</label>
     <select id="genealogy-birthday-precision" aria-label="生日精度" value={precision} onChange={(event) => changePrecision(event.target.value as BirthdayPrecision)} className="mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm">

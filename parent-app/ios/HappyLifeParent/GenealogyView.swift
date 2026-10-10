@@ -124,15 +124,6 @@ struct GenealogyDetailView: View {
     @State private var query = ""
     @State private var hasMore = false
     @State private var selected: Record?
-    @State private var name = ""
-    @State private var generation = ""
-    @State private var branch = ""
-    @State private var note = ""
-    @State private var gender = ""
-    @State private var birthYear = ""
-    @State private var birthMonth = ""
-    @State private var birthDay = ""
-    @State private var birthPrecision = "none"
     @State private var editName = ""
     @State private var editGeneration = ""
     @State private var editBranch = ""
@@ -145,6 +136,7 @@ struct GenealogyDetailView: View {
     @State private var editBusy = false
     @State private var editError: String?
     @State private var showAddPerson = false
+    @State private var birthdayCalendarExpanded = false
     @State private var relatedPersonID = 0
     @State private var relationKind = "parent"
     @State private var invitationURL: URL?
@@ -162,6 +154,10 @@ struct GenealogyDetailView: View {
                     Text(tree.text("name")).font(.title2.bold())
                     Text("\(tree.int("peopleCount")) 位人物 · \(tree.int("memberCount")) 位已加入成员").foregroundStyle(.secondary)
                     if !tree.text("description").isEmpty { Text(tree.text("description")) }
+                    if owner {
+                        Button("添加家族成员", systemImage: "person.badge.plus") { openAddPerson() }
+                            .buttonStyle(.borderedProminent)
+                    }
                 }
             }
             if owner && !requests.isEmpty {
@@ -205,21 +201,6 @@ struct GenealogyDetailView: View {
                 }
                 if hasMore { Text("结果超过 100 位，请输入姓名或支系缩小范围。 ").font(.caption).foregroundStyle(.secondary) }
             }
-            if owner {
-                Section {
-                    DisclosureGroup("新增家族成员", isExpanded: $showAddPerson) {
-                        Text("此处只用于新增；修改已有成员请点选上方姓名。")
-                            .font(.caption).foregroundStyle(.secondary)
-                        TextField("新成员姓名", text: $name)
-                        TextField("辈分（可选）", text: $generation)
-                        TextField("支系（可选）", text: $branch)
-                        demographicFields(gender: $gender, precision: $birthPrecision, year: $birthYear, month: $birthMonth, day: $birthDay)
-                        TextField("备注（仅成员可见）", text: $note, axis: .vertical).lineLimit(2...4)
-                        Button("添加新成员") { Task { await savePerson() } }
-                            .disabled(busy || name.trimmingCharacters(in: .whitespacesAndNewlines).count < 2 || !birthdaySelectionComplete(birthPrecision, birthYear, birthMonth, birthDay))
-                    }
-                }
-            }
         }
         .frame(maxWidth: 860).frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color(uiColor: .systemGroupedBackground))
@@ -235,13 +216,7 @@ struct GenealogyDetailView: View {
                             Text("已关联到‘我的’中的家庭成员").foregroundStyle(.green)
                         }
                         if owner {
-                            TextField("姓名", text: $editName)
-                            TextField("辈分（可选）", text: $editGeneration)
-                            TextField("支系（可选）", text: $editBranch)
-                            demographicFields(gender: $editGender, precision: $editBirthPrecision, year: $editBirthYear, month: $editBirthMonth, day: $editBirthDay)
-                            TextField("备注（仅成员可见）", text: $editNote, axis: .vertical).lineLimit(2...4)
-                            Button("保存资料") { Task { await saveEdit(person.id) } }
-                                .disabled(editBusy || editName.trimmingCharacters(in: .whitespacesAndNewlines).count < 2 || !birthdaySelectionComplete(editBirthPrecision, editBirthYear, editBirthMonth, editBirthDay))
+                            personEditorFields
                         } else {
                             LabeledContent("姓名", value: person.text("displayName"))
                             if !person.text("generationLabel").isEmpty { LabeledContent("辈分", value: person.text("generationLabel")) }
@@ -317,9 +292,50 @@ struct GenealogyDetailView: View {
                 }
                 .navigationTitle(person.text("displayName"))
                 .navigationBarTitleDisplayMode(.inline)
-                .toolbar { Button("完成") { selected = nil }.disabled(editBusy) }
+                .toolbar {
+                    if owner { ToolbarItem(placement: .cancellationAction) { Button("取消") { selected = nil }.disabled(editBusy) } }
+                    ToolbarItem(placement: .confirmationAction) {
+                        Button("完成") {
+                            if owner { Task { await saveEdit(person.id) } }
+                            else { selected = nil }
+                        }
+                        .disabled(editBusy || owner && !personEditorValid)
+                    }
+                }
+                .interactiveDismissDisabled(owner)
             }
         }
+        .sheet(isPresented: $showAddPerson) {
+            NavigationStack {
+                Form {
+                    if let editError { Section { Text(editError).foregroundStyle(.red) } }
+                    Section("成员资料") { personEditorFields }
+                }
+                .navigationTitle("添加家族成员")
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .cancellationAction) { Button("取消") { showAddPerson = false }.disabled(editBusy) }
+                    ToolbarItem(placement: .confirmationAction) {
+                        Button("完成") { Task { await savePerson() } }
+                            .disabled(editBusy || !personEditorValid)
+                    }
+                }
+                .interactiveDismissDisabled()
+            }
+        }
+    }
+    private var personEditorValid: Bool {
+        editName.trimmingCharacters(in: .whitespacesAndNewlines).count >= 2
+            && birthdaySelectionComplete(editBirthPrecision, editBirthYear, editBirthMonth, editBirthDay)
+    }
+    @ViewBuilder private var personEditorFields: some View {
+        TextField("姓名", text: $editName)
+        TextField("辈分（可选）", text: $editGeneration)
+        TextField("支系（可选）", text: $editBranch)
+        demographicFields(gender: $editGender, precision: $editBirthPrecision, year: $editBirthYear, month: $editBirthMonth, day: $editBirthDay)
+        TextField("备注（仅成员可见）", text: $editNote, axis: .vertical).lineLimit(2...4)
+        Text("点右上角“完成”后自动保存。")
+            .font(.caption).foregroundStyle(.secondary)
     }
     private func load() async {
         do {
@@ -380,6 +396,7 @@ struct GenealogyDetailView: View {
         year.wrappedValue = String(parts.year ?? 1)
         month.wrappedValue = precision == "year" ? "" : String(parts.month ?? 1)
         day.wrappedValue = precision == "date" ? String(parts.day ?? 1) : ""
+        birthdayCalendarExpanded = false
     }
     @ViewBuilder private func demographicFields(gender: Binding<String>, precision: Binding<String>, year: Binding<String>, month: Binding<String>, day: Binding<String>) -> some View {
         Picker("性别（可选）", selection: gender) {
@@ -395,6 +412,7 @@ struct GenealogyDetailView: View {
             Text("完整日期").tag("date")
         }
         .onChange(of: precision.wrappedValue) { _, value in
+            birthdayCalendarExpanded = false
             if value == "none" { year.wrappedValue = ""; month.wrappedValue = ""; day.wrappedValue = "" }
             else if value == "year" { month.wrappedValue = ""; day.wrappedValue = "" }
             else if value == "month" { day.wrappedValue = "" }
@@ -404,11 +422,10 @@ struct GenealogyDetailView: View {
                 get: { calendarDate(year.wrappedValue, month.wrappedValue, day.wrappedValue) },
                 set: { applyCalendarDate($0, precision: precision.wrappedValue, year: year, month: month, day: day) }
             )
-            DatePicker("从日历选择生日", selection: selection, displayedComponents: .date)
-                .datePickerStyle(.graphical)
-                .environment(\.calendar, Calendar(identifier: .gregorian))
-            Button("选用日历显示的日期") {
-                applyCalendarDate(selection.wrappedValue, precision: precision.wrappedValue, year: year, month: month, day: day)
+            DisclosureGroup("从日历选择生日", isExpanded: $birthdayCalendarExpanded) {
+                DatePicker("选择日期", selection: selection, displayedComponents: .date)
+                    .datePickerStyle(.graphical)
+                    .environment(\.calendar, Calendar(identifier: .gregorian))
             }
             Text(birthdaySelectionComplete(precision.wrappedValue, year.wrappedValue, month.wrappedValue, day.wrappedValue)
                 ? "仅保存所选精度，未选定的月日不会补值。" : "请在日历中选定生日后保存。")
@@ -416,6 +433,7 @@ struct GenealogyDetailView: View {
         }
     }
     private func openPerson(_ person: Record) {
+        birthdayCalendarExpanded = false
         editName = person.text("displayName")
         editGeneration = person.text("generationLabel")
         editBranch = person.text("branchName")
@@ -430,6 +448,20 @@ struct GenealogyDetailView: View {
         invitationURL = nil
         selected = person
         Task { await loadInferred(person.id) }
+    }
+    private func openAddPerson() {
+        editName = ""
+        editGeneration = ""
+        editBranch = ""
+        editNote = ""
+        editGender = ""
+        editBirthYear = ""
+        editBirthMonth = ""
+        editBirthDay = ""
+        editBirthPrecision = "none"
+        birthdayCalendarExpanded = false
+        editError = nil
+        showAddPerson = true
     }
     private func inferenceLabel(_ kind: String) -> String {
         switch kind {
@@ -455,18 +487,30 @@ struct GenealogyDetailView: View {
         }
     }
     private func savePerson() async {
-        let body = ["displayName": name.trimmingCharacters(in: .whitespacesAndNewlines), "generationLabel": generation.trimmingCharacters(in: .whitespacesAndNewlines), "branchName": branch.trimmingCharacters(in: .whitespacesAndNewlines), "note": note.trimmingCharacters(in: .whitespacesAndNewlines), "gender": gender, "birthYear": birthYear, "birthMonth": birthMonth, "birthDay": birthDay]
-        await mutate(base + "/people", body: body)
-        if error == nil { name = ""; generation = ""; branch = ""; note = ""; gender = ""; birthYear = ""; birthMonth = ""; birthDay = ""; birthPrecision = "none"; showAddPerson = false }
+        editBusy = true; editError = nil; defer { editBusy = false }
+        let body = personEditorBody()
+        do {
+            _ = try await store.call(base + "/people", method: "POST", body: body)
+            await load()
+            showAddPerson = false
+        } catch { editError = error.localizedDescription }
     }
     private func saveEdit(_ personID: Int) async {
         editBusy = true; editError = nil; defer { editBusy = false }
-        let body = ["displayName": editName.trimmingCharacters(in: .whitespacesAndNewlines), "generationLabel": editGeneration.trimmingCharacters(in: .whitespacesAndNewlines), "branchName": editBranch.trimmingCharacters(in: .whitespacesAndNewlines), "note": editNote.trimmingCharacters(in: .whitespacesAndNewlines), "gender": editGender, "birthYear": editBirthYear, "birthMonth": editBirthMonth, "birthDay": editBirthDay]
+        let body = personEditorBody()
         do {
             _ = try await store.call(base + "/people/\(personID)", method: "PUT", body: body)
             await load()
-            await selectPerson(personID)
+            selected = nil
         } catch { editError = error.localizedDescription }
+    }
+    private func personEditorBody() -> [String: Any] {
+        ["displayName": editName.trimmingCharacters(in: .whitespacesAndNewlines),
+         "generationLabel": editGeneration.trimmingCharacters(in: .whitespacesAndNewlines),
+         "branchName": editBranch.trimmingCharacters(in: .whitespacesAndNewlines),
+         "note": editNote.trimmingCharacters(in: .whitespacesAndNewlines),
+         "gender": editGender, "birthYear": editBirthYear,
+         "birthMonth": editBirthMonth, "birthDay": editBirthDay]
     }
     private func addRelation(_ personID: Int) async {
         guard relatedPersonID > 0 else { return }
