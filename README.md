@@ -35,6 +35,10 @@ SwiftUI 原生 iPhone 客户端，提供家庭、孩子、积分奖励、审批�
 bash parent-app/ios/verify.sh
 ```
 
+## Linko Dear Android 家长端（首版预览）
+
+`parent-app/android/` 提供与 Web、iOS 共用后端的 Android 手机客户端，首版覆盖用户中心登录、家庭与孩子、奖励、申请审批、记录及手表配对。当前为内部安装预览包；构建方法、功能边界和模拟器验证见 [Android 家长端说明](parent-app/android/README.md)。
+
 ## 手表 app
 
 手表端 H5 入口为 `https://happylife.ai.impx.net/watch`。手表不再走统一账号登录，由家长在 Web 端家庭管理里生成儿童认证码，手表端输入认证码完成设备绑定，后续用设备 token 查询积分和提交积分申请。
