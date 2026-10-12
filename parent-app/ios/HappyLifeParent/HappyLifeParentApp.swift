@@ -425,10 +425,10 @@ struct AccountView: View {
                 }
                 Button("退出当前账号", role: .destructive) { logout = true }
                 Section("分享外部测试") {
-                    ShareLink(item: URL(string: "https://testflight.apple.com/join/dAHHKXM7")!) {
-                        Label("分享 Linko Dear 测试邀请", systemImage: "square.and.arrow.up")
+                    Link(destination: URL(string: "https://home.ai.impx.net/share/linko-family-ios")!) {
+                        Label("生成专属测试邀请", systemImage: "square.and.arrow.up")
                     }
-                    Text("通过 TestFlight 邀请朋友体验；外部测试版本可能晚于内部测试版本。")
+                    Text("在 Atlas 邀请页登录并分享专属链接；各系统的获取方式和版本说明由应用后台维护。")
                         .font(.footnote).foregroundStyle(.secondary)
                 }
             }.readablePage().navigationTitle("我的").confirmationDialog("退出 Linko Dear？", isPresented: $logout, titleVisibility: .visible) { Button("退出登录", role: .destructive) { store.logout() } } message: { Text("本机登录凭据将清除。用户中心的浏览器登录状态由用户中心管理。") }

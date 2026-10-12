@@ -201,15 +201,14 @@ public sealed class FamilyPage : ContentPage
         content.Add(new Label { Text = $"Android 版本 {AppInfo.Current.VersionString} · 数据与网页版共用" });
         content.Add(Button("刷新", () => _ = Run(store.LoadAsync)));
         content.Add(Button("退出登录", () => _ = Logout()));
-        content.Add(Heading("分享外部测试", 17));
-        content.Add(Button("分享 Linko Dear TestFlight 邀请", () => _ = Run(ShareExternalTest)));
-        content.Add(new Label { Text = "外部测试版本可能晚于内部测试版本。", TextColor = Colors.DimGray, FontSize = 12 });
+        content.Add(Heading("邀请朋友体验", 17));
+        content.Add(Button("生成专属测试邀请", () => _ = Run(OpenTestInvitation)));
+        content.Add(new Label { Text = "在 Atlas 邀请页登录后生成链接；各系统的获取方式由应用后台维护。", TextColor = Colors.DimGray, FontSize = 12 });
     }
 
-    private async Task ShareExternalTest()
+    private async Task OpenTestInvitation()
     {
-        const string url = "https://testflight.apple.com/join/dAHHKXM7";
-        await Share.Default.RequestAsync(new ShareTextRequest { Text = url, Title = "Linko Dear 外部测试邀请" });
+        await Launcher.Default.OpenAsync(new Uri("https://home.ai.impx.net/share/linko-family-ios"));
     }
 
     private async Task Logout()
