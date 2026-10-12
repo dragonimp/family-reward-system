@@ -424,6 +424,13 @@ struct AccountView: View {
                     Text("家庭关系与群组记录均与网页版同步。登录由用户中心提供，凭据保存在本机钥匙串。").font(.footnote).foregroundStyle(.secondary)
                 }
                 Button("退出当前账号", role: .destructive) { logout = true }
+                Section("分享外部测试") {
+                    ShareLink(item: URL(string: "https://testflight.apple.com/join/dAHHKXM7")!) {
+                        Label("分享 Linko Dear 测试邀请", systemImage: "square.and.arrow.up")
+                    }
+                    Text("通过 TestFlight 邀请朋友体验；外部测试版本可能晚于内部测试版本。")
+                        .font(.footnote).foregroundStyle(.secondary)
+                }
             }.readablePage().navigationTitle("我的").confirmationDialog("退出 Linko Dear？", isPresented: $logout, titleVisibility: .visible) { Button("退出登录", role: .destructive) { store.logout() } } message: { Text("本机登录凭据将清除。用户中心的浏览器登录状态由用户中心管理。") }
         }
     }

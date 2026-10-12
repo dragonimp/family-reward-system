@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom';
-import { useEffect, useRef } from 'react';
-import { HomeOutlined, KeyOutlined, LogoutOutlined, SettingOutlined, UserOutlined } from '@ant-design/icons';
+import { useEffect, useRef, useState } from 'react';
+import { HomeOutlined, KeyOutlined, LogoutOutlined, SettingOutlined, ShareAltOutlined, UserOutlined } from '@ant-design/icons';
 import { getUserCenterUrl } from '../auth';
 import { useFamilyGroup } from '../contexts/FamilyGroupContext';
 import type { AuthUser } from '../types';
@@ -12,13 +12,29 @@ interface UserMenuProps {
 }
 
 export default function UserMenu({ user, userId, onLogout }: UserMenuProps) {
+  const externalTestUrl = 'https://testflight.apple.com/join/dAHHKXM7';
   const displayName = user?.displayName || user?.username || userId || '用户';
   const avatar = user?.iconEmoji || displayName.slice(0, 1).toUpperCase();
   const { groups, selectedGroupId, selectedGroup, loading, error, selectGroup } = useFamilyGroup();
   const menuRef = useRef<HTMLDetailsElement>(null);
+  const [shareMessage, setShareMessage] = useState('');
 
   const closeMenu = () => {
     menuRef.current?.removeAttribute('open');
+  };
+  const shareExternalTest = async () => {
+    try {
+      if (navigator.share) {
+        await navigator.share({ title: 'Linko Dear 外部测试', url: externalTestUrl });
+        closeMenu();
+      } else {
+        await navigator.clipboard.writeText(externalTestUrl);
+        setShareMessage('测试邀请链接已复制');
+      }
+    } catch (error) {
+      if (error instanceof DOMException && error.name === 'AbortError') return;
+      setShareMessage('分享失败，请使用下方链接复制');
+    }
   };
 
   useEffect(() => {
@@ -112,6 +128,15 @@ export default function UserMenu({ user, userId, onLogout }: UserMenuProps) {
             <LogoutOutlined aria-hidden="true" />
             <span>退出登录</span>
           </a>
+          <div className="my-1 border-t border-gray-100" />
+          <div className="px-3 py-2">
+            <button type="button" onClick={() => void shareExternalTest()} className="flex items-center gap-2 text-sm text-teal-700 hover:text-teal-900">
+              <ShareAltOutlined aria-hidden="true" /><span>分享外部测试链接</span>
+            </button>
+            <p className="mt-1 text-xs text-gray-500">TestFlight 外部测试版本可能晚于内部版本。</p>
+            {shareMessage && <p role="status" className="mt-1 text-xs text-teal-700">{shareMessage}</p>}
+            <a href={externalTestUrl} target="_blank" rel="noopener noreferrer" className="mt-1 block break-all text-xs text-gray-500 underline">{externalTestUrl}</a>
+          </div>
         </div>
       </details>
     </>

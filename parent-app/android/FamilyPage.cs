@@ -198,9 +198,18 @@ public sealed class FamilyPage : ContentPage
     {
         content.Add(Heading("我的", 21));
         content.Add(new Label { Text = store.Profile?.Text("username") ?? "家长", FontSize = 18 });
-        content.Add(new Label { Text = $"Android 首版 {AppInfo.Current.VersionString} · 数据与网页版共用" });
+        content.Add(new Label { Text = $"Android 版本 {AppInfo.Current.VersionString} · 数据与网页版共用" });
         content.Add(Button("刷新", () => _ = Run(store.LoadAsync)));
         content.Add(Button("退出登录", () => _ = Logout()));
+        content.Add(Heading("分享外部测试", 17));
+        content.Add(Button("分享 Linko Dear TestFlight 邀请", () => _ = Run(ShareExternalTest)));
+        content.Add(new Label { Text = "外部测试版本可能晚于内部测试版本。", TextColor = Colors.DimGray, FontSize = 12 });
+    }
+
+    private async Task ShareExternalTest()
+    {
+        const string url = "https://testflight.apple.com/join/dAHHKXM7";
+        await Share.Default.RequestAsync(new ShareTextRequest { Text = url, Title = "Linko Dear 外部测试邀请" });
     }
 
     private async Task Logout()
