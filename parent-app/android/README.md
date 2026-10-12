@@ -1,6 +1,6 @@
 # Linko Dear Android 家长端
 
-`20261012-external-test-share.1` 在“我的”末尾增加 TestFlight 外部测试邀请分享入口；链接由 Apple 当前外部测试组读回。
+`20261012-external-test-share-android.1` 在“我的”末尾增加 TestFlight 外部测试邀请分享入口；链接由 Apple 当前外部测试组读回。
 
 首版 Android 手机客户端与 Web、iOS 共用 `https://happylife.ai.impx.net` 后端。原生界面使用 .NET MAUI；用户中心登录和令牌续期复用 `AgentIdentity.NativeClient`，本应用仅在 Android SecureStorage 保存会话，不另建账号或业务令牌。
 
