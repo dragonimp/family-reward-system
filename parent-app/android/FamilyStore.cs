@@ -30,6 +30,8 @@ public sealed class FamilyStore
     }
 
     public bool Authenticated { get; private set; }
+    public long SessionVersion => Volatile.Read(ref generation);
+    public Task<string?> GetIdentityTokenAsync(CancellationToken ct = default) => session.GetTokenAsync(ct);
     public bool ParentReady => Profile is { } profile && profile.Text("role") == "parent" && !profile.Bool("needsRole");
     public string? DisplayCode { get; private set; }
     public FamilyRecord? Profile { get; private set; }

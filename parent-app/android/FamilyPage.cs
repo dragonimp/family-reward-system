@@ -201,7 +201,8 @@ public sealed class FamilyPage : ContentPage
         content.Add(new Label { Text = $"Android 版本 {AppInfo.Current.VersionString} · 数据与网页版共用" });
         content.Add(Button("刷新", () => _ = Run(store.LoadAsync)));
         content.Add(Button("退出登录", () => _ = Logout()));
-        content.Add(Heading("邀请朋友体验", 17));
+        content.Add(Heading("反馈与邀请", 17));
+        content.Add(Button("心愿墙与意见墙", () => _ = Navigation.PushAsync(new FeedbackWallPage(store))));
         content.Add(Button("生成专属测试邀请", () => _ = Run(OpenTestInvitation)));
         content.Add(new Label { Text = "在 Atlas 邀请页登录后生成链接；各系统的获取方式由应用后台维护。", TextColor = Colors.DimGray, FontSize = 12 });
     }

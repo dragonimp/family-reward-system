@@ -1,6 +1,6 @@
 # Linko Dear Android 家长端
 
-`20261012-atlas-invite-android.1` 在“我的”末尾接入 Atlas 专属邀请页。Apple TestFlight 等获取地址由 Atlas 应用后台管理，客户端不保存直链。
+`20261017-dear-feedback-android.1` 在“我的”的“反馈与邀请”分组增加心愿墙与意见墙，支持查看公开反馈、投票、提交反馈和查看我的反馈；测试邀请沿用 Atlas 专属邀请页。Apple TestFlight 等获取地址由 Atlas 应用后台管理，客户端不保存直链。
 
 首版 Android 手机客户端与 Web、iOS 共用 `https://happylife.ai.impx.net` 后端。原生界面使用 .NET MAUI；用户中心登录和令牌续期复用 `AgentIdentity.NativeClient`，本应用仅在 Android SecureStorage 保存会话，不另建账号或业务令牌。
 
@@ -12,6 +12,7 @@
 - 积分、零用钱和物品奖励或扣除；提交前确认，记录使用唯一幂等键；成功后从服务端刷新。
 - 儿童手表配对码输入、生成限时儿童手表授权码。
 - 孩子申请列表与批准、交易记录分页。
+- 用户中心统一反馈墙：心愿、意见、公开提案投票、私人反馈及审核状态。
 
 本版不包含 iOS 的所有功能。守约信用、成长图表、亲子互动、族谱、活动、AI 对话、扫码配对及 Android 手表安装仍待后续版本；这些功能仍可使用现有 Web/iOS 入口。后端没有为 Android 修改权限或数据结构。
 

@@ -424,7 +424,12 @@ struct AccountView: View {
                     Text("家庭关系与群组记录均与网页版同步。登录由用户中心提供，凭据保存在本机钥匙串。").font(.footnote).foregroundStyle(.secondary)
                 }
                 Button("退出当前账号", role: .destructive) { logout = true }
-                Section("分享外部测试") {
+                Section("反馈与邀请") {
+                    NavigationLink {
+                        FeedbackWallView(identity: store.identity)
+                    } label: {
+                        Label("心愿墙与意见墙", systemImage: "bubble.left.and.bubble.right")
+                    }
                     Link(destination: URL(string: "https://home.ai.impx.net/share/linko-family-ios")!) {
                         Label("生成专属测试邀请", systemImage: "square.and.arrow.up")
                     }

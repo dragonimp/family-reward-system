@@ -9,8 +9,8 @@
     <Nullable>enable</Nullable>
     <ApplicationTitle>Linko Dear</ApplicationTitle>
     <ApplicationId>net.impx.happylife.parent.android</ApplicationId>
-    <ApplicationDisplayVersion>20261012-atlas-invite-android.1</ApplicationDisplayVersion>
-    <ApplicationVersion>3</ApplicationVersion>
+    <ApplicationDisplayVersion>20261017-dear-feedback-android.1</ApplicationDisplayVersion>
+    <ApplicationVersion>4</ApplicationVersion>
     <SupportedOSPlatformVersion>26</SupportedOSPlatformVersion>
     <AgentIdentityNativeClientProject Condition="'$(AgentIdentityNativeClientProject)' == ''">$(MSBuildThisFileDirectory)../../../AgentIdentity/src/AgentIdentity.NativeClient/AgentIdentity.NativeClient.csproj</AgentIdentityNativeClientProject>
   </PropertyGroup>
