@@ -31,7 +31,11 @@ cleanup() {
       && [[ -z "$(git -C "$checkout" status --porcelain --untracked-files=all 2>/dev/null || true)" ]]; then
     git -C "$root" worktree remove "$checkout" || true
   fi
-  if [[ ! -e "$checkout" ]]; then rmdir "$scratch" 2>/dev/null || true; fi
+  if [[ ! -e "$checkout" ]]; then
+    # Release bundles are reproducible and must not keep the scratch directory alive.
+    rm -rf -- "$scratch/release"
+    rmdir "$scratch" 2>/dev/null || true
+  fi
 }
 trap cleanup EXIT
 git -C "$root" worktree add --detach "$checkout" "$source_commit" >&2
