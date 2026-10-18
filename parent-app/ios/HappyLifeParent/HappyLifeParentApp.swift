@@ -419,7 +419,7 @@ struct AccountView: View {
                 }
                 Section {
                     NavigationLink("订阅权益") { RemoteRecords(store: store, title: "订阅权益", path: "/api/subscription", mode: .subscription) }
-                    Link("隐私政策与支持", destination: URL(string: "https://happylife.ai.impx.net/legal/linko-family-privacy.html")!)
+                    Link("隐私政策与支持", destination: URL(string: "https://happylife.ai.xmkurt.com/legal/linko-family-privacy.html")!)
                     LabeledContent("版本", value: "\(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "") (\(Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? ""))")
                     Text("家庭关系与群组记录均与网页版同步。登录由用户中心提供，凭据保存在本机钥匙串。").font(.footnote).foregroundStyle(.secondary)
                 }

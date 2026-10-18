@@ -36,7 +36,7 @@
 	<key>HappyLifeIdentityURL</key>
 	<string>https://auth.ai.xmkurt.com</string>
 	<key>HappyLifeServiceURL</key>
-	<string>https://happylife.ai.impx.net</string>
+	<string>https://happylife.ai.xmkurt.com</string>
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
 	<key>LSRequiresIPhoneOS</key>

@@ -63,7 +63,7 @@ AI 对话可选择已授权的智能体实例；新会话绑定当前选择的�
 
 直接依赖 `../../../AgentIdentity/packages/AgentIdentity-iOS` 的 Swift Package **AgentIdentity**。系统认证窗口、注册入口、授权交接、Keychain 和退出登录属于公共用户中心 SDK；业务仓库仅调用。
 
-服务端在 `FamilyReward.Api/Program.cs` 引用公共 `AgentIdentity.Sdk` 的 `AddAgentIdentityNativeLogin` / `MapAgentIdentityNativeLogin`。复用现有用户中心 OAuth 配置和令牌，不建业务认证体系。固定无凭据回调 `linkofamily://login-complete/`，接口地址 `https://happylife.ai.impx.net/auth/native/...`。
+服务端在 `FamilyReward.Api/Program.cs` 引用公共 `AgentIdentity.Sdk` 的 `AddAgentIdentityNativeLogin` / `MapAgentIdentityNativeLogin`。复用现有用户中心 OAuth 配置和令牌，不建业务认证体系。固定无凭据回调 `linkofamily://login-complete/`，接口地址 `https://happylife.ai.xmkurt.com/auth/native/...`。
 
 协议与复用示例见 [公共 SDK 文档](../../../AgentIdentity/packages/AgentIdentity-iOS/README.md)。登录凭据只保存在本机 Keychain；业务 HTTP 请求带 Bearer，不带可伪造用户身份参数。401 清除登录及业务数据，家庭切换/退出时使旧请求失效。
 

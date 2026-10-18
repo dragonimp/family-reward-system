@@ -47,7 +47,7 @@ enum WatchPairingCode {
     static func parse(_ text: String) -> String? {
         var value = text.trimmingCharacters(in: .whitespacesAndNewlines)
         if let url = URLComponents(string: value), url.scheme != nil {
-            guard url.scheme == "https", url.host == "happylife.ai.impx.net",
+            guard url.scheme == "https", ["happylife.ai.xmkurt.com", "happylife.ai.impx.net"].contains(url.host ?? ""),
                   url.path == "/children", url.user == nil, url.password == nil,
                   url.port == nil || url.port == 443,
                   let codes = url.queryItems?.filter({ $0.name == "watchCode" }),

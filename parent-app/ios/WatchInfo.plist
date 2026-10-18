@@ -17,7 +17,7 @@
 	<key>CFBundleVersion</key>
 	<string>$(CURRENT_PROJECT_VERSION)</string>
 	<key>HappyLifeAPIBaseURL</key>
-	<string>https://happylife.ai.impx.net</string>
+	<string>https://happylife.ai.xmkurt.com</string>
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
 	<key>WKApplication</key>

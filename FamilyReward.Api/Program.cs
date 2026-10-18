@@ -138,7 +138,7 @@ app.UseCors();
 app.UseAgentIdentity();
 app.UseAtlasReleaseDrain(context => HttpMethods.IsGet(context.Request.Method) && context.Request.Path == "/health");
 app.MapAgentIdentityAuthEndpoints();
-app.MapAgentIdentityNativeLogin(new Uri("https://happylife.ai.impx.net"), new Uri("linkofamily://login-complete"), "Linko-Family");
+app.MapAgentIdentityNativeLogin(new Uri("https://happylife.ai.xmkurt.com"), new Uri("linkofamily://login-complete"), "Linko-Family");
 app.MapLinkoSocialGateway();
 app.MapAtlasReleaseVersion();
 if (!string.IsNullOrWhiteSpace(releaseControlApplicationId))
@@ -10635,7 +10635,7 @@ static string SanitizeFeedbackUrl(string value, HttpRequest request)
     if (!Uri.TryCreate(value, UriKind.Absolute, out var uri) || uri.Scheme is not ("http" or "https")) return "";
     var requestHost = request.Host.Host;
     var allowed = string.Equals(uri.Host, requestHost, StringComparison.OrdinalIgnoreCase)
-        || uri.Host is "happylife.ai.impx.net" or "localhost" or "127.0.0.1";
+        || uri.Host is "happylife.ai.xmkurt.com" or "happylife.ai.impx.net" or "localhost" or "127.0.0.1";
     if (!allowed) return "";
 
     var blockedKeys = new[] { "token", "code", "auth", "key", "password", "secret" };
