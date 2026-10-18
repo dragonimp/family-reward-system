@@ -70,14 +70,16 @@ internal static class LinkoSocialGateway
         var s = path.Split('/', StringSplitOptions.RemoveEmptyEntries);
         if (s.Length == 1 && s[0] == "me") return method == "GET";
         if (s.Length == 1 && s[0] == "tenants") return method is "GET" or "POST";
+        if (s.Length == 2 && s[0] == "tenants" && Guid.TryParse(s[1], out _)) return method is "PATCH" or "DELETE";
         if (s.Length == 3 && s[0] == "tenants" && Guid.TryParse(s[1], out _) && s[2] == "activities")
             return method is "GET" or "POST";
         if (s.Length >= 4 && s[0] == "tenants" && Guid.TryParse(s[1], out _) &&
             s[2] == "activities" && Guid.TryParse(s[3], out _))
         {
-            if (s.Length == 4) return method == "PATCH";
+            if (s.Length == 4) return method is "PATCH" or "DELETE";
             if (s.Length == 5 && s[4] == "invites") return method == "GET";
             if (s.Length == 5 && s[4] == "moments") return method is "GET" or "POST";
+            if (s.Length == 5 && s[4] == "checkins") return method is "GET" or "POST";
             if (s.Length == 5 && s[4] == "members") return method == "GET";
             if (s.Length == 6 && s[4] == "moments" && Guid.TryParse(s[5], out _)) return method == "DELETE";
             if (s.Length == 6 && s[4] == "invites" && s[5] is "link" or "username") return method == "POST";

@@ -1,10 +1,18 @@
 import SwiftUI
+import CoreLocation
 
 private struct DearRecord: Identifiable {
     let data: [String: Any]
     var id: String { text("id") }
     var subject: String { text("subject") }
     func text(_ key: String) -> String { data[key] as? String ?? "" }
+    func dateText(_ key: String) -> String {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        let raw = text(key)
+        let date = formatter.date(from: raw) ?? ISO8601DateFormatter().date(from: raw)
+        return date?.formatted(date: .abbreviated, time: .shortened) ?? raw
+    }
     func flag(_ key: String) -> Bool { data[key] as? Bool ?? false }
     static func list(_ value: Any) throws -> [DearRecord] {
         guard let values = value as? [[String: Any]] else { throw APIError.message("Linko Social 返回的数据格式不正确。") }
@@ -19,6 +27,11 @@ struct DearSocialView: View {
     @State private var activities: [DearRecord] = []
     @State private var photos: [DearRecord] = []
     @State private var moments: [DearRecord] = []
+    @State private var checkIns: [DearRecord] = []
+    @StateObject private var checkInLocator = DearCheckInLocator()
+    @State private var showingCheckIn = false
+    @State private var checkInNote = ""
+    @State private var checkInRequestID = UUID()
     @State private var activityMembers: [DearRecord] = []
     @State private var relationships: [DearRecord] = []
     @State private var invitations: [DearRecord] = []
@@ -28,6 +41,12 @@ struct DearSocialView: View {
     @State private var showingActivityManagement = false
     @State private var spaceName = ""
     @State private var activityName = ""
+    @State private var editedSpaceName = ""
+    @State private var editedActivityName = ""
+    @State private var showingSpaceRename = false
+    @State private var showingActivityRename = false
+    @State private var showingSpaceDelete = false
+    @State private var showingActivityDelete = false
     @State private var inviteUsername = ""
     @State private var momentDraft = ""
     @State private var momentRequestID = UUID()
@@ -68,6 +87,15 @@ struct DearSocialView: View {
                     else {
                         Picker("当前空间", selection: $spaceId) {
                             ForEach(spaces) { item in Text(item.text("name")).tag(item.id) }
+                        }
+                        if selectedSpace?.text("role") == "owner" {
+                            Button("修改空间名称", systemImage: "pencil") {
+                                editedSpaceName = selectedSpace?.text("name") ?? ""
+                                showingSpaceRename = true
+                            }.disabled(busy)
+                            Button("删除空间", systemImage: "trash", role: .destructive) {
+                                showingSpaceDelete = true
+                            }.disabled(busy)
                         }
                     }
                     HStack {
@@ -145,7 +173,16 @@ struct DearSocialView: View {
             .task { await refresh() }
             .onChange(of: spaceId) { _, _ in activityId = ""; showingActivity = false; showingActivityManagement = false; activities = []; photos = []; activityError = ""; activityLoading = true; run { try await loadActivities() } }
             .navigationDestination(isPresented: $showingActivity) { activityDetail }
-            .onChange(of: activityId) { _, _ in photos = []; moments = []; activityMembers = []; run { try await loadPhotos(); try await loadMoments(); try await loadMembers() } }
+            .onChange(of: activityId) { _, _ in photos = []; moments = []; checkIns = []; activityMembers = []; run { try await loadDetails() } }
+            .alert("修改空间名称", isPresented: $showingSpaceRename) {
+                TextField("空间名称", text: $editedSpaceName)
+                Button("取消", role: .cancel) { }
+                Button("保存") { run { try await renameSpace() } }
+            } message: { Text("新名称会同步给空间成员。") }
+            .confirmationDialog("删除空间「\(selectedSpace?.text("name") ?? "")」？", isPresented: $showingSpaceDelete, titleVisibility: .visible) {
+                Button("确认删除空间", role: .destructive) { run { try await deleteSpace() } }
+                Button("取消", role: .cancel) { }
+            } message: { Text("仅可删除没有活动、其他成员或分享记录的空间。") }
         }
     }
 
@@ -202,6 +239,29 @@ struct DearSocialView: View {
                         if moments.isEmpty { Text("还没有分享的日常。") .foregroundStyle(.secondary) }
                         Button("刷新日常") { run { try await loadMoments() } }.disabled(busy)
                     }
+                    Section("活动打卡") {
+                        Button { checkInNote = ""; checkInRequestID = UUID(); showingCheckIn = true; checkInLocator.locate() } label: {
+                            Label("在当前位置打卡", systemImage: "location.circle")
+                        }.disabled(busy)
+                        ForEach(checkIns) { checkIn in
+                            VStack(alignment: .leading, spacing: 4) {
+                                HStack {
+                                    Text(checkIn.text("authorName")).font(.subheadline.bold())
+                                    Spacer()
+                                    Text(checkIn.dateText("createdAt")).font(.caption).foregroundStyle(.secondary)
+                                }
+                                Text(checkIn.text("note")).textSelection(.enabled)
+                                Text("海拔 \(String(format: "%.1f", checkIn.data["altitudeMeters"] as? Double ?? 0)) 米 · \(checkIn.text("address"))")
+                                    .font(.caption).foregroundStyle(.secondary)
+                                if let latitude = checkIn.data["latitude"] as? Double,
+                                   let longitude = checkIn.data["longitude"] as? Double {
+                                    Text(String(format: "%.6f, %.6f", latitude, longitude))
+                                        .font(.caption2).foregroundStyle(.secondary).textSelection(.enabled)
+                                }
+                            }.padding(.vertical, 4)
+                        }
+                        if checkIns.isEmpty { Text("还没有打卡记录。") .foregroundStyle(.secondary) }
+                    }
                     Section("活动成员") {
                         Text("同一活动不会自动建立好友关系，需要对方确认。")
                             .font(.caption).foregroundStyle(.secondary)
@@ -225,10 +285,44 @@ struct DearSocialView: View {
         .readablePage()
         .navigationTitle(selectedActivity?.text("title") ?? "活动详情")
         .sheet(isPresented: $showingActivityManagement) { activityManagement }
+        .sheet(isPresented: $showingCheckIn) { checkInSheet }
         .onChange(of: activityId) { _, _ in showingActivityManagement = false; inviteLink = ""; inviteUsername = ""; momentDraft = ""; momentRequestID = UUID() }
         .refreshable {
             do { try await loadDetails(); try await loadRelationships() }
             catch { self.error = error.localizedDescription }
+        }
+    }
+
+    private var checkInSheet: some View {
+        NavigationStack {
+            Form {
+                Section("当前位置") {
+                    if checkInLocator.fetching { ProgressView("正在获取位置和地址…") }
+                    if !checkInLocator.error.isEmpty { Text(checkInLocator.error).foregroundStyle(.red) }
+                    if let location = checkInLocator.location, !checkInLocator.fetching {
+                        Text(checkInLocator.address)
+                        Text(String(format: "纬度 %.6f，经度 %.6f", location.coordinate.latitude, location.coordinate.longitude))
+                        Text(String(format: "海拔 %.1f 米", location.altitude))
+                    }
+                    Button("重新定位") { checkInLocator.locate() }.disabled(checkInLocator.fetching)
+                }
+                Section("备注") {
+                    TextField("默认填写当前位置地址", text: $checkInNote, axis: .vertical)
+                        .lineLimit(2...5)
+                    Text("留空时使用上方地址作为备注。") .font(.caption).foregroundStyle(.secondary)
+                }
+            }
+            .navigationTitle("活动打卡")
+            .onChange(of: checkInLocator.address) { _, address in
+                if checkInNote.isEmpty { checkInNote = address }
+            }
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) { Button("取消") { showingCheckIn = false } }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("保存") { run { try await createCheckIn() } }
+                        .disabled(checkInLocator.location == nil || checkInLocator.fetching || busy || checkInNote.count > 1000)
+                }
+            }
         }
     }
 
@@ -237,6 +331,17 @@ struct DearSocialView: View {
             Form {
                 if !error.isEmpty { Section { Text(error).foregroundStyle(.red) } }
                 if !notice.isEmpty { Section { Text(notice).foregroundStyle(.teal) } }
+                if selectedActivity?.flag("canEdit") == true {
+                    Section("活动设置") {
+                        Button("修改活动名称", systemImage: "pencil") {
+                            editedActivityName = selectedActivity?.text("title") ?? ""
+                            showingActivityRename = true
+                        }.disabled(busy)
+                        Button("删除活动", systemImage: "trash", role: .destructive) {
+                            showingActivityDelete = true
+                        }.disabled(busy)
+                    }
+                }
                 Section("邀请参加") {
                     HStack {
                         TextField("用户中心用户名", text: $inviteUsername).textInputAutocapitalization(.never)
@@ -277,6 +382,15 @@ struct DearSocialView: View {
             }
             .navigationTitle("管理 · \(selectedActivity?.text("title") ?? "活动")")
             .toolbar { ToolbarItem(placement: .topBarTrailing) { Button("完成") { showingActivityManagement = false } } }
+            .alert("修改活动名称", isPresented: $showingActivityRename) {
+                TextField("活动名称", text: $editedActivityName)
+                Button("取消", role: .cancel) { }
+                Button("保存") { run { try await renameActivity() } }
+            } message: { Text("新名称会同步给活动成员。") }
+            .confirmationDialog("删除活动「\(selectedActivity?.text("title") ?? "")」？", isPresented: $showingActivityDelete, titleVisibility: .visible) {
+                Button("确认删除活动", role: .destructive) { run { try await deleteActivity() } }
+                Button("取消", role: .cancel) { }
+            } message: { Text("仅可删除没有其他成员、照片或日常记录的活动；已发出的邀请会失效。") }
         }
     }
 
@@ -323,7 +437,7 @@ struct DearSocialView: View {
         }
     }
     private func loadDetails() async throws {
-        try await loadPhotos(); try await loadMoments(); try await loadMembers()
+        try await loadPhotos(); try await loadMoments(); try await loadCheckIns(); try await loadMembers()
     }
     private func loadPhotos() async throws {
         guard !spaceId.isEmpty, !activityId.isEmpty else { return }
@@ -332,6 +446,22 @@ struct DearSocialView: View {
     private func loadMoments() async throws {
         guard !spaceId.isEmpty, !activityId.isEmpty else { return }
         moments = try DearRecord.list(await store.call(base + "tenants/\(spaceId)/activities/\(activityId)/moments"))
+    }
+    private func loadCheckIns() async throws {
+        guard !spaceId.isEmpty, !activityId.isEmpty else { return }
+        checkIns = try DearRecord.list(await store.call(base + "tenants/\(spaceId)/activities/\(activityId)/checkins"))
+    }
+    private func createCheckIn() async throws {
+        guard let location = checkInLocator.location, !checkInLocator.fetching else { throw APIError.message("请先获取当前位置。") }
+        let note = checkInNote.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard note.count <= 1000 else { throw APIError.message("备注不能超过 1000 字。") }
+        _ = try await store.call(base + "tenants/\(spaceId)/activities/\(activityId)/checkins", method: "POST", body: [
+            "requestId": checkInRequestID.uuidString,
+            "latitude": location.coordinate.latitude, "longitude": location.coordinate.longitude,
+            "altitudeMeters": location.altitude, "address": checkInLocator.address,
+            "note": note.isEmpty ? checkInLocator.address : note
+        ])
+        showingCheckIn = false; checkInRequestID = UUID(); try await loadCheckIns(); notice = "打卡已保存。"
     }
     private func loadMembers() async throws {
         guard !spaceId.isEmpty, !activityId.isEmpty else { return }
@@ -367,10 +497,36 @@ struct DearSocialView: View {
         let item = DearRecord(data: value as? [String: Any] ?? [:])
         spaceName = ""; try await load(); spaceId = item.id; notice = "空间已创建。"
     }
+    private func renameSpace() async throws {
+        guard selectedSpace?.text("role") == "owner" else { throw APIError.message("只有空间所有者可以修改名称。") }
+        let name = editedSpaceName.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !name.isEmpty && name.count <= 200 else { throw APIError.message("请填写不超过 200 字的空间名称。") }
+        _ = try await store.call(base + "tenants/\(spaceId)", method: "PATCH", body: ["name": name])
+        try await load(); notice = "空间名称已更新。"
+    }
+    private func deleteSpace() async throws {
+        guard selectedSpace?.text("role") == "owner" else { throw APIError.message("只有空间所有者可以删除空间。") }
+        _ = try await store.call(base + "tenants/\(spaceId)", method: "DELETE")
+        spaceId = ""; activityId = ""; activities = []
+        try await load(); notice = "空间已删除。"
+    }
     private func createActivity() async throws {
         let value = try await store.call(base + "tenants/\(spaceId)/activities", method: "POST", body: ["title": activityName.trimmingCharacters(in: .whitespacesAndNewlines), "description": ""])
         let item = DearRecord(data: value as? [String: Any] ?? [:])
         activityName = ""; try await loadActivities(); activityId = item.id; showingActivity = true; notice = "活动已创建。"
+    }
+    private func renameActivity() async throws {
+        guard selectedActivity?.flag("canEdit") == true else { throw APIError.message("只有活动组织者可以修改名称。") }
+        let name = editedActivityName.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !name.isEmpty && name.count <= 200 else { throw APIError.message("请填写不超过 200 字的活动名称。") }
+        _ = try await store.call(base + "tenants/\(spaceId)/activities/\(activityId)", method: "PATCH", body: ["title": name])
+        try await loadActivities(); notice = "活动名称已更新。"
+    }
+    private func deleteActivity() async throws {
+        guard selectedActivity?.flag("canEdit") == true else { throw APIError.message("只有活动组织者可以删除活动。") }
+        _ = try await store.call(base + "tenants/\(spaceId)/activities/\(activityId)", method: "DELETE")
+        showingActivityManagement = false; showingActivity = false; activityId = ""
+        try await loadActivities(); notice = "活动已删除。"
     }
     private func inviteByName() async throws {
         _ = try await store.call(base + "tenants/\(spaceId)/activities/\(activityId)/invites/username", method: "POST", body: ["username": inviteUsername.trimmingCharacters(in: .whitespacesAndNewlines)])
@@ -388,6 +544,57 @@ struct DearSocialView: View {
               let safe = username.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) else { throw APIError.message("无法确认用户名。") }
         _ = try await store.call(base + "tenants/\(invitation.text("tenantId"))/activities/\(invitation.text("activityId"))/invites/username/\(safe)/accept", method: "POST", body: [:])
         try await load(); spaceId = invitation.text("tenantId"); notice = "已加入共同活动，可在所属空间点开查看。"
+    }
+}
+
+private final class DearCheckInLocator: NSObject, ObservableObject, CLLocationManagerDelegate {
+    @Published private(set) var location: CLLocation?
+    @Published private(set) var address = ""
+    @Published private(set) var error = ""
+    @Published private(set) var fetching = false
+    private let manager = CLLocationManager()
+    private let geocoder = CLGeocoder()
+
+    override init() {
+        super.init()
+        manager.delegate = self
+        manager.desiredAccuracy = kCLLocationAccuracyBest
+    }
+
+    func locate() {
+        location = nil; address = ""; error = ""; fetching = true
+        switch manager.authorizationStatus {
+        case .authorizedWhenInUse, .authorizedAlways: manager.requestLocation()
+        case .notDetermined: manager.requestWhenInUseAuthorization()
+        default: fetching = false; error = "请在系统设置中允许此 App 使用位置后重试。"
+        }
+    }
+
+    func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {
+        guard fetching else { return }
+        switch manager.authorizationStatus {
+        case .authorizedWhenInUse, .authorizedAlways: manager.requestLocation()
+        case .denied, .restricted: fetching = false; error = "位置访问未获授权，请在系统设置中开启。"
+        default: break
+        }
+    }
+
+    func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
+        guard fetching else { return }
+        guard let current = locations.last(where: { $0.horizontalAccuracy >= 0 && $0.verticalAccuracy >= 0 && abs($0.timestamp.timeIntervalSinceNow) < 120 }) else {
+            fetching = false; error = "没有获取到有效的位置与海拔，请重试。"; return
+        }
+        geocoder.reverseGeocodeLocation(current) { [weak self] placemarks, _ in
+            guard let self else { return }
+            let fallback = String(format: "%.6f, %.6f", current.coordinate.latitude, current.coordinate.longitude)
+            self.address = placemarks?.first?.name ?? fallback
+            self.location = current
+            self.fetching = false
+        }
+    }
+
+    func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {
+        fetching = false; self.error = "定位失败：\(error.localizedDescription)"
     }
 }
 
