@@ -215,15 +215,19 @@ struct DearSocialView: View {
                             .font(.caption).foregroundStyle(.secondary)
                         if photos.isEmpty { Text("还没有分享的照片").foregroundStyle(.secondary) }
                         ForEach(photos) { photo in
-                            HStack(spacing: 12) {
-                                if photo.flag("thumbnailAvailable") {
+                            NavigationLink {
+                                DearPhotoDetailView(store: store, photo: photo,
+                                    path: base + "tenants/\(spaceId)/activities/\(activityId)/native-photos/\(photo.id)/thumbnail")
+                            } label: {
+                                HStack(spacing: 14) {
                                     DearPhotoPreview(store: store, path: base + "tenants/\(spaceId)/activities/\(activityId)/native-photos/\(photo.id)/thumbnail")
-                                } else {
-                                    Image(systemName: "photo").frame(width: 64, height: 64).background(.quaternary).clipShape(RoundedRectangle(cornerRadius: 10))
-                                }
-                                VStack(alignment: .leading) {
-                                    Text(photo.text("sourceDisplayName")).font(.subheadline.bold())
-                                    Text(photo.text("originalFileName")).font(.caption).lineLimit(1).foregroundStyle(.secondary)
+                                    VStack(alignment: .leading, spacing: 5) {
+                                        Text(photo.text("originalFileName")).font(.subheadline.bold()).lineLimit(2)
+                                        Text(photo.text("sourceDisplayName")).font(.caption).foregroundStyle(.secondary)
+                                        if !photo.flag("thumbnailAvailable") {
+                                            Text("预览尚未就绪，点开可重试").font(.caption).foregroundStyle(.secondary)
+                                        }
+                                    }
                                 }
                             }
                         }
@@ -628,13 +632,54 @@ private struct DearPhotoPreview: View {
     @ObservedObject var store: FamilyStore
     let path: String
     @State private var image: UIImage?
+    @State private var failed = false
     var body: some View {
         Group {
             if let image { Image(uiImage: image).resizable().scaledToFill() }
-            else { Image(systemName: "photo").foregroundStyle(.secondary) }
+            else if failed { Image(systemName: "photo.badge.exclamationmark").foregroundStyle(.secondary) }
+            else { ProgressView() }
         }
-        .frame(width: 64, height: 64).clipped().background(.quaternary)
+        .frame(width: 104, height: 104).clipped().background(.quaternary)
         .clipShape(RoundedRectangle(cornerRadius: 10))
-        .task(id: path) { image = try? await store.authenticatedImage(path) }
+        .task(id: path) {
+            do { image = try await store.authenticatedImage(path); failed = false }
+            catch { image = nil; failed = true }
+        }
+    }
+}
+
+private struct DearPhotoDetailView: View {
+    @ObservedObject var store: FamilyStore
+    let photo: DearRecord
+    let path: String
+    @State private var image: UIImage?
+    @State private var error: String?
+    var body: some View {
+        ScrollView {
+            VStack(spacing: 16) {
+                if let image {
+                    Image(uiImage: image).resizable().scaledToFit()
+                        .clipShape(RoundedRectangle(cornerRadius: 12))
+                } else if let error {
+                    ContentUnavailableView("无法显示照片预览", systemImage: "photo.badge.exclamationmark",
+                                           description: Text(error))
+                    Button("重试") { Task { await load() } }
+                } else { ProgressView("正在加载照片") }
+                Text(photo.text("originalFileName")).font(.headline)
+                Text("分享者：\(photo.text("sourceDisplayName"))").font(.subheadline).foregroundStyle(.secondary)
+                Text("这里显示活动照片预览；原图可在 Linko Social 获取。")
+                    .font(.footnote).foregroundStyle(.secondary)
+            }
+            .frame(maxWidth: .infinity)
+            .padding()
+        }
+        .navigationTitle("照片")
+        .task(id: path) { await load() }
+    }
+
+    private func load() async {
+        image = nil; error = nil
+        do { image = try await store.authenticatedImage(path) }
+        catch { self.error = error.localizedDescription }
     }
 }
