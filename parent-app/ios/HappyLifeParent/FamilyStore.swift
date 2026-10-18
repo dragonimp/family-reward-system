@@ -1,8 +1,9 @@
 import Foundation
 import SwiftUI
 import AgentIdentity
+import WatchConnectivity
 
-@MainActor final class FamilyStore: ObservableObject {
+@MainActor final class FamilyStore: NSObject, ObservableObject {
     let identity = AgentIdentitySession(origin: URL(string: "https://happylife.ai.xmkurt.com")!, callback: URL(string: "linkofamily://login-complete/")!, keychainService: "net.impx.happylife.parent.identity")
     private let base = URL(string: "https://happylife.ai.xmkurt.com")!
     private let session = URLSession(configuration: .ephemeral)
@@ -21,6 +22,13 @@ import AgentIdentity
     @Published var ledgerTotal = 0
     private var revision = UUID()
     private var lastRefresh = Date.distantPast
+    override init() {
+        super.init()
+        if WCSession.isSupported() {
+            WCSession.default.delegate = self
+            WCSession.default.activate()
+        }
+    }
     var scope: String { groupID == 0 ? "" : "familyGroupId=\(groupID)" }
     var ready: Bool { profile?.text("role") == "parent" && profile?.flag("needsRole") == false }
     var selectedFamily: String { groups.first(where: { $0.id == groupID })?.text("name") ?? "我的群组" }
@@ -161,5 +169,77 @@ import AgentIdentity
     }
     func logout() {
         revision = UUID(); identity.logout(); profile = nil; groups = []; children = []; rules = []; requests = []; transactions = []; growth = []; members = []; groupID = 0; loading = false
+    }
+}
+
+extension FamilyStore: WCSessionDelegate {
+    nonisolated func session(_ session: WCSession, activationDidCompleteWith activationState: WCSessionActivationState, error: Error?) { }
+    nonisolated func sessionDidBecomeInactive(_ session: WCSession) { }
+    nonisolated func sessionDidDeactivate(_ session: WCSession) { Task { @MainActor in session.activate() } }
+
+    nonisolated func session(_ session: WCSession, didReceiveMessage message: [String: Any],
+                             replyHandler: @escaping ([String: Any]) -> Void) {
+        Task { @MainActor in
+            do { replyHandler(try await watchActivityReply(message)) }
+            catch { replyHandler(["error": error.localizedDescription]) }
+        }
+    }
+
+    private func watchActivityReply(_ message: [String: Any]) async throws -> [String: Any] {
+        guard identity.isAuthenticated else { throw APIError.message("请先在配对的 iPhone 上登录 Linko Dear。") }
+        let base = "/api/dear/social/tenants"
+        switch message["action"] as? String {
+        case "spaces":
+            let rows = try watchRows(await call(base))
+            return ["items": rows.map { ["id": $0["id"] as? String ?? "", "name": $0["name"] as? String ?? ""] }]
+        case "activities", "photos", "thumbnail":
+            guard let spaceID = message["spaceId"] as? String, UUID(uuidString: spaceID) != nil else {
+                throw APIError.message("空间标识无效。")
+            }
+            if message["action"] as? String == "activities" {
+                let rows = try watchRows(await call(base + "/\(spaceID)/activities"))
+                return ["items": rows.map { ["id": $0["id"] as? String ?? "", "title": $0["title"] as? String ?? ""] }]
+            }
+            guard let activityID = message["activityId"] as? String, UUID(uuidString: activityID) != nil else {
+                throw APIError.message("活动标识无效。")
+            }
+            let prefix = base + "/\(spaceID)/activities/\(activityID)"
+            let photos = try watchRows(await call(prefix + "/live/photos"))
+            if message["action"] as? String == "photos" {
+                let offset = max(0, message["offset"] as? Int ?? 0)
+                let page = Array(photos.dropFirst(offset).prefix(30))
+                return ["hasMore": offset + page.count < photos.count, "items": page.map { photo in
+                    ["id": photo["id"] as? String ?? "",
+                     "name": photo["originalFileName"] as? String ?? "照片",
+                     "author": photo["sourceDisplayName"] as? String ?? "",
+                     "available": photo["thumbnailAvailable"] as? Bool ?? false] as [String: Any]
+                }]
+            }
+            guard let photoID = message["photoId"] as? String, UUID(uuidString: photoID) != nil,
+                  photos.contains(where: { ($0["id"] as? String) == photoID && ($0["thumbnailAvailable"] as? Bool) == true }) else {
+                throw APIError.message("照片预览不可用，请在 iPhone 上查看。")
+            }
+            let image = try await authenticatedImage(prefix + "/native-photos/\(photoID)/thumbnail")
+            let renderer = UIGraphicsImageRenderer(size: CGSize(width: 240, height: 240))
+            let scale = min(240 / image.size.width, 240 / image.size.height)
+            let size = CGSize(width: image.size.width * scale, height: image.size.height * scale)
+            let preview = renderer.image { context in
+                UIColor.black.setFill()
+                context.cgContext.fill(CGRect(x: 0, y: 0, width: 240, height: 240))
+                image.draw(in: CGRect(x: (240 - size.width) / 2, y: (240 - size.height) / 2,
+                                           width: size.width, height: size.height))
+            }
+            guard let data = preview.jpegData(compressionQuality: 0.55), data.count <= 100_000 else {
+                throw APIError.message("照片预览过大，请在 iPhone 上查看。")
+            }
+            return ["image": data]
+        default:
+            throw APIError.message("手表活动请求无效。")
+        }
+    }
+
+    private func watchRows(_ value: Any) throws -> [[String: Any]] {
+        guard let rows = value as? [[String: Any]] else { throw APIError.message("活动数据暂时不可用。") }
+        return rows
     }
 }

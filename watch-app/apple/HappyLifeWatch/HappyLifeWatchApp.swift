@@ -48,6 +48,7 @@ struct WatchHomeView: View {
                     NavigationLink("申请记录", destination: RequestsView())
                     NavigationLink("爸爸妈妈的闪光时刻", destination: WarmMomentView())
                     NavigationLink("亲子互动", destination: WatchConnectionsView())
+                    NavigationLink("活动照片", destination: WatchSocialSpacesView())
                     NavigationLink("今日鼓励", destination: GrowthView())
                     NavigationLink("我的好友", destination: FriendsView())
                     if store.settings?.friendLeaderboardEnabled == true {

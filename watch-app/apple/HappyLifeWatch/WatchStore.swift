@@ -1,4 +1,46 @@
 import SwiftUI
+#if canImport(WatchConnectivity)
+import WatchConnectivity
+#endif
+
+struct WatchSocialSpace: Identifiable { let id: String; let name: String }
+struct WatchSocialActivity: Identifiable { let id: String; let title: String }
+struct WatchSocialPhoto: Identifiable { let id: String; let name: String; let author: String; let available: Bool }
+
+#if canImport(WatchConnectivity)
+private final class WatchActivityTransport: NSObject, WCSessionDelegate {
+    private let session: WCSession? = WCSession.isSupported() ? .default : nil
+
+    func activate() {
+        session?.delegate = self
+        session?.activate()
+    }
+
+    func request(_ message: [String: Any]) async throws -> [String: Any] {
+        guard let session, session.activationState == .activated, session.isReachable else {
+            throw APIError(status: 0, message: "请让配对的 iPhone 保持连接，并在 iPhone 上登录 Linko Dear 后重试。")
+        }
+        return try await withCheckedThrowingContinuation { continuation in
+            session.sendMessage(message, replyHandler: { reply in
+                if let error = reply["error"] as? String {
+                    continuation.resume(throwing: APIError(status: 0, message: error))
+                } else { continuation.resume(returning: reply) }
+            }, errorHandler: { error in
+                continuation.resume(throwing: APIError(status: 0, message: "无法连接配对的 iPhone：\(error.localizedDescription)"))
+            })
+        }
+    }
+
+    func session(_ session: WCSession, activationDidCompleteWith activationState: WCSessionActivationState, error: Error?) { }
+}
+#else
+private final class WatchActivityTransport {
+    func activate() { }
+    func request(_ message: [String: Any]) async throws -> [String: Any] {
+        throw APIError(status: 0, message: "手表活动照片需要 Apple Watch。")
+    }
+}
+#endif
 
 @MainActor
 final class WatchStore: ObservableObject {
@@ -20,10 +62,17 @@ final class WatchStore: ObservableObject {
     @Published private(set) var parents: [ParentOption] = []
     @Published private(set) var growth: GrowthReport?
     @Published private(set) var connections: ConnectionResponse?
+    @Published private(set) var socialSpaces: [WatchSocialSpace] = []
+    @Published private(set) var socialActivities: [WatchSocialActivity] = []
+    @Published private(set) var socialPhotos: [WatchSocialPhoto] = []
+    @Published private(set) var socialPhotosHasMore = false
+    @Published private(set) var socialLoading = false
+    @Published private(set) var socialError: String?
     @Published private(set) var busy = false
     @Published private(set) var ready = false
     @Published var message: String?
     private let api: WatchAPI
+    private let activityTransport = WatchActivityTransport()
     private let readCredential: () throws -> String?
     private let saveCredential: (String) throws -> Void
     private let clearCredential: () throws -> Void
@@ -37,6 +86,7 @@ final class WatchStore: ObservableObject {
         self.readCredential = readCredential
         self.saveCredential = saveCredential
         self.clearCredential = clearCredential
+        activityTransport.activate()
     }
 
     func start() async {
@@ -155,6 +205,62 @@ final class WatchStore: ObservableObject {
         }
     }
 
+    func loadSocialSpaces() async {
+        guard token != nil else { return }
+        socialLoading = true; socialError = nil
+        defer { socialLoading = false }
+        do {
+            let reply = try await activityTransport.request(["action": "spaces"])
+            guard let rows = reply["items"] as? [[String: Any]] else { throw APIError(status: 0, message: "空间列表无效。") }
+            socialSpaces = rows.compactMap { row in
+                guard let id = row["id"] as? String, let name = row["name"] as? String else { return nil }
+                return WatchSocialSpace(id: id, name: name)
+            }
+        } catch { socialError = error.localizedDescription }
+    }
+
+    func loadSocialActivities(spaceID: String) async {
+        socialLoading = true; socialError = nil; socialActivities = []
+        defer { socialLoading = false }
+        do {
+            let reply = try await activityTransport.request(["action": "activities", "spaceId": spaceID])
+            guard let rows = reply["items"] as? [[String: Any]] else { throw APIError(status: 0, message: "活动列表无效。") }
+            socialActivities = rows.compactMap { row in
+                guard let id = row["id"] as? String, let title = row["title"] as? String else { return nil }
+                return WatchSocialActivity(id: id, title: title)
+            }
+        } catch { socialError = error.localizedDescription }
+    }
+
+    func loadSocialPhotos(spaceID: String, activityID: String, more: Bool = false) async {
+        guard !socialLoading else { return }
+        socialLoading = true; socialError = nil
+        if !more { socialPhotos = []; socialPhotosHasMore = false }
+        defer { socialLoading = false }
+        do {
+            let reply = try await activityTransport.request(["action": "photos", "spaceId": spaceID,
+                                                             "activityId": activityID, "offset": more ? socialPhotos.count : 0])
+            guard let rows = reply["items"] as? [[String: Any]] else { throw APIError(status: 0, message: "照片列表无效。") }
+            let page = rows.compactMap { row -> WatchSocialPhoto? in
+                guard let id = row["id"] as? String, let name = row["name"] as? String else { return nil }
+                return WatchSocialPhoto(id: id, name: name, author: row["author"] as? String ?? "",
+                                        available: row["available"] as? Bool ?? false)
+            }
+            socialPhotos = more ? socialPhotos + page : page
+            socialPhotosHasMore = reply["hasMore"] as? Bool ?? false
+        } catch { socialError = error.localizedDescription }
+    }
+
+    func socialPreview(spaceID: String, activityID: String, photoID: String) async throws -> Data {
+        guard token != nil else { throw APIError(status: 401, message: "请先绑定手表。") }
+        let reply = try await activityTransport.request(["action": "thumbnail", "spaceId": spaceID,
+                                                         "activityId": activityID, "photoId": photoID])
+        guard let data = reply["image"] as? Data, data.count <= 100_000 else {
+            throw APIError(status: 0, message: "照片预览无法读取。")
+        }
+        return data
+    }
+
     func makeFriendCode() async {
         await perform {
             guard let token = self.token else { return }
@@ -250,6 +356,11 @@ final class WatchStore: ObservableObject {
         parents = []
         growth = nil
         connections = nil
+        socialSpaces = []
+        socialActivities = []
+        socialPhotos = []
+        socialPhotosHasMore = false
+        socialError = nil
         try clearCredential()
     }
 

@@ -12,6 +12,112 @@ enum WatchTheme {
     }
 }
 
+struct WatchSocialSpacesView: View {
+    @EnvironmentObject private var store: WatchStore
+    var body: some View {
+        List {
+            Text("通过配对的 iPhone 查看已登录账号可访问的活动照片。")
+                .font(.footnote).foregroundStyle(.secondary)
+            if store.socialLoading { ProgressView("读取中") }
+            if let error = store.socialError { Text(error).foregroundStyle(.red).font(.footnote) }
+            ForEach(store.socialSpaces) { space in
+                NavigationLink(space.name, destination: WatchSocialActivitiesView(space: space))
+            }
+            if store.socialSpaces.isEmpty && !store.socialLoading && store.socialError == nil {
+                Text("暂无可查看的空间")
+            }
+            Button("刷新") { Task { await store.loadSocialSpaces() } }
+        }
+        .navigationTitle("活动空间")
+        .task { await store.loadSocialSpaces() }
+    }
+}
+
+struct WatchSocialActivitiesView: View {
+    @EnvironmentObject private var store: WatchStore
+    let space: WatchSocialSpace
+    var body: some View {
+        List {
+            if store.socialLoading { ProgressView("读取中") }
+            if let error = store.socialError { Text(error).foregroundStyle(.red).font(.footnote) }
+            ForEach(store.socialActivities) { activity in
+                NavigationLink(activity.title, destination: WatchSocialPhotosView(spaceID: space.id, activity: activity))
+            }
+            if store.socialActivities.isEmpty && !store.socialLoading && store.socialError == nil {
+                Text("这个空间暂无可查看的活动")
+            }
+            Button("刷新") { Task { await store.loadSocialActivities(spaceID: space.id) } }
+        }
+        .navigationTitle(space.name)
+        .task { await store.loadSocialActivities(spaceID: space.id) }
+    }
+}
+
+struct WatchSocialPhotosView: View {
+    @EnvironmentObject private var store: WatchStore
+    let spaceID: String
+    let activity: WatchSocialActivity
+    var body: some View {
+        List {
+            if store.socialLoading { ProgressView("读取中") }
+            if let error = store.socialError { Text(error).foregroundStyle(.red).font(.footnote) }
+            ForEach(store.socialPhotos) { photo in
+                if photo.available {
+                    NavigationLink(destination: WatchSocialPreviewView(spaceID: spaceID,
+                                                                        activityID: activity.id, photo: photo)) {
+                        VStack(alignment: .leading) {
+                            Text(photo.name).lineLimit(2)
+                            if !photo.author.isEmpty { Text(photo.author).font(.footnote).foregroundStyle(.secondary) }
+                        }
+                    }
+                } else {
+                    VStack(alignment: .leading) {
+                        Text(photo.name).lineLimit(2)
+                        Text("暂无预览，请在 iPhone 查看").font(.footnote).foregroundStyle(.secondary)
+                    }
+                }
+            }
+            if store.socialPhotos.isEmpty && !store.socialLoading && store.socialError == nil {
+                Text("这场活动还没有照片")
+            }
+            if store.socialPhotosHasMore {
+                Button("加载更多照片") {
+                    Task { await store.loadSocialPhotos(spaceID: spaceID, activityID: activity.id, more: true) }
+                }.disabled(store.socialLoading)
+            }
+            Button("刷新") { Task { await store.loadSocialPhotos(spaceID: spaceID, activityID: activity.id) } }
+        }
+        .navigationTitle(activity.title)
+        .task { await store.loadSocialPhotos(spaceID: spaceID, activityID: activity.id) }
+    }
+}
+
+struct WatchSocialPreviewView: View {
+    @EnvironmentObject private var store: WatchStore
+    let spaceID: String
+    let activityID: String
+    let photo: WatchSocialPhoto
+    @State private var preview: Data?
+    @State private var error: String?
+    var body: some View {
+        ScrollView {
+            VStack(spacing: 8) {
+                if let preview, let image = UIImage(data: preview) {
+                    Image(uiImage: image).resizable().scaledToFit().clipShape(RoundedRectangle(cornerRadius: 8))
+                } else if let error {
+                    Text(error).foregroundStyle(.red).font(.footnote)
+                } else { ProgressView("读取照片") }
+                Text(photo.name).font(.footnote).multilineTextAlignment(.center)
+            }
+        }
+        .navigationTitle("照片预览")
+        .task {
+            do { preview = try await store.socialPreview(spaceID: spaceID, activityID: activityID, photoID: photo.id) }
+            catch { self.error = error.localizedDescription }
+        }
+    }
+}
+
 struct FriendsView: View {
     @EnvironmentObject private var store: WatchStore
     var leaderboard = false
