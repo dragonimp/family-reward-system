@@ -217,6 +217,7 @@ struct DearSocialView: View {
                         ForEach(photos) { photo in
                             NavigationLink {
                                 DearPhotoDetailView(store: store, photo: photo,
+                                    spaceID: spaceId, activityID: activityId,
                                     path: base + "tenants/\(spaceId)/activities/\(activityId)/native-photos/\(photo.id)/thumbnail")
                             } label: {
                                 HStack(spacing: 14) {
@@ -232,7 +233,6 @@ struct DearSocialView: View {
                             }
                         }
                         Button("刷新相册") { run { try await loadPhotos() } }.disabled(busy)
-                        Link("在 Linko Social 获取原图", destination: URL(string: "https://linko.ai.impx.net/")!)
                     }
                     Section("生活分享 · \(selectedActivity.text("title"))") {
                         Text("只向这场活动的成员展示。")
@@ -636,7 +636,12 @@ private struct DearPhotoPreview: View {
     var body: some View {
         Group {
             if let image { Image(uiImage: image).resizable().scaledToFill() }
-            else if failed { Image(systemName: "photo.badge.exclamationmark").foregroundStyle(.secondary) }
+            else if failed {
+                VStack(spacing: 4) {
+                    Image(systemName: "photo.badge.exclamationmark")
+                    Text("预览失败").font(.caption2)
+                }.foregroundStyle(.secondary)
+            }
             else { ProgressView() }
         }
         .frame(width: 104, height: 104).clipped().background(.quaternary)
@@ -651,13 +656,19 @@ private struct DearPhotoPreview: View {
 private struct DearPhotoDetailView: View {
     @ObservedObject var store: FamilyStore
     let photo: DearRecord
+    let spaceID: String
+    let activityID: String
     let path: String
     @State private var image: UIImage?
     @State private var error: String?
+    @State private var originalURL: URL?
+    @State private var originalImage: UIImage?
+    @State private var originalError: String?
+    @State private var fetchingOriginal = false
     var body: some View {
         ScrollView {
             VStack(spacing: 16) {
-                if let image {
+                if let image = originalImage ?? image {
                     Image(uiImage: image).resizable().scaledToFit()
                         .clipShape(RoundedRectangle(cornerRadius: 12))
                 } else if let error {
@@ -667,7 +678,17 @@ private struct DearPhotoDetailView: View {
                 } else { ProgressView("正在加载照片") }
                 Text(photo.text("originalFileName")).font(.headline)
                 Text("分享者：\(photo.text("sourceDisplayName"))").font(.subheadline).foregroundStyle(.secondary)
-                Text("这里显示活动照片预览；原图可在 Linko Social 获取。")
+                if let originalURL {
+                    ShareLink(item: originalURL) { Label("分享原图", systemImage: "square.and.arrow.up") }
+                } else {
+                    Button {
+                        Task { await fetchOriginal() }
+                    } label: {
+                        Label(fetchingOriginal ? "正在等待源设备传图…" : "获取原图", systemImage: "arrow.down.circle")
+                    }.disabled(fetchingOriginal)
+                }
+                if let originalError { Text(originalError).font(.footnote).foregroundStyle(.red) }
+                Text("原图从分享者设备传来，获取时请保持对方的分享应用打开。")
                     .font(.footnote).foregroundStyle(.secondary)
             }
             .frame(maxWidth: .infinity)
@@ -680,6 +701,21 @@ private struct DearPhotoDetailView: View {
     private func load() async {
         image = nil; error = nil
         do { image = try await store.authenticatedImage(path) }
-        catch { self.error = error.localizedDescription }
+        catch {
+            if let local = await store.photoSource.localOriginal(photoID: photo.id, spaceID: spaceID, activityID: activityID),
+               let localImage = UIImage(contentsOfFile: local.path) { image = localImage }
+            else { self.error = error.localizedDescription }
+        }
+    }
+
+    private func fetchOriginal() async {
+        fetchingOriginal = true; originalError = nil
+        defer { fetchingOriginal = false }
+        do {
+            let url = try await store.photoSource.downloadOriginal(photoID: photo.id, spaceID: spaceID, activityID: activityID)
+            guard let decoded = UIImage(contentsOfFile: url.path) else { throw APIError.message("原图无法显示。") }
+            originalImage = decoded
+            originalURL = url
+        } catch { originalError = error.localizedDescription }
     }
 }

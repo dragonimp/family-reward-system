@@ -62,11 +62,14 @@ import WatchConnectivity
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         request.timeoutInterval = 30
         let (data, response) = try await session.data(for: request)
-        guard current == revision, token == identity.accessToken,
-              let response = response as? HTTPURLResponse, response.url?.host == base.host,
-              response.statusCode == 200, let image = UIImage(data: data) else {
-            throw APIError.message("无法读取照片预览。")
+        guard current == revision, token == identity.accessToken else { throw CancellationError() }
+        guard let response = response as? HTTPURLResponse, response.url?.host == base.host else {
+            throw APIError.message("照片预览网络响应无效。")
         }
+        guard response.statusCode == 200 else {
+            throw APIError.message("照片预览读取失败（\(response.statusCode)），请刷新相册。")
+        }
+        guard let image = UIImage(data: data) else { throw APIError.message("照片预览格式无效。") }
         return image
     }
     func streamChat(sessionID: String, message: String) async throws {

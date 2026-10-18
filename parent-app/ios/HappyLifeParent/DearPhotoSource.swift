@@ -138,6 +138,89 @@ import UIKit
         }
     }
 
+    func localOriginal(photoID: String, spaceID: String, activityID: String) async -> URL? {
+        guard let subject = try? await currentSubject(), let root = try? directory(for: subject),
+              let index = try? readIndex(at: root),
+              let photo = index.photos.first(where: { $0.id == photoID && $0.spaceID == spaceID && $0.activityID == activityID }) else { return nil }
+        let path = root.appendingPathComponent(photo.fileName)
+        guard let data = try? Data(contentsOf: path), data.count == photo.length,
+              SHA256.hash(data: data).map({ String(format: "%02x", $0) }).joined() == photo.sha256 else { return nil }
+        return path
+    }
+
+    func downloadOriginal(photoID: String, spaceID: String, activityID: String) async throws -> URL {
+        guard UUID(uuidString: photoID) != nil, UUID(uuidString: spaceID) != nil,
+              UUID(uuidString: activityID) != nil else { throw APIError.message("照片标识无效。") }
+        if let local = await localOriginal(photoID: photoID, spaceID: spaceID, activityID: activityID) { return local }
+        guard let store, let token = store.identity.accessToken else { throw APIError.message("请先登录用户中心。") }
+        let value = try await store.call("/api/dear/social/tenants/\(spaceID)/activities/\(activityID)/photo-requests",
+                                         method: "POST", body: ["photoId": photoID, "operationId": UUID().uuidString])
+        guard let request = value as? [String: Any], let id = request["id"] as? String,
+              UUID(uuidString: id) != nil, let length = (request["length"] as? NSNumber)?.intValue,
+              (1...50 * 1024 * 1024).contains(length), let sha = request["sha256"] as? String,
+              sha.count == 64, sha.allSatisfy({ $0.isHexDigit }) else {
+            throw APIError.message("原图请求回执无效。")
+        }
+        var completed = false
+        do {
+            var components = URLComponents(url: base, resolvingAgainstBaseURL: false)!
+            components.scheme = "wss"
+            components.path = "/api/dear/social/photo-requests/\(id)/transfer"
+            components.queryItems = [URLQueryItem(name: "role", value: "receiver")]
+            var socketRequest = URLRequest(url: components.url!)
+            socketRequest.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+            socketRequest.timeoutInterval = 125
+            let socket = session.webSocketTask(with: socketRequest)
+            socket.resume()
+            defer { socket.cancel(with: .normalClosure, reason: nil) }
+            var received = Data()
+            var started = false
+            while true {
+                try Task.checkCancellation()
+                let message = try await socket.receive()
+                switch message {
+                case .string(let text):
+                    guard let bytes = text.data(using: .utf8),
+                          let marker = try? JSONSerialization.jsonObject(with: bytes) as? [String: Any],
+                          let kind = marker["kind"] as? String else { throw APIError.message("原图传输消息无效。") }
+                    if kind == "start" && !started {
+                        guard (marker["length"] as? NSNumber)?.intValue == length,
+                              (marker["sha256"] as? String)?.caseInsensitiveCompare(sha) == .orderedSame else {
+                            throw APIError.message("原图传输信息不匹配。")
+                        }
+                        started = true
+                    } else if kind == "end" && started {
+                        guard received.count == length,
+                              SHA256.hash(data: received).map({ String(format: "%02x", $0) }).joined().caseInsensitiveCompare(sha) == .orderedSame,
+                              UIImage(data: received) != nil else { throw APIError.message("原图完整性校验失败。") }
+                        _ = try await store.call("/api/dear/social/photo-requests/\(id)/complete", method: "POST", body: [:])
+                        completed = true
+                        let root = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)[0]
+                            .appendingPathComponent("DearReceivedPhotos", isDirectory: true)
+                        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+                        let suffix: String
+                        switch request["contentType"] as? String {
+                        case "image/png": suffix = ".png"
+                        case "image/webp": suffix = ".webp"
+                        case "image/heic": suffix = ".heic"
+                        default: suffix = ".jpg"
+                        }
+                        let url = root.appendingPathComponent(UUID().uuidString + suffix)
+                        try received.write(to: url, options: [.atomic, .completeFileProtectionUntilFirstUserAuthentication])
+                        return url
+                    } else { throw APIError.message("原图传输顺序无效。") }
+                case .data(let chunk):
+                    guard started, received.count + chunk.count <= length else { throw APIError.message("原图大小不匹配。") }
+                    received.append(chunk)
+                @unknown default: throw APIError.message("原图传输格式无效。")
+                }
+            }
+        } catch {
+            if !completed { _ = try? await store.call("/api/dear/social/photo-requests/\(id)/cancel", method: "POST", body: [:]) }
+            throw error
+        }
+    }
+
     private func currentSubject() async throws -> String {
         if let subjectCache, store?.identity.isAuthenticated == true { return subjectCache }
         guard let store, store.identity.isAuthenticated,
@@ -175,7 +258,12 @@ import UIKit
         }
         let scale = min(360 / image.size.width, 360 / image.size.height, 1)
         let size = CGSize(width: image.size.width * scale, height: image.size.height * scale)
-        let rendered = UIGraphicsImageRenderer(size: size).image { _ in image.draw(in: CGRect(origin: .zero, size: size)) }
+        let format = UIGraphicsImageRendererFormat.default()
+        format.scale = 1
+        format.opaque = true
+        let rendered = UIGraphicsImageRenderer(size: size, format: format).image { _ in
+            image.draw(in: CGRect(origin: .zero, size: size))
+        }
         guard let jpeg = rendered.jpegData(compressionQuality: 0.65), jpeg.count <= 256 * 1024 else {
             throw APIError.message("照片预览无法压缩。")
         }

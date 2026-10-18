@@ -12,7 +12,8 @@ internal static class LinkoSocialGateway
         app.MapGet("/api/dear/social/photo-requests/{requestId:guid}/transfer", async (
             HttpContext context, Guid requestId, IHttpClientFactory clients, IConfiguration configuration, CancellationToken ct) =>
         {
-            if (!context.WebSockets.IsWebSocketRequest || context.Request.Query["role"] != "source")
+            var role = context.Request.Query["role"].ToString();
+            if (!context.WebSockets.IsWebSocketRequest || role is not ("source" or "receiver"))
                 return Results.BadRequest();
             var originText = configuration["LinkoSocial:Origin"];
             var loginText = configuration["LinkoSocial:LoginOrigin"];
@@ -27,11 +28,11 @@ internal static class LinkoSocialGateway
                     .ExchangeAsync(loginOrigin, origin, token, ct);
                 using var upstream = new ClientWebSocket();
                 upstream.Options.SetRequestHeader("Authorization", "Bearer " + serviceToken);
-                var destination = new UriBuilder(origin) { Scheme = "wss", Path = $"/api/photo-requests/{requestId}/transfer", Query = "role=source" }.Uri;
+                var destination = new UriBuilder(origin) { Scheme = "wss", Path = $"/api/photo-requests/{requestId}/transfer", Query = "role=" + role }.Uri;
                 await upstream.ConnectAsync(destination, ct);
                 using var downstream = await context.WebSockets.AcceptWebSocketAsync();
                 using var linked = CancellationTokenSource.CreateLinkedTokenSource(ct);
-                linked.CancelAfter(TimeSpan.FromMinutes(2));
+                linked.CancelAfter(TimeSpan.FromSeconds(125));
                 var send = RelayWebSocket(downstream, upstream, linked.Token);
                 var receive = RelayWebSocket(upstream, downstream, linked.Token);
                 await Task.WhenAny(send, receive);
@@ -132,7 +133,8 @@ internal static class LinkoSocialGateway
         if (s.Length == 1 && s[0] == "photo-devices") return method == "POST";
         if (s.Length == 2 && s[0] == "photo-devices" && Guid.TryParse(s[1], out _)) return method == "DELETE";
         if (s.Length == 3 && s[0] == "photo-devices" && Guid.TryParse(s[1], out _) && s[2] == "requests") return method == "GET";
-        if (s.Length == 3 && s[0] == "photo-requests" && Guid.TryParse(s[1], out _) && s[2] == "unavailable") return method == "POST";
+        if (s.Length == 2 && s[0] == "photo-requests" && Guid.TryParse(s[1], out _)) return method == "GET";
+        if (s.Length == 3 && s[0] == "photo-requests" && Guid.TryParse(s[1], out _) && s[2] is "unavailable" or "complete" or "cancel") return method == "POST";
         if (s.Length == 1 && s[0] == "tenants") return method is "GET" or "POST";
         if (s.Length == 2 && s[0] == "tenants" && Guid.TryParse(s[1], out _)) return method is "PATCH" or "DELETE";
         if (s.Length == 3 && s[0] == "tenants" && Guid.TryParse(s[1], out _) && s[2] == "activities")
@@ -152,6 +154,7 @@ internal static class LinkoSocialGateway
             if (s.Length == 6 && s[4] == "live" && s[5] == "photos") return method == "GET";
             if (s.Length == 7 && s[4] == "live" && s[5] == "photos" && Guid.TryParse(s[6], out _)) return method == "DELETE";
             if (s.Length == 5 && s[4] == "native-photos") return method == "POST";
+            if (s.Length == 5 && s[4] == "photo-requests") return method == "POST";
             if (s.Length == 7 && s[4] == "native-photos" && Guid.TryParse(s[5], out _) && s[6] == "thumbnail") return method is "GET" or "PUT";
         }
         if (s.Length == 3 && s[0] == "invites" && s[1] == "username" && s[2] == "pending") return method == "GET";
