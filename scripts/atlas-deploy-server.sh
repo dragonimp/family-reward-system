@@ -27,14 +27,14 @@ git -C "$root" merge-base --is-ancestor "$source_commit" "$merge_commit" || {
 scratch="$(mktemp -d "$HOME/.codex/worktrees/family-reward-atlas-deploy.XXXXXXXX")"
 checkout="$scratch/source"
 cleanup() {
-  if [[ -d "$checkout" ]] && [[ "$(git -C "$checkout" rev-parse HEAD 2>/dev/null || true)" == "$merge_commit" ]] \
+  if [[ -d "$checkout" ]] && [[ "$(git -C "$checkout" rev-parse HEAD 2>/dev/null || true)" == "$source_commit" ]] \
       && [[ -z "$(git -C "$checkout" status --porcelain --untracked-files=all 2>/dev/null || true)" ]]; then
     git -C "$root" worktree remove "$checkout" || true
   fi
   if [[ ! -e "$checkout" ]]; then rmdir "$scratch" 2>/dev/null || true; fi
 }
 trap cleanup EXIT
-git -C "$root" worktree add --detach "$checkout" "$merge_commit" >&2
+git -C "$root" worktree add --detach "$checkout" "$source_commit" >&2
 ATLAS_SOURCE_ROOT=/Users/wengzhishan/Projects/Atlas \
 FAMILY_REWARD_SHARED_PROJECTS_ROOT=/Users/wengzhishan/Projects \
   bash "$checkout/scripts/build-atlas-release.sh" "$version" "$scratch/release" >&2
@@ -43,6 +43,7 @@ stage="/opt/Atlas/release-staging/family-points-pipeline/$version"
 ssh -o BatchMode=yes root@zz.impx.net "test ! -e '$stage' && mkdir -p '$stage'"
 scp -q "$scratch/release/bundle.json" "$scratch/release/family-points-api.tar.gz" \
   "$scratch/release/family-points-web.tar.gz" "$scratch/release/family-points-server.tar.gz" \
-  "$checkout/scripts/atlas-activate-server.sh" "root@zz.impx.net:$stage/"
+  "$checkout/scripts/atlas-activate-server.sh" "$checkout/scripts/install-social-photo-proxy.sh" \
+  "$checkout/deploy/happylife.ai.xmkurt.com.nginx.conf" "root@zz.impx.net:$stage/"
 ssh -o BatchMode=yes root@zz.impx.net \
   "bash '$stage/atlas-activate-server.sh' '$version' '$source_commit' '$stage'"

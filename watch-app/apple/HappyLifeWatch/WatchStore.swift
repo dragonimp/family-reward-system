@@ -3,13 +3,16 @@ import SwiftUI
 import WatchConnectivity
 #endif
 
-struct WatchSocialSpace: Identifiable { let id: String; let name: String }
-struct WatchSocialActivity: Identifiable { let id: String; let title: String }
-struct WatchSocialPhoto: Identifiable { let id: String; let name: String; let author: String; let available: Bool }
+struct WatchSocialSpace: Identifiable { let id: String; let name: String; let owner: Bool }
+struct WatchSocialActivity: Identifiable { let id: String; let title: String; let canEdit: Bool }
+struct WatchSocialPhoto: Identifiable {
+    let id: String; let name: String; let author: String; let available: Bool; let canDelete: Bool
+}
 
 #if canImport(WatchConnectivity)
 private final class WatchActivityTransport: NSObject, WCSessionDelegate {
     private let session: WCSession? = WCSession.isSupported() ? .default : nil
+    private var photoTransfers: [String: (CheckedContinuation<Void, Error>, WCSessionFileTransfer)] = [:]
 
     func activate() {
         session?.delegate = self
@@ -32,11 +35,43 @@ private final class WatchActivityTransport: NSObject, WCSessionDelegate {
     }
 
     func session(_ session: WCSession, activationDidCompleteWith activationState: WCSessionActivationState, error: Error?) { }
+
+    func sendPhoto(_ data: Data, metadata: [String: Any]) async throws {
+        guard let session, session.activationState == .activated,
+              let operationID = metadata["operationId"] as? String else {
+            throw APIError(status: 0, message: "手表与 iPhone 的照片传输尚未就绪。")
+        }
+        let path = FileManager.default.temporaryDirectory.appendingPathComponent(operationID + ".jpg")
+        try data.write(to: path, options: .atomic)
+        try await withCheckedThrowingContinuation { continuation in
+            let transfer = session.transferFile(path, metadata: metadata)
+            photoTransfers[operationID] = (continuation, transfer)
+            Task { @MainActor in
+                try? await Task.sleep(for: .seconds(120))
+                guard let pending = photoTransfers.removeValue(forKey: operationID) else { return }
+                pending.1.cancel()
+                pending.0.resume(throwing: APIError(status: 0, message: "照片传输超时，请让配对的 iPhone 保持连接后重试。"))
+            }
+        }
+    }
+
+    func session(_ session: WCSession, didFinish fileTransfer: WCSessionFileTransfer, error: Error?) {
+        Task { @MainActor in
+            guard let operationID = fileTransfer.file.metadata?["operationId"] as? String else { return }
+            try? FileManager.default.removeItem(at: fileTransfer.file.fileURL)
+            guard let pending = photoTransfers.removeValue(forKey: operationID) else { return }
+            if let error { pending.0.resume(throwing: error) }
+            else { pending.0.resume() }
+        }
+    }
 }
 #else
 private final class WatchActivityTransport {
     func activate() { }
     func request(_ message: [String: Any]) async throws -> [String: Any] {
+        throw APIError(status: 0, message: "手表活动照片需要 Apple Watch。")
+    }
+    func sendPhoto(_ data: Data, metadata: [String: Any]) async throws {
         throw APIError(status: 0, message: "手表活动照片需要 Apple Watch。")
     }
 }
@@ -214,7 +249,7 @@ final class WatchStore: ObservableObject {
             guard let rows = reply["items"] as? [[String: Any]] else { throw APIError(status: 0, message: "空间列表无效。") }
             socialSpaces = rows.compactMap { row in
                 guard let id = row["id"] as? String, let name = row["name"] as? String else { return nil }
-                return WatchSocialSpace(id: id, name: name)
+                return WatchSocialSpace(id: id, name: name, owner: row["owner"] as? Bool ?? false)
             }
         } catch { socialError = error.localizedDescription }
     }
@@ -227,7 +262,7 @@ final class WatchStore: ObservableObject {
             guard let rows = reply["items"] as? [[String: Any]] else { throw APIError(status: 0, message: "活动列表无效。") }
             socialActivities = rows.compactMap { row in
                 guard let id = row["id"] as? String, let title = row["title"] as? String else { return nil }
-                return WatchSocialActivity(id: id, title: title)
+                return WatchSocialActivity(id: id, title: title, canEdit: row["canEdit"] as? Bool ?? false)
             }
         } catch { socialError = error.localizedDescription }
     }
@@ -244,7 +279,8 @@ final class WatchStore: ObservableObject {
             let page = rows.compactMap { row -> WatchSocialPhoto? in
                 guard let id = row["id"] as? String, let name = row["name"] as? String else { return nil }
                 return WatchSocialPhoto(id: id, name: name, author: row["author"] as? String ?? "",
-                                        available: row["available"] as? Bool ?? false)
+                                        available: row["available"] as? Bool ?? false,
+                                        canDelete: row["canDelete"] as? Bool ?? false)
             }
             socialPhotos = more ? socialPhotos + page : page
             socialPhotosHasMore = reply["hasMore"] as? Bool ?? false
@@ -259,6 +295,34 @@ final class WatchStore: ObservableObject {
             throw APIError(status: 0, message: "照片预览无法读取。")
         }
         return data
+    }
+
+    func socialRequest(_ action: String, spaceID: String? = nil, activityID: String? = nil,
+                       fields: [String: Any] = [:]) async throws -> [String: Any] {
+        guard token != nil else { throw APIError(status: 401, message: "请先绑定手表。") }
+        var message = fields
+        message["action"] = action
+        if let spaceID { message["spaceId"] = spaceID }
+        if let activityID { message["activityId"] = activityID }
+        return try await activityTransport.request(message)
+    }
+
+    func shareSocialPhoto(_ data: Data, spaceID: String, activityID: String) async throws {
+        guard token != nil else { throw APIError(status: 401, message: "请先绑定手表。") }
+        guard data.count > 0, data.count <= 50 * 1024 * 1024 else {
+            throw APIError(status: 0, message: "照片超过 50 MB，请选择较小的照片。")
+        }
+        let operationID = UUID().uuidString
+        try await activityTransport.sendPhoto(data, metadata: ["operationId": operationID,
+            "spaceId": spaceID, "activityId": activityID, "name": "手表照片.jpg"])
+        for _ in 0..<30 {
+            let reply = try await socialRequest("photoTransferStatus", fields: ["operationId": operationID])
+            let status = reply["status"] as? String ?? "waiting"
+            if status == "published" { return }
+            if status.hasPrefix("error: ") { throw APIError(status: 0, message: String(status.dropFirst(7))) }
+            try await Task.sleep(for: .seconds(4))
+        }
+        throw APIError(status: 0, message: "照片已发送到 iPhone，登记尚未确认，请稍后刷新相册。")
     }
 
     func makeFriendCode() async {

@@ -135,6 +135,7 @@ app.UseForwardedHeaders(new ForwardedHeadersOptions
 });
 app.UseRateLimiter();
 app.UseCors();
+app.UseWebSockets();
 app.UseAgentIdentity();
 app.UseAtlasReleaseDrain(context => HttpMethods.IsGet(context.Request.Method) && context.Request.Path == "/health");
 app.MapAgentIdentityAuthEndpoints();

@@ -74,6 +74,8 @@ PY
 done
 [[ "$state" == completed ]] || { echo 'Atlas API upgrade did not finish within 15 minutes.' >&2; exit 1; }
 
+bash "$stage/install-social-photo-proxy.sh" "$stage/happylife.ai.xmkurt.com.nginx.conf" "$stage"
+
 site=/var/www/happylife/frontend/static
 previous="$(readlink "$site")"
 candidate="/var/www/happylife/frontend/releases/$version"

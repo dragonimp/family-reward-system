@@ -1,5 +1,6 @@
 import SwiftUI
 import CoreLocation
+import PhotosUI
 
 private struct DearRecord: Identifiable {
     let data: [String: Any]
@@ -26,6 +27,7 @@ struct DearSocialView: View {
     @State private var spaces: [DearRecord] = []
     @State private var activities: [DearRecord] = []
     @State private var photos: [DearRecord] = []
+    @State private var selectedPhoto: PhotosPickerItem?
     @State private var moments: [DearRecord] = []
     @State private var checkIns: [DearRecord] = []
     @StateObject private var checkInLocator = DearCheckInLocator()
@@ -207,6 +209,10 @@ struct DearSocialView: View {
             }
                 if let selectedActivity {
                     Section("照片分享 · \(selectedActivity.text("title"))") {
+                        PhotosPicker("共享 iPhone 照片", selection: $selectedPhoto, matching: .images)
+                            .disabled(busy)
+                        Text("原图留在此 iPhone；对方获取原图时，请保持 Linko Dear 打开。")
+                            .font(.caption).foregroundStyle(.secondary)
                         if photos.isEmpty { Text("还没有分享的照片").foregroundStyle(.secondary) }
                         ForEach(photos) { photo in
                             HStack(spacing: 12) {
@@ -222,7 +228,7 @@ struct DearSocialView: View {
                             }
                         }
                         Button("刷新相册") { run { try await loadPhotos() } }.disabled(busy)
-                        Link("分享照片与获取原图", destination: URL(string: "https://linko.ai.impx.net/")!)
+                        Link("在 Linko Social 获取原图", destination: URL(string: "https://linko.ai.impx.net/")!)
                     }
                     Section("生活分享 · \(selectedActivity.text("title"))") {
                         Text("只向这场活动的成员展示。")
@@ -287,6 +293,21 @@ struct DearSocialView: View {
         .sheet(isPresented: $showingActivityManagement) { activityManagement }
         .sheet(isPresented: $showingCheckIn) { checkInSheet }
         .onChange(of: activityId) { _, _ in showingActivityManagement = false; inviteLink = ""; inviteUsername = ""; momentDraft = ""; momentRequestID = UUID() }
+        .onChange(of: selectedPhoto) { _, selected in
+            guard let selected else { return }
+            let targetSpace = spaceId, targetActivity = activityId
+            run {
+                defer { selectedPhoto = nil }
+                guard let data = try await selected.loadTransferable(type: Data.self),
+                      let image = UIImage(data: data), let jpeg = image.jpegData(compressionQuality: 0.9) else {
+                    throw APIError.message("无法读取所选照片。")
+                }
+                try await store.photoSource.publish(jpeg, spaceID: targetSpace, activityID: targetActivity,
+                                                    name: "iPhone照片.jpg")
+                try await loadPhotos()
+                notice = "照片已共享；请保持此 iPhone 可以响应原图请求。"
+            }
+        }
         .refreshable {
             do { try await loadDetails(); try await loadRelationships() }
             catch { self.error = error.localizedDescription }
@@ -441,7 +462,12 @@ struct DearSocialView: View {
     }
     private func loadPhotos() async throws {
         guard !spaceId.isEmpty, !activityId.isEmpty else { return }
-        photos = try DearRecord.list(await store.call(base + "tenants/\(spaceId)/activities/\(activityId)/live/photos"))
+        var loaded = try DearRecord.list(await store.call(base + "tenants/\(spaceId)/activities/\(activityId)/live/photos"))
+        if loaded.contains(where: { !$0.flag("thumbnailAvailable") }) {
+            await store.photoSource.refreshPreviews(spaceID: spaceId, activityID: activityId, rows: loaded.map(\.data))
+            loaded = try DearRecord.list(await store.call(base + "tenants/\(spaceId)/activities/\(activityId)/live/photos"))
+        }
+        photos = loaded
     }
     private func loadMoments() async throws {
         guard !spaceId.isEmpty, !activityId.isEmpty else { return }

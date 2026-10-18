@@ -23,7 +23,8 @@ extension View {
     @StateObject private var store = FamilyStore()
     @Environment(\.scenePhase) private var scenePhase
     var body: some Scene { WindowGroup { FamilyRoot(store: store, identity: store.identity).tint(.teal).onChange(of: scenePhase) { _, phase in
-        if phase == .active { Task { await store.refreshIfStale() } }
+        if phase == .active { store.resumePhotoSharing(); Task { await store.refreshIfStale() } }
+        else { store.suspendPhotoSharing() }
     } } }
 }
 
@@ -53,7 +54,9 @@ struct FamilyRoot: View {
                 }
             }
         }
-        .task(id: identity.isAuthenticated) { if identity.isAuthenticated { await store.load() } }
+        .task(id: identity.isAuthenticated) {
+            if identity.isAuthenticated { await store.load(); store.resumePhotoSharing() }
+        }
         .alert("操作提示", isPresented: Binding(get: { store.error != nil }, set: { if !$0 { store.error = nil } })) { Button("知道了", role: .cancel) { store.error = nil } } message: { Text(store.error ?? "") }
     }
     private var login: some View {

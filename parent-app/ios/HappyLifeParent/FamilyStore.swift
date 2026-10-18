@@ -7,6 +7,8 @@ import WatchConnectivity
     let identity = AgentIdentitySession(origin: URL(string: "https://happylife.ai.xmkurt.com")!, callback: URL(string: "linkofamily://login-complete/")!, keychainService: "net.impx.happylife.parent.identity")
     private let base = URL(string: "https://happylife.ai.xmkurt.com")!
     private let session = URLSession(configuration: .ephemeral)
+    let photoSource = DearPhotoSource()
+    private var photoTransferStatuses: [String: String] = [:]
     @Published var profile: Record?
     @Published var groups: [Record] = []
     @Published var children: [Record] = []
@@ -24,6 +26,7 @@ import WatchConnectivity
     private var lastRefresh = Date.distantPast
     override init() {
         super.init()
+        photoSource.store = self
         if WCSession.isSupported() {
             WCSession.default.delegate = self
             WCSession.default.activate()
@@ -168,8 +171,12 @@ import WatchConnectivity
         catch { self.error = error.localizedDescription }
     }
     func logout() {
+        photoSource.logout(token: identity.accessToken)
         revision = UUID(); identity.logout(); profile = nil; groups = []; children = []; rules = []; requests = []; transactions = []; growth = []; members = []; groupID = 0; loading = false
     }
+
+    func resumePhotoSharing() { if identity.isAuthenticated { photoSource.start() } }
+    func suspendPhotoSharing() { photoSource.stop() }
 }
 
 extension FamilyStore: WCSessionDelegate {
@@ -185,34 +192,158 @@ extension FamilyStore: WCSessionDelegate {
         }
     }
 
+    nonisolated func session(_ session: WCSession, didReceive file: WCSessionFile) {
+        let metadata = file.metadata ?? [:]
+        let data = try? Data(contentsOf: file.fileURL)
+        Task { @MainActor in
+            guard let operationID = metadata["operationId"] as? String, UUID(uuidString: operationID) != nil else { return }
+            photoTransferStatuses[operationID] = "publishing"
+            do {
+                guard let data, let spaceID = metadata["spaceId"] as? String,
+                      let activityID = metadata["activityId"] as? String else {
+                    throw APIError.message("照片传输文件无效。")
+                }
+                try await photoSource.publish(data, spaceID: spaceID, activityID: activityID,
+                                              name: metadata["name"] as? String ?? "手表照片.jpg")
+                photoTransferStatuses[operationID] = "published"
+            } catch { photoTransferStatuses[operationID] = "error: \(error.localizedDescription)" }
+        }
+    }
+
     private func watchActivityReply(_ message: [String: Any]) async throws -> [String: Any] {
         guard identity.isAuthenticated else { throw APIError.message("请先在配对的 iPhone 上登录 Linko Dear。") }
         let base = "/api/dear/social/tenants"
         switch message["action"] as? String {
+        case "photoTransferStatus":
+            let id = try watchUUID(message, key: "operationId")
+            return ["status": photoTransferStatuses[id] ?? "waiting"]
         case "spaces":
             let rows = try watchRows(await call(base))
-            return ["items": rows.map { ["id": $0["id"] as? String ?? "", "name": $0["name"] as? String ?? ""] }]
-        case "activities", "photos", "thumbnail":
+            return ["items": rows.map { ["id": $0["id"] as? String ?? "", "name": $0["name"] as? String ?? "",
+                                           "owner": ($0["role"] as? String) == "owner"] as [String: Any] }]
+        case "invitations":
+            let rows = try watchRows(await call("/api/dear/social/invites/username/pending"))
+            return ["items": rows.filter { ($0["joined"] as? Bool) != true }.map {
+                ["id": $0["id"] as? String ?? "", "tenantId": $0["tenantId"] as? String ?? "",
+                                           "activityId": $0["activityId"] as? String ?? "",
+                 "title": $0["activityTitle"] as? String ?? "活动"] }]
+        case "createSpace":
+            let name = try watchText(message, key: "name", limit: 200)
+            _ = try await call(base, method: "POST", body: ["name": name])
+            return ["ok": true]
+        case "activities", "createActivity", "renameSpace", "deleteSpace", "acceptInvitation",
+             "photos", "thumbnail", "moments", "createMoment", "deleteMoment", "checkins", "createCheckIn",
+             "members", "renameActivity", "deleteActivity", "inviteUsername", "inviteLink", "deletePhoto":
             guard let spaceID = message["spaceId"] as? String, UUID(uuidString: spaceID) != nil else {
                 throw APIError.message("空间标识无效。")
             }
+            if message["action"] as? String == "renameSpace" {
+                let name = try watchText(message, key: "name", limit: 200)
+                _ = try await call(base + "/\(spaceID)", method: "PATCH", body: ["name": name])
+                return ["ok": true]
+            }
+            if message["action"] as? String == "deleteSpace" {
+                _ = try await call(base + "/\(spaceID)", method: "DELETE")
+                return ["ok": true]
+            }
             if message["action"] as? String == "activities" {
                 let rows = try watchRows(await call(base + "/\(spaceID)/activities"))
-                return ["items": rows.map { ["id": $0["id"] as? String ?? "", "title": $0["title"] as? String ?? ""] }]
+                return ["items": rows.map { ["id": $0["id"] as? String ?? "", "title": $0["title"] as? String ?? "",
+                                               "canEdit": $0["canEdit"] as? Bool ?? false] as [String: Any] }]
+            }
+            if message["action"] as? String == "createActivity" {
+                let title = try watchText(message, key: "title", limit: 200)
+                _ = try await call(base + "/\(spaceID)/activities", method: "POST", body: ["title": title, "description": ""])
+                return ["ok": true]
             }
             guard let activityID = message["activityId"] as? String, UUID(uuidString: activityID) != nil else {
                 throw APIError.message("活动标识无效。")
             }
             let prefix = base + "/\(spaceID)/activities/\(activityID)"
-            let photos = try watchRows(await call(prefix + "/live/photos"))
+            switch message["action"] as? String {
+            case "renameActivity":
+                let title = try watchText(message, key: "title", limit: 200)
+                _ = try await call(prefix, method: "PATCH", body: ["title": title]); return ["ok": true]
+            case "deleteActivity":
+                _ = try await call(prefix, method: "DELETE"); return ["ok": true]
+            case "moments":
+                let rows = try watchRows(await call(prefix + "/moments"))
+                return ["items": rows.map { ["id": $0["id"] as? String ?? "", "text": $0["text"] as? String ?? "",
+                                               "author": $0["authorName"] as? String ?? "",
+                                               "canDelete": $0["canDelete"] as? Bool ?? false] as [String: Any] }]
+            case "createMoment":
+                let body = try watchText(message, key: "text", limit: 1000)
+                let requestID = try watchUUID(message, key: "requestId")
+                _ = try await call(prefix + "/moments", method: "POST", body: ["text": body, "requestId": requestID])
+                return ["ok": true]
+            case "deleteMoment":
+                let id = try watchUUID(message, key: "itemId")
+                _ = try await call(prefix + "/moments/\(id)", method: "DELETE"); return ["ok": true]
+            case "checkins":
+                let rows = try watchRows(await call(prefix + "/checkins"))
+                return ["items": rows.map { ["id": $0["id"] as? String ?? "", "note": $0["note"] as? String ?? "",
+                                               "address": $0["address"] as? String ?? "",
+                                               "author": $0["authorName"] as? String ?? "",
+                                               "altitudeMeters": $0["altitudeMeters"] as? Double ?? 0] as [String: Any] }]
+            case "createCheckIn":
+                let requestID = try watchUUID(message, key: "requestId")
+                guard let latitude = message["latitude"] as? Double, (-90...90).contains(latitude),
+                      let longitude = message["longitude"] as? Double, (-180...180).contains(longitude),
+                      let altitude = message["altitudeMeters"] as? Double, altitude.isFinite else {
+                    throw APIError.message("手表位置无效，请重新定位。")
+                }
+                let address = try watchText(message, key: "address", limit: 500)
+                let note = (message["note"] as? String ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+                guard note.count <= 1000 else { throw APIError.message("备注不能超过 1000 字。") }
+                _ = try await call(prefix + "/checkins", method: "POST", body: ["requestId": requestID,
+                    "latitude": latitude, "longitude": longitude, "altitudeMeters": altitude,
+                    "address": address, "note": note.isEmpty ? address : note])
+                return ["ok": true]
+            case "members":
+                let rows = try watchRows(await call(prefix + "/members"))
+                return ["items": rows.map { ["name": $0["displayName"] as? String ?? "",
+                                               "isSelf": $0["isSelf"] as? Bool ?? false] as [String: Any] }]
+            case "inviteUsername":
+                let username = try watchText(message, key: "username", limit: 200)
+                _ = try await call(prefix + "/invites/username", method: "POST", body: ["username": username])
+                return ["ok": true]
+            case "inviteLink":
+                let value = try await call(prefix + "/invites/link", method: "POST", body: [:]) as? [String: Any]
+                guard let token = value?["token"] as? String,
+                      let safe = token.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) else {
+                    throw APIError.message("邀请链接无效。")
+                }
+                return ["url": "https://happylife.ai.xmkurt.com/dear?invite=\(safe)"]
+            case "acceptInvitation":
+                let me = try await call("/api/dear/social/me") as? [String: Any]
+                guard let username = me?["username"] as? String,
+                      let safe = username.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) else {
+                    throw APIError.message("无法确认当前用户名。")
+                }
+                _ = try await call(prefix + "/invites/username/\(safe)/accept", method: "POST", body: [:])
+                return ["ok": true]
+            case "deletePhoto":
+                let id = try watchUUID(message, key: "photoId")
+                _ = try await call(prefix + "/live/photos/\(id)", method: "DELETE")
+                return ["ok": true]
+            default: break
+            }
+            var photos = try watchRows(await call(prefix + "/live/photos"))
             if message["action"] as? String == "photos" {
+                await photoSource.refreshPreviews(spaceID: spaceID, activityID: activityID, rows: photos)
+                if photos.contains(where: { ($0["thumbnailAvailable"] as? Bool) == false }) {
+                    photos = try watchRows(await call(prefix + "/live/photos"))
+                }
+                let me = try await call("/api/dear/social/me") as? [String: Any]
+                let subject = me?["subject"] as? String ?? ""
                 let offset = max(0, message["offset"] as? Int ?? 0)
                 let page = Array(photos.dropFirst(offset).prefix(30))
                 return ["hasMore": offset + page.count < photos.count, "items": page.map { photo in
                     ["id": photo["id"] as? String ?? "",
                      "name": photo["originalFileName"] as? String ?? "照片",
                      "author": photo["sourceDisplayName"] as? String ?? "",
-                     "available": photo["thumbnailAvailable"] as? Bool ?? false] as [String: Any]
+                     "available": photo["thumbnailAvailable"] as? Bool ?? false,
+                     "canDelete": !subject.isEmpty && (photo["sourceSubject"] as? String) == subject] as [String: Any]
                 }]
             }
             guard let photoID = message["photoId"] as? String, UUID(uuidString: photoID) != nil,
@@ -241,5 +372,18 @@ extension FamilyStore: WCSessionDelegate {
     private func watchRows(_ value: Any) throws -> [[String: Any]] {
         guard let rows = value as? [[String: Any]] else { throw APIError.message("活动数据暂时不可用。") }
         return rows
+    }
+
+    private func watchText(_ message: [String: Any], key: String, limit: Int) throws -> String {
+        let value = (message[key] as? String ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !value.isEmpty, value.count <= limit else { throw APIError.message("输入内容须为 1 至 \(limit) 字。") }
+        return value
+    }
+
+    private func watchUUID(_ message: [String: Any], key: String) throws -> String {
+        guard let value = message[key] as? String, UUID(uuidString: value) != nil else {
+            throw APIError.message("请求标识无效。")
+        }
+        return value
     }
 }
