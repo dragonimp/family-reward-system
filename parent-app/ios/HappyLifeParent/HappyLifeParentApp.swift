@@ -101,9 +101,14 @@ struct FamilyRoot: View {
         NavigationStack {
             VStack(alignment: .leading, spacing: 24) {
                 Spacer()
-                Image(systemName: "house.and.flag.fill").font(.system(size: 72)).foregroundStyle(.teal)
-                Text("每一份成长\n都值得被看见").font(.largeTitle.bold())
-                Text("家庭、积分与成长记录，随手相伴。").foregroundStyle(.secondary)
+                Image("LoginBrand")
+                    .resizable()
+                    .frame(width: 88, height: 88)
+                    .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+                    .accessibilityLabel("Linko Dear 图标")
+                Text("一起记录生活里的\n重要时刻").font(.largeTitle.bold())
+                Text("和家人朋友共建活动、分享照片与打卡；家长还可管理孩子的成长和积分。")
+                    .foregroundStyle(.secondary)
                 Spacer()
                 if identity.isBusy {
                     HStack { ProgressView(); Text(identity.status).font(.subheadline); Spacer(); Button("取消") { identity.cancelLogin() }.buttonStyle(.bordered) }
