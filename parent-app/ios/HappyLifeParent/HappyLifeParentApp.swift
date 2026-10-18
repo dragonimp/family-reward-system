@@ -1,6 +1,34 @@
 import SwiftUI
 import AgentIdentity
 import Charts
+import UserNotifications
+
+@MainActor final class PhotoPushDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDelegate {
+    weak var photoSource: DearPhotoSource?
+
+    func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil) -> Bool {
+        UNUserNotificationCenter.current().delegate = self
+        return true
+    }
+
+    func application(_ application: UIApplication, didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data) {
+        let token = deviceToken.map { String(format: "%02x", $0) }.joined()
+        Task { await photoSource?.updatePushToken(token) }
+    }
+
+    nonisolated func userNotificationCenter(_ center: UNUserNotificationCenter, willPresent notification: UNNotification,
+                                withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void) {
+        completionHandler([.banner, .sound])
+    }
+
+    nonisolated func userNotificationCenter(_ center: UNUserNotificationCenter, didReceive response: UNNotificationResponse,
+                                withCompletionHandler completionHandler: @escaping () -> Void) {
+        Task { @MainActor [weak self] in
+            self?.photoSource?.start()
+            completionHandler()
+        }
+    }
+}
 
 private struct ReadablePage: ViewModifier {
     let maxWidth: CGFloat
@@ -20,9 +48,12 @@ extension View {
 }
 
 @main struct LinkoFamilyApp: App {
+    @UIApplicationDelegateAdaptor(PhotoPushDelegate.self) private var photoPushDelegate
     @StateObject private var store = FamilyStore()
     @Environment(\.scenePhase) private var scenePhase
-    var body: some Scene { WindowGroup { FamilyRoot(store: store, identity: store.identity).tint(.teal).onChange(of: scenePhase) { _, phase in
+    var body: some Scene { WindowGroup { FamilyRoot(store: store, identity: store.identity).tint(.teal).onAppear {
+        photoPushDelegate.photoSource = store.photoSource
+    }.onChange(of: scenePhase) { _, phase in
         if phase == .active { store.resumePhotoSharing(); Task { await store.refreshIfStale() } }
         else { store.suspendPhotoSharing() }
     } } }
@@ -52,6 +83,13 @@ struct FamilyRoot: View {
                         Button("退出登录") { store.logout() }
                     }.padding().navigationTitle("Linko Dear")
                 }
+            }
+        }
+        .safeAreaInset(edge: .top) {
+            if let notice = store.photoRequestNotice {
+                Label(notice, systemImage: "photo.badge.arrow.down")
+                    .font(.footnote.weight(.semibold)).frame(maxWidth: .infinity)
+                    .padding(10).background(.orange.opacity(0.18))
             }
         }
         .task(id: identity.isAuthenticated) {

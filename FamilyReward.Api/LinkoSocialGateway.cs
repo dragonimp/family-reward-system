@@ -32,7 +32,7 @@ internal static class LinkoSocialGateway
                 await upstream.ConnectAsync(destination, ct);
                 using var downstream = await context.WebSockets.AcceptWebSocketAsync();
                 using var linked = CancellationTokenSource.CreateLinkedTokenSource(ct);
-                linked.CancelAfter(TimeSpan.FromSeconds(125));
+                linked.CancelAfter(TimeSpan.FromSeconds(305));
                 var send = RelayWebSocket(downstream, upstream, linked.Token);
                 var receive = RelayWebSocket(upstream, downstream, linked.Token);
                 await Task.WhenAny(send, receive);

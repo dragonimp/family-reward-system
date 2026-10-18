@@ -9,6 +9,7 @@ import WatchConnectivity
     private let session = URLSession(configuration: .ephemeral)
     let photoSource = DearPhotoSource()
     private var photoTransferStatuses: [String: String] = [:]
+    @Published var photoRequestNotice: String?
     @Published var profile: Record?
     @Published var groups: [Record] = []
     @Published var children: [Record] = []
@@ -175,6 +176,7 @@ import WatchConnectivity
     }
     func logout() {
         photoSource.logout(token: identity.accessToken)
+        photoRequestNotice = nil
         revision = UUID(); identity.logout(); profile = nil; groups = []; children = []; rules = []; requests = []; transactions = []; growth = []; members = []; groupID = 0; loading = false
     }
 

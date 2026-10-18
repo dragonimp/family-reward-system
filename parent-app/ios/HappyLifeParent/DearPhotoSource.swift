@@ -1,6 +1,7 @@
 import CryptoKit
 import Foundation
 import UIKit
+import UserNotifications
 
 // Linko Social keeps original image bytes on the source device. This adapter
 // stores the selected JPEG on the paired iPhone and serves verified requests.
@@ -23,6 +24,7 @@ import UIKit
     private var subjectCache: String?
     private var enabledForSession = false
     private var publishing = false
+    private var pushToken: String?
     private let session = URLSession(configuration: .ephemeral)
     private let base = URL(string: "https://happylife.ai.xmkurt.com")!
 
@@ -38,7 +40,29 @@ import UIKit
     }
 
     func stop() { pump?.cancel(); pump = nil; enabledForSession = false }
-    func reset() { stop(); subjectCache = nil }
+    func reset() { stop(); subjectCache = nil; pushToken = nil }
+
+    func updatePushToken(_ token: String) async {
+        guard !token.isEmpty, token.allSatisfy(\.isHexDigit) else { return }
+        pushToken = token
+        guard let store, let subject = try? await currentSubject(), let root = try? directory(for: subject),
+              let deviceID = (try? readIndex(at: root))?.deviceID else { return }
+        _ = try? await store.call("/api/dear/social/photo-devices", method: "POST",
+                                  body: ["id": deviceID, "pushToken": token])
+    }
+
+    private func enableNotificationsIfNeeded() async -> Bool {
+        guard UIApplication.shared.applicationState == .active else { return false }
+        let center = UNUserNotificationCenter.current()
+        let settings = await center.notificationSettings()
+        if settings.authorizationStatus == .notDetermined {
+            _ = try? await center.requestAuthorization(options: [.alert, .sound])
+        }
+        let updated = await center.notificationSettings()
+        guard updated.authorizationStatus == .authorized || updated.authorizationStatus == .provisional else { return false }
+        UIApplication.shared.registerForRemoteNotifications()
+        return true
+    }
 
     func logout(token: String?) {
         let deviceID: String? = subjectCache.flatMap { subject in
@@ -60,8 +84,11 @@ import UIKit
               let index = try? readIndex(at: root) else { return }
         guard let deviceID = index.deviceID else { enabledForSession = true; return }
         do {
-            _ = try await store.call("/api/dear/social/photo-devices", method: "POST", body: ["id": deviceID])
+            var body: [String: Any] = ["id": deviceID]
+            if let pushToken { body["pushToken"] = pushToken }
+            _ = try await store.call("/api/dear/social/photo-devices", method: "POST", body: body)
             enabledForSession = true
+            if !index.photos.isEmpty { _ = await enableNotificationsIfNeeded() }
         } catch { }
     }
 
@@ -76,8 +103,10 @@ import UIKit
         let subject = try await currentSubject()
         let root = try directory(for: subject)
         var index = try readIndex(at: root)
+        var deviceBody: [String: Any] = ["id": index.deviceID as Any? ?? NSNull()]
+        if let pushToken { deviceBody["pushToken"] = pushToken }
         let device = try await store.call("/api/dear/social/photo-devices", method: "POST",
-                                          body: ["id": index.deviceID as Any? ?? NSNull()]) as? [String: Any]
+                                          body: deviceBody) as? [String: Any]
         guard let deviceID = device?["id"] as? String, UUID(uuidString: deviceID) != nil else {
             throw APIError.message("照片分享设备登记失败。")
         }
@@ -110,6 +139,9 @@ import UIKit
                 // The original remains available. Opening the album retries a missing preview.
             }
             start()
+            if !(await enableNotificationsIfNeeded()) {
+                store.error = "有人请求原图时需要通知提醒。请在系统设置中允许 Linko Dear 发送通知，并保持 App 打开完成传输。"
+            }
         } catch {
             if let publishedID {
                 if (try? await store.call(prefix + "/live/photos/\(publishedID)", method: "DELETE")) != nil {
@@ -169,7 +201,7 @@ import UIKit
             components.queryItems = [URLQueryItem(name: "role", value: "receiver")]
             var socketRequest = URLRequest(url: components.url!)
             socketRequest.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-            socketRequest.timeoutInterval = 125
+            socketRequest.timeoutInterval = 305
             let socket = session.webSocketTask(with: socketRequest)
             socket.resume()
             defer { socket.cancel(with: .normalClosure, reason: nil) }
@@ -287,6 +319,9 @@ import UIKit
               let index = try? readIndex(at: root), let deviceID = index.deviceID else { return }
         do {
             let rows = try await store.call("/api/dear/social/photo-devices/\(deviceID)/requests") as? [[String: Any]] ?? []
+            if rows.isEmpty { store.photoRequestNotice = nil; return }
+            store.photoRequestNotice = "有活动成员正在请求原图，请保持 App 打开直到传输完成。"
+            defer { store.photoRequestNotice = nil }
             for request in rows {
                 guard !Task.isCancelled else { return }
                 let requestID = request["id"] as? String ?? ""

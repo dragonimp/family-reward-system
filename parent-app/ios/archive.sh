@@ -21,5 +21,6 @@ app="$PWD/build/Linko Family-signed.xcarchive/Products/Applications/Linko Dear.a
 codesign --force --sign "$APPLE_SIGNING_IDENTITY" --keychain "$APPLE_SIGNING_KEYCHAIN" \
   --identifier net.impx.happylife.parent.watchkitapp "$app/Watch/Linko Dear Watch.app"
 codesign --force --sign "$APPLE_SIGNING_IDENTITY" --keychain "$APPLE_SIGNING_KEYCHAIN" \
+  --entitlements "$PWD/HappyLifeParent/HappyLifeParent.entitlements" \
   --identifier net.impx.happylife.parent "$app"
 codesign --verify --deep --strict "$app"

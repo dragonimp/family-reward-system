@@ -33,11 +33,13 @@ with tempfile.TemporaryDirectory(prefix="happylife-parent-ipa-") as directory:
         ["codesign", "-d", "--entitlements", ":-", str(app)], capture_output=True, check=True).stdout)
     assert entitlements["application-identifier"] == "JQPH54K7SD." + expected
     assert entitlements.get("get-task-allow") is False
+    assert entitlements.get("aps-environment") == "production"
     profile = plistlib.loads(subprocess.run(
         ["security", "cms", "-D", "-i", str(app / "embedded.mobileprovision")],
         capture_output=True, check=True).stdout)
     assert profile["TeamIdentifier"] == ["JQPH54K7SD"]
     assert profile["Entitlements"]["application-identifier"] == entitlements["application-identifier"]
+    assert profile["Entitlements"].get("aps-environment") == "production"
     assert profile["ExpirationDate"].replace(tzinfo=datetime.timezone.utc) > datetime.datetime.now(datetime.timezone.utc)
     assert not profile.get("ProvisionedDevices") and not profile.get("ProvisionsAllDevices")
     assert (app / "Assets.car").is_file()
