@@ -138,7 +138,8 @@ app.UseCors();
 app.UseAgentIdentity();
 app.UseAtlasReleaseDrain(context => HttpMethods.IsGet(context.Request.Method) && context.Request.Path == "/health");
 app.MapAgentIdentityAuthEndpoints();
-app.MapAgentIdentityNativeLogin(new Uri("https://happylife.ai.xmkurt.com"), new Uri("linkofamily://login-complete"), "Linko-Family");
+app.MapAgentIdentityNativeLogin(new Uri("https://happylife.ai.xmkurt.com"), new Uri("linkofamily://login-complete"), "Linko-Family",
+    additionalPublicOrigins: [new Uri("https://happylife.ai.impx.net")]);
 app.MapLinkoSocialGateway();
 app.MapAtlasReleaseVersion();
 if (!string.IsNullOrWhiteSpace(releaseControlApplicationId))
