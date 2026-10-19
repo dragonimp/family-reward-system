@@ -66,7 +66,7 @@ export default function Layout({ children }: LayoutProps) {
           <div className="flex items-center justify-between h-14 sm:h-16">
             <div className="flex min-w-0 items-center gap-2">
               <img src="/favicon.png" alt="" className="h-8 w-8 rounded-lg" />
-              <h1 className="text-base sm:text-lg md:text-xl font-bold text-[#4A90D9] truncate">Linko Dear</h1>
+              <h1 className="text-base sm:text-lg md:text-xl font-bold text-[#4A90D9] truncate">Linko Moment</h1>
             </div>
             {/* 桌面端导航 */}
             <nav className="hidden lg:flex items-center gap-1">

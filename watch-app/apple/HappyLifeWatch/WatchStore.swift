@@ -21,7 +21,7 @@ private final class WatchActivityTransport: NSObject, WCSessionDelegate {
 
     func request(_ message: [String: Any]) async throws -> [String: Any] {
         guard let session, session.activationState == .activated, session.isReachable else {
-            throw APIError(status: 0, message: "请让配对的 iPhone 保持连接，并在 iPhone 上登录 Linko Dear 后重试。")
+            throw APIError(status: 0, message: "请让配对的 iPhone 保持连接，并在 iPhone 上登录 Linko Moment 后重试。")
         }
         return try await withCheckedThrowingContinuation { continuation in
             session.sendMessage(message, replyHandler: { reply in

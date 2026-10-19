@@ -71,7 +71,7 @@ struct FamilyRoot: View {
                 NavigationStack {
                     VStack(spacing: 24) {
                         Image(systemName: "person.2.circle.fill").font(.system(size: 64)).foregroundStyle(.teal)
-                        Text("欢迎使用 Linko Dear").font(.title2.bold())
+                        Text("欢迎使用 Linko Moment").font(.title2.bold())
                         if store.loading { ProgressView("正在读取家庭身份…") }
                         else if store.profile?.flag("needsRole") == true {
                             Text("选择家长身份，管理家庭与孩子的成长记录。")
@@ -81,7 +81,7 @@ struct FamilyRoot: View {
                             Text("此账号是孩子身份，请使用家长账号登录。")
                         } else { Button("重新加载") { Task { await store.load() } } }
                         Button("退出登录") { store.logout() }
-                    }.padding().navigationTitle("Linko Dear")
+                    }.padding().navigationTitle("Linko Moment")
                 }
             }
         }
@@ -105,7 +105,7 @@ struct FamilyRoot: View {
                     .resizable()
                     .frame(width: 88, height: 88)
                     .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
-                    .accessibilityLabel("Linko Dear 图标")
+                    .accessibilityLabel("Linko Moment 图标")
                 Text("一起记录生活里的\n重要时刻").font(.largeTitle.bold())
                 Text("和家人朋友共建活动、分享照片与打卡；家长还可管理孩子的成长和积分。")
                     .foregroundStyle(.secondary)
@@ -117,7 +117,7 @@ struct FamilyRoot: View {
                 Button { signIn(false) } label: { HStack { Spacer(); if identity.isBusy { ProgressView() }; Text("用户中心登录").bold(); Spacer() }.padding(.vertical, 8) }.buttonStyle(.borderedProminent).disabled(identity.isBusy)
                 Button("注册用户中心账号") { signIn(true) }.frame(maxWidth: .infinity).disabled(identity.isBusy)
                 Text("登录和注册在系统认证窗口中完成。登录后自动返回 App。").font(.footnote).foregroundStyle(.secondary)
-            }.padding(28).frame(maxWidth: 560).frame(maxWidth: .infinity).navigationTitle("Linko Dear")
+            }.padding(28).frame(maxWidth: 560).frame(maxWidth: .infinity).navigationTitle("Linko Moment")
         }
     }
     private func signIn(_ register: Bool) {
@@ -457,7 +457,7 @@ struct AccountView: View {
     var body: some View {
         NavigationStack {
             List {
-                Section { Label(store.profile?.text("username") ?? "家长", systemImage: "person.crop.circle.fill"); LabeledContent("身份", value: "家长"); LabeledContent("应用", value: "Linko Dear") }
+                Section { Label(store.profile?.text("username") ?? "家长", systemImage: "person.crop.circle.fill"); LabeledContent("身份", value: "家长"); LabeledContent("应用", value: "Linko Moment") }
                 Section("真实家庭关系") {
                     NavigationLink { GenealogyView(store: store) } label: { Label("家族族谱", systemImage: "person.3.sequence.fill") }
                     NavigationLink { MembersView(store: store) } label: { Label("家庭成员", systemImage: "person.3.fill") }
@@ -482,7 +482,7 @@ struct AccountView: View {
                     Text("在 Atlas 邀请页登录并分享专属链接；各系统的获取方式和版本说明由应用后台维护。")
                         .font(.footnote).foregroundStyle(.secondary)
                 }
-            }.readablePage().navigationTitle("我的").confirmationDialog("退出 Linko Dear？", isPresented: $logout, titleVisibility: .visible) { Button("退出登录", role: .destructive) { store.logout() } } message: { Text("本机登录凭据将清除。用户中心的浏览器登录状态由用户中心管理。") }
+            }.readablePage().navigationTitle("我的").confirmationDialog("退出 Linko Moment？", isPresented: $logout, titleVisibility: .visible) { Button("退出登录", role: .destructive) { store.logout() } } message: { Text("本机登录凭据将清除。用户中心的浏览器登录状态由用户中心管理。") }
         }
     }
 }

@@ -211,7 +211,7 @@ struct DearSocialView: View {
                     Section("照片分享 · \(selectedActivity.text("title"))") {
                         PhotosPicker("共享 iPhone 照片", selection: $selectedPhoto, matching: .images)
                             .disabled(busy)
-                        Text("原图留在此 iPhone；对方获取原图时，请保持 Linko Dear 打开。")
+                        Text("原图留在此 iPhone；对方获取原图时，请保持 Linko Moment 打开。")
                             .font(.caption).foregroundStyle(.secondary)
                         if photos.isEmpty { Text("还没有分享的照片").foregroundStyle(.secondary) }
                         ForEach(photos) { photo in

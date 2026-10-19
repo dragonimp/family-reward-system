@@ -27,7 +27,7 @@ export default function IdentityGate({ children }: { children: ReactNode }) {
   if (appProfile.role === 'child') {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[#F7F9FC] text-gray-500">
-        正在进入 Linko Dear...
+        正在进入 Linko Moment...
       </div>
     );
   }

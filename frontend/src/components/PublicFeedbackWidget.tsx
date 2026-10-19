@@ -43,10 +43,10 @@ export default function PublicFeedbackWidget() {
 
     window.AgentDashFeedback = {
       projectCode: 'family-reward',
-      projectName: 'Linko Dear',
+      projectName: 'Linko Moment',
       projectCodename: '家加分',
       appCode: '家加分',
-      sourceApp: 'Linko Dear',
+      sourceApp: 'Linko Moment',
       launcherEntries: [{
         id: 'family-reward-assistant',
         label: '智能对话',
