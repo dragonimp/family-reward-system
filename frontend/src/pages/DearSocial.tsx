@@ -3,7 +3,7 @@ import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext';
 
 type Space = { id: string; name: string; role: string };
-type Activity = { id: string; title: string; description: string; createdAt: string; canEdit: boolean };
+type Activity = { id: string; sourceTenantId?: string; title: string; description: string; createdAt: string; canEdit: boolean; isBookmarked?: boolean };
 type Photo = { id: string; sourceDisplayName: string; originalFileName: string; createdAt: string; thumbnailAvailable: boolean };
 type Invitation = { id: string; tenantId: string; activityId: string; activityTitle: string; joined: boolean };
 type Moment = { id: string; authorName: string; text: string; createdAt: string; canDelete: boolean };
@@ -90,10 +90,14 @@ export default function DearSocial() {
   const [spaces, setSpaces] = useState<Space[]>([]);
   const [spaceId, setSpaceId] = useState(routeSpaceId || '');
   const [activities, setActivities] = useState<Activity[]>([]);
+  const [joinedActivities, setJoinedActivities] = useState<Activity[]>([]);
   const [activityId, setActivityId] = useState(routeActivityId || '');
   const [photos, setPhotos] = useState<Photo[]>([]);
   const [invitations, setInvitations] = useState<Invitation[]>([]);
   const [spaceName, setSpaceName] = useState('');
+  const [editedSpaceName, setEditedSpaceName] = useState('');
+  const [spaceMenuOpen, setSpaceMenuOpen] = useState(false);
+  const [spaceDialog, setSpaceDialog] = useState<'create' | 'rename' | null>(null);
   const [activityName, setActivityName] = useState('');
   const [inviteUsername, setInviteUsername] = useState('');
   const [inviteUrl, setInviteUrl] = useState('');
@@ -110,7 +114,8 @@ export default function DearSocial() {
   const [message, setMessage] = useState('');
   const selected = activities.find(item => item.id === activityId);
   const chosenSpace = spaces.find(item => item.id === spaceId);
-  const activityPath = (id: string) => `/dear/spaces/${encodeURIComponent(spaceId)}/activities/${encodeURIComponent(id)}`;
+  const ownedSpaces = spaces.filter(item => item.role === 'owner');
+  const activityPath = (item: Activity) => `/dear/spaces/${encodeURIComponent(item.sourceTenantId || spaceId)}/activities/${encodeURIComponent(item.id)}`;
 
   useEffect(() => {
     if (detailMode) { setSpaceId(routeSpaceId || ''); setActivityId(routeActivityId || ''); }
@@ -124,9 +129,10 @@ export default function DearSocial() {
   }, [manageOpen]);
 
   const reload = useCallback(async () => {
-    const found = await social<Space[]>('tenants');
+    const [found, joined] = await Promise.all([social<Space[]>('tenants'), social<Activity[]>('activities/joined')]);
     setSpaces(found);
-    setSpaceId(previous => found.some(item => item.id === previous) ? previous : detailMode ? routeSpaceId || '' : found[0]?.id || '');
+    setJoinedActivities(joined);
+    setSpaceId(previous => detailMode ? routeSpaceId || '' : found.some(item => item.id === previous && item.role === 'owner') ? previous : found.find(item => item.role === 'owner')?.id || '');
     setRefreshIndex(previous => previous + 1);
     try { setInvitations(await social<Invitation[]>('invites/username/pending')); }
     catch (e) { setError(e instanceof Error ? `活动邀请暂时无法读取：${e.message}` : '活动邀请暂时无法读取'); }
@@ -143,7 +149,7 @@ export default function DearSocial() {
     let current = true;
     setActivityLoading(true);
     setActivityError('');
-    void social<Activity[]>(`tenants/${spaceId}/activities`).then(items => {
+    void social<Activity[]>(detailMode ? `tenants/${spaceId}/activities` : `spaces/${spaceId}/activities`).then(items => {
       if (!current) return;
       setActivities(items);
       setActivityId(detailMode && items.some(item => item.id === routeActivityId) ? routeActivityId || '' : '');
@@ -167,12 +173,30 @@ export default function DearSocial() {
   }
   const createSpace = () => act(async () => {
     const item = await social<Space>('tenants', 'POST', { name: spaceName.trim() });
-    setSpaceName(''); await reload(); setSpaceId(item.id); setMessage('生活空间已创建。');
+    setSpaceName(''); setSpaceDialog(null); await reload(); setSpaceId(item.id); setMessage('生活空间已创建。');
+  });
+  const renameSpace = () => act(async () => {
+    if (!chosenSpace || chosenSpace.role !== 'owner') return;
+    await social(`tenants/${chosenSpace.id}`, 'PATCH', { name: editedSpaceName.trim() });
+    setSpaceDialog(null); await reload(); setMessage('空间名称已更新。');
+  });
+  const deleteSpace = () => {
+    if (!chosenSpace || chosenSpace.role !== 'owner' || !window.confirm(`删除空间「${chosenSpace.name}」？空间中的收藏会移除，原活动不会删除。`)) return;
+    void act(async () => { await social(`tenants/${chosenSpace.id}`, 'DELETE'); setSpaceId(''); await reload(); setMessage('空间已删除。'); });
+  };
+  const addBookmark = (destinationSpaceId: string, item: Activity) => act(async () => {
+    const sourceTenantId = item.sourceTenantId || spaceId;
+    await social(`spaces/${destinationSpaceId}/bookmarks`, 'POST', { sourceTenantId, activityId: item.id });
+    setRefreshIndex(value => value + 1); setMessage('活动已收藏到空间。');
+  });
+  const removeBookmark = (item: Activity) => act(async () => {
+    await social(`spaces/${spaceId}/bookmarks/${item.sourceTenantId}/${item.id}`, 'DELETE');
+    setRefreshIndex(value => value + 1); setMessage('已从空间移除收藏，原活动仍在。');
   });
   const createActivity = () => act(async () => {
     const item = await social<Activity>(`tenants/${spaceId}/activities`, 'POST', { title: activityName.trim(), description: '' });
     setActivityName('');
-    setActivities(await social<Activity[]>(`tenants/${spaceId}/activities`));
+    setActivities(await social<Activity[]>(`spaces/${spaceId}/activities`));
     navigate(`/dear/spaces/${spaceId}/activities/${item.id}`);
   });
   const inviteByName = () => act(async () => {
@@ -205,12 +229,15 @@ export default function DearSocial() {
   return <div className="min-h-screen bg-[#F7F9FC] px-4 py-6 text-slate-800 sm:px-6">
     <div className="mx-auto max-w-5xl space-y-5">
       <header className="flex flex-wrap items-center justify-between gap-3">
-        <div><p className="text-sm font-semibold tracking-widest text-teal-700">LINKO DEAR</p><h1 className="text-3xl font-bold">{detailMode ? '活动详情' : '活动与分享'}</h1><p className="mt-1 text-sm text-slate-600">空间收纳一组活动；邀请、相册和日常只属于各自的活动。</p></div>
-        <div className="flex gap-2">{detailMode && <Link className="rounded-xl border bg-white px-4 py-2 text-sm" to="/dear">返回活动</Link>}{appProfile?.role === 'parent' ? <Link className="rounded-xl border bg-white px-4 py-2 text-sm" to="/dashboard">家庭积分</Link> : <a className="rounded-xl border bg-white px-4 py-2 text-sm" href="/watch">手表端</a>}<button className="rounded-xl border bg-white px-4 py-2 text-sm" onClick={logout}>退出</button></div>
+        <div><p className="text-sm font-semibold tracking-widest text-teal-700">LINKO MOMENT</p><h1 className="text-3xl font-bold">{detailMode ? '活动详情' : '活动与分享'}</h1><p className="mt-1 text-sm text-slate-600">个人空间可以收藏参加过的活动；照片和日常仍属于原活动。</p></div>
+        <div className="flex gap-2">{detailMode && <Link className="rounded-xl border bg-white px-4 py-2 text-sm" to="/dear">返回活动</Link>}{appProfile?.role === 'parent' ? <Link className="rounded-xl border bg-white px-4 py-2 text-sm" to="/dashboard">家庭积分</Link> : <a className="rounded-xl border bg-white px-4 py-2 text-sm" href="/watch">手表端</a>}<button className="rounded-xl border bg-white px-4 py-2 text-sm" onClick={logout}>退出</button>
+          {!detailMode && <div className="relative"><button type="button" aria-label="空间菜单" aria-expanded={spaceMenuOpen} className="rounded-xl border bg-white px-3 py-2 text-lg" onClick={() => setSpaceMenuOpen(value => !value)}>⋯</button>{spaceMenuOpen && <div className="absolute right-0 z-20 mt-2 min-w-40 rounded-xl border bg-white p-2 shadow-lg"><button className="block w-full rounded-lg px-3 py-2 text-left text-sm hover:bg-slate-50" onClick={() => { setSpaceName(''); setSpaceDialog('create'); setSpaceMenuOpen(false); }}>新增空间</button>{chosenSpace?.role === 'owner' && <><button className="block w-full rounded-lg px-3 py-2 text-left text-sm hover:bg-slate-50" onClick={() => { setEditedSpaceName(chosenSpace.name); setSpaceDialog('rename'); setSpaceMenuOpen(false); }}>修改空间名称</button><button className="block w-full rounded-lg px-3 py-2 text-left text-sm text-red-700 hover:bg-red-50" onClick={() => { setSpaceMenuOpen(false); deleteSpace(); }}>删除空间</button></>}</div>}</div>}
+        </div>
       </header>
       {params.get('invite') && <section className="rounded-2xl border border-teal-200 bg-teal-50 p-4"><p className="mb-2">有人邀请你加入共同活动。确认后，该活动成员可看到你在活动中分享的内容。</p><button disabled={busy} className="rounded-lg bg-teal-700 px-4 py-2 text-white" onClick={acceptLink}>确认加入</button></section>}
       {error && <p role="alert" className="rounded-xl bg-red-50 p-3 text-red-700">{error}</p>}
       {message && <p role="status" className="rounded-xl bg-teal-50 p-3 text-teal-800">{message}</p>}
+      {spaceDialog && <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/45 p-4"><section role="dialog" aria-modal="true" aria-label={spaceDialog === 'create' ? '新增空间' : '修改空间名称'} className="w-full max-w-sm rounded-2xl bg-white p-5 shadow-2xl"><h2 className="text-xl font-bold">{spaceDialog === 'create' ? '新增空间' : '修改空间名称'}</h2><input autoFocus aria-label="空间名称" maxLength={200} className="mt-4 w-full rounded-xl border p-3" value={spaceDialog === 'create' ? spaceName : editedSpaceName} onChange={event => spaceDialog === 'create' ? setSpaceName(event.target.value) : setEditedSpaceName(event.target.value)} /><div className="mt-5 flex justify-end gap-2"><button className="rounded-lg border px-4 py-2" onClick={() => setSpaceDialog(null)}>取消</button><button disabled={busy || !(spaceDialog === 'create' ? spaceName : editedSpaceName).trim()} className="rounded-lg bg-teal-700 px-4 py-2 text-white disabled:opacity-50" onClick={spaceDialog === 'create' ? createSpace : renameSpace}>保存</button></div></section></div>}
       {detailMode ? <>
         <nav aria-label="当前位置" className="text-sm text-slate-600"><Link to="/dear" className="text-teal-700">活动</Link><span className="mx-2">/</span>{chosenSpace?.name || '空间'}<span className="mx-2">/</span>{selected?.title || '活动详情'}</nav>
         {loading || activityLoading ? <p className="rounded-2xl bg-white p-6 text-slate-500">正在读取活动…</p> : activityError ? <p role="alert" className="rounded-2xl bg-red-50 p-6 text-red-700">活动读取失败：{activityError}</p> : !chosenSpace || !selected ? <section className="rounded-2xl bg-white p-6"><p>找不到这场活动，或你尚未加入。</p><Link to="/dear" className="mt-3 inline-block text-teal-700">返回活动列表</Link></section> : <>
@@ -220,8 +247,9 @@ export default function DearSocial() {
           {manageOpen && <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/45 p-4" onMouseDown={event => { if (event.target === event.currentTarget) setManageOpen(false); }}><section role="dialog" aria-modal="true" aria-labelledby="activity-manage-title" className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-white p-5 shadow-2xl"><div className="flex items-center justify-between gap-3"><div><h2 id="activity-manage-title" className="text-xl font-bold">管理 · {selected.title}</h2><p className="text-sm text-slate-500">邀请参加、发布日常和管理好友</p></div><button type="button" onClick={() => setManageOpen(false)} className="rounded-lg border px-3 py-1.5 text-sm">完成</button></div>{error && <p role="alert" className="mt-4 rounded-lg bg-red-50 p-3 text-sm text-red-700">{error}</p>}{message && <p role="status" className="mt-4 rounded-lg bg-teal-50 p-3 text-sm text-teal-800">{message}</p>}<div className="mt-5 space-y-6"><section><h3 className="font-semibold">邀请参加</h3><p className="mt-1 text-xs text-slate-500">受邀人确认后才能参加；空间本身不代表亲属或好友关系。</p><div className="mt-3 flex gap-2"><input aria-label="被邀请人的用户名" className="min-w-0 flex-1 rounded-lg border p-2" placeholder="用户中心用户名" value={inviteUsername} onChange={e => setInviteUsername(e.target.value)} /><button disabled={busy || !inviteUsername.trim()} className="rounded-lg border px-3 disabled:opacity-50" onClick={inviteByName}>邀请</button></div><button disabled={busy} className="mt-3 text-sm text-teal-700" onClick={makeLink}>生成七天有效的邀请链接</button>{inviteUrl && <input aria-label="活动邀请链接" className="mt-2 w-full rounded-lg border p-2 text-sm" readOnly value={inviteUrl} onFocus={e => e.target.select()} />}</section><section className="border-t pt-5"><h3 className="font-semibold">发布日常</h3><textarea aria-label="写下生活日常" className="mt-3 min-h-24 w-full rounded-xl border p-3" maxLength={1000} placeholder="今天想和大家分享什么？" value={momentDraft} onChange={e => { setMomentDraft(e.target.value); momentRequestId.current = crypto.randomUUID(); }} /><button disabled={busy || !momentDraft.trim()} className="mt-2 rounded-xl bg-teal-700 px-5 py-2 text-white disabled:opacity-50" onClick={publishMoment}>发布日常</button></section><DearRelationships key={`${spaceId}:${activityId}`} spaceId={spaceId} activityId={activityId} /></div></section></div>}
         </>}
       </> : <>
-        <section className="rounded-2xl bg-white p-5 shadow-sm"><div className="flex flex-wrap justify-between gap-3"><div><h2 className="text-xl font-bold">生活空间</h2><p className="text-sm text-slate-500">空间用来归拢活动；加入某场活动才可查看该场的分享。</p></div><button className="text-sm text-teal-700" onClick={() => void act(reload)}>刷新</button></div>{loading ? <p className="py-6 text-slate-500">正在读取生活空间…</p> : <div className="mt-4 grid gap-3 sm:grid-cols-[1fr_auto]"><select aria-label="选择生活空间" className="rounded-xl border p-3" value={spaceId} onChange={e => setSpaceId(e.target.value)}><option value="">选择空间</option>{spaces.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}</select><div className="flex gap-2"><input aria-label="新空间名称" className="min-w-0 rounded-xl border p-3" maxLength={200} placeholder="例如：周末好友" value={spaceName} onChange={e => setSpaceName(e.target.value)} /><button disabled={busy || !spaceName.trim()} className="rounded-xl bg-teal-700 px-4 text-white disabled:opacity-50" onClick={createSpace}>创建空间</button></div></div>}</section>
-        {chosenSpace && <section className="rounded-2xl bg-white p-5 shadow-sm"><div><p className="text-sm text-teal-700">当前空间</p><h2 className="text-xl font-bold">{chosenSpace.name}的活动</h2><p className="mt-1 text-sm text-slate-500">点开活动查看邀请、照片、日常与成员。</p></div><div className="mt-4 flex gap-2"><input aria-label="新活动名称" className="min-w-0 flex-1 rounded-xl border p-2" maxLength={200} placeholder="一起做什么？" value={activityName} onChange={e => setActivityName(e.target.value)} /><button disabled={busy || !activityName.trim()} className="rounded-xl bg-teal-700 px-3 text-white disabled:opacity-50" onClick={createActivity}>创建活动</button></div><div className="mt-4 divide-y">{activityLoading && <p className="py-3 text-sm text-slate-500">正在读取已有活动…</p>}{activityError && <p role="alert" className="py-3 text-sm text-red-700">{activityError}</p>}{activities.map(item => <Link key={item.id} to={activityPath(item.id)} className="flex items-center justify-between gap-3 py-4 hover:text-teal-700"><span><b className="block">{item.title}</b><span className="mt-1 block text-sm text-slate-500">{item.description || '查看活动详情与共同记忆'}</span></span><span aria-hidden="true">›</span></Link>)}{!activityLoading && !activityError && activities.length === 0 && <p className="py-4 text-sm text-slate-500">尚无活动。创建一个相聚计划吧。</p>}</div></section>}
+        <section className="rounded-2xl bg-white p-5 shadow-sm"><div className="flex flex-wrap justify-between gap-3"><div><h2 className="text-xl font-bold">我的空间</h2><p className="text-sm text-slate-500">每个人管理自己的空间；活动可收藏到多个空间。</p></div><button className="text-sm text-teal-700" onClick={() => void act(reload)}>刷新</button></div>{loading ? <p className="py-6 text-slate-500">正在读取生活空间…</p> : ownedSpaces.length === 0 ? <p className="mt-4 text-sm text-slate-500">还没有个人空间，请用右上角“⋯”新增。</p> : <select aria-label="选择生活空间" className="mt-4 w-full rounded-xl border p-3" value={spaceId} onChange={e => setSpaceId(e.target.value)}>{ownedSpaces.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}</select>}</section>
+        {chosenSpace?.role === 'owner' && <section className="rounded-2xl bg-white p-5 shadow-sm"><div><p className="text-sm text-teal-700">当前空间</p><h2 className="text-xl font-bold">{chosenSpace.name}的活动</h2><p className="mt-1 text-sm text-slate-500">收藏只改变整理位置，活动内容由原活动成员共享。</p></div><div className="mt-4 flex gap-2"><input aria-label="新活动名称" className="min-w-0 flex-1 rounded-xl border p-2" maxLength={200} placeholder="一起做什么？" value={activityName} onChange={e => setActivityName(e.target.value)} /><button disabled={busy || !activityName.trim()} className="rounded-xl bg-teal-700 px-3 text-white disabled:opacity-50" onClick={createActivity}>创建活动</button></div><div className="mt-4 divide-y">{activityLoading && <p className="py-3 text-sm text-slate-500">正在读取已有活动…</p>}{activityError && <p role="alert" className="py-3 text-sm text-red-700">{activityError}</p>}{activities.map(item => <div key={item.id} className="flex items-center justify-between gap-3 py-4"><Link to={activityPath(item)} className="min-w-0 flex-1 hover:text-teal-700"><b className="block">{item.title}</b><span className="mt-1 block text-sm text-slate-500">{item.description || '查看活动详情与共同记忆'}</span></Link>{item.isBookmarked && <button disabled={busy} className="shrink-0 text-sm text-red-700" onClick={() => void removeBookmark(item)}>取消收藏</button>}</div>)}{!activityLoading && !activityError && activities.length === 0 && <p className="py-4 text-sm text-slate-500">尚无活动。创建活动或从下方收藏已参加的活动。</p>}</div></section>}
+        {joinedActivities.length > 0 && <section className="rounded-2xl bg-white p-5 shadow-sm"><h2 className="text-xl font-bold">已参加的活动</h2><p className="mt-1 text-sm text-slate-500">可将同一活动收藏到你的不同空间。</p><div className="mt-3 divide-y">{joinedActivities.map(item => <div key={`${item.sourceTenantId}:${item.id}`} className="flex items-center justify-between gap-3 py-3"><Link to={activityPath(item)} className="min-w-0 flex-1 font-medium text-teal-800">{item.title}</Link>{chosenSpace?.role === 'owner' && item.sourceTenantId !== spaceId && !activities.some(saved => saved.id === item.id) && <button disabled={busy} className="shrink-0 text-sm text-teal-700" onClick={() => void addBookmark(spaceId, item)}>收藏到当前空间</button>}</div>)}</div></section>}
         {invitations.some(item => !item.joined) && <section className="rounded-2xl bg-white p-5 shadow-sm"><h2 className="text-xl font-bold">收到的活动邀请</h2><p className="mb-3 text-xs text-slate-500">确认后才会加入对应活动。</p>{invitations.filter(item => !item.joined).map(item => <div key={item.id} className="flex items-center justify-between border-t py-3"><span>{item.activityTitle}</span><button disabled={busy} className="text-teal-700" onClick={() => void act(async () => { const user = await social<{ username: string }>('me'); await social(`tenants/${item.tenantId}/activities/${item.activityId}/invites/username/${encodeURIComponent(user.username)}/accept`, 'POST', {}); await reload(); navigate(`/dear/spaces/${encodeURIComponent(item.tenantId)}/activities/${encodeURIComponent(item.activityId)}`); })}>确认加入</button></div>)}</section>}
         <details className="rounded-2xl bg-white p-5 shadow-sm"><summary className="cursor-pointer font-semibold">好友与申请（跨空间）</summary><div className="mt-4"><DearRelationships spaceId="" activityId="" /></div></details>
       </>}

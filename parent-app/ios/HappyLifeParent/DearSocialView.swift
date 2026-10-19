@@ -25,6 +25,7 @@ struct DearSocialView: View {
     @ObservedObject var store: FamilyStore
     var showLogout = false
     @State private var spaces: [DearRecord] = []
+    @State private var joinedActivities: [DearRecord] = []
     @State private var activities: [DearRecord] = []
     @State private var photos: [DearRecord] = []
     @State private var selectedPhoto: PhotosPickerItem?
@@ -46,6 +47,7 @@ struct DearSocialView: View {
     @State private var editedSpaceName = ""
     @State private var editedActivityName = ""
     @State private var showingSpaceRename = false
+    @State private var showingSpaceCreate = false
     @State private var showingActivityRename = false
     @State private var showingSpaceDelete = false
     @State private var showingActivityDelete = false
@@ -61,14 +63,16 @@ struct DearSocialView: View {
 
     private var base: String { "/api/dear/social/" }
     private var selectedSpace: DearRecord? { spaces.first { $0.id == spaceId } }
-    private var selectedActivity: DearRecord? { activities.first { $0.id == activityId } }
+    private var selectedActivity: DearRecord? { activities.first { $0.id == activityId } ?? joinedActivities.first { $0.id == activityId } }
+    private var ownedSpaces: [DearRecord] { spaces.filter { $0.text("role") == "owner" } }
+    private var activityTenantId: String { selectedActivity?.text("sourceTenantId") ?? spaceId }
 
     var body: some View {
         NavigationStack {
             List {
                 Section {
                     Text("相聚时刻").font(.title2.bold())
-                    Text("空间收纳一组活动；点开活动再查看邀请、相册、日常与成员。")
+                    Text("个人空间可以收藏参加过的活动；照片和日常仍属于原活动。")
                         .font(.subheadline).foregroundStyle(.secondary)
                     if !error.isEmpty { Text(error).foregroundStyle(.red) }
                     if !notice.isEmpty { Text(notice).foregroundStyle(.teal) }
@@ -84,31 +88,17 @@ struct DearSocialView: View {
                         }
                     }
                 }
-                Section("生活空间") {
-                    if spaces.isEmpty { Text("创建一个空间，邀请家人或朋友参加活动。").foregroundStyle(.secondary) }
+                Section("我的空间") {
+                    if ownedSpaces.isEmpty { Text("请用右上角“…”新增个人空间。") .foregroundStyle(.secondary) }
                     else {
                         Picker("当前空间", selection: $spaceId) {
-                            ForEach(spaces) { item in Text(item.text("name")).tag(item.id) }
-                        }
-                        if selectedSpace?.text("role") == "owner" {
-                            Button("修改空间名称", systemImage: "pencil") {
-                                editedSpaceName = selectedSpace?.text("name") ?? ""
-                                showingSpaceRename = true
-                            }.disabled(busy)
-                            Button("删除空间", systemImage: "trash", role: .destructive) {
-                                showingSpaceDelete = true
-                            }.disabled(busy)
+                            ForEach(ownedSpaces) { item in Text(item.text("name")).tag(item.id) }
                         }
                     }
-                    HStack {
-                        TextField("新空间名称", text: $spaceName).textInputAutocapitalization(.never)
-                        Button("创建") { run { try await createSpace() } }
-                            .disabled(busy || spaceName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-                    }
-                    Text("空间只用于归拢活动；参加活动和建立好友关系都需分别确认。")
+                    Text("每个人管理自己的空间，同一活动可收藏到多个空间。")
                         .font(.caption).foregroundStyle(.secondary)
                 }
-                if selectedSpace != nil {
+                if selectedSpace?.text("role") == "owner" {
                     Section("活动 · \(selectedSpace?.text("name") ?? "")") {
                         if activityLoading { Text("正在读取已有活动…").foregroundStyle(.secondary) }
                         if !activityError.isEmpty { Text(activityError).foregroundStyle(.red) }
@@ -130,12 +120,29 @@ struct DearSocialView: View {
                                         Image(systemName: "chevron.right").font(.caption).foregroundStyle(.secondary)
                                     }
                                 }.buttonStyle(.plain)
+                                if item.flag("isBookmarked") {
+                                    Button("取消收藏", role: .destructive) { run { try await removeBookmark(item) } }.disabled(busy)
+                                }
                             }
                         }
                         HStack {
                             TextField("例如：周末野餐", text: $activityName)
                             Button("添加") { run { try await createActivity() } }
                                 .disabled(busy || activityName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                        }
+                    }
+                }
+                if !joinedActivities.isEmpty {
+                    Section("已参加的活动") {
+                        ForEach(joinedActivities) { item in
+                            HStack {
+                                Button(item.text("title")) { activityId = item.id; showingActivity = true }
+                                    .buttonStyle(.plain)
+                                Spacer()
+                                if selectedSpace?.text("role") == "owner" && item.text("sourceTenantId") != spaceId && !activities.contains(where: { $0.id == item.id }) {
+                                    Button("收藏") { run { try await addBookmark(item) } }.disabled(busy)
+                                }
+                            }
                         }
                     }
                 }
@@ -168,7 +175,17 @@ struct DearSocialView: View {
             .readablePage()
             .navigationTitle("活动与分享")
             .toolbar {
-                ToolbarItem(placement: .topBarTrailing) { Button("刷新", systemImage: "arrow.clockwise") { run { try await load() } }.disabled(busy) }
+                ToolbarItem(placement: .topBarTrailing) {
+                    Menu {
+                        Button("新增空间", systemImage: "plus") { spaceName = ""; showingSpaceCreate = true }
+                        if selectedSpace?.text("role") == "owner" {
+                            Button("修改空间名称", systemImage: "pencil") { editedSpaceName = selectedSpace?.text("name") ?? ""; showingSpaceRename = true }
+                            Button("删除空间", systemImage: "trash", role: .destructive) { showingSpaceDelete = true }
+                        }
+                        Button("刷新", systemImage: "arrow.clockwise") { run { try await load() } }
+                    } label: { Image(systemName: "ellipsis.circle").accessibilityLabel("空间菜单") }
+                    .disabled(busy)
+                }
                 if showLogout { ToolbarItem(placement: .topBarLeading) { Button("退出") { store.logout() } } }
             }
             .refreshable { await refresh() }
@@ -176,11 +193,16 @@ struct DearSocialView: View {
             .onChange(of: spaceId) { _, _ in activityId = ""; showingActivity = false; showingActivityManagement = false; activities = []; photos = []; activityError = ""; activityLoading = true; run { try await loadActivities() } }
             .navigationDestination(isPresented: $showingActivity) { activityDetail }
             .onChange(of: activityId) { _, _ in photos = []; moments = []; checkIns = []; activityMembers = []; run { try await loadDetails() } }
+            .alert("新增空间", isPresented: $showingSpaceCreate) {
+                TextField("空间名称", text: $spaceName)
+                Button("取消", role: .cancel) { }
+                Button("创建") { run { try await createSpace() } }
+            } message: { Text("此空间由你管理，可收藏参加过的活动。") }
             .alert("修改空间名称", isPresented: $showingSpaceRename) {
                 TextField("空间名称", text: $editedSpaceName)
                 Button("取消", role: .cancel) { }
                 Button("保存") { run { try await renameSpace() } }
-            } message: { Text("新名称会同步给空间成员。") }
+            } message: { Text("更新你的空间名称。") }
             .confirmationDialog("删除空间「\(selectedSpace?.text("name") ?? "")」？", isPresented: $showingSpaceDelete, titleVisibility: .visible) {
                 Button("确认删除空间", role: .destructive) { run { try await deleteSpace() } }
                 Button("取消", role: .cancel) { }
@@ -195,7 +217,8 @@ struct DearSocialView: View {
             Section {
                 HStack(alignment: .top) {
                     VStack(alignment: .leading, spacing: 4) {
-                        Text(selectedSpace?.text("name") ?? "生活空间").font(.caption).foregroundStyle(.teal)
+                        Text(activities.contains(where: { $0.id == activityId }) ? (selectedSpace?.text("name") ?? "我的空间") : "已参加的活动")
+                            .font(.caption).foregroundStyle(.teal)
                         Text(selectedActivity?.text("title") ?? "活动详情").font(.title2.bold())
                         Text("邀请、照片、日常和成员仅属于这场活动。")
                             .font(.caption).foregroundStyle(.secondary)
@@ -217,11 +240,11 @@ struct DearSocialView: View {
                         ForEach(photos) { photo in
                             NavigationLink {
                                 DearPhotoDetailView(store: store, photo: photo,
-                                    spaceID: spaceId, activityID: activityId,
-                                    path: base + "tenants/\(spaceId)/activities/\(activityId)/native-photos/\(photo.id)/thumbnail")
+                                    spaceID: activityTenantId, activityID: activityId,
+                                    path: base + "tenants/\(activityTenantId)/activities/\(activityId)/native-photos/\(photo.id)/thumbnail")
                             } label: {
                                 HStack(spacing: 14) {
-                                    DearPhotoPreview(store: store, path: base + "tenants/\(spaceId)/activities/\(activityId)/native-photos/\(photo.id)/thumbnail")
+                                    DearPhotoPreview(store: store, path: base + "tenants/\(activityTenantId)/activities/\(activityId)/native-photos/\(photo.id)/thumbnail")
                                     VStack(alignment: .leading, spacing: 5) {
                                         Text(photo.text("originalFileName")).font(.subheadline.bold()).lineLimit(2)
                                         Text(photo.text("sourceDisplayName")).font(.caption).foregroundStyle(.secondary)
@@ -299,7 +322,7 @@ struct DearSocialView: View {
         .onChange(of: activityId) { _, _ in showingActivityManagement = false; inviteLink = ""; inviteUsername = ""; momentDraft = ""; momentRequestID = UUID() }
         .onChange(of: selectedPhoto) { _, selected in
             guard let selected else { return }
-            let targetSpace = spaceId, targetActivity = activityId
+            let targetSpace = activityTenantId, targetActivity = activityId
             run {
                 defer { selectedPhoto = nil }
                 guard let data = try await selected.loadTransferable(type: Data.self),
@@ -431,9 +454,10 @@ struct DearSocialView: View {
     private func load() async throws {
         error = ""
         let loaded = try DearRecord.list(await store.call(base + "tenants"))
+        joinedActivities = try DearRecord.list(await store.call(base + "activities/joined"))
         spaces = loaded
         let previousSpace = spaceId
-        if !loaded.contains(where: { $0.id == spaceId }) { spaceId = loaded.first?.id ?? "" }
+        if !loaded.contains(where: { $0.id == spaceId && $0.text("role") == "owner" }) { spaceId = loaded.first(where: { $0.text("role") == "owner" })?.id ?? "" }
         if spaceId == previousSpace && !spaceId.isEmpty { try await loadActivities() }
         do { invitations = try DearRecord.list(await store.call(base + "invites/username/pending")) }
         catch { self.error = "活动邀请暂时无法读取：\(error.localizedDescription)" }
@@ -446,7 +470,7 @@ struct DearSocialView: View {
         defer { activityLoading = false }
         let requestedSpace = spaceId
         let loaded: [DearRecord]
-        do { loaded = try DearRecord.list(await store.call(base + "tenants/\(requestedSpace)/activities")) }
+        do { loaded = try DearRecord.list(await store.call(base + "spaces/\(requestedSpace)/activities")) }
         catch {
             activityError = "活动读取失败：\(error.localizedDescription)"
             throw error
@@ -455,7 +479,7 @@ struct DearSocialView: View {
         activities = loaded
         activityError = ""
         let previousActivity = activityId
-        if !loaded.contains(where: { $0.id == activityId }) { activityId = ""; showingActivity = false }
+        if !loaded.contains(where: { $0.id == activityId }) && !joinedActivities.contains(where: { $0.id == activityId }) { activityId = ""; showingActivity = false }
         if activityId == previousActivity && !activityId.isEmpty {
             do { try await loadDetails() }
             catch { self.error = "活动内容暂时无法读取：\(error.localizedDescription)" }
@@ -465,27 +489,27 @@ struct DearSocialView: View {
         try await loadPhotos(); try await loadMoments(); try await loadCheckIns(); try await loadMembers()
     }
     private func loadPhotos() async throws {
-        guard !spaceId.isEmpty, !activityId.isEmpty else { return }
-        var loaded = try DearRecord.list(await store.call(base + "tenants/\(spaceId)/activities/\(activityId)/live/photos"))
+        guard !activityTenantId.isEmpty, !activityId.isEmpty else { return }
+        var loaded = try DearRecord.list(await store.call(base + "tenants/\(activityTenantId)/activities/\(activityId)/live/photos"))
         if loaded.contains(where: { !$0.flag("thumbnailAvailable") }) {
-            await store.photoSource.refreshPreviews(spaceID: spaceId, activityID: activityId, rows: loaded.map(\.data))
-            loaded = try DearRecord.list(await store.call(base + "tenants/\(spaceId)/activities/\(activityId)/live/photos"))
+            await store.photoSource.refreshPreviews(spaceID: activityTenantId, activityID: activityId, rows: loaded.map(\.data))
+            loaded = try DearRecord.list(await store.call(base + "tenants/\(activityTenantId)/activities/\(activityId)/live/photos"))
         }
         photos = loaded
     }
     private func loadMoments() async throws {
-        guard !spaceId.isEmpty, !activityId.isEmpty else { return }
-        moments = try DearRecord.list(await store.call(base + "tenants/\(spaceId)/activities/\(activityId)/moments"))
+        guard !activityTenantId.isEmpty, !activityId.isEmpty else { return }
+        moments = try DearRecord.list(await store.call(base + "tenants/\(activityTenantId)/activities/\(activityId)/moments"))
     }
     private func loadCheckIns() async throws {
-        guard !spaceId.isEmpty, !activityId.isEmpty else { return }
-        checkIns = try DearRecord.list(await store.call(base + "tenants/\(spaceId)/activities/\(activityId)/checkins"))
+        guard !activityTenantId.isEmpty, !activityId.isEmpty else { return }
+        checkIns = try DearRecord.list(await store.call(base + "tenants/\(activityTenantId)/activities/\(activityId)/checkins"))
     }
     private func createCheckIn() async throws {
         guard let location = checkInLocator.location, !checkInLocator.fetching else { throw APIError.message("请先获取当前位置。") }
         let note = checkInNote.trimmingCharacters(in: .whitespacesAndNewlines)
         guard note.count <= 1000 else { throw APIError.message("备注不能超过 1000 字。") }
-        _ = try await store.call(base + "tenants/\(spaceId)/activities/\(activityId)/checkins", method: "POST", body: [
+        _ = try await store.call(base + "tenants/\(activityTenantId)/activities/\(activityId)/checkins", method: "POST", body: [
             "requestId": checkInRequestID.uuidString,
             "latitude": location.coordinate.latitude, "longitude": location.coordinate.longitude,
             "altitudeMeters": location.altitude, "address": checkInLocator.address,
@@ -494,14 +518,14 @@ struct DearSocialView: View {
         showingCheckIn = false; checkInRequestID = UUID(); try await loadCheckIns(); notice = "打卡已保存。"
     }
     private func loadMembers() async throws {
-        guard !spaceId.isEmpty, !activityId.isEmpty else { return }
-        activityMembers = try DearRecord.list(await store.call(base + "tenants/\(spaceId)/activities/\(activityId)/members"))
+        guard !activityTenantId.isEmpty, !activityId.isEmpty else { return }
+        activityMembers = try DearRecord.list(await store.call(base + "tenants/\(activityTenantId)/activities/\(activityId)/members"))
     }
     private func loadRelationships() async throws {
         relationships = try DearRecord.list(await store.call(base + "relationships"))
     }
     private func requestFriend(_ member: DearRecord) async throws {
-        _ = try await store.call(base + "relationships/requests", method: "POST", body: ["targetSubject": member.subject, "tenantId": spaceId, "activityId": activityId])
+        _ = try await store.call(base + "relationships/requests", method: "POST", body: ["targetSubject": member.subject, "tenantId": activityTenantId, "activityId": activityId])
         try await loadRelationships(); notice = "好友申请已发出。"
     }
     private func acceptFriend(_ relation: DearRecord) async throws {
@@ -515,17 +539,27 @@ struct DearSocialView: View {
     private func publishMoment() async throws {
         let body = momentDraft.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !body.isEmpty, body.count <= 1000 else { throw APIError.message("请填写 1 至 1000 字的日常内容。") }
-        _ = try await store.call(base + "tenants/\(spaceId)/activities/\(activityId)/moments", method: "POST", body: ["text": body, "requestId": momentRequestID.uuidString])
+        _ = try await store.call(base + "tenants/\(activityTenantId)/activities/\(activityId)/moments", method: "POST", body: ["text": body, "requestId": momentRequestID.uuidString])
         momentDraft = ""; momentRequestID = UUID(); try await loadMoments(); notice = "日常已发布。"
     }
     private func deleteMoment(_ moment: DearRecord) async throws {
-        _ = try await store.call(base + "tenants/\(spaceId)/activities/\(activityId)/moments/\(moment.id)", method: "DELETE")
+        _ = try await store.call(base + "tenants/\(activityTenantId)/activities/\(activityId)/moments/\(moment.id)", method: "DELETE")
         try await loadMoments(); notice = "日常已删除。"
     }
     private func createSpace() async throws {
         let value = try await store.call(base + "tenants", method: "POST", body: ["name": spaceName.trimmingCharacters(in: .whitespacesAndNewlines)])
         let item = DearRecord(data: value as? [String: Any] ?? [:])
         spaceName = ""; try await load(); spaceId = item.id; notice = "空间已创建。"
+    }
+    private func addBookmark(_ item: DearRecord) async throws {
+        guard selectedSpace?.text("role") == "owner" else { throw APIError.message("请先选择自己的空间。") }
+        _ = try await store.call(base + "spaces/\(spaceId)/bookmarks", method: "POST", body: ["sourceTenantId": item.text("sourceTenantId"), "activityId": item.id])
+        try await loadActivities(); notice = "活动已收藏到空间。"
+    }
+    private func removeBookmark(_ item: DearRecord) async throws {
+        guard selectedSpace?.text("role") == "owner" else { throw APIError.message("只有空间所有者可以取消收藏。") }
+        _ = try await store.call(base + "spaces/\(spaceId)/bookmarks/\(item.text("sourceTenantId"))/\(item.id)", method: "DELETE")
+        try await loadActivities(); notice = "已取消收藏，原活动仍在。"
     }
     private func renameSpace() async throws {
         guard selectedSpace?.text("role") == "owner" else { throw APIError.message("只有空间所有者可以修改名称。") }
@@ -549,21 +583,21 @@ struct DearSocialView: View {
         guard selectedActivity?.flag("canEdit") == true else { throw APIError.message("只有活动组织者可以修改名称。") }
         let name = editedActivityName.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !name.isEmpty && name.count <= 200 else { throw APIError.message("请填写不超过 200 字的活动名称。") }
-        _ = try await store.call(base + "tenants/\(spaceId)/activities/\(activityId)", method: "PATCH", body: ["title": name])
-        try await loadActivities(); notice = "活动名称已更新。"
+        _ = try await store.call(base + "tenants/\(activityTenantId)/activities/\(activityId)", method: "PATCH", body: ["title": name])
+        try await load(); notice = "活动名称已更新。"
     }
     private func deleteActivity() async throws {
         guard selectedActivity?.flag("canEdit") == true else { throw APIError.message("只有活动组织者可以删除活动。") }
-        _ = try await store.call(base + "tenants/\(spaceId)/activities/\(activityId)", method: "DELETE")
+        _ = try await store.call(base + "tenants/\(activityTenantId)/activities/\(activityId)", method: "DELETE")
         showingActivityManagement = false; showingActivity = false; activityId = ""
-        try await loadActivities(); notice = "活动已删除。"
+        try await load(); notice = "活动已删除。"
     }
     private func inviteByName() async throws {
-        _ = try await store.call(base + "tenants/\(spaceId)/activities/\(activityId)/invites/username", method: "POST", body: ["username": inviteUsername.trimmingCharacters(in: .whitespacesAndNewlines)])
+        _ = try await store.call(base + "tenants/\(activityTenantId)/activities/\(activityId)/invites/username", method: "POST", body: ["username": inviteUsername.trimmingCharacters(in: .whitespacesAndNewlines)])
         inviteUsername = ""; notice = "邀请已发出，等待对方确认。"
     }
     private func createInviteLink() async throws {
-        let value = try await store.call(base + "tenants/\(spaceId)/activities/\(activityId)/invites/link", method: "POST", body: [:])
+        let value = try await store.call(base + "tenants/\(activityTenantId)/activities/\(activityId)/invites/link", method: "POST", body: [:])
         guard let token = (value as? [String: Any])?["token"] as? String,
               let safe = token.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) else { throw APIError.message("邀请链接无效。") }
         inviteLink = "https://happylife.ai.xmkurt.com/dear?invite=\(safe)"
@@ -573,7 +607,7 @@ struct DearSocialView: View {
         guard let username = me["username"] as? String,
               let safe = username.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) else { throw APIError.message("无法确认用户名。") }
         _ = try await store.call(base + "tenants/\(invitation.text("tenantId"))/activities/\(invitation.text("activityId"))/invites/username/\(safe)/accept", method: "POST", body: [:])
-        try await load(); spaceId = invitation.text("tenantId"); notice = "已加入共同活动，可在所属空间点开查看。"
+        try await load(); activityId = invitation.text("activityId"); showingActivity = true; notice = "已加入共同活动，可收藏到自己的空间。"
     }
 }
 

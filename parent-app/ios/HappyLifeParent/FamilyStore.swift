@@ -223,7 +223,7 @@ extension FamilyStore: WCSessionDelegate {
             let id = try watchUUID(message, key: "operationId")
             return ["status": photoTransferStatuses[id] ?? "waiting"]
         case "spaces":
-            let rows = try watchRows(await call(base))
+            let rows = try watchRows(await call("/api/dear/social/spaces/mine"))
             return ["items": rows.map { ["id": $0["id"] as? String ?? "", "name": $0["name"] as? String ?? "",
                                            "owner": ($0["role"] as? String) == "owner"] as [String: Any] }]
         case "invitations":
@@ -252,8 +252,9 @@ extension FamilyStore: WCSessionDelegate {
                 return ["ok": true]
             }
             if message["action"] as? String == "activities" {
-                let rows = try watchRows(await call(base + "/\(spaceID)/activities"))
+                let rows = try watchRows(await call("/api/dear/social/spaces/\(spaceID)/activities"))
                 return ["items": rows.map { ["id": $0["id"] as? String ?? "", "title": $0["title"] as? String ?? "",
+                                               "sourceTenantId": $0["sourceTenantId"] as? String ?? spaceID,
                                                "canEdit": $0["canEdit"] as? Bool ?? false] as [String: Any] }]
             }
             if message["action"] as? String == "createActivity" {

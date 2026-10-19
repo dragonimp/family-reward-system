@@ -4,7 +4,7 @@ import WatchConnectivity
 #endif
 
 struct WatchSocialSpace: Identifiable { let id: String; let name: String; let owner: Bool }
-struct WatchSocialActivity: Identifiable { let id: String; let title: String; let canEdit: Bool }
+struct WatchSocialActivity: Identifiable { let id: String; let title: String; let sourceTenantId: String; let canEdit: Bool }
 struct WatchSocialPhoto: Identifiable {
     let id: String; let name: String; let author: String; let available: Bool; let canDelete: Bool
 }
@@ -262,7 +262,9 @@ final class WatchStore: ObservableObject {
             guard let rows = reply["items"] as? [[String: Any]] else { throw APIError(status: 0, message: "活动列表无效。") }
             socialActivities = rows.compactMap { row in
                 guard let id = row["id"] as? String, let title = row["title"] as? String else { return nil }
-                return WatchSocialActivity(id: id, title: title, canEdit: row["canEdit"] as? Bool ?? false)
+                return WatchSocialActivity(id: id, title: title,
+                                           sourceTenantId: row["sourceTenantId"] as? String ?? spaceID,
+                                           canEdit: row["canEdit"] as? Bool ?? false)
             }
         } catch { socialError = error.localizedDescription }
     }
