@@ -1,6 +1,10 @@
-# Linko Dear 原生 iOS
+# Linko Moment 原生 iOS
 
-SwiftUI 原生界面，iPhone、iPad / iOS 17+。当前工程版本 1.2.34（43），Bundle ID `net.impx.happylife.parent`。业务页面不包含 WebView。
+SwiftUI 原生界面，iPhone、iPad / iOS 17+。当前工程版本 1.2.35（44），Bundle ID `net.impx.happylife.parent`。业务页面不包含 WebView。
+
+## 1.2.35（44）：Linko Moment
+
+iPhone、iPad 与 Apple Watch 的显示名称统一为 Linko Moment；Bundle ID、登录回调和现有数据保持兼容。Android 与网页同步调整用户可见名称。
 
 ## 1.2.34（43）：登录提示页
 

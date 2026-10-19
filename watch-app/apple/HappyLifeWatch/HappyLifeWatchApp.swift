@@ -62,7 +62,7 @@ struct WatchHomeView: View {
                 if store.busy { ProgressView("处理中") }
             }
             .disabled(store.busy)
-            .navigationTitle("Linko Dear")
+            .navigationTitle("Linko Moment")
             .containerBackground(WatchTheme.colors(store.face).gradient, for: .navigation)
             .alert("提示", isPresented: Binding(get: { store.message != nil }, set: {
                 if !$0 { store.message = nil }

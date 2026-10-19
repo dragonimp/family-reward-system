@@ -10,19 +10,19 @@ import zipfile
 from pathlib import Path
 
 if len(sys.argv) != 2:
-    raise SystemExit("Usage: verify-ipa.py Linko Dear.ipa")
+    raise SystemExit("Usage: verify-ipa.py Linko Moment.ipa")
 ipa = Path(sys.argv[1])
 with tempfile.TemporaryDirectory(prefix="happylife-parent-ipa-") as directory:
     with zipfile.ZipFile(ipa) as archive:
         archive.extractall(directory)
-    app = Path(directory) / "Payload/Linko Dear.app"
+    app = Path(directory) / "Payload/Linko Moment.app"
     subprocess.run(["codesign", "--verify", "--deep", "--strict", str(app)], check=True)
     info = plistlib.loads((app / "Info.plist").read_bytes())
     expected = "net.impx.happylife.parent"
     signature = subprocess.run(["codesign", "-dv", str(app)], capture_output=True, text=True, check=True)
     fields = dict(line.split("=", 1) for line in signature.stderr.splitlines() if "=" in line)
     assert info["CFBundleIdentifier"] == expected
-    assert info["CFBundleDisplayName"] == "Linko Dear"
+    assert info["CFBundleDisplayName"] == "Linko Moment"
     assert any("linkofamily" in item.get("CFBundleURLSchemes", []) for item in info.get("CFBundleURLTypes", []))
     frameworks = subprocess.run(["xcrun", "otool", "-L", str(app / info["CFBundleExecutable"])], capture_output=True, text=True, check=True).stdout
     assert "SwiftUI.framework" in frameworks and "AuthenticationServices.framework" in frameworks
@@ -44,13 +44,13 @@ with tempfile.TemporaryDirectory(prefix="happylife-parent-ipa-") as directory:
     assert not profile.get("ProvisionedDevices") and not profile.get("ProvisionsAllDevices")
     assert (app / "Assets.car").is_file()
     assert info["CFBundleIcons"]["CFBundlePrimaryIcon"]["CFBundleIconName"] == "AppIcon"
-    watch = app / "Watch/Linko Dear Watch.app"
+    watch = app / "Watch/Linko Moment Watch.app"
     wi = plistlib.loads((watch / "Info.plist").read_bytes())
     assert wi["CFBundleIdentifier"] == expected + ".watchkitapp"
     assert wi["WKCompanionAppBundleIdentifier"] == expected
     assert wi["WKRunsIndependentlyOfCompanionApp"] is True
     assert wi.get("WKWatchOnly") is not True
-    assert wi["CFBundleDisplayName"] == "Linko Dear"
+    assert wi["CFBundleDisplayName"] == "Linko Moment"
     assert wi["CFBundleShortVersionString"] == info["CFBundleShortVersionString"]
     assert wi["CFBundleVersion"] == info["CFBundleVersion"]
     subprocess.run(["codesign", "--verify", "--deep", "--strict", str(watch)], check=True)

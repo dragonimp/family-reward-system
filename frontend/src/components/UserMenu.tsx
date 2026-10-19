@@ -25,7 +25,7 @@ export default function UserMenu({ user, userId, onLogout }: UserMenuProps) {
   const shareExternalTest = async () => {
     try {
       if (navigator.share) {
-        await navigator.share({ title: 'Linko Dear 外部测试', url: externalTestUrl });
+        await navigator.share({ title: 'Linko Moment 外部测试', url: externalTestUrl });
         closeMenu();
       } else {
         await navigator.clipboard.writeText(externalTestUrl);

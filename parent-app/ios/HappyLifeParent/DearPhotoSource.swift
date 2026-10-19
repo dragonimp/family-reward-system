@@ -140,7 +140,7 @@ import UserNotifications
             }
             start()
             if !(await enableNotificationsIfNeeded()) {
-                store.error = "有人请求原图时需要通知提醒。请在系统设置中允许 Linko Dear 发送通知，并保持 App 打开完成传输。"
+                store.error = "有人请求原图时需要通知提醒。请在系统设置中允许 Linko Moment 发送通知，并保持 App 打开完成传输。"
             }
         } catch {
             if let publishedID {
@@ -258,7 +258,7 @@ import UserNotifications
         guard let store, store.identity.isAuthenticated,
               let me = try await store.call("/api/dear/social/me") as? [String: Any],
               let subject = me["subject"] as? String, !subject.isEmpty else {
-            throw APIError.message("请先在 iPhone 上登录 Linko Dear。")
+            throw APIError.message("请先在 iPhone 上登录 Linko Moment。")
         }
         subjectCache = subject
         return subject

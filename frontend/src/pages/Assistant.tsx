@@ -25,8 +25,8 @@ export default function AssistantPage() {
         currentUser={user}
         routeBase="/assistant"
         webAppBotId={webAppBotId}
-        emptyAgentText="暂无可用的家庭积分应用智能体"
-        welcomeTitle="家庭积分应用"
+        emptyAgentText="暂无可用的 Linko Moment 智能体"
+        welcomeTitle="Linko Moment"
         welcomeHint="从左侧创建或选择会话"
         mobileWelcomeHint="打开右侧菜单创建或选择会话"
         storageKey="happylife.agentChat.sidebarWidth"

@@ -2637,7 +2637,7 @@ app.MapGet("/api/agentfree/agents", async (IHttpClientFactory httpClientFactory,
     }
     catch (Exception ex)
     {
-        return Results.Json(new { error = $"获取家庭积分应用智能体失败: {ex.Message}" }, statusCode: StatusCodes.Status502BadGateway);
+        return Results.Json(new { error = $"获取 Linko Moment 智能体失败: {ex.Message}" }, statusCode: StatusCodes.Status502BadGateway);
     }
 });
 
@@ -2793,13 +2793,13 @@ app.MapPost("/api/agentfree/sessions", async (JsonObject body, IHttpClientFactor
         int? agentId = requestedAgentId ?? authorizedAgentIds.Select(id => (int?)id).FirstOrDefault();
         if (!agentId.HasValue)
         {
-            return Results.Json(new { error = "未找到家庭积分应用智能体" }, statusCode: StatusCodes.Status502BadGateway);
+            return Results.Json(new { error = "未找到 Linko Moment 智能体" }, statusCode: StatusCodes.Status502BadGateway);
         }
         var session = await CreateOrbitWebAppClient(httpClientFactory, webAppBotId).CreateSessionAsync(
             new CreateOrbitWebAppSessionRequest
             {
                 AgentId = agentId.Value,
-                Name = string.IsNullOrWhiteSpace(body.String("name")) ? "家庭积分会话" : body.String("name").Trim(),
+                Name = string.IsNullOrWhiteSpace(body.String("name")) ? "Linko Moment 会话" : body.String("name").Trim(),
                 WebAppBotId = webAppBotId
             },
             userName,

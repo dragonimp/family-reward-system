@@ -1,6 +1,6 @@
-# Linko Dear Android 家长端
+# Linko Moment Android 家长端
 
-`20261017-dear-feedback-android.1` 在“我的”的“反馈与邀请”分组增加心愿墙与意见墙，支持查看公开反馈、投票、提交反馈和查看我的反馈；测试邀请沿用 Atlas 专属邀请页。Apple TestFlight 等获取地址由 Atlas 应用后台管理，客户端不保存直链。
+`20261019-moment-android.1` 仅更新应用显示名。此前的 `20261017-dear-feedback-android.1` 在“我的”的“反馈与邀请”分组增加心愿墙与意见墙，支持查看公开反馈、投票、提交反馈和查看我的反馈；测试邀请沿用 Atlas 专属邀请页。Apple TestFlight 等获取地址由 Atlas 应用后台管理，客户端不保存直链。
 
 首版 Android 手机客户端与 Web、iOS 共用 `https://happylife.ai.impx.net` 后端。原生界面使用 .NET MAUI；用户中心登录和令牌续期复用 `AgentIdentity.NativeClient`，本应用仅在 Android SecureStorage 保存会话，不另建账号或业务令牌。
 

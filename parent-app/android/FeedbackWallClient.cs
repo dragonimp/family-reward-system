@@ -13,7 +13,7 @@ public sealed record FeedbackWallSnapshot(int Total, int Wishes, int Opinions, i
     int Downvotes, IReadOnlyList<FeedbackWallPost> Items);
 
 // The native login is issued for happylife.ai. User Center validates that audience
-// for this wall; no credentials or feedback records are stored by Linko Dear.
+// for this wall; no credentials or feedback records are stored by Linko Moment.
 public sealed class FeedbackWallClient
 {
     private static readonly Uri Origin = new("https://auth.ai.xmkurt.com");

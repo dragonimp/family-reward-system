@@ -19,7 +19,7 @@ export default function MobileAssistantBar() {
         type="button"
         onClick={() => navigate('/assistant')}
         className="flex h-11 min-w-0 items-center justify-center gap-2 rounded-md border border-gray-300 bg-gray-50 px-3 text-sm text-gray-700 shadow-sm"
-        aria-label="打开家庭积分应用智能对话"
+        aria-label="打开 Linko Moment 智能对话"
       >
         <MessageOutlined className="text-lg text-[#4A90D9]" />
         <span className="truncate">智能对话</span>

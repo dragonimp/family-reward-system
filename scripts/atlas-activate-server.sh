@@ -8,11 +8,8 @@ version="$1"; source_commit="$2"; stage="$3"
 [[ "$stage" == /opt/Atlas/release-staging/family-points-pipeline/"$version" ]] || exit 2
 [[ -f "$stage/bundle.json" && -f "$stage/family-points-api.tar.gz" && -f "$stage/family-points-web.tar.gz" ]] || exit 2
 
-atlas_cli=/opt/Atlas/tools/releases-sdk/cli.js
 updater=/opt/Atlas/updater/current/Atlas.Updater.dll
-app_id=735a18a1-ba4c-4471-b409-279d8014b16a
 export ATLAS_RELEASE_BASE_URL=https://home.ai.impx.net
-export ATLAS_RELEASE_CREDENTIALS_FILE=/etc/atlas/releases/family-points-publisher.json
 
 python3 - "$stage/bundle.json" "$version" <<'PY'
 import json,sys
@@ -43,8 +40,8 @@ if new:
         raise SystemExit('New migration lacks a matching audited completion record; deployment stopped.')
 PY
 
-node "$atlas_cli" publish-bundle "$app_id" "$stage/bundle.json" > "$stage/atlas-publish-receipt.json"
-node "$atlas_cli" list family-points | python3 -c 'import json,sys; d=json.load(sys.stdin); assert d["currentVersion"]==sys.argv[1]' "$version"
+sudo -n atlas-managed-release publish-bundle family-points "$stage/bundle.json" > "$stage/atlas-publish-receipt.json"
+sudo -n atlas-managed-release preflight family-points | python3 -c 'import json,sys; d=json.load(sys.stdin); assert d["currentVersion"]==sys.argv[1]' "$version"
 
 profile="$stage/application-profile.json"
 python3 - "$profile" <<'PY'

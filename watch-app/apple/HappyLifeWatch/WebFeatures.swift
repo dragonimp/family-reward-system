@@ -176,7 +176,7 @@ struct WatchSocialAlbumView: View {
         List {
             PhotosPicker("共享手表照片", selection: $selectedPhoto, matching: .images)
                 .disabled(sharing)
-            Text("照片会以配对 iPhone 的账号共享；原图留在 iPhone，获取原图时请保持 iPhone 上的 Linko Dear 打开。")
+            Text("照片会以配对 iPhone 的账号共享；原图留在 iPhone，获取原图时请保持 iPhone 上的 Linko Moment 打开。")
                 .font(.footnote).foregroundStyle(.secondary)
             if sharing { ProgressView("共享中") }
             if store.socialLoading { ProgressView("读取中") }
@@ -599,7 +599,7 @@ struct FaceSettingsView: View {
     @EnvironmentObject private var store: WatchStore
     var body: some View {
         List {
-            Text("设置 Linko Dear App 内的主题外观。")
+            Text("设置 Linko Moment App 内的主题外观。")
                 .font(.footnote).foregroundStyle(.secondary)
             ForEach(store.settings?.availableFaces ?? []) { face in
                 Button {

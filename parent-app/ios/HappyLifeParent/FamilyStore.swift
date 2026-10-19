@@ -216,7 +216,7 @@ extension FamilyStore: WCSessionDelegate {
     }
 
     private func watchActivityReply(_ message: [String: Any]) async throws -> [String: Any] {
-        guard identity.isAuthenticated else { throw APIError.message("请先在配对的 iPhone 上登录 Linko Dear。") }
+        guard identity.isAuthenticated else { throw APIError.message("请先在配对的 iPhone 上登录 Linko Moment。") }
         let base = "/api/dear/social/tenants"
         switch message["action"] as? String {
         case "photoTransferStatus":

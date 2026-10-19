@@ -50,7 +50,7 @@ struct FamilyChatView: View {
                         .onTapGesture { composerFocused = false }
                 }
                 if agents.isEmpty && !busy {
-                    ContentUnavailableView("暂无可用智能体", systemImage: "bubble.left.and.bubble.right", description: Text("请在家庭积分应用中授权智能体后刷新。"))
+                    ContentUnavailableView("暂无可用智能体", systemImage: "bubble.left.and.bubble.right", description: Text("请在 Linko Moment 中授权智能体后刷新。"))
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                         .contentShape(Rectangle())
                         .onTapGesture { composerFocused = false }

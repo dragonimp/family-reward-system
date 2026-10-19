@@ -17,7 +17,7 @@ public sealed class FamilyPage : ContentPage
     public FamilyPage(FamilyStore store)
     {
         this.store = store;
-        Title = "Linko Dear";
+        Title = "Linko Moment";
         BackgroundColor = Color.FromArgb("#F4F8F7");
         var root = new Grid { RowDefinitions = new RowDefinitionCollection { new(GridLength.Auto), new(GridLength.Star) } };
         var scroll = new ScrollView { Content = content };
@@ -53,7 +53,7 @@ public sealed class FamilyPage : ContentPage
     private void Render()
     {
         content.Children.Clear();
-        content.Add(Heading("Linko Dear", 27));
+        content.Add(Heading("Linko Moment", 27));
         if (!store.Authenticated) { LoginContent(); return; }
         if (!store.ParentReady) { IdentityContent(); return; }
         if (childId is int id) { ChildContent(id); return; }
