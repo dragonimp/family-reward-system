@@ -108,7 +108,7 @@ struct WatchSocialActivitiesView: View {
             if let error = store.socialError { Text(error).foregroundStyle(.red).font(.footnote) }
             if let actionError { Text(actionError).foregroundStyle(.red).font(.footnote) }
             ForEach(store.socialActivities) { activity in
-                NavigationLink(activity.title, destination: WatchSocialPhotosView(spaceID: space.id, activity: activity))
+                NavigationLink(activity.title, destination: WatchSocialPhotosView(spaceID: activity.sourceTenantId, activity: activity))
                 if activity.canEdit {
                     Button("修改“\(activity.title)”名称") { title = activity.title; editing = activity }
                     Button("删除“\(activity.title)”", role: .destructive) { deleting = activity }
@@ -128,22 +128,22 @@ struct WatchSocialActivitiesView: View {
             TextField("活动名称", text: $title)
             Button("保存") {
                 guard let activity = editing else { return }
-                Task { await run("renameActivity", activityID: activity.id, fields: ["title": title]) }
+                Task { await run("renameActivity", spaceID: activity.sourceTenantId, activityID: activity.id, fields: ["title": title]) }
             }
             Button("取消", role: .cancel) { editing = nil }
         }
         .confirmationDialog("确认删除活动？", isPresented: Binding(get: { deleting != nil }, set: { if !$0 { deleting = nil } })) {
             Button("确认删除", role: .destructive) {
                 guard let activity = deleting else { return }
-                Task { await run("deleteActivity", activityID: activity.id) }
+                Task { await run("deleteActivity", spaceID: activity.sourceTenantId, activityID: activity.id) }
             }
         } message: { Text("仅可删除没有其他成员、照片或日常记录的活动。") }
     }
 
-    private func run(_ action: String, activityID: String? = nil, fields: [String: Any] = [:]) async {
+    private func run(_ action: String, spaceID: String? = nil, activityID: String? = nil, fields: [String: Any] = [:]) async {
         actionError = nil
         do {
-            _ = try await store.socialRequest(action, spaceID: space.id, activityID: activityID, fields: fields)
+            _ = try await store.socialRequest(action, spaceID: spaceID ?? space.id, activityID: activityID, fields: fields)
             title = ""; editing = nil; deleting = nil
             await store.loadSocialActivities(spaceID: space.id)
         } catch { actionError = error.localizedDescription }

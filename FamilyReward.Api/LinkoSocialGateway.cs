@@ -136,6 +136,12 @@ internal static class LinkoSocialGateway
         if (s.Length == 2 && s[0] == "photo-requests" && Guid.TryParse(s[1], out _)) return method == "GET";
         if (s.Length == 3 && s[0] == "photo-requests" && Guid.TryParse(s[1], out _) && s[2] is "unavailable" or "complete" or "cancel") return method == "POST";
         if (s.Length == 1 && s[0] == "tenants") return method is "GET" or "POST";
+        if (s.Length == 2 && s[0] == "spaces" && s[1] == "mine") return method == "GET";
+        if (s.Length == 2 && s[0] == "activities" && s[1] == "joined") return method == "GET";
+        if (s.Length == 3 && s[0] == "spaces" && Guid.TryParse(s[1], out _) && s[2] == "activities") return method == "GET";
+        if (s.Length == 3 && s[0] == "spaces" && Guid.TryParse(s[1], out _) && s[2] == "bookmarks") return method == "POST";
+        if (s.Length == 5 && s[0] == "spaces" && Guid.TryParse(s[1], out _) && s[2] == "bookmarks"
+            && Guid.TryParse(s[3], out _) && Guid.TryParse(s[4], out _)) return method == "DELETE";
         if (s.Length == 2 && s[0] == "tenants" && Guid.TryParse(s[1], out _)) return method is "PATCH" or "DELETE";
         if (s.Length == 3 && s[0] == "tenants" && Guid.TryParse(s[1], out _) && s[2] == "activities")
             return method is "GET" or "POST";
