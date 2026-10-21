@@ -457,24 +457,47 @@ struct AccountView: View {
     var body: some View {
         NavigationStack {
             List {
-                Section { Label(store.profile?.text("username") ?? "家长", systemImage: "person.crop.circle.fill"); LabeledContent("身份", value: "家长"); LabeledContent("应用", value: "Linko Moment") }
-                Section("真实家庭关系") {
+                Section("用户中心") {
+                    Label(store.profile?.text("username") ?? "家长", systemImage: "person.crop.circle.fill")
+                    LabeledContent("身份", value: "家长")
+                    Link(destination: URL(string: "https://auth.ai.xmkurt.com/personal/info")!) {
+                        Label("账号资料", systemImage: "person.crop.circle")
+                    }
+                    Link(destination: URL(string: "https://auth.ai.xmkurt.com/personal/info?deleteAccount=1")!) {
+                        Label("注销账号", systemImage: "trash")
+                    }
+                    Button("退出当前账号", role: .destructive) { logout = true }
+                }
+                Section("订阅与权益") {
+                    NavigationLink { RemoteRecords(store: store, title: "订阅权益", path: "/api/subscription", mode: .subscription) } label: {
+                        Label("查看订阅权益", systemImage: "checkmark.seal.fill")
+                    }
+                }
+                Section("功能设置") {
                     NavigationLink { GenealogyView(store: store) } label: { Label("家族族谱", systemImage: "person.3.sequence.fill") }
                     NavigationLink { MembersView(store: store) } label: { Label("家庭成员", systemImage: "person.3.fill") }
                     NavigationLink { FamilyInvitationHub(store: store) } label: { Label("邀请家人", systemImage: "envelope.open.fill") }
+                    Link(destination: URL(string: UIApplication.openSettingsURLString)!) {
+                        Label("通知、照片与位置权限", systemImage: "gearshape.fill")
+                    }
                 }
-                Section {
-                    NavigationLink("订阅权益") { RemoteRecords(store: store, title: "订阅权益", path: "/api/subscription", mode: .subscription) }
-                    Link("隐私政策与支持", destination: URL(string: "https://happylife.ai.xmkurt.com/legal/linko-family-privacy.html")!)
+                Section("隐私与帮助") {
+                    Link(destination: URL(string: "https://happylife.ai.xmkurt.com/legal/linko-family-privacy.html")!) {
+                        Label("隐私政策", systemImage: "hand.raised.fill")
+                    }
+                    NavigationLink { MomentHelpView() } label: {
+                        Label("使用帮助", systemImage: "book.closed.fill")
+                    }
                     LabeledContent("版本", value: "\(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "") (\(Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? ""))")
-                    Text("家庭关系与群组记录均与网页版同步。登录由用户中心提供，凭据保存在本机钥匙串。").font(.footnote).foregroundStyle(.secondary)
                 }
-                Button("退出当前账号", role: .destructive) { logout = true }
                 Section("反馈与邀请") {
                     NavigationLink {
                         FeedbackWallView(identity: store.identity)
                     } label: {
                         Label("心愿墙与意见墙", systemImage: "bubble.left.and.bubble.right")
+                    }
+                    NavigationLink { MomentTeamMembersView() } label: {
+                        Label("同行共创成员", systemImage: "person.3.fill")
                     }
                     Link(destination: URL(string: "https://home.ai.impx.net/share/linko-family-ios")!) {
                         Label("生成专属测试邀请", systemImage: "square.and.arrow.up")
@@ -484,6 +507,60 @@ struct AccountView: View {
                 }
             }.readablePage().navigationTitle("我的").confirmationDialog("退出 Linko Moment？", isPresented: $logout, titleVisibility: .visible) { Button("退出登录", role: .destructive) { store.logout() } } message: { Text("本机登录凭据将清除。用户中心的浏览器登录状态由用户中心管理。") }
         }
+    }
+}
+
+private struct MomentHelpView: View {
+    var body: some View {
+        List {
+            Section("活动与照片") {
+                Text("在“活动”创建或加入共同活动，收藏到自己的空间，并与成员分享照片和打卡。访问别人分享的原图时，提供照片的成员需要打开 App 完成传输。")
+            }
+            Section("家庭与成长") {
+                Text("在“群组”管理家庭成员、奖励审批和积分记录；在“我的”维护族谱、家庭成员及设备权限。")
+            }
+            Section("账号与支持") {
+                Text("登录由用户中心提供。遇到问题可在“我的”中的“心愿墙与意见墙”提交反馈。")
+            }
+        }
+        .navigationTitle("使用帮助")
+    }
+}
+
+private struct MomentTeamMembersView: View {
+    var body: some View {
+        List {
+            Section("人类成员") {
+                member("大珊君", role: "项目负责人", detail: "负责 Linko Moment 项目管理与产品协作。", symbol: "person.crop.circle.fill")
+                member("翁志山", role: "项目协作成员", detail: "参与产品需求与项目交付。", symbol: "person.crop.circle.fill")
+                member("志海", role: "项目协作成员", detail: "参与项目协作。", symbol: "person.crop.circle.fill")
+            }
+            Section("智能体成员") {
+                member("家庭积分系统", role: "开发智能体", detail: "负责应用功能实现、集成与发布。", symbol: "cpu.fill")
+            }
+            Section {
+                Text("成员信息核对于 2026 年 10 月 22 日")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .navigationTitle("同行共创成员")
+    }
+
+    private func member(_ name: String, role: String, detail: String, symbol: String) -> some View {
+        HStack(alignment: .top, spacing: 12) {
+            Image(systemName: symbol)
+                .font(.title2)
+                .foregroundStyle(.teal)
+                .frame(width: 32)
+                .accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: 4) {
+                Text(name).font(.headline)
+                Text(role).font(.subheadline).foregroundStyle(.teal)
+                Text(detail).font(.subheadline).foregroundStyle(.secondary)
+            }
+        }
+        .padding(.vertical, 4)
     }
 }
 
