@@ -170,10 +170,6 @@ import WatchConnectivity
     func chooseGroup(_ id: Int) async {
         groupID = id; revision = UUID(); await load()
     }
-    func selectParent() async {
-        do { _ = try await call("/api/user/profile", method: "POST", body: ["channel":"pc", "role":"parent"]); await load() }
-        catch { self.error = error.localizedDescription }
-    }
     func logout() {
         photoSource.logout(token: identity.accessToken)
         photoRequestNotice = nil

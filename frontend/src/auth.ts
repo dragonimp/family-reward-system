@@ -58,25 +58,6 @@ export async function refreshAppUserProfile(): Promise<AppUserProfile | null> {
   return cachedAppProfile;
 }
 
-export async function saveAppUserRole(role: 'parent' | 'child'): Promise<AppUserProfile> {
-  const response = await fetch('/api/user/profile', {
-    method: 'POST',
-    credentials: 'include',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ channel: 'pc', role }),
-  });
-  if (!response.ok) {
-    const payload = await response.json().catch(() => ({}));
-    throw new Error(payload.error || '身份保存失败');
-  }
-
-  cachedAppProfile = await response.json();
-  if (!cachedAppProfile) {
-    throw new Error('身份保存失败');
-  }
-  return cachedAppProfile;
-}
-
 function getCurrentReturnUrl() {
   if (window.location.pathname === '/login' || window.location.pathname.startsWith('/auth/')) {
     return `${window.location.origin}/dashboard`;

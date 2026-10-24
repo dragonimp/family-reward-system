@@ -7,7 +7,6 @@ import {
   redirectToAuthLogout,
   refreshAppUserProfile,
   refreshCurrentUser,
-  saveAppUserRole,
 } from '../auth';
 import type { AppUserProfile, AuthContextType, AuthUser } from '../types';
 
@@ -35,13 +34,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const refreshAppProfile = useCallback(async () => {
     const profile = await refreshAppUserProfile();
-    setAppProfile(profile);
-    setProfileReady(true);
-    return profile;
-  }, []);
-
-  const selectAppRole = useCallback(async (role: 'parent' | 'child') => {
-    const profile = await saveAppUserRole(role);
     setAppProfile(profile);
     setProfileReady(true);
     return profile;
@@ -98,9 +90,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     logout,
     refresh,
     refreshAppProfile,
-    selectAppRole,
     isAuthenticated: Boolean(user),
-  }), [user, appProfile, profileReady, ready, login, logout, refresh, refreshAppProfile, selectAppRole]);
+  }), [user, appProfile, profileReady, ready, login, logout, refresh, refreshAppProfile]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

@@ -67,20 +67,16 @@ struct FamilyRoot: View {
         Group {
             if !identity.isAuthenticated { login }
             else if store.ready { main }
-            else if store.profile?.text("role") == "child" { DearSocialView(store: store, showLogout: true) }
             else {
                 NavigationStack {
                     VStack(spacing: 24) {
                         Image(systemName: "person.2.circle.fill").font(.system(size: 64)).foregroundStyle(.teal)
                         Text("欢迎使用 Linko Moment").font(.title2.bold())
-                        if store.loading { ProgressView("正在读取家庭身份…") }
-                        else if store.profile?.flag("needsRole") == true {
-                            Text("选择家长身份，管理家庭与孩子的成长记录。")
-                            Button("我是家长") { Task { await store.selectParent() } }.buttonStyle(.borderedProminent)
-                            NavigationLink("先进入生活日常") { DearSocialView(store: store) }
-                        } else if store.profile?.text("role") == "child" {
-                            Text("此账号是孩子身份，请使用家长账号登录。")
-                        } else { Button("重新加载") { Task { await store.load() } } }
+                        if store.loading { ProgressView("正在读取家长资料…") }
+                        else {
+                            Text("家长资料暂时无法读取。")
+                            Button("重新加载") { Task { await store.load() } }.buttonStyle(.borderedProminent)
+                        }
                         Button("退出登录") { store.logout() }
                     }.padding().navigationTitle("Linko Moment")
                 }

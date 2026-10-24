@@ -139,12 +139,6 @@ public sealed class FamilyStore
         await LoadFamilyAsync(current);
     }
 
-    public async Task SelectParentAsync()
-    {
-        await CallAsync("/api/user/profile", HttpMethod.Post, new { channel = "pc", role = "parent" });
-        await LoadAsync();
-    }
-
     public async Task SelectGroupAsync(int id)
     {
         if (!Groups.Any(item => item.Id == id)) throw new FamilyApiException("无法访问该家庭。");

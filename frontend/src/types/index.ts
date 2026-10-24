@@ -425,7 +425,6 @@ export interface AuthContextType {
   logout: () => void;
   refresh: () => Promise<AuthUser | null>;
   refreshAppProfile: () => Promise<AppUserProfile | null>;
-  selectAppRole: (role: 'parent' | 'child') => Promise<AppUserProfile>;
   isAuthenticated: boolean;
 }
 

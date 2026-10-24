@@ -14,7 +14,6 @@ import GrowthPage from './pages/Growth';
 import FamilyConnectionsPage from './pages/FamilyConnections';
 import SettingsPage from './pages/Settings';
 import AssistantPage from './pages/Assistant';
-import IdentityPage from './pages/Identity';
 import VirtualWatchPage from './pages/VirtualWatch';
 import XiaotiancaiDeviceTestApplicationPage from './pages/XiaotiancaiDeviceTestApplication';
 import AdminPage from './pages/Admin';
@@ -40,14 +39,6 @@ export default function App() {
           <Route
             path="/dear/spaces/:spaceId/activities/:activityId"
             element={<ProtectedRoute><DearSocialPage /></ProtectedRoute>}
-          />
-          <Route
-            path="/identity"
-            element={
-              <ProtectedRoute>
-                <IdentityPage />
-              </ProtectedRoute>
-            }
           />
           <Route
             path="/*"
