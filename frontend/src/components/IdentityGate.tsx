@@ -1,16 +1,8 @@
-import { useEffect, type ReactNode } from 'react';
-import { useLocation, Navigate } from 'react-router-dom';
+import { type ReactNode } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 
 export default function IdentityGate({ children }: { children: ReactNode }) {
-  const { appProfile, profileReady } = useAuth();
-  const location = useLocation();
-
-  useEffect(() => {
-    if (profileReady && appProfile?.role === 'child' && location.pathname !== '/identity') {
-      window.location.replace('/dear');
-    }
-  }, [appProfile?.role, location.pathname, profileReady]);
+  const { appProfile, profileReady, refreshAppProfile } = useAuth();
 
   if (!profileReady) {
     return (
@@ -20,14 +12,11 @@ export default function IdentityGate({ children }: { children: ReactNode }) {
     );
   }
 
-  if (!appProfile || appProfile.needsRole || !appProfile.role) {
-    return <Navigate to="/identity" replace state={{ from: location }} />;
-  }
-
-  if (appProfile.role === 'child') {
+  if (!appProfile || appProfile.role !== 'parent') {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[#F7F9FC] text-gray-500">
-        正在进入 Linko Moment...
+      <div className="min-h-screen flex flex-col items-center justify-center gap-4 bg-[#F7F9FC] text-gray-500">
+        <p>家长资料读取失败，请重试。</p>
+        <button type="button" className="rounded-lg bg-teal-700 px-4 py-2 text-white" onClick={() => void refreshAppProfile()}>重新加载</button>
       </div>
     );
   }

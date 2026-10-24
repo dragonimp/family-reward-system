@@ -82,7 +82,7 @@ function DearRelationships({ spaceId, activityId }: { spaceId: string; activityI
 }
 
 export default function DearSocial() {
-  const { appProfile, logout } = useAuth();
+  const { logout } = useAuth();
   const navigate = useNavigate();
   const { spaceId: routeSpaceId, activityId: routeActivityId } = useParams();
   const detailMode = Boolean(routeSpaceId && routeActivityId);
@@ -230,7 +230,7 @@ export default function DearSocial() {
     <div className="mx-auto max-w-5xl space-y-5">
       <header className="flex flex-wrap items-center justify-between gap-3">
         <div><p className="text-sm font-semibold tracking-widest text-teal-700">LINKO MOMENT</p><h1 className="text-3xl font-bold">{detailMode ? '活动详情' : '活动与分享'}</h1><p className="mt-1 text-sm text-slate-600">个人空间可以收藏参加过的活动；照片和日常仍属于原活动。</p></div>
-        <div className="flex gap-2">{detailMode && <Link className="rounded-xl border bg-white px-4 py-2 text-sm" to="/dear">返回活动</Link>}{appProfile?.role === 'parent' ? <Link className="rounded-xl border bg-white px-4 py-2 text-sm" to="/dashboard">家庭积分</Link> : <a className="rounded-xl border bg-white px-4 py-2 text-sm" href="/watch">手表端</a>}<button className="rounded-xl border bg-white px-4 py-2 text-sm" onClick={logout}>退出</button>
+        <div className="flex gap-2">{detailMode && <Link className="rounded-xl border bg-white px-4 py-2 text-sm" to="/dear">返回活动</Link>}<Link className="rounded-xl border bg-white px-4 py-2 text-sm" to="/dashboard">家庭积分</Link><button className="rounded-xl border bg-white px-4 py-2 text-sm" onClick={logout}>退出</button>
           {!detailMode && <div className="relative"><button type="button" aria-label="空间菜单" aria-expanded={spaceMenuOpen} className="rounded-xl border bg-white px-3 py-2 text-lg" onClick={() => setSpaceMenuOpen(value => !value)}>⋯</button>{spaceMenuOpen && <div className="absolute right-0 z-20 mt-2 min-w-40 rounded-xl border bg-white p-2 shadow-lg"><button className="block w-full rounded-lg px-3 py-2 text-left text-sm hover:bg-slate-50" onClick={() => { setSpaceName(''); setSpaceDialog('create'); setSpaceMenuOpen(false); }}>新增空间</button>{chosenSpace?.role === 'owner' && <><button className="block w-full rounded-lg px-3 py-2 text-left text-sm hover:bg-slate-50" onClick={() => { setEditedSpaceName(chosenSpace.name); setSpaceDialog('rename'); setSpaceMenuOpen(false); }}>修改空间名称</button><button className="block w-full rounded-lg px-3 py-2 text-left text-sm text-red-700 hover:bg-red-50" onClick={() => { setSpaceMenuOpen(false); deleteSpace(); }}>删除空间</button></>}</div>}</div>}
         </div>
       </header>

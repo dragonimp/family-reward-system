@@ -55,7 +55,7 @@ public sealed class FamilyPage : ContentPage
         content.Children.Clear();
         content.Add(Heading("Linko Moment", 27));
         if (!store.Authenticated) { LoginContent(); return; }
-        if (!store.ParentReady) { IdentityContent(); return; }
+        if (!store.ParentReady) { ParentProfileUnavailableContent(); return; }
         if (childId is int id) { ChildContent(id); return; }
         var tabs = new HorizontalStackLayout { Spacing = 7 };
         foreach (var name in new[] { "家庭", "审批", "记录", "我的" })
@@ -100,14 +100,10 @@ public sealed class FamilyPage : ContentPage
         finally { loginCancellation?.Dispose(); loginCancellation = null; Render(); }
     }
 
-    private void IdentityContent()
+    private void ParentProfileUnavailableContent()
     {
-        content.Add(Heading("选择家庭身份", 21));
-        if (store.Profile?.Text("role") == "child")
-            content.Add(new Label { Text = "当前账号是孩子身份。请使用家长账号登录。" });
-        else if (store.Profile?.Bool("needsRole") == true)
-            content.Add(Button("我是家长", () => _ = Run(store.SelectParentAsync), true));
-        else content.Add(Button("重新读取", () => _ = Run(store.LoadAsync), true));
+        content.Add(Heading("家长资料暂时无法读取", 21));
+        content.Add(Button("重新读取", () => _ = Run(store.LoadAsync), true));
         content.Add(Button("退出登录", () => { store.Logout(); Render(); }));
     }
 
