@@ -74,8 +74,32 @@ done
 bash "$stage/install-social-photo-proxy.sh" "$stage/happylife.ai.xmkurt.com.nginx.conf" "$stage"
 
 site=/var/www/happylife/frontend/static
+releases_link=/var/www/happylife/frontend/releases
+releases_real="$(readlink -f "$releases_link")"
+[[ -d "$releases_real" && ! -L "$releases_real" ]] || { echo 'Canonical web release directory missing.' >&2; exit 1; }
 previous="$(readlink "$site")"
-candidate="/var/www/happylife/frontend/releases/$version"
+if [[ "$previous" == "$releases_link/"* ]]; then
+  canonical_previous="$(readlink -f "$previous")"
+  [[ "$canonical_previous" == "$releases_real/"* && -d "$canonical_previous" ]] || exit 1
+  python3 - "$site" "$previous" "$canonical_previous" <<'PY'
+import os,sys
+site,expected,canonical=sys.argv[1:]
+if os.readlink(site)!=expected or not os.path.samefile(expected,canonical):
+    raise SystemExit('Static pointer changed before canonicalization')
+temporary=f'{site}.canonical-{os.getpid()}'
+try:
+    os.symlink(canonical,temporary)
+    if os.readlink(site)!=expected: raise SystemExit('Static pointer changed during canonicalization')
+    os.replace(temporary,site)
+finally:
+    if os.path.lexists(temporary): os.unlink(temporary)
+if os.readlink(site)!=canonical or not os.path.samefile(site,canonical):
+    raise SystemExit('Canonical static pointer readback failed')
+PY
+  previous="$canonical_previous"
+fi
+[[ "$previous" == "$releases_real/"* && -d "$previous" ]] || exit 1
+candidate="$releases_real/$version"
 journal="/opt/Atlas/updater-state/family-points-api-credit/family-pipeline-${version}-web.json"
 static_profile="$stage/static-profile.json"
 python3 - "$static_profile" "$version" "$previous" "$candidate" "$journal" <<'PY'
