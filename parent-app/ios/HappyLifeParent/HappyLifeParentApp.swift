@@ -1,4 +1,5 @@
 import SwiftUI
+import CoreImage.CIFilterBuiltins
 import AgentIdentity
 import Charts
 import UserNotifications
@@ -454,6 +455,15 @@ struct FamilyInvitationHub: View {
 struct AccountView: View {
     @ObservedObject var store: FamilyStore
     @State private var logout = false
+    @State private var resources: MomentResources?
+    @State private var resourceError: String?
+    private struct MomentResources: Decodable {
+        let appCode: String
+        let privacyPolicyUrl: URL?
+        let termsUrl: URL?
+        let supportUrl: URL?
+        let userManualUrl: URL?
+    }
     var body: some View {
         NavigationStack {
             List {
@@ -482,11 +492,20 @@ struct AccountView: View {
                     }
                 }
                 Section("隐私与帮助") {
-                    Link(destination: URL(string: "https://happylife.ai.xmkurt.com/legal/linko-family-privacy.html")!) {
-                        Label("隐私政策", systemImage: "hand.raised.fill")
+                    if let url = resources?.privacyPolicyUrl, url.scheme == "https" {
+                        Link(destination: url) { Label("隐私政策", systemImage: "hand.raised.fill") }
+                    } else {
+                        Label("隐私政策未配置", systemImage: "hand.raised.fill").foregroundStyle(.secondary)
                     }
+                    if let url = resources?.termsUrl, url.scheme == "https" { Link("用户协议", destination: url) }
                     NavigationLink { MomentHelpView() } label: {
                         Label("使用帮助", systemImage: "book.closed.fill")
+                    }
+                    if let url = resources?.userManualUrl, url.scheme == "https" { Link("详细使用手册", destination: url) }
+                    if let url = resources?.supportUrl, url.scheme == "https" { Link("联系支持", destination: url) }
+                    if let resourceError {
+                        Text(resourceError).font(.footnote).foregroundStyle(.red)
+                        Button("重试读取应用资料") { Task { await loadResources() } }
                     }
                     LabeledContent("版本", value: "\(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "") (\(Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? ""))")
                 }
@@ -499,14 +518,148 @@ struct AccountView: View {
                     NavigationLink { MomentTeamMembersView() } label: {
                         Label("同行共创成员", systemImage: "person.3.fill")
                     }
-                    Link(destination: URL(string: "https://home.ai.impx.net/share/linko-family-ios")!) {
+                    NavigationLink { MomentTestInvitationView() } label: {
                         Label("生成专属测试邀请", systemImage: "square.and.arrow.up")
                     }
-                    Text("在 Atlas 邀请页登录并分享专属链接；各系统的获取方式和版本说明由应用后台维护。")
+                    Text("生成 Linko Moment 专属链接，扫码或通过系统分享邀请朋友。")
                         .font(.footnote).foregroundStyle(.secondary)
                 }
-            }.readablePage().navigationTitle("我的").confirmationDialog("退出 Linko Moment？", isPresented: $logout, titleVisibility: .visible) { Button("退出登录", role: .destructive) { store.logout() } } message: { Text("本机登录凭据将清除。用户中心的浏览器登录状态由用户中心管理。") }
+            }.readablePage().navigationTitle("我的")
+                .task { await loadResources() }
+                .confirmationDialog("退出 Linko Moment？", isPresented: $logout, titleVisibility: .visible) { Button("退出登录", role: .destructive) { store.logout() } } message: { Text("本机登录凭据将清除。用户中心的浏览器登录状态由用户中心管理。") }
         }
+    }
+
+    private func loadResources() async {
+        do {
+            var request = URLRequest(url: URL(string: "https://home.ai.impx.net/api/capabilities/apps/linko-family-ios/resources")!)
+            request.timeoutInterval = 15
+            request.cachePolicy = .reloadIgnoringLocalCacheData
+            let (data, response) = try await URLSession.shared.data(for: request)
+            guard (response as? HTTPURLResponse)?.statusCode == 200 else { throw APIError.message("应用资料暂不可用。") }
+            let result = try JSONDecoder().decode(MomentResources.self, from: data)
+            guard result.appCode == "linko-family-ios" else { throw APIError.message("应用资料来源不正确。") }
+            resources = result; resourceError = nil
+        } catch { resourceError = error.localizedDescription }
+    }
+}
+
+private struct MomentTestInvitationView: View {
+    @StateObject private var atlasIdentity = AgentIdentitySession(
+        origin: URL(string: "https://home.ai.impx.net")!,
+        callback: URL(string: "linkofamily://login-complete/")!,
+        keychainService: "net.impx.happylife.parent.atlasShareIdentity")
+    @State private var invitation: Invitation?
+    @State private var details: Details?
+    @State private var busy = false
+    @State private var error: String?
+    @State private var copied = false
+
+    private struct Invitation: Decodable { let url: URL; let title: String }
+    private struct Details: Decodable { let title: String; let description: String }
+
+    var body: some View {
+        ScrollView {
+            VStack(spacing: 20) {
+                Image(systemName: "envelope.open.fill")
+                    .font(.system(size: 38)).foregroundStyle(.white)
+                    .frame(width: 76, height: 76)
+                    .background(.teal.gradient, in: RoundedRectangle(cornerRadius: 22))
+                Text(details?.title ?? "专属测试邀请").font(.title2.bold())
+                Text(details?.description ?? "正在读取邀请活动…")
+                    .font(.subheadline).foregroundStyle(.secondary).multilineTextAlignment(.center)
+
+                if let invitation {
+                    VStack(spacing: 18) {
+                        if let image = qrImage(invitation.url) {
+                            Image(uiImage: image).interpolation(.none).resizable()
+                                .frame(width: 220, height: 220).padding(18)
+                                .background(.white, in: RoundedRectangle(cornerRadius: 18))
+                                .accessibilityLabel("邀请链接二维码")
+                        }
+                        Text("扫码打开邀请").font(.headline)
+                        Link(destination: invitation.url) {
+                            Text(invitation.url.absoluteString).font(.footnote)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                        }.accessibilityIdentifier("invitationLink")
+                        HStack(spacing: 12) {
+                            Button {
+                                UIPasteboard.general.url = invitation.url
+                                copied = true
+                            } label: { Label(copied ? "已复制" : "复制链接", systemImage: copied ? "checkmark" : "doc.on.doc") }
+                                .buttonStyle(.bordered)
+                            ShareLink(item: invitation.url, subject: Text("\(invitation.title) 测试邀请")) {
+                                Label("分享邀请", systemImage: "square.and.arrow.up")
+                            }.buttonStyle(.borderedProminent)
+                        }
+                    }
+                    .padding(20).frame(maxWidth: .infinity)
+                    .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 24))
+                } else if busy { ProgressView("正在生成邀请链接…") }
+
+                Button(invitation == nil ? (atlasIdentity.isAuthenticated ? "生成邀请链接" : "登录并生成邀请") : "生成新链接") {
+                    Task { await create() }
+                }.disabled(busy).buttonStyle(.bordered)
+                if let error { Text(error).font(.footnote).foregroundStyle(.red) }
+            }
+            .padding(20).frame(maxWidth: 500).frame(maxWidth: .infinity)
+        }
+        .background(Color.teal.opacity(0.06))
+        .navigationTitle("专属测试邀请")
+        .navigationBarTitleDisplayMode(.inline)
+        .task { await loadDetails(); if invitation == nil && atlasIdentity.isAuthenticated { await create() } }
+        .onChange(of: atlasIdentity.isAuthenticated) { _, signedIn in
+            if signedIn && invitation == nil { Task { await create() } }
+            if !signedIn { invitation = nil }
+        }
+    }
+
+    private func loadDetails() async {
+        do {
+            let url = URL(string: "https://home.ai.impx.net/api/marketplace/apps/linko-family-ios/sharing")!
+            let (data, response) = try await URLSession.shared.data(from: url)
+            guard (response as? HTTPURLResponse)?.statusCode == 200 else {
+                throw APIError.message("此应用暂未配置测试邀请。")
+            }
+            details = try JSONDecoder().decode(Details.self, from: data)
+        } catch { self.error = error.localizedDescription }
+    }
+
+    private func create() async {
+        guard !busy else { return }
+        busy = true; error = nil; copied = false
+        defer { busy = false }
+        do {
+            if !atlasIdentity.isAuthenticated { try await atlasIdentity.login() }
+            guard let token = try await atlasIdentity.validAccessToken() else {
+                throw APIError.message("请先登录用户中心。")
+            }
+            var request = URLRequest(url: URL(string: "https://home.ai.impx.net/api/marketplace/apps/linko-family-ios/share-links")!)
+            request.httpMethod = "POST"; request.timeoutInterval = 20
+            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+            request.setValue("application/json", forHTTPHeaderField: "Accept")
+            let (data, response) = try await URLSession.shared.data(for: request)
+            guard (response as? HTTPURLResponse)?.statusCode == 200 else {
+                throw APIError.message("生成邀请失败，请稍后重试。")
+            }
+            let result = try JSONDecoder().decode(Invitation.self, from: data)
+            guard result.url.scheme == "https", result.url.host == "home.ai.impx.net",
+                  result.url.path.range(of: "^/invite/[A-Za-z0-9_-]{16,48}$", options: .regularExpression) != nil,
+                  result.url.query == nil, result.url.fragment == nil else {
+                throw APIError.message("邀请地址无效。")
+            }
+            invitation = result
+        } catch { self.error = error.localizedDescription }
+    }
+
+    private func qrImage(_ url: URL) -> UIImage? {
+        let filter = CIFilter.qrCodeGenerator()
+        filter.message = Data(url.absoluteString.utf8)
+        filter.correctionLevel = "M"
+        guard let output = filter.outputImage else { return nil }
+        let scaled = output.transformed(by: CGAffineTransform(scaleX: 8, y: 8))
+        guard let image = CIContext().createCGImage(scaled, from: scaled.extent) else { return nil }
+        return UIImage(cgImage: image)
     }
 }
 
@@ -528,26 +681,65 @@ private struct MomentHelpView: View {
 }
 
 private struct MomentTeamMembersView: View {
+    @State private var roster: Roster?
+    @State private var loading = false
+    @State private var error: String?
+
+    private struct Member: Decodable, Identifiable {
+        let name: String
+        let role: String
+        var id: String { name + "|" + role }
+    }
+    private struct Roster: Decodable {
+        let projectCode: String
+        let humans: [Member]
+        let agents: [Member]
+    }
+
     var body: some View {
         List {
-            Section("人类成员") {
-                member("大珊君", role: "项目负责人", detail: "负责 Linko Moment 项目管理与产品协作。", symbol: "person.crop.circle.fill")
-                member("翁志山", role: "项目协作成员", detail: "参与产品需求与项目交付。", symbol: "person.crop.circle.fill")
-                member("志海", role: "项目协作成员", detail: "参与项目协作。", symbol: "person.crop.circle.fill")
+            if loading && roster == nil { ProgressView("正在读取成员…") }
+            if let roster {
+                Section("人类成员") {
+                    ForEach(roster.humans) { member($0, symbol: "person.crop.circle.fill") }
+                    if roster.humans.isEmpty { Text("暂无公开成员").foregroundStyle(.secondary) }
+                }
+                Section("智能体成员") {
+                    ForEach(roster.agents) { member($0, symbol: "cpu.fill") }
+                    if roster.agents.isEmpty { Text("暂无公开成员").foregroundStyle(.secondary) }
+                }
             }
-            Section("智能体成员") {
-                member("家庭积分系统", role: "开发智能体", detail: "负责应用功能实现、集成与发布。", symbol: "cpu.fill")
-            }
-            Section {
-                Text("成员信息核对于 2026 年 10 月 22 日")
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
+            if let error {
+                Section {
+                    Text(error).foregroundStyle(.red)
+                    Button("重试") { Task { await refresh() } }
+                }
             }
         }
         .navigationTitle("同行共创成员")
+        .task { await refresh() }
+        .refreshable { await refresh() }
     }
 
-    private func member(_ name: String, role: String, detail: String, symbol: String) -> some View {
+    private func refresh() async {
+        guard !loading else { return }
+        loading = true; error = nil
+        defer { loading = false }
+        do {
+            var request = URLRequest(url: URL(string: "https://home.ai.impx.net/api/projects/family-reward/members")!)
+            request.timeoutInterval = 15
+            request.cachePolicy = .reloadIgnoringLocalCacheData
+            let (data, response) = try await URLSession.shared.data(for: request)
+            guard (response as? HTTPURLResponse)?.statusCode == 200 else {
+                throw APIError.message("成员资料暂不可用。")
+            }
+            let value = try JSONDecoder().decode(Roster.self, from: data)
+            guard value.projectCode == "family-reward" else { throw APIError.message("成员资料来源不正确。") }
+            roster = value
+        } catch { self.error = error.localizedDescription }
+    }
+
+    private func member(_ person: Member, symbol: String) -> some View {
         HStack(alignment: .top, spacing: 12) {
             Image(systemName: symbol)
                 .font(.title2)
@@ -555,9 +747,8 @@ private struct MomentTeamMembersView: View {
                 .frame(width: 32)
                 .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 4) {
-                Text(name).font(.headline)
-                Text(role).font(.subheadline).foregroundStyle(.teal)
-                Text(detail).font(.subheadline).foregroundStyle(.secondary)
+                Text(person.name).font(.headline)
+                Text(person.role).font(.subheadline).foregroundStyle(.teal)
             }
         }
         .padding(.vertical, 4)
