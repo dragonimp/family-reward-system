@@ -370,10 +370,9 @@ app.MapGet("/api/user/profile", async (HttpRequest request) =>
         return Results.Json(new { error = "请先登录", code = "login_required" }, statusCode: StatusCodes.Status401Unauthorized);
     }
     var channel = NormalizeIdentityChannel(request.Query.String("channel"), IsWatchRequest(request) ? "watch" : "pc");
-    var role = NormalizeAppRole(request.Query.String("role"));
-    var autoCreate = channel == "watch" || string.Equals(request.Query.String("autoCreate"), "true", StringComparison.OrdinalIgnoreCase);
-    var profile = await GetOrCreateAppUserProfile(connectionString, request, channel, role, autoCreate);
-    return Results.Json(profile);
+    var role = channel == "watch" ? null : "parent";
+    try { return Results.Json(await GetOrCreateAppUserProfile(connectionString, request, channel, role, autoCreate: true)); }
+    catch (InvalidOperationException ex) { return Results.Conflict(new { error = ex.Message }); }
 });
 
 app.MapPost("/api/user/profile", async (JsonObject body, HttpRequest request) =>
@@ -384,13 +383,13 @@ app.MapPost("/api/user/profile", async (JsonObject body, HttpRequest request) =>
     }
     var channel = NormalizeIdentityChannel(body.String("channel"), IsWatchRequest(request) ? "watch" : "pc");
     var role = NormalizeAppRole(body.String("role"));
-    if (string.IsNullOrWhiteSpace(role))
+    if (string.IsNullOrWhiteSpace(role) || channel == "pc" && role != "parent")
     {
-        return Results.BadRequest(new { error = "请选择身份" });
+        return Results.BadRequest(new { error = "手机和网页仅支持家长身份" });
     }
 
-    var profile = await GetOrCreateAppUserProfile(connectionString, request, channel, role, autoCreate: true, body);
-    return Results.Json(profile);
+    try { return Results.Json(await GetOrCreateAppUserProfile(connectionString, request, channel, role, autoCreate: true, body)); }
+    catch (InvalidOperationException ex) { return Results.Conflict(new { error = ex.Message }); }
 });
 
 app.MapGet("/api/family-groups", async (HttpRequest request) =>
@@ -994,7 +993,7 @@ app.MapPost("/api/children/{id:int}/pair-device", async (int id, JsonObject body
     if (!AgentIdentityAuthorizationExtensions.IsUserIdentity(request.HttpContext.User)
         || FirstClaim(request, ClaimTypes.NameIdentifier, "sub") is null)
         return Results.Json(new { error = "请先登录家长账号" }, statusCode: 401);
-    var profile = await GetOrCreateAppUserProfile(connectionString, request, "pc", null, autoCreate: false);
+    var profile = await GetOrCreateAppUserProfile(connectionString, request, "pc", "parent", autoCreate: true);
     if (profile.Role != "parent" || !await IsAppUserBusinessActive(connectionString, profile.UnifiedUserId))
         return Results.Json(new { error = "请使用有效的家长账号" }, statusCode: 403);
     var owner = profile.AppUserId;
@@ -7461,10 +7460,10 @@ static async Task<(AppUserProfile? Profile, IResult? Error)> RequireParentProfil
         return (new AppUserProfile(GetUnifiedUserId(request), GetUnifiedUsername(request), "pc", "parent", appUserId.ToString().Trim(), null, null, false), null);
     }
 
-    var profile = await GetOrCreateAppUserProfile(connectionString, request, NormalizeIdentityChannel(request.Query.String("channel"), "pc"), null, autoCreate: false);
+    var profile = await GetOrCreateAppUserProfile(connectionString, request, "pc", "parent", autoCreate: true);
     if (profile.NeedsRole)
     {
-        return (null, Results.Json(new { error = "请选择家长 / 孩子身份", code = "needs_role" }, statusCode: StatusCodes.Status428PreconditionRequired));
+        return (null, Results.Json(new { error = "无法读取家长资料", code = "profile_unavailable" }, statusCode: StatusCodes.Status503ServiceUnavailable));
     }
     if (!string.Equals(profile.Role, "parent", StringComparison.Ordinal))
     {
@@ -7788,11 +7787,12 @@ static async Task<AppUserProfile> GetOrCreateAppUserProfile(
 {
     channel = NormalizeIdentityChannel(channel, "pc");
     role = NormalizeAppRole(role);
+    if (channel == "pc" && role == "child")
+        throw new InvalidOperationException("身份与设备通道不匹配");
     var unifiedUserId = GetUnifiedUserId(request);
     var username = GetUnifiedUsername(request);
     await using var conn = await OpenConnection(connectionString);
 
-    if (string.IsNullOrWhiteSpace(role))
     {
         await using var existingCmd = new NpgsqlCommand("""
             SELECT *
@@ -7805,7 +7805,14 @@ static async Task<AppUserProfile> GetOrCreateAppUserProfile(
         await using var existingReader = await existingCmd.ExecuteReaderAsync();
         if (await existingReader.ReadAsync())
         {
-            return ReadAppUserProfile(existingReader, needsRole: false);
+            var existing = ReadAppUserProfile(existingReader, needsRole: false);
+            await existingReader.CloseAsync();
+            if (channel == "watch" && body is not null)
+                return role == "child"
+                    ? await EnsureChildAppUserProfile(conn, unifiedUserId, username, channel, body)
+                    : await EnsureParentAppUserProfile(conn, unifiedUserId, username, channel);
+            if (string.IsNullOrWhiteSpace(role) || existing.Role == role) return existing;
+            throw new InvalidOperationException("账号设备身份与当前通道不匹配，请联系支持人员");
         }
         await existingReader.CloseAsync();
 
