@@ -9,8 +9,8 @@
     <Nullable>enable</Nullable>
     <ApplicationTitle>Linko Moment</ApplicationTitle>
     <ApplicationId>net.impx.happylife.parent.android</ApplicationId>
-    <ApplicationDisplayVersion>20261019-moment-android.1</ApplicationDisplayVersion>
-    <ApplicationVersion>5</ApplicationVersion>
+    <ApplicationDisplayVersion>20261024-moment-invite-android.1</ApplicationDisplayVersion>
+    <ApplicationVersion>6</ApplicationVersion>
     <SupportedOSPlatformVersion>26</SupportedOSPlatformVersion>
     <AgentIdentityNativeClientProject Condition="'$(AgentIdentityNativeClientProject)' == ''">$(MSBuildThisFileDirectory)../../../AgentIdentity/src/AgentIdentity.NativeClient/AgentIdentity.NativeClient.csproj</AgentIdentityNativeClientProject>
   </PropertyGroup>
@@ -20,5 +20,6 @@
     <MauiFont Include="Resources/Fonts/*" />
     <ProjectReference Include="$(AgentIdentityNativeClientProject)" />
     <PackageReference Include="Microsoft.Maui.Controls" Version="$(MauiVersion)" />
+    <PackageReference Include="QRCoder" Version="1.7.0" />
   </ItemGroup>
 </Project>

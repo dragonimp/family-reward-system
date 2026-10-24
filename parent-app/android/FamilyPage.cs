@@ -197,19 +197,18 @@ public sealed class FamilyPage : ContentPage
     private void AccountContent()
     {
         content.Add(Heading("我的", 21));
+        content.Add(Heading("用户中心", 17));
         content.Add(new Label { Text = store.Profile?.Text("username") ?? "家长", FontSize = 18 });
         content.Add(new Label { Text = $"Android 版本 {AppInfo.Current.VersionString} · 数据与网页版共用" });
         content.Add(Button("刷新", () => _ = Run(store.LoadAsync)));
         content.Add(Button("退出登录", () => _ = Logout()));
+        content.Add(Heading("隐私与帮助", 17));
+        content.Add(Button("隐私政策与应用资料", () => _ = Navigation.PushAsync(new AtlasInformationPage(false))));
         content.Add(Heading("反馈与邀请", 17));
         content.Add(Button("心愿墙与意见墙", () => _ = Navigation.PushAsync(new FeedbackWallPage(store))));
-        content.Add(Button("生成专属测试邀请", () => _ = Run(OpenTestInvitation)));
-        content.Add(new Label { Text = "在 Atlas 邀请页登录后生成链接；各系统的获取方式由应用后台维护。", TextColor = Colors.DimGray, FontSize = 12 });
-    }
-
-    private async Task OpenTestInvitation()
-    {
-        await Launcher.Default.OpenAsync(new Uri("https://home.ai.impx.net/share/linko-family-ios"));
+        content.Add(Button("同行共创成员", () => _ = Navigation.PushAsync(new AtlasInformationPage(true))));
+        content.Add(Button("生成专属测试邀请", () => _ = Navigation.PushAsync(new TestInvitationPage())));
+        content.Add(new Label { Text = "生成 Linko Moment 专属链接，扫码或通过系统分享邀请朋友。", TextColor = Colors.DimGray, FontSize = 12 });
     }
 
     private async Task Logout()
