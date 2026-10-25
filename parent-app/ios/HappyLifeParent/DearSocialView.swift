@@ -15,6 +15,7 @@ private struct DearRecord: Identifiable {
         return date?.formatted(date: .abbreviated, time: .shortened) ?? raw
     }
     func flag(_ key: String) -> Bool { data[key] as? Bool ?? false }
+    func number(_ key: String) -> Double { data[key] as? Double ?? 0 }
     static func list(_ value: Any) throws -> [DearRecord] {
         guard let values = value as? [[String: Any]] else { throw APIError.message("Linko Social 返回的数据格式不正确。") }
         return values.map { DearRecord(data: $0) }
@@ -33,6 +34,8 @@ struct DearSocialView: View {
     @State private var checkIns: [DearRecord] = []
     @StateObject private var checkInLocator = DearCheckInLocator()
     @State private var showingCheckIn = false
+    @State private var selectedCheckIn: DearRecord?
+    @State private var pendingCheckIn = false
     @State private var checkInNote = ""
     @State private var checkInRequestID = UUID()
     @State private var activityMembers: [DearRecord] = []
@@ -46,9 +49,10 @@ struct DearSocialView: View {
     @State private var activityName = ""
     @State private var editedSpaceName = ""
     @State private var editedActivityName = ""
+    @State private var editedActivityDescription = ""
+    @State private var editedActivityDate = Date()
     @State private var showingSpaceRename = false
     @State private var showingSpaceCreate = false
-    @State private var showingActivityRename = false
     @State private var showingSpaceDelete = false
     @State private var showingActivityDelete = false
     @State private var inviteUsername = ""
@@ -63,9 +67,20 @@ struct DearSocialView: View {
 
     private var base: String { "/api/dear/social/" }
     private var selectedSpace: DearRecord? { spaces.first { $0.id == spaceId } }
-    private var selectedActivity: DearRecord? { activities.first { $0.id == activityId } ?? joinedActivities.first { $0.id == activityId } }
+    private var allActivities: [DearRecord] { activities + joinedActivities.filter { joined in !activities.contains { $0.id == joined.id } } }
+    private var selectedActivity: DearRecord? { allActivities.first { $0.id == activityId } }
     private var ownedSpaces: [DearRecord] { spaces.filter { $0.text("role") == "owner" } }
     private var activityTenantId: String { selectedActivity?.text("sourceTenantId") ?? spaceId }
+    private func activityDate(_ item: DearRecord) -> String {
+        let key = item.text("startsAt").isEmpty ? "createdAt" : "startsAt"
+        return (key == "createdAt" ? "创建于 " : "活动日期 ") + item.dateText(key)
+    }
+    private func activityDateValue(_ item: DearRecord) -> Date {
+        let value = item.text("startsAt").isEmpty ? item.text("createdAt") : item.text("startsAt")
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return formatter.date(from: value) ?? ISO8601DateFormatter().date(from: value) ?? Date()
+    }
 
     var body: some View {
         NavigationStack {
@@ -98,50 +113,52 @@ struct DearSocialView: View {
                     Text("每个人管理自己的空间，同一活动可收藏到多个空间。")
                         .font(.caption).foregroundStyle(.secondary)
                 }
-                if selectedSpace?.text("role") == "owner" {
-                    Section("活动 · \(selectedSpace?.text("name") ?? "")") {
+                if selectedSpace?.text("role") == "owner" || !joinedActivities.isEmpty {
+                    Section("活动列表") {
                         if activityLoading { Text("正在读取已有活动…").foregroundStyle(.secondary) }
                         if !activityError.isEmpty { Text(activityError).foregroundStyle(.red) }
-                        if activities.isEmpty && !activityLoading && activityError.isEmpty { Text("还没有活动").foregroundStyle(.secondary) }
+                        if allActivities.isEmpty && !activityLoading && activityError.isEmpty { Text("还没有活动").foregroundStyle(.secondary) }
                         else {
-                            ForEach(activities) { item in
-                                Button {
-                                    activityId = item.id
-                                    showingActivity = true
-                                } label: {
+                            ForEach(allActivities) { item in
+                                HStack {
+                                    Button {
+                                        activityId = item.id
+                                        showingActivity = true
+                                    } label: {
                                     HStack {
                                         VStack(alignment: .leading, spacing: 4) {
                                             Text(item.text("title")).font(.body.weight(.medium))
+                                            Text(activityDate(item)).font(.caption).foregroundStyle(.secondary)
                                             if !item.text("description").isEmpty {
                                                 Text(item.text("description")).font(.caption).foregroundStyle(.secondary).lineLimit(2)
                                             }
                                         }
                                         Spacer()
-                                        Image(systemName: "chevron.right").font(.caption).foregroundStyle(.secondary)
                                     }
-                                }.buttonStyle(.plain)
-                                if item.flag("isBookmarked") {
-                                    Button("取消收藏", role: .destructive) { run { try await removeBookmark(item) } }.disabled(busy)
+                                    }.buttonStyle(.plain)
+                                    Menu {
+                                        Button("活动管理", systemImage: "gearshape") {
+                                            activityId = item.id
+                                            editedActivityName = item.text("title")
+                                            editedActivityDescription = item.text("description")
+                                            editedActivityDate = activityDateValue(item)
+                                            showingActivityManagement = true
+                                        }
+                                        if item.flag("isBookmarked") {
+                                            Button("取消收藏", systemImage: "bookmark.slash", role: .destructive) { run { try await removeBookmark(item) } }
+                                        } else if selectedSpace?.text("role") == "owner" && item.text("sourceTenantId") != spaceId && !activities.contains(where: { $0.id == item.id }) {
+                                            Button("收藏到当前空间", systemImage: "bookmark") { run { try await addBookmark(item) } }
+                                        }
+                                    } label: { Image(systemName: "ellipsis.circle").accessibilityLabel("管理\(item.text("title"))") }
+                                    .disabled(busy)
                                 }
                             }
                         }
-                        HStack {
-                            TextField("例如：周末野餐", text: $activityName)
-                            Button("添加") { run { try await createActivity() } }
-                                .disabled(busy || activityName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-                        }
-                    }
-                }
-                if !joinedActivities.isEmpty {
-                    Section("已参加的活动") {
-                        ForEach(joinedActivities) { item in
+                        if selectedSpace?.text("role") == "owner" {
                             HStack {
-                                Button(item.text("title")) { activityId = item.id; showingActivity = true }
-                                    .buttonStyle(.plain)
-                                Spacer()
-                                if selectedSpace?.text("role") == "owner" && item.text("sourceTenantId") != spaceId && !activities.contains(where: { $0.id == item.id }) {
-                                    Button("收藏") { run { try await addBookmark(item) } }.disabled(busy)
-                                }
+                                TextField("例如：周末野餐", text: $activityName)
+                                Button("添加") { run { try await createActivity() } }
+                                    .disabled(busy || activityName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                             }
                         }
                     }
@@ -192,6 +209,7 @@ struct DearSocialView: View {
             .task { await refresh() }
             .onChange(of: spaceId) { _, _ in activityId = ""; showingActivity = false; showingActivityManagement = false; activities = []; photos = []; activityError = ""; activityLoading = true; run { try await loadActivities() } }
             .navigationDestination(isPresented: $showingActivity) { activityDetail }
+            .sheet(isPresented: $showingActivityManagement) { activityManagement }
             .onChange(of: activityId) { _, _ in photos = []; moments = []; checkIns = []; activityMembers = []; run { try await loadDetails() } }
             .alert("新增空间", isPresented: $showingSpaceCreate) {
                 TextField("空间名称", text: $spaceName)
@@ -224,10 +242,6 @@ struct DearSocialView: View {
                             .font(.caption).foregroundStyle(.secondary)
                     }
                     Spacer()
-                    Button { showingActivityManagement = true } label: {
-                        Label("管理", systemImage: "ellipsis.circle")
-                            .font(.subheadline)
-                    }.disabled(selectedActivity == nil)
                 }
             }
                 if let selectedActivity {
@@ -273,25 +287,34 @@ struct DearSocialView: View {
                         Button("刷新日常") { run { try await loadMoments() } }.disabled(busy)
                     }
                     Section("活动打卡") {
-                        Button { checkInNote = ""; checkInRequestID = UUID(); showingCheckIn = true; checkInLocator.locate() } label: {
-                            Label("在当前位置打卡", systemImage: "location.circle")
-                        }.disabled(busy)
+                        Button {
+                            checkInNote = ""; checkInRequestID = UUID(); pendingCheckIn = true
+                            checkInLocator.locate()
+                        } label: {
+                            Label(pendingCheckIn ? "正在定位并打卡…" : "在当前位置打卡", systemImage: "location.circle")
+                        }.disabled(busy || pendingCheckIn)
                         ForEach(checkIns) { checkIn in
-                            VStack(alignment: .leading, spacing: 4) {
+                            Button {
+                                pendingCheckIn = false
+                                selectedCheckIn = checkIn
+                                checkInNote = checkIn.text("note")
+                                checkInLocator.clear()
+                                showingCheckIn = true
+                            } label: { VStack(alignment: .leading, spacing: 4) {
                                 HStack {
                                     Text(checkIn.text("authorName")).font(.subheadline.bold())
                                     Spacer()
                                     Text(checkIn.dateText("createdAt")).font(.caption).foregroundStyle(.secondary)
                                 }
-                                Text(checkIn.text("note")).textSelection(.enabled)
-                                Text("海拔 \(String(format: "%.1f", checkIn.data["altitudeMeters"] as? Double ?? 0)) 米 · \(checkIn.text("address"))")
+                                Text(checkIn.text("note"))
+                                Text("海拔 \(String(format: "%.1f", checkIn.number("altitudeMeters"))) 米 · \(checkIn.text("address"))")
                                     .font(.caption).foregroundStyle(.secondary)
                                 if let latitude = checkIn.data["latitude"] as? Double,
                                    let longitude = checkIn.data["longitude"] as? Double {
                                     Text(String(format: "%.6f, %.6f", latitude, longitude))
-                                        .font(.caption2).foregroundStyle(.secondary).textSelection(.enabled)
+                                        .font(.caption2).foregroundStyle(.secondary)
                                 }
-                            }.padding(.vertical, 4)
+                            }}.buttonStyle(.plain).padding(.vertical, 4).disabled(busy || pendingCheckIn)
                         }
                         if checkIns.isEmpty { Text("还没有打卡记录。") .foregroundStyle(.secondary) }
                     }
@@ -317,8 +340,18 @@ struct DearSocialView: View {
         .listStyle(.insetGrouped)
         .readablePage()
         .navigationTitle(selectedActivity?.text("title") ?? "活动详情")
-        .sheet(isPresented: $showingActivityManagement) { activityManagement }
         .sheet(isPresented: $showingCheckIn) { checkInSheet }
+        .onChange(of: checkInLocator.location?.timestamp) { _, value in
+            guard pendingCheckIn, value != nil else { return }
+            pendingCheckIn = false
+            run { try await createCheckIn() }
+        }
+        .onChange(of: checkInLocator.error) { _, value in
+            guard pendingCheckIn, !value.isEmpty else { return }
+            pendingCheckIn = false
+            error = value
+        }
+        .onDisappear { pendingCheckIn = false }
         .onChange(of: activityId) { _, _ in showingActivityManagement = false; inviteLink = ""; inviteUsername = ""; momentDraft = ""; momentRequestID = UUID() }
         .onChange(of: selectedPhoto) { _, selected in
             guard let selected else { return }
@@ -347,28 +380,33 @@ struct DearSocialView: View {
                 Section("当前位置") {
                     if checkInLocator.fetching { ProgressView("正在获取位置和地址…") }
                     if !checkInLocator.error.isEmpty { Text(checkInLocator.error).foregroundStyle(.red) }
-                    if let location = checkInLocator.location, !checkInLocator.fetching {
-                        Text(checkInLocator.address)
-                        Text(String(format: "纬度 %.6f，经度 %.6f", location.coordinate.latitude, location.coordinate.longitude))
-                        Text(String(format: "海拔 %.1f 米", location.altitude))
+                    if let selectedCheckIn {
+                        Text(checkInLocator.location == nil ? selectedCheckIn.text("address") : checkInLocator.address)
+                        Text(String(format: "纬度 %.6f，经度 %.6f", checkInLocator.location?.coordinate.latitude ?? selectedCheckIn.number("latitude"), checkInLocator.location?.coordinate.longitude ?? selectedCheckIn.number("longitude")))
+                        Text(String(format: "海拔 %.1f 米", checkInLocator.location?.altitude ?? selectedCheckIn.number("altitudeMeters")))
                     }
-                    Button("重新定位") { checkInLocator.locate() }.disabled(checkInLocator.fetching)
+                    if selectedCheckIn?.flag("canEdit") == true {
+                        Button("重新定位") { checkInLocator.locate() }.disabled(checkInLocator.fetching)
+                    }
                 }
                 Section("备注") {
                     TextField("默认填写当前位置地址", text: $checkInNote, axis: .vertical)
                         .lineLimit(2...5)
+                        .disabled(selectedCheckIn?.flag("canEdit") != true)
                     Text("留空时使用上方地址作为备注。") .font(.caption).foregroundStyle(.secondary)
                 }
             }
-            .navigationTitle("活动打卡")
+            .navigationTitle(selectedCheckIn?.flag("canEdit") == true ? "修改打卡" : "打卡详情")
             .onChange(of: checkInLocator.address) { _, address in
                 if checkInNote.isEmpty { checkInNote = address }
             }
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) { Button("取消") { showingCheckIn = false } }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("保存") { run { try await createCheckIn() } }
-                        .disabled(checkInLocator.location == nil || checkInLocator.fetching || busy || checkInNote.count > 1000)
+                ToolbarItem(placement: .cancellationAction) { Button("关闭") { showingCheckIn = false } }
+                if selectedCheckIn?.flag("canEdit") == true {
+                    ToolbarItem(placement: .confirmationAction) {
+                        Button("保存") { run { try await updateCheckIn() } }
+                            .disabled(checkInLocator.fetching || busy || checkInNote.count > 1000)
+                    }
                 }
             }
         }
@@ -380,28 +418,32 @@ struct DearSocialView: View {
                 if !error.isEmpty { Section { Text(error).foregroundStyle(.red) } }
                 if !notice.isEmpty { Section { Text(notice).foregroundStyle(.teal) } }
                 if selectedActivity?.flag("canEdit") == true {
-                    Section("活动设置") {
-                        Button("修改活动名称", systemImage: "pencil") {
-                            editedActivityName = selectedActivity?.text("title") ?? ""
-                            showingActivityRename = true
-                        }.disabled(busy)
+                    Section("基本信息") {
+                        TextField("活动名称", text: $editedActivityName)
+                        TextField("活动介绍", text: $editedActivityDescription, axis: .vertical)
+                            .lineLimit(2...5)
+                        DatePicker("活动日期", selection: $editedActivityDate, displayedComponents: .date)
+                        Button("保存基本信息") { run { try await updateActivity() } }
+                            .disabled(busy || editedActivityName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || editedActivityDescription.count > 2000)
                         Button("删除活动", systemImage: "trash", role: .destructive) {
                             showingActivityDelete = true
                         }.disabled(busy)
                     }
                 }
-                Section("邀请参加") {
-                    HStack {
-                        TextField("用户中心用户名", text: $inviteUsername).textInputAutocapitalization(.never)
-                        Button("邀请") { run { try await inviteByName() } }
-                            .disabled(busy || inviteUsername.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                if selectedActivity?.flag("canEdit") == true {
+                    Section("邀请参加") {
+                        HStack {
+                            TextField("用户中心用户名", text: $inviteUsername).textInputAutocapitalization(.never)
+                            Button("邀请") { run { try await inviteByName() } }
+                                .disabled(busy || inviteUsername.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                        }
+                        Button("生成七天有效的邀请链接") { run { try await createInviteLink() } }.disabled(busy)
+                        if let url = URL(string: inviteLink), url.scheme == "https" {
+                            ShareLink(item: url) { Label("分享邀请链接", systemImage: "square.and.arrow.up") }
+                        }
+                        Text("对方确认加入后才能查看这场活动的分享。")
+                            .font(.caption).foregroundStyle(.secondary)
                     }
-                    Button("生成七天有效的邀请链接") { run { try await createInviteLink() } }.disabled(busy)
-                    if let url = URL(string: inviteLink), url.scheme == "https" {
-                        ShareLink(item: url) { Label("分享邀请链接", systemImage: "square.and.arrow.up") }
-                    }
-                    Text("对方确认加入后才能查看这场活动的分享。")
-                        .font(.caption).foregroundStyle(.secondary)
                 }
                 Section("发布日常") {
                     TextEditor(text: $momentDraft).frame(minHeight: 90)
@@ -430,11 +472,6 @@ struct DearSocialView: View {
             }
             .navigationTitle("管理 · \(selectedActivity?.text("title") ?? "活动")")
             .toolbar { ToolbarItem(placement: .topBarTrailing) { Button("完成") { showingActivityManagement = false } } }
-            .alert("修改活动名称", isPresented: $showingActivityRename) {
-                TextField("活动名称", text: $editedActivityName)
-                Button("取消", role: .cancel) { }
-                Button("保存") { run { try await renameActivity() } }
-            } message: { Text("新名称会同步给活动成员。") }
             .confirmationDialog("删除活动「\(selectedActivity?.text("title") ?? "")」？", isPresented: $showingActivityDelete, titleVisibility: .visible) {
                 Button("确认删除活动", role: .destructive) { run { try await deleteActivity() } }
                 Button("取消", role: .cancel) { }
@@ -515,7 +552,21 @@ struct DearSocialView: View {
             "altitudeMeters": location.altitude, "address": checkInLocator.address,
             "note": note.isEmpty ? checkInLocator.address : note
         ])
-        showingCheckIn = false; checkInRequestID = UUID(); try await loadCheckIns(); notice = "打卡已保存。"
+        checkInRequestID = UUID(); try await loadCheckIns(); notice = "打卡已保存。"
+    }
+    private func updateCheckIn() async throws {
+        guard let selectedCheckIn, selectedCheckIn.flag("canEdit") else { throw APIError.message("只能修改自己的打卡。") }
+        let note = checkInNote.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard note.count <= 1000 else { throw APIError.message("备注不能超过 1000 字。") }
+        let location = checkInLocator.location
+        let address = location == nil ? selectedCheckIn.text("address") : checkInLocator.address
+        _ = try await store.call(base + "tenants/\(activityTenantId)/activities/\(activityId)/checkins/\(selectedCheckIn.id)", method: "PATCH", body: [
+            "latitude": location?.coordinate.latitude ?? selectedCheckIn.number("latitude"),
+            "longitude": location?.coordinate.longitude ?? selectedCheckIn.number("longitude"),
+            "altitudeMeters": location?.altitude ?? selectedCheckIn.number("altitudeMeters"),
+            "address": address, "note": note.isEmpty ? address : note
+        ])
+        showingCheckIn = false; self.selectedCheckIn = nil; try await loadCheckIns(); notice = "打卡已更新。"
     }
     private func loadMembers() async throws {
         guard !activityTenantId.isEmpty, !activityId.isEmpty else { return }
@@ -575,16 +626,23 @@ struct DearSocialView: View {
         try await load(); notice = "空间已删除。"
     }
     private func createActivity() async throws {
-        let value = try await store.call(base + "tenants/\(spaceId)/activities", method: "POST", body: ["title": activityName.trimmingCharacters(in: .whitespacesAndNewlines), "description": ""])
+        let value = try await store.call(base + "tenants/\(spaceId)/activities", method: "POST", body: [
+            "title": activityName.trimmingCharacters(in: .whitespacesAndNewlines), "description": "",
+            "startsAt": ISO8601DateFormatter().string(from: Date())
+        ])
         let item = DearRecord(data: value as? [String: Any] ?? [:])
         activityName = ""; try await loadActivities(); activityId = item.id; showingActivity = true; notice = "活动已创建。"
     }
-    private func renameActivity() async throws {
-        guard selectedActivity?.flag("canEdit") == true else { throw APIError.message("只有活动组织者可以修改名称。") }
+    private func updateActivity() async throws {
+        guard selectedActivity?.flag("canEdit") == true else { throw APIError.message("只有活动组织者可以修改基本信息。") }
         let name = editedActivityName.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !name.isEmpty && name.count <= 200 else { throw APIError.message("请填写不超过 200 字的活动名称。") }
-        _ = try await store.call(base + "tenants/\(activityTenantId)/activities/\(activityId)", method: "PATCH", body: ["title": name])
-        try await load(); notice = "活动名称已更新。"
+        guard editedActivityDescription.count <= 2000 else { throw APIError.message("活动介绍不能超过 2000 字。") }
+        _ = try await store.call(base + "tenants/\(activityTenantId)/activities/\(activityId)", method: "PATCH", body: [
+            "title": name, "description": editedActivityDescription,
+            "startsAt": ISO8601DateFormatter().string(from: editedActivityDate)
+        ])
+        try await load(); notice = "活动基本信息已更新。"
     }
     private func deleteActivity() async throws {
         guard selectedActivity?.flag("canEdit") == true else { throw APIError.message("只有活动组织者可以删除活动。") }
@@ -625,6 +683,11 @@ private final class DearCheckInLocator: NSObject, ObservableObject, CLLocationMa
         manager.desiredAccuracy = kCLLocationAccuracyBest
     }
 
+    func clear() {
+        geocoder.cancelGeocode()
+        location = nil; address = ""; error = ""; fetching = false
+    }
+
     func locate() {
         location = nil; address = ""; error = ""; fetching = true
         switch manager.authorizationStatus {
@@ -650,6 +713,7 @@ private final class DearCheckInLocator: NSObject, ObservableObject, CLLocationMa
         }
         geocoder.reverseGeocodeLocation(current) { [weak self] placemarks, _ in
             guard let self else { return }
+            guard self.fetching else { return }
             let fallback = String(format: "%.6f, %.6f", current.coordinate.latitude, current.coordinate.longitude)
             self.address = placemarks?.first?.name ?? fallback
             self.location = current
