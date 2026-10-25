@@ -9,7 +9,7 @@
     <key>teamID</key><string>REPLACE_WITH_AUTHORIZED_TEAM_ID</string>
     <key>provisioningProfiles</key>
     <dict>
-        <key>net.impx.happylife.parent</key><string>Linko-Family App Store 20260916</string>
+        <key>net.impx.happylife.parent</key><string>Linko-Family App Store Push 20261018</string>
     </dict>
     <key>manageAppVersionAndBuildNumber</key><false/>
     <key>uploadSymbols</key><true/>

@@ -465,7 +465,6 @@ struct AccountView: View {
             List {
                 Section("用户中心") {
                     Label(store.profile?.text("username") ?? "家长", systemImage: "person.crop.circle.fill")
-                    LabeledContent("身份", value: "家长")
                     Link(destination: URL(string: "https://auth.ai.xmkurt.com/personal/info")!) {
                         Label("账号资料", systemImage: "person.crop.circle")
                     }
