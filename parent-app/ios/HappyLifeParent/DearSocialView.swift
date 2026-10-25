@@ -844,8 +844,12 @@ private struct DearPhotoDetailView: View {
                     Button {
                         Task { await fetchOriginal() }
                     } label: {
-                        Label(fetchingOriginal ? "正在实时接收：\(Int(transferProgress * 100))%" : "获取原文件", systemImage: "arrow.down.circle")
+                        Label(fetchingOriginal ? "正在实时接收：\(Int(transferProgress * 100))%" : originalError == nil ? "获取原文件" : "继续获取原文件", systemImage: "arrow.down.circle")
                     }.disabled(fetchingOriginal)
+                }
+                if fetchingOriginal || transferProgress > 0 && transferProgress < 1 {
+                    ProgressView(value: transferProgress)
+                        .accessibilityLabel("原文件接收进度")
                 }
                 if let originalError { Text(originalError).font(.footnote).foregroundStyle(.red) }
                 if canDelete {

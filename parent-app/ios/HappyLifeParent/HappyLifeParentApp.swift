@@ -84,9 +84,14 @@ struct FamilyRoot: View {
         }
         .safeAreaInset(edge: .top) {
             if let notice = store.photoRequestNotice {
-                Label(notice, systemImage: "photo.badge.arrow.down")
-                    .font(.footnote.weight(.semibold)).frame(maxWidth: .infinity)
-                    .padding(10).background(.orange.opacity(0.18))
+                VStack(spacing: 5) {
+                    Label(notice, systemImage: "photo.badge.arrow.down")
+                        .font(.footnote.weight(.semibold)).frame(maxWidth: .infinity)
+                    if let progress = store.photoTransferProgress {
+                        ProgressView(value: progress).tint(.orange)
+                            .accessibilityLabel("原文件发送进度")
+                    }
+                }.padding(10).background(.orange.opacity(0.18))
             }
         }
         .task(id: identity.isAuthenticated) {

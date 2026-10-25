@@ -235,13 +235,16 @@ import AVFoundation
               sha.count == 64, sha.allSatisfy({ $0.isHexDigit }) else {
             throw APIError.message("原图请求回执无效。")
         }
+        let subject = try await currentSubject()
+        let subjectKey = SHA256.hash(data: Data(subject.utf8)).map { String(format: "%02x", $0) }.joined()
         let root = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)[0]
             .appendingPathComponent("DearReceivedPhotos", isDirectory: true)
+            .appendingPathComponent(subjectKey, isDirectory: true)
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
         for old in (try? FileManager.default.contentsOfDirectory(at: root, includingPropertiesForKeys: [.contentModificationDateKey])) ?? [] {
-            guard UUID(uuidString: old.deletingPathExtension().lastPathComponent) != nil,
+            guard UUID(uuidString: String(old.lastPathComponent.prefix(36))) != nil,
                   let modified = try? old.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate,
-                  modified < Date().addingTimeInterval(-24 * 60 * 60) else { continue }
+                  modified < Date().addingTimeInterval(-7 * 24 * 60 * 60) else { continue }
             try? FileManager.default.removeItem(at: old)
         }
         let suffix: String
@@ -253,21 +256,61 @@ import AVFoundation
         case "video/quicktime": suffix = ".mov"
         default: suffix = ".jpg"
         }
-        let url = root.appendingPathComponent(UUID().uuidString + suffix)
-        var completed = false
-        do {
-            guard FileManager.default.createFile(atPath: url.path, contents: nil,
-                attributes: [.protectionKey: FileProtectionType.completeUntilFirstUserAuthentication]) else {
-                throw APIError.message("无法保存接收的原文件。")
+        let key = "\(photoID.lowercased())-\(sha.lowercased())"
+        let partialURL = root.appendingPathComponent(key + ".part")
+        let finalURL = root.appendingPathComponent(key + suffix)
+        if FileManager.default.fileExists(atPath: finalURL.path) {
+            if (try? finalURL.resourceValues(forKeys: [.fileSizeKey]).fileSize) == length,
+               (try? await hashFile(finalURL))?.caseInsensitiveCompare(sha) == .orderedSame {
+                _ = try? await store.call("/api/dear/social/photo-requests/\(id)/cancel", method: "POST", body: [:])
+                progress?(1)
+                return finalURL
             }
-            let output = try FileHandle(forWritingTo: url)
+            try? FileManager.default.removeItem(at: finalURL)
+        }
+        if FileManager.default.fileExists(atPath: partialURL.path) {
+            let size = try partialURL.resourceValues(forKeys: [.fileSizeKey]).fileSize ?? 0
+            if size >= length {
+                if size == length, (try? await hashFile(partialURL))?.caseInsensitiveCompare(sha) == .orderedSame {
+                    try FileManager.default.moveItem(at: partialURL, to: finalURL)
+                    _ = try? await store.call("/api/dear/social/photo-requests/\(id)/cancel", method: "POST", body: [:])
+                    progress?(1)
+                    return finalURL
+                }
+                try FileManager.default.removeItem(at: partialURL)
+            }
+        }
+        if !FileManager.default.fileExists(atPath: partialURL.path) &&
+            !FileManager.default.createFile(atPath: partialURL.path, contents: nil,
+                    attributes: [.protectionKey: FileProtectionType.completeUntilFirstUserAuthentication]) {
+            throw APIError.message("无法保存接收的原文件。")
+        }
+        let offset = try partialURL.resourceValues(forKeys: [.fileSizeKey]).fileSize ?? 0
+        var digest = SHA256()
+        if offset > 0 {
+            let existing = try FileHandle(forReadingFrom: partialURL)
+            defer { try? existing.close() }
+            while let chunk = try existing.read(upToCount: 1024 * 1024), !chunk.isEmpty {
+                digest.update(data: chunk)
+                await Task.yield()
+            }
+        }
+        var prefixDigest = digest
+        let prefix = offset == 0 ? "" : prefixDigest.finalize().map { String(format: "%02x", $0) }.joined()
+        progress?(Double(offset) / Double(length))
+        var completed = false
+        var badPartial = false
+        do {
+            let output = try FileHandle(forWritingTo: partialURL)
             defer { try? output.close() }
-            var digest = SHA256()
-            var received = 0
+            try output.seek(toOffset: UInt64(offset))
+            var received = offset
             var components = URLComponents(url: base, resolvingAgainstBaseURL: false)!
             components.scheme = "wss"
             components.path = "/api/dear/social/photo-requests/\(id)/transfer"
-            components.queryItems = [URLQueryItem(name: "role", value: "receiver")]
+            components.queryItems = [URLQueryItem(name: "role", value: "receiver"),
+                                     URLQueryItem(name: "offset", value: String(offset))]
+            if offset > 0 { components.queryItems?.append(URLQueryItem(name: "prefixSha256", value: prefix)) }
             var socketRequest = URLRequest(url: components.url!)
             socketRequest.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
             socketRequest.timeoutInterval = contentType.hasPrefix("video/") ? 1805 : 305
@@ -285,23 +328,35 @@ import AVFoundation
                           let kind = marker["kind"] as? String else { throw APIError.message("原图传输消息无效。") }
                     if kind == "start" && !started {
                         guard (marker["length"] as? NSNumber)?.intValue == length,
+                              (marker["offset"] as? NSNumber)?.intValue == offset,
                               (marker["sha256"] as? String)?.caseInsensitiveCompare(sha) == .orderedSame else {
-                            throw APIError.message("原图传输信息不匹配。")
+                            badPartial = true
+                            throw APIError.message("原图续传信息不匹配。")
                         }
                         started = true
                     } else if kind == "end" && started {
                         try output.synchronize()
                         guard received == length,
                               digest.finalize().map({ String(format: "%02x", $0) }).joined().caseInsensitiveCompare(sha) == .orderedSame,
-                              (contentType.hasPrefix("video/") || UIImage(contentsOfFile: url.path) != nil) else {
+                              (contentType.hasPrefix("video/") || UIImage(contentsOfFile: partialURL.path) != nil) else {
+                            badPartial = true
                             throw APIError.message("原文件完整性校验失败。")
                         }
                         _ = try await store.call("/api/dear/social/photo-requests/\(id)/complete", method: "POST", body: [:])
+                        try output.close()
+                        try FileManager.default.moveItem(at: partialURL, to: finalURL)
+                        progress?(1)
                         completed = true
-                        return url
+                        return finalURL
+                    } else if kind == "reset" {
+                        badPartial = true
+                        throw APIError.message("本地部分文件与分享源不一致，再次获取将从头开始。")
                     } else { throw APIError.message("原图传输顺序无效。") }
                 case .data(let chunk):
-                    guard started, received + chunk.count <= length else { throw APIError.message("原图大小不匹配。") }
+                    guard started, received + chunk.count <= length else {
+                        badPartial = true
+                        throw APIError.message("原图大小不匹配。")
+                    }
                     try output.write(contentsOf: chunk)
                     digest.update(data: chunk)
                     received += chunk.count
@@ -312,7 +367,7 @@ import AVFoundation
                 }
             }
         } catch {
-            try? FileManager.default.removeItem(at: url)
+            if badPartial { try? FileManager.default.removeItem(at: partialURL) }
             if !completed { _ = try? await store.call("/api/dear/social/photo-requests/\(id)/cancel", method: "POST", body: [:]) }
             throw error
         }
@@ -353,13 +408,16 @@ import AVFoundation
         try await Task.detached(priority: .utility) { try Self.fileSHA256(url) }.value
     }
 
-    private nonisolated static func fileSHA256(_ url: URL) throws -> String {
+    private nonisolated static func fileSHA256(_ url: URL, limit: Int? = nil) throws -> String {
         let handle = try FileHandle(forReadingFrom: url)
         defer { try? handle.close() }
         var digest = SHA256()
-        while let chunk = try handle.read(upToCount: 1024 * 1024), !chunk.isEmpty {
+        var remaining = limit
+        while remaining != 0, let chunk = try handle.read(upToCount: min(remaining ?? 1024 * 1024, 1024 * 1024)), !chunk.isEmpty {
             digest.update(data: chunk)
+            if remaining != nil { remaining! -= chunk.count }
         }
+        if remaining != nil && remaining != 0 { throw APIError.message("续传原文件已发生变化。") }
         return digest.finalize().map { String(format: "%02x", $0) }.joined()
     }
 
@@ -404,9 +462,10 @@ import AVFoundation
               let index = try? readIndex(at: root), let deviceID = index.deviceID else { return }
         do {
             let rows = try await store.call("/api/dear/social/photo-devices/\(deviceID)/requests") as? [[String: Any]] ?? []
-            if rows.isEmpty { store.photoRequestNotice = nil; return }
+            if rows.isEmpty { store.photoRequestNotice = nil; store.photoTransferProgress = nil; return }
             store.photoRequestNotice = "有活动成员正在请求原图，请保持 App 打开直到传输完成。"
-            defer { store.photoRequestNotice = nil }
+            store.photoTransferProgress = nil
+            defer { store.photoRequestNotice = nil; store.photoTransferProgress = nil }
             for request in rows {
                 guard !Task.isCancelled else { return }
                 let requestID = request["id"] as? String ?? ""
@@ -438,13 +497,32 @@ import AVFoundation
         var components = URLComponents(url: base, resolvingAgainstBaseURL: false)!
         components.scheme = "wss"
         components.path = "/api/dear/social/photo-requests/\(requestID)/transfer"
-        components.queryItems = [URLQueryItem(name: "role", value: "source")]
+        components.queryItems = [URLQueryItem(name: "role", value: "source"), URLQueryItem(name: "protocol", value: "2")]
         var request = URLRequest(url: components.url!)
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         let task = session.webSocketTask(with: request)
         task.resume()
         defer { task.cancel(with: .normalClosure, reason: nil) }
-        var sent = 0
+        guard case .string(let controlText) = try await task.receive(),
+              let controlData = controlText.data(using: .utf8),
+              let control = try JSONSerialization.jsonObject(with: controlData) as? [String: Any],
+              control["kind"] as? String == "resume",
+              let offset = (control["offset"] as? NSNumber)?.intValue,
+              offset >= 0, offset < length,
+              let prefix = control["prefixSha256"] as? String else {
+            throw APIError.message("续传请求无效。")
+        }
+        let localPrefix = offset == 0 ? "" : try await Task.detached(priority: .utility) {
+            try Self.fileSHA256(url, limit: offset)
+        }.value
+        guard localPrefix.caseInsensitiveCompare(prefix) == .orderedSame else {
+            try? await task.send(.string("{\"kind\":\"reset\"}"))
+            throw APIError.message("已接收部分与本机原文件不匹配，请重新获取。")
+        }
+        try input.seek(toOffset: UInt64(offset))
+        try await task.send(.string("{\"kind\":\"ready\"}"))
+        var sent = offset
+        store.photoTransferProgress = Double(sent) / Double(length)
         var reportedPercent = -1
         while let chunk = try input.read(upToCount: 16 * 1024), !chunk.isEmpty {
             try Task.checkCancellation()
@@ -454,6 +532,7 @@ import AVFoundation
             let percent = Int(Double(sent) / Double(length) * 100)
             if percent / 5 != reportedPercent / 5 {
                 store.photoRequestNotice = "正在实时传输原文件：\(percent)%；请保持 App 打开。"
+                store.photoTransferProgress = Double(sent) / Double(length)
                 reportedPercent = percent
             }
         }
