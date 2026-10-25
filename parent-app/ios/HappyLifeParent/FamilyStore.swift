@@ -172,13 +172,14 @@ import WatchConnectivity
         groupID = id; revision = UUID(); await load()
     }
     func logout() {
+        DearShareInbox.clearCatalog()
         photoSource.logout(token: identity.accessToken)
         photoRequestNotice = nil
         photoTransferProgress = nil
         revision = UUID(); identity.logout(); profile = nil; groups = []; children = []; rules = []; requests = []; transactions = []; growth = []; members = []; groupID = 0; loading = false
     }
 
-    func resumePhotoSharing() { if identity.isAuthenticated { photoSource.start() } }
+    func resumePhotoSharing() { if identity.isAuthenticated { photoSource.start(); Task { await photoSource.importSharedItems() } } }
     func suspendPhotoSharing() { photoSource.stop() }
 }
 

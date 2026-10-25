@@ -27,6 +27,7 @@ import UniformTypeIdentifiers
     private var subjectCache: String?
     private var enabledForSession = false
     private var publishing = false
+    private var importingSharedItems = false
     private var checkedLocationIDs = Set<String>()
     private var pushToken: String?
     private let session = URLSession(configuration: .ephemeral)
@@ -53,6 +54,73 @@ import UniformTypeIdentifiers
               let deviceID = (try? readIndex(at: root))?.deviceID else { return }
         _ = try? await store.call("/api/dear/social/photo-devices", method: "POST",
                                   body: ["id": deviceID, "pushToken": token])
+    }
+
+    func cacheShareActivities(_ rows: [[String: Any]]) async {
+        guard let subject = try? await currentSubject() else { return }
+        let account = SHA256.hash(data: Data(subject.utf8)).map { String(format: "%02x", $0) }.joined()
+        let formatter = ISO8601DateFormatter()
+        let activities = rows.compactMap { row -> DearShareInbox.Activity? in
+            guard let id = row["id"] as? String, UUID(uuidString: id) != nil,
+                  let tenant = row["sourceTenantId"] as? String, UUID(uuidString: tenant) != nil,
+                  let title = row["title"] as? String else { return nil }
+            let raw = (row["startsAt"] as? String).flatMap { $0.isEmpty ? nil : $0 }
+                ?? (row["createdAt"] as? String) ?? ""
+            formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+            let date = formatter.date(from: raw) ?? ISO8601DateFormatter().date(from: raw) ?? .distantPast
+            return .init(id: id, tenantID: tenant, title: title, date: date)
+        }.sorted { $0.date > $1.date }
+        try? DearShareInbox.saveCatalog(.init(account: account, activities: activities))
+    }
+
+    func importSharedItems() async {
+        guard !importingSharedItems, let store, store.identity.isAuthenticated,
+              let subject = try? await currentSubject(),
+              let root = try? DearShareInbox.pendingRoot() else { return }
+        importingSharedItems = true
+        defer { importingSharedItems = false }
+        let account = SHA256.hash(data: Data(subject.utf8)).map { String(format: "%02x", $0) }.joined()
+        guard let rows = try? await store.call("/api/dear/social/activities/joined") as? [[String: Any]] else { return }
+        let allowed = Set(rows.compactMap { row -> String? in
+            guard let tenant = row["sourceTenantId"] as? String, let activity = row["id"] as? String else { return nil }
+            return tenant + "/" + activity
+        })
+        guard let directories = try? FileManager.default.contentsOfDirectory(at: root, includingPropertiesForKeys: nil) else { return }
+        var imported = 0
+        for directory in directories where directory.hasDirectoryPath && UUID(uuidString: directory.lastPathComponent) != nil {
+            let manifest = directory.appendingPathComponent("manifest.json")
+            guard let data = try? Data(contentsOf: manifest),
+                  var batch = try? JSONDecoder().decode(DearShareInbox.Batch.self, from: data),
+                  batch.account == account,
+                  allowed.contains(batch.tenantID + "/" + batch.activityID) else { continue }
+            for item in batch.items {
+                guard item.fileName == URL(fileURLWithPath: item.fileName).lastPathComponent,
+                      !item.fileName.contains("..") else { break }
+                let url = directory.appendingPathComponent(item.fileName)
+                do {
+                    if item.mediaType == "video" {
+                        let copy = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + "." + url.pathExtension)
+                        try FileManager.default.copyItem(at: url, to: copy)
+                        defer { try? FileManager.default.removeItem(at: copy) }
+                        try await publishVideo(at: copy, spaceID: batch.tenantID, activityID: batch.activityID)
+                    } else if item.mediaType == "image" {
+                        let imageData = try Data(contentsOf: url)
+                        try await publish(imageData, spaceID: batch.tenantID, activityID: batch.activityID,
+                                          name: item.displayName,
+                                          locationName: DearPhotoLocation.label(in: imageData) ?? "")
+                    } else { break }
+                    batch.items.removeFirst()
+                    try DearShareInbox.save(batch, at: directory)
+                    try? FileManager.default.removeItem(at: url)
+                    imported += 1
+                } catch {
+                    store.error = "相册分享尚未完成：\(error.localizedDescription)。打开 App 后会重试。"
+                    break
+                }
+            }
+            if batch.items.isEmpty { try? FileManager.default.removeItem(at: directory) }
+        }
+        if imported > 0 { store.photoRequestNotice = "已从相册共享 \(imported) 项到活动；请保持 App 打开，以便他人获取原文件。" }
     }
 
     private func enableNotificationsIfNeeded() async -> Bool {

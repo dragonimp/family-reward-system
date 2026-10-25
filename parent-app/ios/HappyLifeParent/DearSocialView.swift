@@ -92,6 +92,8 @@ struct DearSocialView: View {
     @State private var checkInNote = ""
     @State private var checkInRequestID = UUID()
     @State private var activityMembers: [DearRecord] = []
+    @State private var spaceMembers: [DearRecord] = []
+    @State private var showingSpaceMembers = false
     @State private var relationships: [DearRecord] = []
     @State private var invitations: [DearRecord] = []
     @State private var spaceId = ""
@@ -123,7 +125,7 @@ struct DearSocialView: View {
     private var selectedSpace: DearRecord? { spaces.first { $0.id == spaceId } }
     private var allActivities: [DearRecord] { activities + joinedActivities.filter { joined in !activities.contains { $0.id == joined.id } } }
     private var selectedActivity: DearRecord? { allActivities.first { $0.id == activityId } }
-    private var ownedSpaces: [DearRecord] { spaces.filter { $0.text("role") == "owner" } }
+    private var visibleSpaces: [DearRecord] { spaces.filter { $0.text("role") == "owner" || $0.text("role") == "member" } }
     private var activityTenantId: String { selectedActivity?.text("sourceTenantId") ?? spaceId }
     private var isActivityCreator: Bool {
         guard let creator = selectedActivity?.text("createdBySubject"), !creator.isEmpty else { return false }
@@ -143,12 +145,11 @@ struct DearSocialView: View {
     var body: some View {
         NavigationStack {
             List {
-                Section {
-                    Text("相聚时刻").font(.title2.bold())
-                    Text("个人空间可以收藏参加过的活动；照片和日常仍属于原活动。")
-                        .font(.subheadline).foregroundStyle(.secondary)
-                    if !error.isEmpty { Text(error).foregroundStyle(.red) }
-                    if !notice.isEmpty { Text(notice).foregroundStyle(.teal) }
+                if !error.isEmpty || !notice.isEmpty {
+                    Section {
+                        if !error.isEmpty { Text(error).foregroundStyle(.red) }
+                        if !notice.isEmpty { Text(notice).foregroundStyle(.teal) }
+                    }
                 }
                 if invitations.contains(where: { !$0.flag("joined") }) {
                     Section("待确认的活动邀请") {
@@ -162,10 +163,27 @@ struct DearSocialView: View {
                     }
                 }
                 Section("我的空间") {
-                    if ownedSpaces.isEmpty { Text("请用右上角“…”新增个人空间。") .foregroundStyle(.secondary) }
+                    if visibleSpaces.isEmpty { Text("请用右上角“…”新增个人空间。") .foregroundStyle(.secondary) }
                     else {
-                        Picker("当前空间", selection: $spaceId) {
-                            ForEach(ownedSpaces) { item in Text(item.text("name")).tag(item.id) }
+                        HStack {
+                            Picker("", selection: $spaceId) {
+                                ForEach(visibleSpaces) { item in Text(item.text("name")).tag(item.id) }
+                            }
+                            .labelsHidden()
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            Menu {
+                                if selectedSpace?.text("role") == "owner" {
+                                    Button("编辑基本信息", systemImage: "pencil") {
+                                        editedSpaceName = selectedSpace?.text("name") ?? ""
+                                        showingSpaceRename = true
+                                    }
+                                }
+                                Button("查看空间成员", systemImage: "person.2") { run { try await loadSpaceMembers() } }
+                                if selectedSpace?.text("role") == "owner" {
+                                    Button("删除空间", systemImage: "trash", role: .destructive) { showingSpaceDelete = true }
+                                }
+                            } label: { Image(systemName: "ellipsis.circle").accessibilityLabel("管理当前空间") }
+                            .disabled(busy)
                         }
                     }
                     Text("每个人管理自己的空间，同一活动可收藏到多个空间。")
@@ -268,6 +286,34 @@ struct DearSocialView: View {
             .onChange(of: spaceId) { _, _ in activityId = ""; showingActivity = false; showingActivityManagement = false; activities = []; photos = []; activityError = ""; activityLoading = true; run { try await loadActivities() } }
             .navigationDestination(isPresented: $showingActivity) { activityDetail }
             .sheet(isPresented: $showingActivityManagement) { activityManagement }
+            .sheet(isPresented: $showingSpaceMembers) {
+                NavigationStack {
+                    List {
+                        if selectedSpace?.text("role") == "owner" {
+                            Text("先邀请对方加入本空间的活动，再从活动访客设为空间成员。空间成员可查看本空间的所有原生活动；收藏活动仍遵循原活动权限。")
+                                .font(.footnote).foregroundStyle(.secondary)
+                        }
+                        ForEach(spaceMembers) { member in
+                            HStack {
+                                Text(member.text("displayName"))
+                                Spacer()
+                                Text(member.text("role") == "owner" ? "空间主人" : member.text("role") == "member" ? "空间成员" : "活动访客")
+                                    .foregroundStyle(.secondary)
+                                if selectedSpace?.text("role") == "owner" && member.text("role") != "owner" {
+                                    Menu {
+                                        Button(member.text("role") == "member" ? "改为活动访客" : "设为空间成员") {
+                                            run { try await setSpaceMemberRole(member,
+                                                role: member.text("role") == "member" ? "guest" : "member") }
+                                        }
+                                    } label: { Image(systemName: "ellipsis.circle") }
+                                }
+                            }
+                        }
+                    }
+                    .navigationTitle("空间成员")
+                    .toolbar { ToolbarItem(placement: .topBarTrailing) { Button("完成") { showingSpaceMembers = false } } }
+                }
+            }
             .onChange(of: activityId) { _, _ in photos = []; moments = []; checkIns = []; activityMembers = []; run { try await loadDetails() } }
             .alert("新增空间", isPresented: $showingSpaceCreate) {
                 TextField("空间名称", text: $spaceName)
@@ -659,9 +705,13 @@ struct DearSocialView: View {
         error = ""
         let loaded = try DearRecord.list(await store.call(base + "tenants"))
         joinedActivities = try DearRecord.list(await store.call(base + "activities/joined"))
+        await store.photoSource.cacheShareActivities(joinedActivities.map(\.data))
+        await store.photoSource.importSharedItems()
         spaces = loaded
         let previousSpace = spaceId
-        if !loaded.contains(where: { $0.id == spaceId && $0.text("role") == "owner" }) { spaceId = loaded.first(where: { $0.text("role") == "owner" })?.id ?? "" }
+        if !loaded.contains(where: { $0.id == spaceId && ($0.text("role") == "owner" || $0.text("role") == "member") }) {
+            spaceId = loaded.first(where: { $0.text("role") == "owner" || $0.text("role") == "member" })?.id ?? ""
+        }
         if spaceId == previousSpace && !spaceId.isEmpty { try await loadActivities() }
         do { invitations = try DearRecord.list(await store.call(base + "invites/username/pending")) }
         catch { self.error = "活动邀请暂时无法读取：\(error.localizedDescription)" }
@@ -688,6 +738,17 @@ struct DearSocialView: View {
             do { try await loadDetails() }
             catch { self.error = "活动内容暂时无法读取：\(error.localizedDescription)" }
         }
+    }
+    private func loadSpaceMembers() async throws {
+        guard !spaceId.isEmpty else { return }
+        spaceMembers = try DearRecord.list(await store.call(base + "tenants/\(spaceId)/members"))
+        showingSpaceMembers = true
+    }
+    private func setSpaceMemberRole(_ member: DearRecord, role: String) async throws {
+        guard selectedSpace?.text("role") == "owner",
+              let encoded = member.subject.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) else { return }
+        _ = try await store.call(base + "tenants/\(spaceId)/members/\(encoded)", method: "PATCH", body: ["role": role])
+        try await loadSpaceMembers()
     }
     private func loadDetails() async throws {
         try await loadPhotos(); try await loadMoments(); try await loadCheckIns(); try await loadMembers()

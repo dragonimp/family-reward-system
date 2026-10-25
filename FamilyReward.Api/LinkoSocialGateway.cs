@@ -143,6 +143,9 @@ internal static class LinkoSocialGateway
         if (s.Length == 5 && s[0] == "spaces" && Guid.TryParse(s[1], out _) && s[2] == "bookmarks"
             && Guid.TryParse(s[3], out _) && Guid.TryParse(s[4], out _)) return method == "DELETE";
         if (s.Length == 2 && s[0] == "tenants" && Guid.TryParse(s[1], out _)) return method is "PATCH" or "DELETE";
+        if (s.Length == 3 && s[0] == "tenants" && Guid.TryParse(s[1], out _) && s[2] == "members") return method == "GET";
+        if (s.Length == 4 && s[0] == "tenants" && Guid.TryParse(s[1], out _) && s[2] == "members" &&
+            s[3].Length is > 0 and <= 200 && s[3].All(c => !char.IsControl(c) && c is not ('/' or '\\' or '?' or '#'))) return method == "PATCH";
         if (s.Length == 3 && s[0] == "tenants" && Guid.TryParse(s[1], out _) && s[2] == "activities")
             return method is "GET" or "POST";
         if (s.Length >= 4 && s[0] == "tenants" && Guid.TryParse(s[1], out _) &&
