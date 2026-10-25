@@ -10,6 +10,7 @@
     <key>provisioningProfiles</key>
     <dict>
         <key>net.impx.happylife.parent</key><string>Linko-Family App Store Push 20261018</string>
+        <key>net.impx.happylife.parent.watchkitapp</key><string>Linko Family Watch App Store</string>
     </dict>
     <key>manageAppVersionAndBuildNumber</key><false/>
     <key>uploadSymbols</key><true/>
