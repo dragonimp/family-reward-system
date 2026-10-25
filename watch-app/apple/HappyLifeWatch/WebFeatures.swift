@@ -331,19 +331,25 @@ struct WatchSocialCheckInsView: View {
             if locator.fetching { ProgressView("定位中") }
             if let location = locator.location {
                 Text(locator.address).font(.footnote)
-                Text(String(format: "海拔 %.1f 米", location.altitude)).font(.footnote)
+                Label(String(format: "海拔 %.1f 米", location.altitude), systemImage: "mountain.2.fill")
+                    .font(.headline)
                 TextField("备注（默认地址）", text: $note)
                 Button("确认打卡") { Task { await create() } }
                     .disabled(loading || note.count > 1000)
             }
             Button("获取当前位置") { locator.locate() }.disabled(locator.fetching || loading)
+            if let latest = rows.first {
+                Label(String(format: "最近打卡海拔 %.1f 米", latest["altitudeMeters"] as? Double ?? 0), systemImage: "mountain.2.fill")
+                    .font(.footnote.weight(.semibold))
+            }
             ForEach(rows.indices, id: \.self) { index in
                 let row = rows[index]
                 VStack(alignment: .leading) {
                     Text(row["author"] as? String ?? "").font(.footnote)
                     Text(row["note"] as? String ?? "")
-                    Text("\(row["address"] as? String ?? "") · 海拔 \(String(format: "%.1f", row["altitudeMeters"] as? Double ?? 0)) 米")
-                        .font(.footnote).foregroundStyle(.secondary)
+                    Label(String(format: "海拔 %.1f 米", row["altitudeMeters"] as? Double ?? 0), systemImage: "mountain.2")
+                        .font(.footnote)
+                    Text(row["address"] as? String ?? "").font(.footnote).foregroundStyle(.secondary)
                 }
             }
             if rows.isEmpty && !loading && error == nil { Text("还没有打卡记录") }

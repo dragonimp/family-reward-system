@@ -318,6 +318,10 @@ struct DearSocialView: View {
                         } label: {
                             Label(pendingCheckIn ? "正在定位并打卡…" : "在当前位置打卡", systemImage: "location.circle")
                         }.disabled(busy || pendingCheckIn)
+                        if let latest = checkIns.first {
+                            Label(String(format: "最近打卡海拔 %.1f 米", latest.number("altitudeMeters")), systemImage: "mountain.2.fill")
+                                .font(.subheadline.weight(.semibold))
+                        }
                         ForEach(checkIns) { checkIn in
                             Button {
                                 pendingCheckIn = false
@@ -332,8 +336,9 @@ struct DearSocialView: View {
                                     Text(checkIn.dateText("createdAt")).font(.caption).foregroundStyle(.secondary)
                                 }
                                 Text(checkIn.text("note"))
-                                Text("海拔 \(String(format: "%.1f", checkIn.number("altitudeMeters"))) 米 · \(checkIn.text("address"))")
-                                    .font(.caption).foregroundStyle(.secondary)
+                                Label(String(format: "海拔 %.1f 米", checkIn.number("altitudeMeters")), systemImage: "mountain.2")
+                                    .font(.subheadline)
+                                Text(checkIn.text("address")).font(.caption).foregroundStyle(.secondary)
                                 if let latitude = checkIn.data["latitude"] as? Double,
                                    let longitude = checkIn.data["longitude"] as? Double {
                                     Text(String(format: "%.6f, %.6f", latitude, longitude))
@@ -597,7 +602,8 @@ struct DearSocialView: View {
             "altitudeMeters": location.altitude, "address": checkInLocator.address,
             "note": note.isEmpty ? checkInLocator.address : note
         ])
-        checkInRequestID = UUID(); try await loadCheckIns(); notice = "打卡已保存。"
+        checkInRequestID = UUID(); try await loadCheckIns()
+        notice = String(format: "打卡已保存，海拔 %.1f 米。", location.altitude)
     }
     private func updateCheckIn() async throws {
         guard let selectedCheckIn, selectedCheckIn.flag("canEdit") else { throw APIError.message("只能修改自己的打卡。") }
