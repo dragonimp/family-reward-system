@@ -464,7 +464,7 @@ struct AccountView: View {
         NavigationStack {
             List {
                 Section("用户中心") {
-                    Label(store.profile?.text("username") ?? "家长", systemImage: "person.crop.circle.fill")
+                    Label(store.profile?.text("username") ?? "账号", systemImage: "person.crop.circle.fill")
                     Link(destination: URL(string: "https://auth.ai.xmkurt.com/personal/info")!) {
                         Label("账号资料", systemImage: "person.crop.circle")
                     }
