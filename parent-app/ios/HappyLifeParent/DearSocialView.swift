@@ -1,6 +1,21 @@
 import SwiftUI
 import CoreLocation
 import PhotosUI
+import CoreTransferable
+import UniformTypeIdentifiers
+import AVKit
+
+private struct DearPickedVideo: Transferable {
+    let url: URL
+    static var transferRepresentation: some TransferRepresentation {
+        FileRepresentation(importedContentType: .movie) { received in
+            let ext = received.file.pathExtension.lowercased() == "mp4" ? "mp4" : "mov"
+            let copy = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + "." + ext)
+            try FileManager.default.copyItem(at: received.file, to: copy)
+            return Self(url: copy)
+        }
+    }
+}
 
 private struct DearRecord: Identifiable {
     let data: [String: Any]
@@ -250,23 +265,28 @@ struct DearSocialView: View {
                 }
             }
                 if let selectedActivity {
-                    Section("照片分享 · \(selectedActivity.text("title"))") {
-                        PhotosPicker("共享 iPhone 照片", selection: $selectedPhoto, matching: .images)
+                    Section("照片与视频 · \(selectedActivity.text("title"))") {
+                        PhotosPicker("共享 iPhone 照片或视频", selection: $selectedPhoto, matching: .any(of: [.images, .videos]))
                             .disabled(busy)
                         Text("原图留在此 iPhone；对方获取原图时，请保持 Linko Moment 打开。")
                             .font(.caption).foregroundStyle(.secondary)
-                        if photos.isEmpty { Text("还没有分享的照片").foregroundStyle(.secondary) }
+                        if photos.isEmpty { Text("还没有分享的照片或视频").foregroundStyle(.secondary) }
                         ForEach(photos) { photo in
                             NavigationLink {
                                 DearPhotoDetailView(store: store, photo: photo,
                                     spaceID: activityTenantId, activityID: activityId,
-                                    path: base + "tenants/\(activityTenantId)/activities/\(activityId)/native-photos/\(photo.id)/thumbnail")
+                                    path: base + "tenants/\(activityTenantId)/activities/\(activityId)/native-photos/\(photo.id)/thumbnail",
+                                    canDelete: photo.text("sourceSubject") == activityMembers.first(where: { $0.flag("isSelf") })?.subject,
+                                    onDeleted: { try await loadPhotos() })
                             } label: {
                                 HStack(spacing: 14) {
                                     DearPhotoPreview(store: store, path: base + "tenants/\(activityTenantId)/activities/\(activityId)/native-photos/\(photo.id)/thumbnail")
                                     VStack(alignment: .leading, spacing: 5) {
                                         Text(photo.text("originalFileName")).font(.subheadline.bold()).lineLimit(2)
                                         Text(photo.text("sourceDisplayName")).font(.caption).foregroundStyle(.secondary)
+                                        if photo.text("contentType").hasPrefix("video/") {
+                                            Label("视频", systemImage: "play.rectangle.fill").font(.caption).foregroundStyle(.secondary)
+                                        }
                                         if !photo.flag("thumbnailAvailable") {
                                             Text("预览尚未就绪，点开可重试").font(.caption).foregroundStyle(.secondary)
                                         }
@@ -363,14 +383,22 @@ struct DearSocialView: View {
             let targetSpace = activityTenantId, targetActivity = activityId
             run {
                 defer { selectedPhoto = nil }
-                guard let data = try await selected.loadTransferable(type: Data.self),
-                      let image = UIImage(data: data), let jpeg = image.jpegData(compressionQuality: 0.9) else {
-                    throw APIError.message("无法读取所选照片。")
+                if selected.supportedContentTypes.contains(where: { $0.conforms(to: .movie) }) {
+                    guard let video = try await selected.loadTransferable(type: DearPickedVideo.self) else {
+                        throw APIError.message("无法读取所选视频。")
+                    }
+                    defer { try? FileManager.default.removeItem(at: video.url) }
+                    try await store.photoSource.publishVideo(at: video.url, spaceID: targetSpace, activityID: targetActivity)
+                } else {
+                    guard let data = try await selected.loadTransferable(type: Data.self),
+                          let image = UIImage(data: data), let jpeg = image.jpegData(compressionQuality: 0.9) else {
+                        throw APIError.message("无法读取所选照片。")
+                    }
+                    try await store.photoSource.publish(jpeg, spaceID: targetSpace, activityID: targetActivity,
+                                                        name: "iPhone照片.jpg")
                 }
-                try await store.photoSource.publish(jpeg, spaceID: targetSpace, activityID: targetActivity,
-                                                    name: "iPhone照片.jpg")
                 try await loadPhotos()
-                notice = "照片已共享；请保持此 iPhone 可以响应原图请求。"
+                notice = "已共享；请保持此 iPhone 可以响应原文件请求。"
             }
         }
         .refreshable {
@@ -777,21 +805,29 @@ private struct DearPhotoPreview: View {
 }
 
 private struct DearPhotoDetailView: View {
+    @Environment(\.dismiss) private var dismiss
     @ObservedObject var store: FamilyStore
     let photo: DearRecord
     let spaceID: String
     let activityID: String
     let path: String
+    let canDelete: Bool
+    let onDeleted: () async throws -> Void
     @State private var image: UIImage?
     @State private var error: String?
     @State private var originalURL: URL?
     @State private var originalImage: UIImage?
     @State private var originalError: String?
     @State private var fetchingOriginal = false
+    @State private var deleting = false
+    @State private var showingDelete = false
+    private var isVideo: Bool { photo.text("contentType").hasPrefix("video/") }
     var body: some View {
         ScrollView {
             VStack(spacing: 16) {
-                if let image = originalImage ?? image {
+                if isVideo, let originalURL {
+                    VideoPlayer(player: AVPlayer(url: originalURL)).frame(minHeight: 240)
+                } else if let image = originalImage ?? image {
                     Image(uiImage: image).resizable().scaledToFit()
                         .clipShape(RoundedRectangle(cornerRadius: 12))
                 } else if let error {
@@ -802,22 +838,29 @@ private struct DearPhotoDetailView: View {
                 Text(photo.text("originalFileName")).font(.headline)
                 Text("分享者：\(photo.text("sourceDisplayName"))").font(.subheadline).foregroundStyle(.secondary)
                 if let originalURL {
-                    ShareLink(item: originalURL) { Label("分享原图", systemImage: "square.and.arrow.up") }
+                    ShareLink(item: originalURL) { Label("分享原文件", systemImage: "square.and.arrow.up") }
                 } else {
                     Button {
                         Task { await fetchOriginal() }
                     } label: {
-                        Label(fetchingOriginal ? "正在等待源设备传图…" : "获取原图", systemImage: "arrow.down.circle")
+                        Label(fetchingOriginal ? "正在等待分享设备…" : "获取原文件", systemImage: "arrow.down.circle")
                     }.disabled(fetchingOriginal)
                 }
                 if let originalError { Text(originalError).font(.footnote).foregroundStyle(.red) }
-                Text("原图从分享者设备传来，获取时请保持对方的分享应用打开。")
+                if canDelete {
+                    Button("删除分享", role: .destructive) { showingDelete = true }.disabled(deleting)
+                }
+                Text("原文件从分享者设备传来，获取时请保持对方的分享应用打开。")
                     .font(.footnote).foregroundStyle(.secondary)
             }
             .frame(maxWidth: .infinity)
             .padding()
         }
-        .navigationTitle("照片")
+        .navigationTitle(isVideo ? "视频" : "照片")
+        .confirmationDialog("删除这项分享？", isPresented: $showingDelete, titleVisibility: .visible) {
+            Button("删除分享", role: .destructive) { Task { await deleteSharedMedia() } }
+            Button("取消", role: .cancel) { }
+        } message: { Text("活动成员将无法再获取此文件；iPhone 相册中的原文件不会删除。") }
         .task(id: path) { await load() }
     }
 
@@ -836,9 +879,21 @@ private struct DearPhotoDetailView: View {
         defer { fetchingOriginal = false }
         do {
             let url = try await store.photoSource.downloadOriginal(photoID: photo.id, spaceID: spaceID, activityID: activityID)
-            guard let decoded = UIImage(contentsOfFile: url.path) else { throw APIError.message("原图无法显示。") }
-            originalImage = decoded
+            if !isVideo {
+                guard let decoded = UIImage(contentsOfFile: url.path) else { throw APIError.message("原图无法显示。") }
+                originalImage = decoded
+            }
             originalURL = url
+        } catch { originalError = error.localizedDescription }
+    }
+
+    private func deleteSharedMedia() async {
+        deleting = true; originalError = nil
+        defer { deleting = false }
+        do {
+            try await store.photoSource.revoke(photoID: photo.id, spaceID: spaceID, activityID: activityID)
+            try await onDeleted()
+            dismiss()
         } catch { originalError = error.localizedDescription }
     }
 }

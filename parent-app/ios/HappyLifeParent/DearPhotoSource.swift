@@ -2,9 +2,10 @@ import CryptoKit
 import Foundation
 import UIKit
 import UserNotifications
+import AVFoundation
 
-// Linko Social keeps original image bytes on the source device. This adapter
-// stores the selected JPEG on the paired iPhone and serves verified requests.
+// Linko Social keeps original media bytes on the source device. This adapter
+// stores selected photos and videos on the iPhone and serves verified requests.
 @MainActor final class DearPhotoSource {
     private struct SharedPhoto: Codable {
         let id: String
@@ -93,12 +94,24 @@ import UserNotifications
     }
 
     func publish(_ imageData: Data, spaceID: String, activityID: String, name: String) async throws {
+        try await publishMedia(imageData, contentType: "image/jpeg", spaceID: spaceID, activityID: activityID, name: name)
+    }
+
+    func publishVideo(at url: URL, spaceID: String, activityID: String) async throws {
+        let length = try url.resourceValues(forKeys: [.fileSizeKey]).fileSize ?? 0
+        guard (1...50 * 1024 * 1024).contains(length) else { throw APIError.message("视频必须在 50 MB 以内。") }
+        let type = url.pathExtension.lowercased() == "mp4" ? "video/mp4" : "video/quicktime"
+        let name = type == "video/mp4" ? "iPhone视频.mp4" : "iPhone视频.mov"
+        try await publishMedia(Data(contentsOf: url), contentType: type, spaceID: spaceID, activityID: activityID, name: name)
+    }
+
+    private func publishMedia(_ imageData: Data, contentType: String, spaceID: String, activityID: String, name: String) async throws {
         guard !publishing else { throw APIError.message("另一张照片正在共享，请稍后重试。") }
         publishing = true
         defer { publishing = false }
         guard UUID(uuidString: spaceID) != nil, UUID(uuidString: activityID) != nil,
               imageData.count > 0, imageData.count <= 50 * 1024 * 1024,
-              UIImage(data: imageData) != nil else { throw APIError.message("照片文件无效或超过 50 MB。") }
+              (contentType.starts(with: "video/") || UIImage(data: imageData) != nil) else { throw APIError.message("照片或视频文件无效或超过 50 MB。") }
         guard let store else { throw APIError.message("活动服务暂不可用。") }
         let subject = try await currentSubject()
         let root = try directory(for: subject)
@@ -114,16 +127,17 @@ import UserNotifications
         try writeIndex(index, at: root)
         enabledForSession = true
 
-        let localName = UUID().uuidString + ".jpg"
+        let localName = UUID().uuidString + (contentType == "video/mp4" ? ".mp4" : contentType == "video/quicktime" ? ".mov" : ".jpg")
         let localURL = root.appendingPathComponent(localName)
         try imageData.write(to: localURL, options: [.atomic, .completeFileProtectionUntilFirstUserAuthentication])
         let sha = SHA256.hash(data: imageData).map { String(format: "%02x", $0) }.joined()
-        let displayName = String(name.prefix(200)).isEmpty ? "共享照片.jpg" : String(name.prefix(200))
+        let displayName = String(name.prefix(200)).isEmpty ? "共享媒体.jpg" : String(name.prefix(200))
         let prefix = "/api/dear/social/tenants/\(spaceID)/activities/\(activityID)"
         var publishedID: String?
         do {
+            let thumbnail = try preview(from: imageData, fileURL: localURL)
             let response = try await store.call(prefix + "/native-photos", method: "POST", body: [
-                "deviceId": deviceID, "fileName": displayName, "contentType": "image/jpeg",
+                "deviceId": deviceID, "fileName": displayName, "contentType": contentType,
                 "length": imageData.count, "sha256": sha]) as? [String: Any]
             guard let photoID = response?["id"] as? String, UUID(uuidString: photoID) != nil else {
                 throw APIError.message("照片登记回执无效。")
@@ -133,7 +147,6 @@ import UserNotifications
                                             fileName: localName, length: imageData.count, sha256: sha))
             try writeIndex(index, at: root)
             do {
-                let thumbnail = try preview(from: imageData)
                 try await uploadThumbnail(thumbnail, prefix: prefix, photoID: photoID, revision: sha)
             } catch {
                 // The original remains available. Opening the album retries a missing preview.
@@ -154,6 +167,19 @@ import UserNotifications
         }
     }
 
+    func revoke(photoID: String, spaceID: String, activityID: String) async throws {
+        guard UUID(uuidString: photoID) != nil, UUID(uuidString: spaceID) != nil,
+              UUID(uuidString: activityID) != nil, let store else { throw APIError.message("照片或视频标识无效。") }
+        let prefix = "/api/dear/social/tenants/\(spaceID)/activities/\(activityID)"
+        _ = try await store.call(prefix + "/live/photos/\(photoID)", method: "DELETE")
+        guard let subject = try? await currentSubject(), let root = try? directory(for: subject) else { return }
+        var index = try readIndex(at: root)
+        let removed = index.photos.filter { $0.id == photoID && $0.spaceID == spaceID && $0.activityID == activityID }
+        index.photos.removeAll { $0.id == photoID && $0.spaceID == spaceID && $0.activityID == activityID }
+        try writeIndex(index, at: root)
+        for item in removed { try? FileManager.default.removeItem(at: root.appendingPathComponent(item.fileName)) }
+    }
+
     func refreshPreviews(spaceID: String, activityID: String, rows: [[String: Any]]) async {
         guard !publishing else { return }
         guard let subject = try? await currentSubject(), let root = try? directory(for: subject),
@@ -165,7 +191,7 @@ import UserNotifications
             guard rows.contains(where: { ($0["id"] as? String) == photo.id && ($0["thumbnailAvailable"] as? Bool) == false }) else { continue }
             let path = root.appendingPathComponent(photo.fileName)
             guard let data = try? Data(contentsOf: path), data.count == photo.length,
-                  let thumbnail = try? preview(from: data) else { continue }
+                  let thumbnail = try? preview(from: data, fileURL: path) else { continue }
             try? await uploadThumbnail(thumbnail, prefix: prefix, photoID: photo.id, revision: photo.sha256)
         }
     }
@@ -224,7 +250,7 @@ import UserNotifications
                     } else if kind == "end" && started {
                         guard received.count == length,
                               SHA256.hash(data: received).map({ String(format: "%02x", $0) }).joined().caseInsensitiveCompare(sha) == .orderedSame,
-                              UIImage(data: received) != nil else { throw APIError.message("原图完整性校验失败。") }
+                              ((request["contentType"] as? String)?.hasPrefix("video/") == true || UIImage(data: received) != nil) else { throw APIError.message("原文件完整性校验失败。") }
                         _ = try await store.call("/api/dear/social/photo-requests/\(id)/complete", method: "POST", body: [:])
                         completed = true
                         let root = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)[0]
@@ -235,6 +261,8 @@ import UserNotifications
                         case "image/png": suffix = ".png"
                         case "image/webp": suffix = ".webp"
                         case "image/heic": suffix = ".heic"
+                        case "video/mp4": suffix = ".mp4"
+                        case "video/quicktime": suffix = ".mov"
                         default: suffix = ".jpg"
                         }
                         let url = root.appendingPathComponent(UUID().uuidString + suffix)
@@ -284,8 +312,14 @@ import UserNotifications
                                               options: [.atomic, .completeFileProtectionUntilFirstUserAuthentication])
     }
 
-    private func preview(from data: Data) throws -> Data {
-        guard let image = UIImage(data: data), image.size.width > 0, image.size.height > 0 else {
+    private func preview(from data: Data, fileURL: URL) throws -> Data {
+        let image: UIImage?
+        if fileURL.pathExtension.lowercased() == "mp4" || fileURL.pathExtension.lowercased() == "mov" {
+            let generator = AVAssetImageGenerator(asset: AVURLAsset(url: fileURL))
+            generator.appliesPreferredTrackTransform = true
+            image = (try? generator.copyCGImage(at: .zero, actualTime: nil)).map(UIImage.init(cgImage:))
+        } else { image = UIImage(data: data) }
+        guard let image, image.size.width > 0, image.size.height > 0 else {
             throw APIError.message("无法处理照片预览。")
         }
         let scale = min(360 / image.size.width, 360 / image.size.height, 1)
