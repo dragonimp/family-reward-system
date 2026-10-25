@@ -94,24 +94,30 @@ import AVFoundation
     }
 
     func publish(_ imageData: Data, spaceID: String, activityID: String, name: String) async throws {
-        try await publishMedia(imageData, contentType: "image/jpeg", spaceID: spaceID, activityID: activityID, name: name)
+        guard imageData.count > 0, imageData.count <= 50 * 1024 * 1024,
+              UIImage(data: imageData) != nil else { throw APIError.message("照片文件无效或超过 50 MB。") }
+        let temporary = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".jpg")
+        try imageData.write(to: temporary, options: .atomic)
+        defer { try? FileManager.default.removeItem(at: temporary) }
+        try await publishMedia(at: temporary, contentType: "image/jpeg", spaceID: spaceID, activityID: activityID, name: name)
     }
 
     func publishVideo(at url: URL, spaceID: String, activityID: String) async throws {
         let length = try url.resourceValues(forKeys: [.fileSizeKey]).fileSize ?? 0
-        guard (1...50 * 1024 * 1024).contains(length) else { throw APIError.message("视频必须在 50 MB 以内。") }
+        guard (1...500 * 1024 * 1024).contains(length) else { throw APIError.message("视频必须在 500 MB 以内。") }
         let type = url.pathExtension.lowercased() == "mp4" ? "video/mp4" : "video/quicktime"
         let name = type == "video/mp4" ? "iPhone视频.mp4" : "iPhone视频.mov"
-        try await publishMedia(Data(contentsOf: url), contentType: type, spaceID: spaceID, activityID: activityID, name: name)
+        try await publishMedia(at: url, contentType: type, spaceID: spaceID, activityID: activityID, name: name)
     }
 
-    private func publishMedia(_ imageData: Data, contentType: String, spaceID: String, activityID: String, name: String) async throws {
+    private func publishMedia(at sourceURL: URL, contentType: String, spaceID: String, activityID: String, name: String) async throws {
         guard !publishing else { throw APIError.message("另一张照片正在共享，请稍后重试。") }
         publishing = true
         defer { publishing = false }
+        let length = try sourceURL.resourceValues(forKeys: [.fileSizeKey]).fileSize ?? 0
+        let limit = contentType.starts(with: "video/") ? 500 * 1024 * 1024 : 50 * 1024 * 1024
         guard UUID(uuidString: spaceID) != nil, UUID(uuidString: activityID) != nil,
-              imageData.count > 0, imageData.count <= 50 * 1024 * 1024,
-              (contentType.starts(with: "video/") || UIImage(data: imageData) != nil) else { throw APIError.message("照片或视频文件无效或超过 50 MB。") }
+              length > 0, length <= limit else { throw APIError.message("照片或视频文件超过大小限制。") }
         guard let store else { throw APIError.message("活动服务暂不可用。") }
         let subject = try await currentSubject()
         let root = try directory(for: subject)
@@ -129,22 +135,29 @@ import AVFoundation
 
         let localName = UUID().uuidString + (contentType == "video/mp4" ? ".mp4" : contentType == "video/quicktime" ? ".mov" : ".jpg")
         let localURL = root.appendingPathComponent(localName)
-        try imageData.write(to: localURL, options: [.atomic, .completeFileProtectionUntilFirstUserAuthentication])
-        let sha = SHA256.hash(data: imageData).map { String(format: "%02x", $0) }.joined()
+        do {
+            do { try FileManager.default.moveItem(at: sourceURL, to: localURL) }
+            catch { try FileManager.default.copyItem(at: sourceURL, to: localURL) }
+            try FileManager.default.setAttributes([.protectionKey: FileProtectionType.completeUntilFirstUserAuthentication], ofItemAtPath: localURL.path)
+        } catch {
+            try? FileManager.default.removeItem(at: localURL)
+            throw error
+        }
         let displayName = String(name.prefix(200)).isEmpty ? "共享媒体.jpg" : String(name.prefix(200))
         let prefix = "/api/dear/social/tenants/\(spaceID)/activities/\(activityID)"
         var publishedID: String?
         do {
-            let thumbnail = try preview(from: imageData, fileURL: localURL)
+            let sha = try await hashFile(localURL)
+            let thumbnail = try preview(fromFile: localURL)
             let response = try await store.call(prefix + "/native-photos", method: "POST", body: [
                 "deviceId": deviceID, "fileName": displayName, "contentType": contentType,
-                "length": imageData.count, "sha256": sha]) as? [String: Any]
+                "length": length, "sha256": sha]) as? [String: Any]
             guard let photoID = response?["id"] as? String, UUID(uuidString: photoID) != nil else {
                 throw APIError.message("照片登记回执无效。")
             }
             publishedID = photoID
             index.photos.append(SharedPhoto(id: photoID, spaceID: spaceID, activityID: activityID,
-                                            fileName: localName, length: imageData.count, sha256: sha))
+                                            fileName: localName, length: length, sha256: sha))
             try writeIndex(index, at: root)
             do {
                 try await uploadThumbnail(thumbnail, prefix: prefix, photoID: photoID, revision: sha)
@@ -190,8 +203,8 @@ import AVFoundation
         for photo in index.photos where photo.spaceID == spaceID && photo.activityID == activityID {
             guard rows.contains(where: { ($0["id"] as? String) == photo.id && ($0["thumbnailAvailable"] as? Bool) == false }) else { continue }
             let path = root.appendingPathComponent(photo.fileName)
-            guard let data = try? Data(contentsOf: path), data.count == photo.length,
-                  let thumbnail = try? preview(from: data, fileURL: path) else { continue }
+            guard (try? path.resourceValues(forKeys: [.fileSizeKey]).fileSize) == photo.length,
+                  let thumbnail = try? preview(fromFile: path) else { continue }
             try? await uploadThumbnail(thumbnail, prefix: prefix, photoID: photo.id, revision: photo.sha256)
         }
     }
@@ -201,12 +214,13 @@ import AVFoundation
               let index = try? readIndex(at: root),
               let photo = index.photos.first(where: { $0.id == photoID && $0.spaceID == spaceID && $0.activityID == activityID }) else { return nil }
         let path = root.appendingPathComponent(photo.fileName)
-        guard let data = try? Data(contentsOf: path), data.count == photo.length,
-              SHA256.hash(data: data).map({ String(format: "%02x", $0) }).joined() == photo.sha256 else { return nil }
+        guard (try? path.resourceValues(forKeys: [.fileSizeKey]).fileSize) == photo.length,
+              (try? await hashFile(path)) == photo.sha256 else { return nil }
         return path
     }
 
-    func downloadOriginal(photoID: String, spaceID: String, activityID: String) async throws -> URL {
+    func downloadOriginal(photoID: String, spaceID: String, activityID: String,
+                          progress: ((Double) -> Void)? = nil) async throws -> URL {
         guard UUID(uuidString: photoID) != nil, UUID(uuidString: spaceID) != nil,
               UUID(uuidString: activityID) != nil else { throw APIError.message("照片标识无效。") }
         if let local = await localOriginal(photoID: photoID, spaceID: spaceID, activityID: activityID) { return local }
@@ -215,23 +229,51 @@ import AVFoundation
                                          method: "POST", body: ["photoId": photoID, "operationId": UUID().uuidString])
         guard let request = value as? [String: Any], let id = request["id"] as? String,
               UUID(uuidString: id) != nil, let length = (request["length"] as? NSNumber)?.intValue,
-              (1...50 * 1024 * 1024).contains(length), let sha = request["sha256"] as? String,
+              let contentType = request["contentType"] as? String,
+              length > 0, length <= (contentType.hasPrefix("video/") ? 500 : 50) * 1024 * 1024,
+              let sha = request["sha256"] as? String,
               sha.count == 64, sha.allSatisfy({ $0.isHexDigit }) else {
             throw APIError.message("原图请求回执无效。")
         }
+        let root = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent("DearReceivedPhotos", isDirectory: true)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        for old in (try? FileManager.default.contentsOfDirectory(at: root, includingPropertiesForKeys: [.contentModificationDateKey])) ?? [] {
+            guard UUID(uuidString: old.deletingPathExtension().lastPathComponent) != nil,
+                  let modified = try? old.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate,
+                  modified < Date().addingTimeInterval(-24 * 60 * 60) else { continue }
+            try? FileManager.default.removeItem(at: old)
+        }
+        let suffix: String
+        switch contentType {
+        case "image/png": suffix = ".png"
+        case "image/webp": suffix = ".webp"
+        case "image/heic": suffix = ".heic"
+        case "video/mp4": suffix = ".mp4"
+        case "video/quicktime": suffix = ".mov"
+        default: suffix = ".jpg"
+        }
+        let url = root.appendingPathComponent(UUID().uuidString + suffix)
         var completed = false
         do {
+            guard FileManager.default.createFile(atPath: url.path, contents: nil,
+                attributes: [.protectionKey: FileProtectionType.completeUntilFirstUserAuthentication]) else {
+                throw APIError.message("无法保存接收的原文件。")
+            }
+            let output = try FileHandle(forWritingTo: url)
+            defer { try? output.close() }
+            var digest = SHA256()
+            var received = 0
             var components = URLComponents(url: base, resolvingAgainstBaseURL: false)!
             components.scheme = "wss"
             components.path = "/api/dear/social/photo-requests/\(id)/transfer"
             components.queryItems = [URLQueryItem(name: "role", value: "receiver")]
             var socketRequest = URLRequest(url: components.url!)
             socketRequest.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-            socketRequest.timeoutInterval = 305
+            socketRequest.timeoutInterval = contentType.hasPrefix("video/") ? 1805 : 305
             let socket = session.webSocketTask(with: socketRequest)
             socket.resume()
             defer { socket.cancel(with: .normalClosure, reason: nil) }
-            var received = Data()
             var started = false
             while true {
                 try Task.checkCancellation()
@@ -248,34 +290,29 @@ import AVFoundation
                         }
                         started = true
                     } else if kind == "end" && started {
-                        guard received.count == length,
-                              SHA256.hash(data: received).map({ String(format: "%02x", $0) }).joined().caseInsensitiveCompare(sha) == .orderedSame,
-                              ((request["contentType"] as? String)?.hasPrefix("video/") == true || UIImage(data: received) != nil) else { throw APIError.message("原文件完整性校验失败。") }
+                        try output.synchronize()
+                        guard received == length,
+                              digest.finalize().map({ String(format: "%02x", $0) }).joined().caseInsensitiveCompare(sha) == .orderedSame,
+                              (contentType.hasPrefix("video/") || UIImage(contentsOfFile: url.path) != nil) else {
+                            throw APIError.message("原文件完整性校验失败。")
+                        }
                         _ = try await store.call("/api/dear/social/photo-requests/\(id)/complete", method: "POST", body: [:])
                         completed = true
-                        let root = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)[0]
-                            .appendingPathComponent("DearReceivedPhotos", isDirectory: true)
-                        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
-                        let suffix: String
-                        switch request["contentType"] as? String {
-                        case "image/png": suffix = ".png"
-                        case "image/webp": suffix = ".webp"
-                        case "image/heic": suffix = ".heic"
-                        case "video/mp4": suffix = ".mp4"
-                        case "video/quicktime": suffix = ".mov"
-                        default: suffix = ".jpg"
-                        }
-                        let url = root.appendingPathComponent(UUID().uuidString + suffix)
-                        try received.write(to: url, options: [.atomic, .completeFileProtectionUntilFirstUserAuthentication])
                         return url
                     } else { throw APIError.message("原图传输顺序无效。") }
                 case .data(let chunk):
-                    guard started, received.count + chunk.count <= length else { throw APIError.message("原图大小不匹配。") }
-                    received.append(chunk)
+                    guard started, received + chunk.count <= length else { throw APIError.message("原图大小不匹配。") }
+                    try output.write(contentsOf: chunk)
+                    digest.update(data: chunk)
+                    received += chunk.count
+                    if received == length || received % (1024 * 1024) < chunk.count {
+                        progress?(Double(received) / Double(length))
+                    }
                 @unknown default: throw APIError.message("原图传输格式无效。")
                 }
             }
         } catch {
+            try? FileManager.default.removeItem(at: url)
             if !completed { _ = try? await store.call("/api/dear/social/photo-requests/\(id)/cancel", method: "POST", body: [:]) }
             throw error
         }
@@ -312,13 +349,27 @@ import AVFoundation
                                               options: [.atomic, .completeFileProtectionUntilFirstUserAuthentication])
     }
 
-    private func preview(from data: Data, fileURL: URL) throws -> Data {
+    private func hashFile(_ url: URL) async throws -> String {
+        try await Task.detached(priority: .utility) { try Self.fileSHA256(url) }.value
+    }
+
+    private nonisolated static func fileSHA256(_ url: URL) throws -> String {
+        let handle = try FileHandle(forReadingFrom: url)
+        defer { try? handle.close() }
+        var digest = SHA256()
+        while let chunk = try handle.read(upToCount: 1024 * 1024), !chunk.isEmpty {
+            digest.update(data: chunk)
+        }
+        return digest.finalize().map { String(format: "%02x", $0) }.joined()
+    }
+
+    private func preview(fromFile fileURL: URL) throws -> Data {
         let image: UIImage?
         if fileURL.pathExtension.lowercased() == "mp4" || fileURL.pathExtension.lowercased() == "mov" {
             let generator = AVAssetImageGenerator(asset: AVURLAsset(url: fileURL))
             generator.appliesPreferredTrackTransform = true
             image = (try? generator.copyCGImage(at: .zero, actualTime: nil)).map(UIImage.init(cgImage:))
-        } else { image = UIImage(data: data) }
+        } else { image = UIImage(contentsOfFile: fileURL.path) }
         guard let image, image.size.width > 0, image.size.height > 0 else {
             throw APIError.message("无法处理照片预览。")
         }
@@ -370,18 +421,20 @@ import AVFoundation
                     continue
                 }
                 let path = root.appendingPathComponent(photo.fileName)
-                guard let data = try? Data(contentsOf: path), data.count == photo.length,
-                      SHA256.hash(data: data).map({ String(format: "%02x", $0) }).joined() == photo.sha256 else {
+                guard (try? path.resourceValues(forKeys: [.fileSizeKey]).fileSize) == photo.length,
+                      (try? await hashFile(path)) == photo.sha256 else {
                     _ = try? await store.call("/api/dear/social/photo-requests/\(requestID)/unavailable", method: "POST", body: [:])
                     continue
                 }
-                try await sendOriginal(data, requestID: requestID)
+                try await sendOriginal(at: path, length: photo.length, requestID: requestID)
             }
         } catch { }
     }
 
-    private func sendOriginal(_ data: Data, requestID: String) async throws {
+    private func sendOriginal(at url: URL, length: Int, requestID: String) async throws {
         guard let store, let token = store.identity.accessToken else { throw APIError.message("登录已过期。") }
+        let input = try FileHandle(forReadingFrom: url)
+        defer { try? input.close() }
         var components = URLComponents(url: base, resolvingAgainstBaseURL: false)!
         components.scheme = "wss"
         components.path = "/api/dear/social/photo-requests/\(requestID)/transfer"
@@ -391,10 +444,20 @@ import AVFoundation
         let task = session.webSocketTask(with: request)
         task.resume()
         defer { task.cancel(with: .normalClosure, reason: nil) }
-        for start in stride(from: 0, to: data.count, by: 16 * 1024) {
+        var sent = 0
+        var reportedPercent = -1
+        while let chunk = try input.read(upToCount: 16 * 1024), !chunk.isEmpty {
             try Task.checkCancellation()
-            try await task.send(.data(data.subdata(in: start..<min(start + 16 * 1024, data.count))))
+            guard sent + chunk.count <= length else { throw APIError.message("原文件已发生变化。") }
+            try await task.send(.data(chunk))
+            sent += chunk.count
+            let percent = Int(Double(sent) / Double(length) * 100)
+            if percent / 5 != reportedPercent / 5 {
+                store.photoRequestNotice = "正在实时传输原文件：\(percent)%；请保持 App 打开。"
+                reportedPercent = percent
+            }
         }
+        guard sent == length else { throw APIError.message("原文件已发生变化。") }
         // Linko confirms receipt only after the other device has consumed all bytes.
         do { _ = try await task.receive() }
         catch {

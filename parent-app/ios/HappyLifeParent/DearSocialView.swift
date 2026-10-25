@@ -819,6 +819,7 @@ private struct DearPhotoDetailView: View {
     @State private var originalImage: UIImage?
     @State private var originalError: String?
     @State private var fetchingOriginal = false
+    @State private var transferProgress = 0.0
     @State private var deleting = false
     @State private var showingDelete = false
     private var isVideo: Bool { photo.text("contentType").hasPrefix("video/") }
@@ -843,7 +844,7 @@ private struct DearPhotoDetailView: View {
                     Button {
                         Task { await fetchOriginal() }
                     } label: {
-                        Label(fetchingOriginal ? "正在等待分享设备…" : "获取原文件", systemImage: "arrow.down.circle")
+                        Label(fetchingOriginal ? "正在实时接收：\(Int(transferProgress * 100))%" : "获取原文件", systemImage: "arrow.down.circle")
                     }.disabled(fetchingOriginal)
                 }
                 if let originalError { Text(originalError).font(.footnote).foregroundStyle(.red) }
@@ -875,10 +876,12 @@ private struct DearPhotoDetailView: View {
     }
 
     private func fetchOriginal() async {
-        fetchingOriginal = true; originalError = nil
+        fetchingOriginal = true; transferProgress = 0; originalError = nil
         defer { fetchingOriginal = false }
         do {
-            let url = try await store.photoSource.downloadOriginal(photoID: photo.id, spaceID: spaceID, activityID: activityID)
+            let url = try await store.photoSource.downloadOriginal(photoID: photo.id, spaceID: spaceID, activityID: activityID) {
+                transferProgress = $0
+            }
             if !isVideo {
                 guard let decoded = UIImage(contentsOfFile: url.path) else { throw APIError.message("原图无法显示。") }
                 originalImage = decoded
