@@ -106,7 +106,7 @@ python3 - "$static_profile" "$version" "$previous" "$candidate" "$journal" <<'PY
 import hashlib,json,os,sys
 from pathlib import Path
 output,version,previous,candidate,journal=sys.argv[1:]
-assert previous.startswith('/var/www/happylife/frontend/releases/')
+assert Path(previous).parent == Path(candidate).parent
 assert not Path(candidate).exists() and not Path(journal).exists()
 payload={"AtlasOrigin":"https://home.ai.impx.net","AppCode":"family-points","Version":version,
  "Platform":"web","Architecture":"any","FileName":"family-points-web.tar.gz",
