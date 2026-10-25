@@ -153,6 +153,9 @@ internal static class LinkoSocialGateway
             if (s.Length == 5 && s[4] == "moments") return method is "GET" or "POST";
             if (s.Length == 5 && s[4] == "checkins") return method is "GET" or "POST";
             if (s.Length == 5 && s[4] == "members") return method == "GET";
+            if (s.Length == 6 && s[4] == "members" && s[5].Length is > 0 and <= 200 &&
+                s[5].All(c => !char.IsControl(c) && c is not ('/' or '\\' or '?' or '#')))
+                return method == "DELETE";
             if (s.Length == 6 && s[4] == "moments" && Guid.TryParse(s[5], out _)) return method == "DELETE";
             if (s.Length == 6 && s[4] == "invites" && s[5] is "link" or "username") return method == "POST";
             if (s.Length == 8 && s[4] == "invites" && s[5] == "username" && s[7] == "accept" &&
