@@ -3,6 +3,8 @@ import Foundation
 import UIKit
 import UserNotifications
 import AVFoundation
+import ImageIO
+import UniformTypeIdentifiers
 
 // Linko Social keeps original media bytes on the source device. This adapter
 // stores selected photos and videos on the iPhone and serves verified requests.
@@ -25,6 +27,7 @@ import AVFoundation
     private var subjectCache: String?
     private var enabledForSession = false
     private var publishing = false
+    private var checkedLocationIDs = Set<String>()
     private var pushToken: String?
     private let session = URLSession(configuration: .ephemeral)
     private let base = URL(string: "https://happylife.ai.xmkurt.com")!
@@ -41,7 +44,7 @@ import AVFoundation
     }
 
     func stop() { pump?.cancel(); pump = nil; enabledForSession = false }
-    func reset() { stop(); subjectCache = nil; pushToken = nil }
+    func reset() { stop(); subjectCache = nil; pushToken = nil; checkedLocationIDs.removeAll() }
 
     func updatePushToken(_ token: String) async {
         guard !token.isEmpty, token.allSatisfy(\.isHexDigit) else { return }
@@ -96,10 +99,20 @@ import AVFoundation
     func publish(_ imageData: Data, spaceID: String, activityID: String, name: String, locationName: String = "") async throws {
         guard imageData.count > 0, imageData.count <= 50 * 1024 * 1024,
               UIImage(data: imageData) != nil else { throw APIError.message("照片文件无效或超过 50 MB。") }
-        let temporary = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".jpg")
+        guard let source = CGImageSourceCreateWithData(imageData as CFData, nil),
+              let identifier = CGImageSourceGetType(source) as String?,
+              let type = UTType(identifier) else { throw APIError.message("无法识别照片格式。") }
+        let format: (mime: String, ext: String)
+        if type.conforms(to: .jpeg) { format = ("image/jpeg", "jpg") }
+        else if type.conforms(to: .png) { format = ("image/png", "png") }
+        else if type.conforms(to: .heic) { format = ("image/heic", "heic") }
+        else if type.conforms(to: .webP) { format = ("image/webp", "webp") }
+        else { throw APIError.message("该照片格式暂不支持共享。") }
+        let temporary = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + "." + format.ext)
         try imageData.write(to: temporary, options: .atomic)
         defer { try? FileManager.default.removeItem(at: temporary) }
-        try await publishMedia(at: temporary, contentType: "image/jpeg", spaceID: spaceID, activityID: activityID, name: name, locationName: locationName)
+        let fileName = name.contains(".") ? name : name + "." + format.ext
+        try await publishMedia(at: temporary, contentType: format.mime, spaceID: spaceID, activityID: activityID, name: fileName, locationName: locationName)
     }
 
     func publishVideo(at url: URL, spaceID: String, activityID: String, locationName: String = "") async throws {
@@ -133,7 +146,16 @@ import AVFoundation
         try writeIndex(index, at: root)
         enabledForSession = true
 
-        let localName = UUID().uuidString + (contentType == "video/mp4" ? ".mp4" : contentType == "video/quicktime" ? ".mov" : ".jpg")
+        let suffix: String
+        switch contentType {
+        case "video/mp4": suffix = ".mp4"
+        case "video/quicktime": suffix = ".mov"
+        case "image/png": suffix = ".png"
+        case "image/heic": suffix = ".heic"
+        case "image/webp": suffix = ".webp"
+        default: suffix = ".jpg"
+        }
+        let localName = UUID().uuidString + suffix
         let localURL = root.appendingPathComponent(localName)
         do {
             do { try FileManager.default.moveItem(at: sourceURL, to: localURL) }
@@ -207,6 +229,28 @@ import AVFoundation
                   let thumbnail = try? preview(fromFile: path) else { continue }
             try? await uploadThumbnail(thumbnail, prefix: prefix, photoID: photo.id, revision: photo.sha256)
         }
+    }
+
+    func refreshLocations(spaceID: String, activityID: String, rows: [[String: Any]]) async -> Bool {
+        guard let store, let subject = try? await currentSubject(), let root = try? directory(for: subject),
+              let index = try? readIndex(at: root) else { return false }
+        var changed = false
+        for photo in index.photos where photo.spaceID == spaceID && photo.activityID == activityID {
+            guard !checkedLocationIDs.contains(photo.id),
+                  let row = rows.first(where: { ($0["id"] as? String) == photo.id }),
+                  (row["locationName"] as? String ?? "").isEmpty,
+                  photo.fileName.lowercased().hasSuffix(".jpg") || photo.fileName.lowercased().hasSuffix(".heic") || photo.fileName.lowercased().hasSuffix(".png") else { continue }
+            checkedLocationIDs.insert(photo.id)
+            guard let local = await localOriginal(photoID: photo.id, spaceID: spaceID, activityID: activityID),
+                  let data = try? Data(contentsOf: local, options: .mappedIfSafe),
+                  let locationName = DearPhotoLocation.label(in: data) else { continue }
+            do {
+                _ = try await store.call("/api/dear/social/tenants/\(spaceID)/activities/\(activityID)/live/photos/\(photo.id)/location",
+                                         method: "PATCH", body: ["locationName": locationName])
+                changed = true
+            } catch { checkedLocationIDs.remove(photo.id) }
+        }
+        return changed
     }
 
     func localOriginal(photoID: String, spaceID: String, activityID: String) async -> URL? {

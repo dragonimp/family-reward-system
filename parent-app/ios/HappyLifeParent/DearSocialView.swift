@@ -4,6 +4,36 @@ import PhotosUI
 import CoreTransferable
 import UniformTypeIdentifiers
 import AVKit
+import ImageIO
+import Photos
+
+enum DearPhotoLocation {
+    static func label(for item: PhotosPickerItem, data: Data) -> String? {
+        if let embedded = label(in: data) { return embedded }
+        guard let identifier = item.itemIdentifier,
+              PHPhotoLibrary.authorizationStatus(for: .readWrite) == .authorized || PHPhotoLibrary.authorizationStatus(for: .readWrite) == .limited,
+              let location = PHAsset.fetchAssets(withLocalIdentifiers: [identifier], options: nil).firstObject?.location else { return nil }
+        return coordinates(latitude: location.coordinate.latitude, longitude: location.coordinate.longitude)
+    }
+
+    static func label(in data: Data) -> String? {
+        if let source = CGImageSourceCreateWithData(data as CFData, [kCGImageSourceShouldCache: false] as CFDictionary),
+           let properties = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [String: Any],
+           let gps = properties[kCGImagePropertyGPSDictionary as String] as? [String: Any],
+           let latitude = (gps[kCGImagePropertyGPSLatitude as String] as? NSNumber)?.doubleValue,
+           let longitude = (gps[kCGImagePropertyGPSLongitude as String] as? NSNumber)?.doubleValue {
+            let signedLatitude = (gps[kCGImagePropertyGPSLatitudeRef as String] as? String)?.uppercased() == "S" ? -latitude : latitude
+            let signedLongitude = (gps[kCGImagePropertyGPSLongitudeRef as String] as? String)?.uppercased() == "W" ? -longitude : longitude
+            return coordinates(latitude: signedLatitude, longitude: signedLongitude)
+        }
+        return nil
+    }
+
+    private static func coordinates(latitude: Double, longitude: Double) -> String? {
+        guard latitude.isFinite, longitude.isFinite, abs(latitude) <= 90, abs(longitude) <= 180 else { return nil }
+        return String(format: "%@ %.5f，%@ %.5f", latitude < 0 ? "南纬" : "北纬", abs(latitude), longitude < 0 ? "西经" : "东经", abs(longitude))
+    }
+}
 
 private struct DearPickedVideo: Transferable {
     let url: URL
@@ -44,9 +74,15 @@ struct DearSocialView: View {
     @State private var joinedActivities: [DearRecord] = []
     @State private var activities: [DearRecord] = []
     @State private var photos: [DearRecord] = []
-    @State private var selectedPhoto: PhotosPickerItem?
+    @State private var selectedPhotos: [PhotosPickerItem] = []
     @AppStorage("dearPhotoViewMode") private var photoViewMode = "grid"
     @State private var photoLocationName = ""
+    @State private var selectingPhotoDownloads = false
+    @State private var selectedPhotoIDs = Set<String>()
+    @State private var batchOriginalURLs: [URL] = []
+    @State private var batchDownloadProgress = 0.0
+    @State private var batchDownloading = false
+    @State private var batchDownloadError = ""
     @State private var moments: [DearRecord] = []
     @State private var checkIns: [DearRecord] = []
     @StateObject private var checkInLocator = DearCheckInLocator()
@@ -250,16 +286,34 @@ struct DearSocialView: View {
         }
     }
 
-    private func photoLink(_ photo: DearRecord) -> some View {
+    @ViewBuilder private func photoLink(_ photo: DearRecord) -> some View {
         let path = base + "tenants/\(activityTenantId)/activities/\(activityId)/native-photos/\(photo.id)/thumbnail"
+        if selectingPhotoDownloads {
+            Button {
+                if !selectedPhotoIDs.insert(photo.id).inserted { selectedPhotoIDs.remove(photo.id) }
+                batchOriginalURLs = []
+            } label: {
+                photoCard(photo, path: path)
+                    .overlay(alignment: .topTrailing) {
+                        Image(systemName: selectedPhotoIDs.contains(photo.id) ? "checkmark.circle.fill" : "circle")
+                            .font(.title2).foregroundStyle(selectedPhotoIDs.contains(photo.id) ? .teal : .white)
+                            .padding(7)
+                    }
+            }.buttonStyle(.plain).disabled(batchDownloading)
+        } else {
+            NavigationLink {
+                DearPhotoDetailView(store: store, photo: photo, spaceID: activityTenantId, activityID: activityId,
+                                    path: path,
+                                    canDelete: photo.text("sourceSubject") == activityMembers.first(where: { $0.flag("isSelf") })?.subject,
+                                    onDeleted: { try await loadPhotos() })
+            } label: { photoCard(photo, path: path) }
+                .buttonStyle(.plain)
+        }
+    }
+
+    private func photoCard(_ photo: DearRecord, path: String) -> some View {
         let isGrid = photoViewMode == "grid"
-        return NavigationLink {
-            DearPhotoDetailView(store: store, photo: photo, spaceID: activityTenantId, activityID: activityId,
-                                path: path,
-                                canDelete: photo.text("sourceSubject") == activityMembers.first(where: { $0.flag("isSelf") })?.subject,
-                                onDeleted: { try await loadPhotos() })
-        } label: {
-            HStack(alignment: .top, spacing: 10) {
+        return HStack(alignment: .top, spacing: 10) {
                 DearPhotoPreview(store: store, path: path)
                     .frame(width: isGrid ? nil : 112, height: isGrid ? 145 : 112)
                     .frame(maxWidth: isGrid ? .infinity : nil)
@@ -268,8 +322,9 @@ struct DearSocialView: View {
                             Text(photo.text("sourceDisplayName").isEmpty ? "活动成员" : photo.text("sourceDisplayName"))
                             Text(photo.text("createdAt").isEmpty ? "正在分享" : photo.dateText("createdAt"))
                             Text(photo.text("locationName").isEmpty ? "地点未记录" : photo.text("locationName"))
+                                .lineLimit(2).minimumScaleFactor(0.8)
                         }
-                        .font(.system(size: 10)).foregroundStyle(.white).lineLimit(1)
+                        .font(.system(size: 10)).foregroundStyle(.white)
                         .padding(6).frame(maxWidth: .infinity, alignment: .leading)
                         .background(LinearGradient(colors: [.clear, .black.opacity(0.8)], startPoint: .top, endPoint: .bottom))
                     }
@@ -281,11 +336,9 @@ struct DearSocialView: View {
                         if !photo.flag("thumbnailAvailable") { Text("预览尚未就绪，点开可重试").font(.caption).foregroundStyle(.secondary) }
                     }
                 }
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .accessibilityLabel("\(photo.text("originalFileName"))，\(photo.text("sourceDisplayName"))，\(photo.dateText("createdAt"))，\(photo.text("locationName").isEmpty ? "地点未记录" : photo.text("locationName"))")
         }
-        .buttonStyle(.plain)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .accessibilityLabel("\(photo.text("originalFileName"))，\(photo.text("sourceDisplayName"))，\(photo.dateText("createdAt"))，\(photo.text("locationName").isEmpty ? "地点未记录" : photo.text("locationName"))")
     }
 
     private var activityDetail: some View {
@@ -306,14 +359,36 @@ struct DearSocialView: View {
             }
                 if let selectedActivity {
                     Section("照片与视频 · \(selectedActivity.text("title"))") {
-                        PhotosPicker("共享 iPhone 照片或视频", selection: $selectedPhoto, matching: .any(of: [.images, .videos]))
+                        PhotosPicker("多选共享 iPhone 照片或视频", selection: $selectedPhotos, maxSelectionCount: 50,
+                                     matching: .any(of: [.images, .videos]), preferredItemEncoding: .current)
                             .disabled(busy)
                         TextField("照片地点（可选，供活动成员查看）", text: $photoLocationName)
                             .textInputAutocapitalization(.sentences)
+                        Text("优先显示照片自带的定位；无定位时使用填写地点。")
+                            .font(.caption).foregroundStyle(.secondary)
                         Picker("显示方式", selection: $photoViewMode) {
                             Text("网格").tag("grid")
                             Text("列表").tag("list")
                         }.pickerStyle(.segmented)
+                        Button(selectingPhotoDownloads ? "完成多选" : "多选下载原文件") {
+                            selectingPhotoDownloads.toggle()
+                            selectedPhotoIDs.removeAll(); batchOriginalURLs = []; batchDownloadError = ""; batchDownloadProgress = 0
+                        }.disabled(batchDownloading)
+                        if selectingPhotoDownloads {
+                            Text("已选 \(selectedPhotoIDs.count) 项") .font(.caption).foregroundStyle(.secondary)
+                            Button(batchDownloading ? "正在获取原文件…" : "获取选中原文件") {
+                                Task { await downloadSelectedPhotos() }
+                            }.disabled(selectedPhotoIDs.isEmpty || batchDownloading)
+                            if batchDownloading || batchDownloadProgress > 0 && batchDownloadProgress < 1 {
+                                ProgressView(value: batchDownloadProgress).accessibilityLabel("多选原文件接收进度")
+                            }
+                            if !batchOriginalURLs.isEmpty {
+                                ShareLink(items: batchOriginalURLs) {
+                                    Label("保存或分享已获取的 \(batchOriginalURLs.count) 项", systemImage: "square.and.arrow.up")
+                                }
+                            }
+                            if !batchDownloadError.isEmpty { Text(batchDownloadError).font(.caption).foregroundStyle(.red) }
+                        }
                         Text("原图留在此 iPhone；对方获取原图时，请保持 Linko Moment 打开。")
                             .font(.caption).foregroundStyle(.secondary)
                         if photos.isEmpty { Text("还没有分享的照片或视频").foregroundStyle(.secondary) }
@@ -357,6 +432,7 @@ struct DearSocialView: View {
                                 pendingCheckIn = false
                                 selectedCheckIn = checkIn
                                 checkInNote = checkIn.text("note")
+                                error = ""
                                 checkInLocator.clear()
                                 showingCheckIn = true
                             } label: { VStack(alignment: .leading, spacing: 4) {
@@ -412,28 +488,38 @@ struct DearSocialView: View {
             error = value
         }
         .onDisappear { pendingCheckIn = false }
-        .onChange(of: activityId) { _, _ in showingActivityManagement = false; inviteLink = ""; inviteUsername = ""; momentDraft = ""; momentRequestID = UUID(); photoLocationName = "" }
-        .onChange(of: selectedPhoto) { _, selected in
-            guard let selected else { return }
+        .onChange(of: activityId) { _, _ in showingActivityManagement = false; inviteLink = ""; inviteUsername = ""; momentDraft = ""; momentRequestID = UUID(); photoLocationName = ""; selectingPhotoDownloads = false; selectedPhotoIDs.removeAll(); batchOriginalURLs = [] }
+        .onChange(of: selectedPhotos) { _, selected in
+            guard !selected.isEmpty else { return }
             let targetSpace = activityTenantId, targetActivity = activityId
             run {
-                defer { selectedPhoto = nil }
-                if selected.supportedContentTypes.contains(where: { $0.conforms(to: .movie) }) {
-                    guard let video = try await selected.loadTransferable(type: DearPickedVideo.self) else {
-                        throw APIError.message("无法读取所选视频。")
+                defer { selectedPhotos = [] }
+                var completed = 0
+                var failures: [String] = []
+                for (index, item) in selected.enumerated() {
+                    do {
+                        if item.supportedContentTypes.contains(where: { $0.conforms(to: .movie) }) {
+                            guard let video = try await item.loadTransferable(type: DearPickedVideo.self) else {
+                                throw APIError.message("无法读取所选视频。")
+                            }
+                            defer { try? FileManager.default.removeItem(at: video.url) }
+                            try await store.photoSource.publishVideo(at: video.url, spaceID: targetSpace, activityID: targetActivity, locationName: photoLocationName)
+                        } else {
+                            guard let data = try await item.loadTransferable(type: Data.self) else {
+                                throw APIError.message("无法读取所选照片。")
+                            }
+                            let embedded = DearPhotoLocation.label(for: item, data: data)
+                            try await store.photoSource.publish(data, spaceID: targetSpace, activityID: targetActivity,
+                                                                name: "iPhone照片", locationName: embedded ?? photoLocationName)
+                        }
+                        completed += 1
+                    } catch {
+                        failures.append("第 \(index + 1) 项：\(error.localizedDescription)")
                     }
-                    defer { try? FileManager.default.removeItem(at: video.url) }
-                    try await store.photoSource.publishVideo(at: video.url, spaceID: targetSpace, activityID: targetActivity, locationName: photoLocationName)
-                } else {
-                    guard let data = try await selected.loadTransferable(type: Data.self),
-                          let image = UIImage(data: data), let jpeg = image.jpegData(compressionQuality: 0.9) else {
-                        throw APIError.message("无法读取所选照片。")
-                    }
-                    try await store.photoSource.publish(jpeg, spaceID: targetSpace, activityID: targetActivity,
-                                                        name: "iPhone照片.jpg", locationName: photoLocationName)
                 }
                 try await loadPhotos()
-                notice = "已共享；请保持此 iPhone 可以响应原文件请求。"
+                notice = "已共享 \(completed) 项；请保持此 iPhone 可以响应原文件请求。"
+                if !failures.isEmpty { error = failures.joined(separator: "；") }
             }
         }
         .refreshable {
@@ -445,6 +531,7 @@ struct DearSocialView: View {
     private var checkInSheet: some View {
         NavigationStack {
             Form {
+                if !error.isEmpty { Text(error).foregroundStyle(.red) }
                 Section("当前位置") {
                     if checkInLocator.fetching { ProgressView("正在获取位置和地址…") }
                     if !checkInLocator.error.isEmpty { Text(checkInLocator.error).foregroundStyle(.red) }
@@ -612,7 +699,29 @@ struct DearSocialView: View {
             await store.photoSource.refreshPreviews(spaceID: activityTenantId, activityID: activityId, rows: loaded.map(\.data))
             loaded = try DearRecord.list(await store.call(base + "tenants/\(activityTenantId)/activities/\(activityId)/live/photos"))
         }
+        if await store.photoSource.refreshLocations(spaceID: activityTenantId, activityID: activityId, rows: loaded.map(\.data)) {
+            loaded = try DearRecord.list(await store.call(base + "tenants/\(activityTenantId)/activities/\(activityId)/live/photos"))
+        }
         photos = loaded
+    }
+    private func downloadSelectedPhotos() async {
+        let selected = photos.filter { selectedPhotoIDs.contains($0.id) }
+        guard !selected.isEmpty else { return }
+        let targetSpace = activityTenantId, targetActivity = activityId
+        batchDownloading = true; batchDownloadProgress = 0; batchDownloadError = ""; batchOriginalURLs = []
+        defer { batchDownloading = false }
+        var failures: [String] = []
+        for (index, photo) in selected.enumerated() {
+            do {
+                let url = try await store.photoSource.downloadOriginal(photoID: photo.id,
+                    spaceID: targetSpace, activityID: targetActivity) { fraction in
+                    batchDownloadProgress = (Double(index) + fraction) / Double(selected.count)
+                }
+                batchOriginalURLs.append(url)
+            } catch { failures.append("\(photo.text("originalFileName"))：\(error.localizedDescription)") }
+            batchDownloadProgress = Double(index + 1) / Double(selected.count)
+        }
+        if !failures.isEmpty { batchDownloadError = failures.joined(separator: "；") }
     }
     private func loadMoments() async throws {
         guard !activityTenantId.isEmpty, !activityId.isEmpty else { return }
