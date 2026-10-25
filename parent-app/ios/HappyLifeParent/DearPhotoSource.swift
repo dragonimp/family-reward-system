@@ -93,24 +93,24 @@ import AVFoundation
         } catch { }
     }
 
-    func publish(_ imageData: Data, spaceID: String, activityID: String, name: String) async throws {
+    func publish(_ imageData: Data, spaceID: String, activityID: String, name: String, locationName: String = "") async throws {
         guard imageData.count > 0, imageData.count <= 50 * 1024 * 1024,
               UIImage(data: imageData) != nil else { throw APIError.message("照片文件无效或超过 50 MB。") }
         let temporary = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".jpg")
         try imageData.write(to: temporary, options: .atomic)
         defer { try? FileManager.default.removeItem(at: temporary) }
-        try await publishMedia(at: temporary, contentType: "image/jpeg", spaceID: spaceID, activityID: activityID, name: name)
+        try await publishMedia(at: temporary, contentType: "image/jpeg", spaceID: spaceID, activityID: activityID, name: name, locationName: locationName)
     }
 
-    func publishVideo(at url: URL, spaceID: String, activityID: String) async throws {
+    func publishVideo(at url: URL, spaceID: String, activityID: String, locationName: String = "") async throws {
         let length = try url.resourceValues(forKeys: [.fileSizeKey]).fileSize ?? 0
         guard (1...500 * 1024 * 1024).contains(length) else { throw APIError.message("视频必须在 500 MB 以内。") }
         let type = url.pathExtension.lowercased() == "mp4" ? "video/mp4" : "video/quicktime"
         let name = type == "video/mp4" ? "iPhone视频.mp4" : "iPhone视频.mov"
-        try await publishMedia(at: url, contentType: type, spaceID: spaceID, activityID: activityID, name: name)
+        try await publishMedia(at: url, contentType: type, spaceID: spaceID, activityID: activityID, name: name, locationName: locationName)
     }
 
-    private func publishMedia(at sourceURL: URL, contentType: String, spaceID: String, activityID: String, name: String) async throws {
+    private func publishMedia(at sourceURL: URL, contentType: String, spaceID: String, activityID: String, name: String, locationName: String) async throws {
         guard !publishing else { throw APIError.message("另一张照片正在共享，请稍后重试。") }
         publishing = true
         defer { publishing = false }
@@ -151,7 +151,7 @@ import AVFoundation
             let thumbnail = try preview(fromFile: localURL)
             let response = try await store.call(prefix + "/native-photos", method: "POST", body: [
                 "deviceId": deviceID, "fileName": displayName, "contentType": contentType,
-                "length": length, "sha256": sha]) as? [String: Any]
+                "length": length, "sha256": sha, "locationName": String(locationName.trimmingCharacters(in: .whitespacesAndNewlines).prefix(200))]) as? [String: Any]
             guard let photoID = response?["id"] as? String, UUID(uuidString: photoID) != nil else {
                 throw APIError.message("照片登记回执无效。")
             }

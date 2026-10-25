@@ -45,6 +45,8 @@ struct DearSocialView: View {
     @State private var activities: [DearRecord] = []
     @State private var photos: [DearRecord] = []
     @State private var selectedPhoto: PhotosPickerItem?
+    @AppStorage("dearPhotoViewMode") private var photoViewMode = "grid"
+    @State private var photoLocationName = ""
     @State private var moments: [DearRecord] = []
     @State private var checkIns: [DearRecord] = []
     @StateObject private var checkInLocator = DearCheckInLocator()
@@ -248,6 +250,44 @@ struct DearSocialView: View {
         }
     }
 
+    private func photoLink(_ photo: DearRecord) -> some View {
+        let path = base + "tenants/\(activityTenantId)/activities/\(activityId)/native-photos/\(photo.id)/thumbnail"
+        let isGrid = photoViewMode == "grid"
+        return NavigationLink {
+            DearPhotoDetailView(store: store, photo: photo, spaceID: activityTenantId, activityID: activityId,
+                                path: path,
+                                canDelete: photo.text("sourceSubject") == activityMembers.first(where: { $0.flag("isSelf") })?.subject,
+                                onDeleted: { try await loadPhotos() })
+        } label: {
+            HStack(alignment: .top, spacing: 10) {
+                DearPhotoPreview(store: store, path: path)
+                    .frame(width: isGrid ? nil : 112, height: isGrid ? 145 : 112)
+                    .frame(maxWidth: isGrid ? .infinity : nil)
+                    .overlay(alignment: .bottomLeading) {
+                        VStack(alignment: .leading, spacing: 1) {
+                            Text(photo.text("sourceDisplayName").isEmpty ? "活动成员" : photo.text("sourceDisplayName"))
+                            Text(photo.text("createdAt").isEmpty ? "正在分享" : photo.dateText("createdAt"))
+                            Text(photo.text("locationName").isEmpty ? "地点未记录" : photo.text("locationName"))
+                        }
+                        .font(.system(size: 10)).foregroundStyle(.white).lineLimit(1)
+                        .padding(6).frame(maxWidth: .infinity, alignment: .leading)
+                        .background(LinearGradient(colors: [.clear, .black.opacity(0.8)], startPoint: .top, endPoint: .bottom))
+                    }
+                    .clipShape(RoundedRectangle(cornerRadius: 10))
+                if !isGrid {
+                    VStack(alignment: .leading, spacing: 5) {
+                        Text(photo.text("originalFileName")).font(.subheadline.bold()).lineLimit(2)
+                        if photo.text("contentType").hasPrefix("video/") { Label("视频", systemImage: "play.rectangle.fill").font(.caption) }
+                        if !photo.flag("thumbnailAvailable") { Text("预览尚未就绪，点开可重试").font(.caption).foregroundStyle(.secondary) }
+                    }
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .accessibilityLabel("\(photo.text("originalFileName"))，\(photo.text("sourceDisplayName"))，\(photo.dateText("createdAt"))，\(photo.text("locationName").isEmpty ? "地点未记录" : photo.text("locationName"))")
+        }
+        .buttonStyle(.plain)
+    }
+
     private var activityDetail: some View {
         List {
             if !error.isEmpty { Section { Text(error).foregroundStyle(.red) } }
@@ -268,31 +308,21 @@ struct DearSocialView: View {
                     Section("照片与视频 · \(selectedActivity.text("title"))") {
                         PhotosPicker("共享 iPhone 照片或视频", selection: $selectedPhoto, matching: .any(of: [.images, .videos]))
                             .disabled(busy)
+                        TextField("照片地点（可选，供活动成员查看）", text: $photoLocationName)
+                            .textInputAutocapitalization(.sentences)
+                        Picker("显示方式", selection: $photoViewMode) {
+                            Text("网格").tag("grid")
+                            Text("列表").tag("list")
+                        }.pickerStyle(.segmented)
                         Text("原图留在此 iPhone；对方获取原图时，请保持 Linko Moment 打开。")
                             .font(.caption).foregroundStyle(.secondary)
                         if photos.isEmpty { Text("还没有分享的照片或视频").foregroundStyle(.secondary) }
-                        ForEach(photos) { photo in
-                            NavigationLink {
-                                DearPhotoDetailView(store: store, photo: photo,
-                                    spaceID: activityTenantId, activityID: activityId,
-                                    path: base + "tenants/\(activityTenantId)/activities/\(activityId)/native-photos/\(photo.id)/thumbnail",
-                                    canDelete: photo.text("sourceSubject") == activityMembers.first(where: { $0.flag("isSelf") })?.subject,
-                                    onDeleted: { try await loadPhotos() })
-                            } label: {
-                                HStack(spacing: 14) {
-                                    DearPhotoPreview(store: store, path: base + "tenants/\(activityTenantId)/activities/\(activityId)/native-photos/\(photo.id)/thumbnail")
-                                    VStack(alignment: .leading, spacing: 5) {
-                                        Text(photo.text("originalFileName")).font(.subheadline.bold()).lineLimit(2)
-                                        Text(photo.text("sourceDisplayName")).font(.caption).foregroundStyle(.secondary)
-                                        if photo.text("contentType").hasPrefix("video/") {
-                                            Label("视频", systemImage: "play.rectangle.fill").font(.caption).foregroundStyle(.secondary)
-                                        }
-                                        if !photo.flag("thumbnailAvailable") {
-                                            Text("预览尚未就绪，点开可重试").font(.caption).foregroundStyle(.secondary)
-                                        }
-                                    }
-                                }
-                            }
+                        if photoViewMode == "grid" {
+                            LazyVGrid(columns: [GridItem(.flexible(), spacing: 8), GridItem(.flexible(), spacing: 8)], spacing: 8) {
+                                ForEach(photos) { photo in photoLink(photo) }
+                            }.listRowInsets(EdgeInsets(top: 8, leading: 12, bottom: 8, trailing: 12))
+                        } else {
+                            ForEach(photos) { photo in photoLink(photo) }
                         }
                         Button("刷新相册") { run { try await loadPhotos() } }.disabled(busy)
                     }
@@ -382,7 +412,7 @@ struct DearSocialView: View {
             error = value
         }
         .onDisappear { pendingCheckIn = false }
-        .onChange(of: activityId) { _, _ in showingActivityManagement = false; inviteLink = ""; inviteUsername = ""; momentDraft = ""; momentRequestID = UUID() }
+        .onChange(of: activityId) { _, _ in showingActivityManagement = false; inviteLink = ""; inviteUsername = ""; momentDraft = ""; momentRequestID = UUID(); photoLocationName = "" }
         .onChange(of: selectedPhoto) { _, selected in
             guard let selected else { return }
             let targetSpace = activityTenantId, targetActivity = activityId
@@ -393,14 +423,14 @@ struct DearSocialView: View {
                         throw APIError.message("无法读取所选视频。")
                     }
                     defer { try? FileManager.default.removeItem(at: video.url) }
-                    try await store.photoSource.publishVideo(at: video.url, spaceID: targetSpace, activityID: targetActivity)
+                    try await store.photoSource.publishVideo(at: video.url, spaceID: targetSpace, activityID: targetActivity, locationName: photoLocationName)
                 } else {
                     guard let data = try await selected.loadTransferable(type: Data.self),
                           let image = UIImage(data: data), let jpeg = image.jpegData(compressionQuality: 0.9) else {
                         throw APIError.message("无法读取所选照片。")
                     }
                     try await store.photoSource.publish(jpeg, spaceID: targetSpace, activityID: targetActivity,
-                                                        name: "iPhone照片.jpg")
+                                                        name: "iPhone照片.jpg", locationName: photoLocationName)
                 }
                 try await loadPhotos()
                 notice = "已共享；请保持此 iPhone 可以响应原文件请求。"
@@ -801,7 +831,7 @@ private struct DearPhotoPreview: View {
             }
             else { ProgressView() }
         }
-        .frame(width: 104, height: 104).clipped().background(.quaternary)
+        .frame(maxWidth: .infinity, maxHeight: .infinity).clipped().background(.quaternary)
         .clipShape(RoundedRectangle(cornerRadius: 10))
         .task(id: path) {
             do { image = try await store.authenticatedImage(path); failed = false }
@@ -844,6 +874,9 @@ private struct DearPhotoDetailView: View {
                 } else { ProgressView("正在加载照片") }
                 Text(photo.text("originalFileName")).font(.headline)
                 Text("分享者：\(photo.text("sourceDisplayName"))").font(.subheadline).foregroundStyle(.secondary)
+                Text("分享时间：\(photo.dateText("createdAt"))").font(.subheadline).foregroundStyle(.secondary)
+                Text("地点：\(photo.text("locationName").isEmpty ? "未记录" : photo.text("locationName"))")
+                    .font(.subheadline).foregroundStyle(.secondary)
                 if let originalURL {
                     ShareLink(item: originalURL) { Label("分享原文件", systemImage: "square.and.arrow.up") }
                 } else {
