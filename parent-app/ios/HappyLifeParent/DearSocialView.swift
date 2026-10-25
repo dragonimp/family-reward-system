@@ -55,6 +55,7 @@ struct DearSocialView: View {
     @State private var showingSpaceCreate = false
     @State private var showingSpaceDelete = false
     @State private var showingActivityDelete = false
+    @State private var memberToRemove: DearRecord?
     @State private var inviteUsername = ""
     @State private var momentDraft = ""
     @State private var momentRequestID = UUID()
@@ -71,6 +72,10 @@ struct DearSocialView: View {
     private var selectedActivity: DearRecord? { allActivities.first { $0.id == activityId } }
     private var ownedSpaces: [DearRecord] { spaces.filter { $0.text("role") == "owner" } }
     private var activityTenantId: String { selectedActivity?.text("sourceTenantId") ?? spaceId }
+    private var isActivityCreator: Bool {
+        guard let creator = selectedActivity?.text("createdBySubject"), !creator.isEmpty else { return false }
+        return activityMembers.contains { $0.flag("isSelf") && $0.subject == creator }
+    }
     private func activityDate(_ item: DearRecord) -> String {
         let key = item.text("startsAt").isEmpty ? "createdAt" : "startsAt"
         return (key == "createdAt" ? "创建于 " : "活动日期 ") + item.dateText(key)
@@ -463,6 +468,9 @@ struct DearSocialView: View {
                             } else {
                                 Button("申请好友") { run { try await requestFriend(member) } }.disabled(busy)
                             }
+                            if isActivityCreator {
+                                Button("移出活动", role: .destructive) { memberToRemove = member }.disabled(busy)
+                            }
                         }
                     }
                     if activityMembers.filter({ !$0.flag("isSelf") }).isEmpty {
@@ -476,6 +484,15 @@ struct DearSocialView: View {
                 Button("确认删除活动", role: .destructive) { run { try await deleteActivity() } }
                 Button("取消", role: .cancel) { }
             } message: { Text("仅可删除没有其他成员、照片或日常记录的活动；已发出的邀请会失效。") }
+            .confirmationDialog("将「\(memberToRemove?.text("displayName") ?? "")」移出活动？", isPresented: Binding(
+                get: { memberToRemove != nil }, set: { if !$0 { memberToRemove = nil } }), titleVisibility: .visible) {
+                Button("确认移出", role: .destructive) {
+                    guard let member = memberToRemove else { return }
+                    memberToRemove = nil
+                    run { try await removeActivityMember(member) }
+                }
+                Button("取消", role: .cancel) { memberToRemove = nil }
+            } message: { Text("移出后，对方将无法查看这场活动的新内容；已有邀请链接仍可再次用于加入。") }
         }
     }
 
@@ -571,6 +588,14 @@ struct DearSocialView: View {
     private func loadMembers() async throws {
         guard !activityTenantId.isEmpty, !activityId.isEmpty else { return }
         activityMembers = try DearRecord.list(await store.call(base + "tenants/\(activityTenantId)/activities/\(activityId)/members"))
+    }
+    private func removeActivityMember(_ member: DearRecord) async throws {
+        guard isActivityCreator, !member.flag("isSelf"),
+              let encoded = member.subject.addingPercentEncoding(withAllowedCharacters: .alphanumerics)
+        else { throw APIError.message("只有活动创建者可以移除其他成员。") }
+        _ = try await store.call(base + "tenants/\(activityTenantId)/activities/\(activityId)/members/\(encoded)", method: "DELETE")
+        try await loadMembers()
+        notice = "已将成员移出活动。"
     }
     private func loadRelationships() async throws {
         relationships = try DearRecord.list(await store.call(base + "relationships"))
