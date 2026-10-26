@@ -7,7 +7,7 @@ stage="$2"
 [[ -f "$source_config" ]] || exit 2
 live=/etc/nginx/conf.d/happylife.ai.xmkurt.com.conf
 backup="$stage/happylife.ai.xmkurt.com.nginx.previous.conf"
-baseline=6cd25c7e1cbbfc78a22ef8966c98d30942ad025c03bf7a4d3e2d88227154672c
+baseline=ed516b0742d17ac042255699e55dde8c719e80b7834af4fdd62605949dd3b7e6
 actual="$(sha256sum "$live" | cut -d ' ' -f 1)"
 target="$(sha256sum "$source_config" | cut -d ' ' -f 1)"
 if [[ "$actual" == "$target" ]]; then
