@@ -6,6 +6,7 @@ import UniformTypeIdentifiers
 import AVKit
 import ImageIO
 import Photos
+import MapKit
 
 enum DearPhotoLocation {
     static func label(for item: PhotosPickerItem, data: Data) -> String? {
@@ -64,6 +65,127 @@ private struct DearRecord: Identifiable {
     static func list(_ value: Any) throws -> [DearRecord] {
         guard let values = value as? [[String: Any]] else { throw APIError.message("Linko Social 返回的数据格式不正确。") }
         return values.map { DearRecord(data: $0) }
+    }
+}
+
+private struct DearActivityMapPoint: Identifiable {
+    let id: String
+    let title: String
+    let subtitle: String
+    let coordinate: CLLocationCoordinate2D
+    let systemImage: String
+
+    static func points(checkIns: [DearRecord], photos: [DearRecord]) -> [Self] {
+        let visits = checkIns.compactMap { item -> Self? in
+            guard let coordinate = coordinate(latitude: item.data["latitude"], longitude: item.data["longitude"]) else { return nil }
+            let address = item.text("address")
+            let subtitle = "\(address.isEmpty ? item.dateText("createdAt") : address) · 海拔 \(String(format: "%.1f", item.number("altitudeMeters"))) 米"
+            return Self(id: "checkin-\(item.id)", title: item.text("authorName").isEmpty ? "活动打卡" : "\(item.text("authorName"))的打卡",
+                        subtitle: subtitle, coordinate: coordinate, systemImage: "mappin.circle.fill")
+        }
+        let pictures = photos.compactMap { item -> Self? in
+            guard let coordinate = photoCoordinate(item.text("locationName")) else { return nil }
+            let title = item.text("originalFileName").isEmpty ? "活动照片" : item.text("originalFileName")
+            return Self(id: "photo-\(item.id)", title: title,
+                        subtitle: "\(item.text("sourceDisplayName")) · \(item.dateText("createdAt"))",
+                        coordinate: coordinate, systemImage: item.text("contentType").hasPrefix("video/") ? "video.fill" : "photo.fill")
+        }
+        return visits + pictures
+    }
+
+    private static func coordinate(latitude: Any?, longitude: Any?) -> CLLocationCoordinate2D? {
+        guard let latitude = (latitude as? NSNumber)?.doubleValue,
+              let longitude = (longitude as? NSNumber)?.doubleValue,
+              latitude.isFinite, longitude.isFinite,
+              abs(latitude) <= 90, abs(longitude) <= 180 else { return nil }
+        return CLLocationCoordinate2D(latitude: latitude, longitude: longitude)
+    }
+
+    private static func photoCoordinate(_ text: String) -> CLLocationCoordinate2D? {
+        let parts = text.components(separatedBy: "，")
+        guard parts.count == 2 else { return nil }
+        let latitudeText = parts[0].trimmingCharacters(in: .whitespaces)
+        let longitudeText = parts[1].trimmingCharacters(in: .whitespaces)
+        let south = latitudeText.hasPrefix("南纬")
+        let west = longitudeText.hasPrefix("西经")
+        guard (south || latitudeText.hasPrefix("北纬")), (west || longitudeText.hasPrefix("东经")),
+              let latitude = Double(latitudeText.dropFirst(2).trimmingCharacters(in: .whitespaces)),
+              let longitude = Double(longitudeText.dropFirst(2).trimmingCharacters(in: .whitespaces)) else { return nil }
+        return coordinate(latitude: NSNumber(value: south ? -latitude : latitude),
+                          longitude: NSNumber(value: west ? -longitude : longitude))
+    }
+}
+
+private struct DearActivityMapView: View {
+    let title: String
+    let points: [DearActivityMapPoint]
+    @State private var cameraPosition: MapCameraPosition = .automatic
+    @State private var selectedPointID: String?
+
+    private var selectedPoint: DearActivityMapPoint? { points.first { $0.id == selectedPointID } }
+
+    var body: some View {
+        VStack(spacing: 0) {
+            Map(position: $cameraPosition) {
+                ForEach(points) { point in
+                    Annotation(point.title, coordinate: point.coordinate) {
+                        Button { selectedPointID = point.id } label: {
+                            Image(systemName: point.systemImage)
+                                .font(.title3)
+                                .foregroundStyle(.white)
+                                .padding(9)
+                                .background(point.id == selectedPointID ? Color.orange : Color.teal, in: Circle())
+                        }
+                        .accessibilityLabel("\(point.title)，\(point.subtitle)")
+                    }
+                }
+            }
+            .mapControls { MapCompass(); MapScaleView() }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            if let selectedPoint {
+                Label(selectedPoint.title, systemImage: selectedPoint.systemImage).font(.headline)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal)
+                    .padding(.top, 12)
+                Text(selectedPoint.subtitle)
+                    .font(.subheadline).foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal)
+                    .padding(.bottom, 12)
+            }
+            List(points) { point in
+                Button {
+                    selectedPointID = point.id
+                    cameraPosition = .region(MKCoordinateRegion(center: point.coordinate,
+                        span: MKCoordinateSpan(latitudeDelta: 0.02, longitudeDelta: 0.02)))
+                } label: {
+                    Label {
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text(point.title).lineLimit(1)
+                            Text(point.subtitle).font(.caption).foregroundStyle(.secondary).lineLimit(2)
+                        }
+                    } icon: { Image(systemName: point.systemImage) }
+                }
+            }
+            .frame(height: min(CGFloat(points.count) * 70 + 16, 220))
+        }
+        .navigationTitle("\(title) · 地图")
+        .navigationBarTitleDisplayMode(.inline)
+        .onAppear { fitAllPoints() }
+    }
+
+    private func fitAllPoints() {
+        guard let first = points.first else { return }
+        let latitudes = points.map(\.coordinate.latitude)
+        let longitudes = points.map(\.coordinate.longitude)
+        let minLat = latitudes.min() ?? first.coordinate.latitude
+        let maxLat = latitudes.max() ?? first.coordinate.latitude
+        let minLon = longitudes.min() ?? first.coordinate.longitude
+        let maxLon = longitudes.max() ?? first.coordinate.longitude
+        cameraPosition = .region(MKCoordinateRegion(
+            center: CLLocationCoordinate2D(latitude: (minLat + maxLat) / 2, longitude: (minLon + maxLon) / 2),
+            span: MKCoordinateSpan(latitudeDelta: max((maxLat - minLat) * 1.5, 0.02),
+                                   longitudeDelta: max((maxLon - minLon) * 1.5, 0.02))))
     }
 }
 
@@ -401,6 +523,22 @@ struct DearSocialView: View {
                             .font(.caption).foregroundStyle(.secondary)
                     }
                     Spacer()
+                }
+            }
+            Section {
+                let points = DearActivityMapPoint.points(checkIns: checkIns, photos: photos)
+                NavigationLink {
+                    DearActivityMapView(title: selectedActivity?.text("title") ?? "活动", points: points)
+                } label: {
+                    Label("活动地图", systemImage: "map")
+                }
+                .disabled(points.isEmpty)
+                if points.isEmpty {
+                    Text("暂无带坐标的打卡或照片。")
+                        .font(.caption).foregroundStyle(.secondary)
+                } else {
+                    Text("显示 \(checkIns.count) 条打卡中的定位记录，以及带照片定位的共享内容。")
+                        .font(.caption).foregroundStyle(.secondary)
                 }
             }
                 if let selectedActivity {
