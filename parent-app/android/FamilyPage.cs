@@ -193,14 +193,18 @@ public sealed class FamilyPage : ContentPage
     private void AccountContent()
     {
         content.Add(Heading("我的", 21));
-        content.Add(Heading("用户中心", 17));
-        content.Add(new Label { Text = store.Profile?.Text("username") ?? "家长", FontSize = 18 });
-        content.Add(new Label { Text = $"Android 版本 {AppInfo.Current.VersionString} · 数据与网页版共用" });
+        content.Add(Heading("用户与权益", 17));
+        var accountRow = new Grid { ColumnDefinitions = new ColumnDefinitionCollection { new(GridLength.Star), new(GridLength.Auto) }, ColumnSpacing = 8 };
+        accountRow.Add(new Label { Text = "👤 " + (store.Profile?.Text("username") ?? "家长"), FontSize = 18, VerticalTextAlignment = TextAlignment.Center }, 0, 0);
+        accountRow.Add(Button("↪ 退出登录", () => _ = Logout()), 1, 0);
+        content.Add(accountRow);
         content.Add(Button("刷新", () => _ = Run(store.LoadAsync)));
-        content.Add(Button("退出登录", () => _ = Logout()));
-        content.Add(Heading("隐私与帮助", 17));
+        content.Add(Heading("应用与设置", 17));
+        content.Add(Button("家庭与成员", () => { tab = "家庭"; Render(); }));
+        content.Add(Heading("帮助与隐私", 17));
+        content.Add(new Label { Text = $"Android 版本 {AppInfo.Current.VersionString} · 数据与网页版共用" });
         content.Add(Button("隐私政策与应用资料", () => _ = Navigation.PushAsync(new AtlasInformationPage(false))));
-        content.Add(Heading("反馈与邀请", 17));
+        content.Add(Heading("邀请与反馈", 17));
         content.Add(Button("心愿墙与意见墙", () => _ = Navigation.PushAsync(new FeedbackWallPage(store))));
         content.Add(Button("同行共创成员", () => _ = Navigation.PushAsync(new AtlasInformationPage(true))));
         content.Add(Button("生成专属测试邀请", () => _ = Navigation.PushAsync(new TestInvitationPage())));

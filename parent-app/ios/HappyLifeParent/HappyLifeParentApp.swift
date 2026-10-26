@@ -456,6 +456,8 @@ struct FamilyInvitationHub: View {
 struct AccountView: View {
     @ObservedObject var store: FamilyStore
     @State private var logout = false
+    @State private var deleteAccount = false
+    @State private var userInfo: AgentIdentityUserInfo?
     @State private var resources: MomentResources?
     @State private var resourceError: String?
     private struct MomentResources: Decodable {
@@ -468,22 +470,36 @@ struct AccountView: View {
     var body: some View {
         NavigationStack {
             List {
-                Section("用户中心") {
-                    Label(store.profile?.text("username") ?? "账号", systemImage: "person.crop.circle.fill")
+                Section("用户与权益") {
+                    HStack {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Label(userInfo?.username ?? store.profile?.text("username") ?? "账号", systemImage: "person.crop.circle.fill")
+                            if let name = userInfo?.displayName, name != userInfo?.username {
+                                Text(name).font(.caption).foregroundStyle(.secondary)
+                            }
+                        }
+                        Spacer()
+                        Button { logout = true } label: {
+                            Label("退出登录", systemImage: "rectangle.portrait.and.arrow.right")
+                        }.font(.subheadline)
+                    }
                     Link(destination: URL(string: "https://auth.ai.xmkurt.com/personal/info")!) {
                         Label("账号资料", systemImage: "person.crop.circle")
                     }
-                    Link(destination: URL(string: "https://auth.ai.xmkurt.com/personal/info?deleteAccount=1")!) {
-                        Label("注销账号", systemImage: "trash")
+                    Link(destination: URL(string: "https://auth.ai.xmkurt.com/personal/info?section=password")!) {
+                        Label("修改密码", systemImage: "key")
                     }
-                    Button("退出当前账号", role: .destructive) { logout = true }
-                }
-                Section("订阅与权益") {
-                    NavigationLink { RemoteRecords(store: store, title: "订阅权益", path: "/api/subscription", mode: .subscription) } label: {
-                        Label("查看订阅权益", systemImage: "checkmark.seal.fill")
+                    Button { deleteAccount = true } label: {
+                        Label("账号注销", systemImage: "person.crop.circle.badge.xmark")
+                    }
+                    Link(destination: URL(string: "https://pay.ai.xmkurt.com/account")!) {
+                        Label("套餐权益", systemImage: "checkmark.seal")
                     }
                 }
-                Section("功能设置") {
+                Section("应用与设置") {
+                    NavigationLink { RemoteRecords(store: store, title: "家庭订阅", path: "/api/subscription", mode: .subscription) } label: {
+                        Label("家庭订阅", systemImage: "checkmark.seal.fill")
+                    }
                     NavigationLink { GenealogyView(store: store) } label: { Label("家族族谱", systemImage: "person.3.sequence.fill") }
                     NavigationLink { MembersView(store: store) } label: { Label("家庭成员", systemImage: "person.3.fill") }
                     NavigationLink { FamilyInvitationHub(store: store) } label: { Label("邀请家人", systemImage: "envelope.open.fill") }
@@ -491,42 +507,56 @@ struct AccountView: View {
                         Label("通知、照片与位置权限", systemImage: "gearshape.fill")
                     }
                 }
-                Section("隐私与帮助") {
+                Section("帮助与隐私") {
                     if let url = resources?.privacyPolicyUrl, url.scheme == "https" {
                         Link(destination: url) { Label("隐私政策", systemImage: "hand.raised.fill") }
                     } else {
                         Label("隐私政策未配置", systemImage: "hand.raised.fill").foregroundStyle(.secondary)
                     }
-                    if let url = resources?.termsUrl, url.scheme == "https" { Link("用户协议", destination: url) }
+                    if let url = resources?.termsUrl, url.scheme == "https" {
+                        Link(destination: url) { Label("用户协议", systemImage: "doc.text") }
+                    } else { Label("用户协议未配置", systemImage: "doc.text").foregroundStyle(.secondary) }
                     NavigationLink { MomentHelpView() } label: {
                         Label("使用帮助", systemImage: "book.closed.fill")
                     }
-                    if let url = resources?.userManualUrl, url.scheme == "https" { Link("详细使用手册", destination: url) }
+                    if let url = resources?.userManualUrl, url.scheme == "https" {
+                        Link(destination: url) { Label("详细使用手册", systemImage: "book") }
+                    }
                     if let url = resources?.supportUrl, url.scheme == "https" { Link("联系支持", destination: url) }
                     if let resourceError {
                         Text(resourceError).font(.footnote).foregroundStyle(.red)
                         Button("重试读取应用资料") { Task { await loadResources() } }
                     }
-                    LabeledContent("版本", value: "\(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "") (\(Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? ""))")
+                    NavigationLink { MomentVersionView() } label: {
+                        Label("版本升级", systemImage: "arrow.up.circle")
+                    }
                 }
-                Section("反馈与邀请") {
+                Section("邀请与反馈") {
                     NavigationLink {
                         FeedbackWallView(identity: store.identity)
                     } label: {
-                        Label("心愿墙与意见墙", systemImage: "bubble.left.and.bubble.right")
+                        Label("意见反馈", systemImage: "bubble.left.and.bubble.right")
                     }
                     NavigationLink { MomentTeamMembersView() } label: {
-                        Label("同行共创成员", systemImage: "person.3.fill")
+                        Label("同行共创", systemImage: "person.3")
                     }
                     NavigationLink { MomentTestInvitationView() } label: {
-                        Label("生成专属测试邀请", systemImage: "square.and.arrow.up")
+                        Label("测试邀请", systemImage: "square.and.arrow.up")
                     }
                     Text("生成 Linko Moment 专属链接，扫码或通过系统分享邀请朋友。")
                         .font(.footnote).foregroundStyle(.secondary)
                 }
             }.readablePage().navigationTitle("我的")
                 .task { await loadResources() }
+                .task(id: store.identity.isAuthenticated) {
+                    if store.identity.isAuthenticated {
+                        userInfo = try? await store.identity.userInfo(authority: URL(string: "https://auth.ai.xmkurt.com")!)
+                    } else { userInfo = nil }
+                }
                 .confirmationDialog("退出 Linko Moment？", isPresented: $logout, titleVisibility: .visible) { Button("退出登录", role: .destructive) { store.logout() } } message: { Text("本机登录凭据将清除。用户中心的浏览器登录状态由用户中心管理。") }
+                .confirmationDialog("前往用户中心注销账号？", isPresented: $deleteAccount, titleVisibility: .visible) {
+                    Link("继续注销", destination: URL(string: "https://auth.ai.xmkurt.com/personal/info?deleteAccount=1")!)
+                } message: { Text("账号注销会影响同一用户中心账号使用的其他应用。用户中心还会要求进一步确认。") }
         }
     }
 
@@ -1114,5 +1144,50 @@ struct FamilyConnectionDetail: View {
             _ = try await store.call("/api/family-connections/\(current.id)/\(endpoint)", method: "POST", body: body)
             done(); await loadLocal(); await reload()
         } catch { self.error = error.localizedDescription }
+    }
+}
+
+private struct MomentVersionView: View {
+    private struct StoreResponse: Decodable {
+        struct App: Decodable { let bundleId: String; let version: String; let trackViewUrl: URL }
+        let results: [App]
+    }
+    @State private var app: StoreResponse.App?
+    @State private var checked = false
+    @State private var failure = false
+    private var version: String { Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "未知" }
+    private var build: String { Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "未知" }
+    var body: some View {
+        List {
+            Section("当前版本") { Label("\(version) (\(build))", systemImage: "iphone") }
+            Section("App Store") {
+                if let app {
+                    Label("最新版本：\(app.version)", systemImage: "arrow.up.circle")
+                    if app.version.compare(version, options: .numeric) == .orderedDescending {
+                        Link("发现新版本，前往升级", destination: app.trackViewUrl)
+                    } else { Text("当前已是 App Store 最新版本").foregroundStyle(.secondary) }
+                } else if failure {
+                    Text("暂时无法检查更新").foregroundStyle(.secondary)
+                    Button("重新检查", systemImage: "arrow.clockwise") { Task { await check() } }
+                } else if checked { Text("App Store 暂无可用版本").foregroundStyle(.secondary) }
+                else { ProgressView("正在检查新版本") }
+            }
+        }
+        .navigationTitle("版本升级")
+        .task { await check() }
+    }
+    private func check() async {
+        guard let bundle = Bundle.main.bundleIdentifier,
+              let encoded = bundle.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed),
+              let url = URL(string: "https://itunes.apple.com/lookup?bundleId=\(encoded)&country=cn") else {
+            failure = true; return
+        }
+        checked = false; failure = false
+        do {
+            let (data, response) = try await URLSession.shared.data(from: url)
+            guard (response as? HTTPURLResponse)?.statusCode == 200 else { failure = true; return }
+            app = try JSONDecoder().decode(StoreResponse.self, from: data).results.first(where: { $0.bundleId == bundle })
+            checked = true
+        } catch { failure = true }
     }
 }
