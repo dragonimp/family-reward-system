@@ -74,6 +74,7 @@ private struct DearActivityMapPoint: Identifiable {
     let subtitle: String
     let coordinate: CLLocationCoordinate2D
     let systemImage: String
+    let photo: DearRecord?
 
     static func points(checkIns: [DearRecord], photos: [DearRecord]) -> [Self] {
         let visits = checkIns.compactMap { item -> Self? in
@@ -81,14 +82,15 @@ private struct DearActivityMapPoint: Identifiable {
             let address = item.text("address")
             let subtitle = "\(address.isEmpty ? item.dateText("createdAt") : address) · 海拔 \(String(format: "%.1f", item.number("altitudeMeters"))) 米"
             return Self(id: "checkin-\(item.id)", title: item.text("authorName").isEmpty ? "活动打卡" : "\(item.text("authorName"))的打卡",
-                        subtitle: subtitle, coordinate: coordinate, systemImage: "mappin.circle.fill")
+                        subtitle: subtitle, coordinate: coordinate, systemImage: "mappin.circle.fill", photo: nil)
         }
         let pictures = photos.compactMap { item -> Self? in
             guard let coordinate = photoCoordinate(item.text("locationName")) else { return nil }
             let title = item.text("originalFileName").isEmpty ? "活动照片" : item.text("originalFileName")
             return Self(id: "photo-\(item.id)", title: title,
                         subtitle: "\(item.text("sourceDisplayName")) · \(item.dateText("createdAt"))",
-                        coordinate: coordinate, systemImage: item.text("contentType").hasPrefix("video/") ? "video.fill" : "photo.fill")
+                        coordinate: coordinate, systemImage: item.text("contentType").hasPrefix("video/") ? "video.fill" : "photo.fill",
+                        photo: item)
         }
         return visits + pictures
     }
@@ -117,41 +119,107 @@ private struct DearActivityMapPoint: Identifiable {
 }
 
 private struct DearActivityMapView: View {
+    @ObservedObject var store: FamilyStore
     let title: String
+    let spaceID: String
+    let activityID: String
     let points: [DearActivityMapPoint]
+    let photos: [DearRecord]
     @State private var cameraPosition: MapCameraPosition = .automatic
     @State private var selectedPointID: String?
+    @State private var selectedPhoto: DearRecord?
+    @State private var showingPhoto = false
 
     private var selectedPoint: DearActivityMapPoint? { points.first { $0.id == selectedPointID } }
+    private func thumbnailPath(_ photo: DearRecord) -> String {
+        "/api/dear/social/tenants/\(spaceID)/activities/\(activityID)/native-photos/\(photo.id)/thumbnail"
+    }
+
+    private func openPhoto(_ photo: DearRecord) {
+        selectedPhoto = photo
+        showingPhoto = true
+    }
 
     var body: some View {
         VStack(spacing: 0) {
-            Map(position: $cameraPosition) {
-                ForEach(points) { point in
-                    Annotation(point.title, coordinate: point.coordinate) {
-                        Button { selectedPointID = point.id } label: {
-                            Image(systemName: point.systemImage)
-                                .font(.title3)
-                                .foregroundStyle(.white)
-                                .padding(9)
-                                .background(point.id == selectedPointID ? Color.orange : Color.teal, in: Circle())
+            if points.isEmpty {
+                ContentUnavailableView("暂无地图位置", systemImage: "map",
+                                       description: Text("照片没有记录坐标时仍可在下方查看，但无法固定到地图上。"))
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else {
+                Map(position: $cameraPosition) {
+                    ForEach(points) { point in
+                        Annotation(point.title, coordinate: point.coordinate) {
+                            Button { selectedPointID = point.id } label: {
+                                if let photo = point.photo {
+                                    DearPhotoPreview(store: store, path: thumbnailPath(photo))
+                                        .frame(width: 66, height: 66)
+                                        .overlay(alignment: .bottomTrailing) {
+                                            if point.systemImage == "video.fill" {
+                                                Image(systemName: "play.circle.fill")
+                                                    .font(.title3).foregroundStyle(.white)
+                                                    .shadow(color: .black, radius: 2)
+                                            }
+                                        }
+                                        .overlay(RoundedRectangle(cornerRadius: 10)
+                                            .stroke(point.id == selectedPointID ? Color.orange : Color.white, lineWidth: 3))
+                                        .shadow(radius: 3)
+                                } else {
+                                    Image(systemName: point.systemImage)
+                                        .font(.title3)
+                                        .foregroundStyle(.white)
+                                        .padding(9)
+                                        .background(point.id == selectedPointID ? Color.orange : Color.teal, in: Circle())
+                                }
+                            }
+                            .accessibilityLabel("\(point.title)，\(point.subtitle)")
                         }
-                        .accessibilityLabel("\(point.title)，\(point.subtitle)")
                     }
                 }
+                .mapControls { MapCompass(); MapScaleView() }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
-            .mapControls { MapCompass(); MapScaleView() }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
             if let selectedPoint {
-                Label(selectedPoint.title, systemImage: selectedPoint.systemImage).font(.headline)
-                    .frame(maxWidth: .infinity, alignment: .leading)
+                HStack(spacing: 10) {
+                    if let photo = selectedPoint.photo {
+                        DearPhotoPreview(store: store, path: thumbnailPath(photo))
+                            .frame(width: 54, height: 54)
+                    } else { Image(systemName: selectedPoint.systemImage).font(.title2) }
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(selectedPoint.title).font(.headline).lineLimit(1)
+                        Text(selectedPoint.subtitle).font(.caption).foregroundStyle(.secondary).lineLimit(2)
+                    }
+                    Spacer(minLength: 0)
+                    if let photo = selectedPoint.photo {
+                        Button("查看") { openPhoto(photo) }.font(.subheadline)
+                    }
+                }
+                .padding(12)
+            }
+            if !photos.isEmpty {
+                HStack {
+                    Text("活动照片与视频").font(.subheadline.bold())
+                    Spacer()
+                    let unlocated = photos.count - points.filter { $0.photo != nil }.count
+                    if unlocated > 0 { Text("\(unlocated) 项未定位").font(.caption).foregroundStyle(.secondary) }
+                }
+                .padding(.horizontal)
+                ScrollView(.horizontal) {
+                    LazyHStack(spacing: 10) {
+                        ForEach(photos) { photo in
+                            Button { openPhoto(photo) } label: {
+                                VStack(alignment: .leading, spacing: 4) {
+                                    DearPhotoPreview(store: store, path: thumbnailPath(photo))
+                                        .frame(width: 82, height: 82)
+                                    Text(photo.text("originalFileName").isEmpty ? "照片" : photo.text("originalFileName"))
+                                        .font(.caption2).lineLimit(1).frame(width: 82, alignment: .leading)
+                                }
+                            }.buttonStyle(.plain)
+                        }
+                    }
                     .padding(.horizontal)
-                    .padding(.top, 12)
-                Text(selectedPoint.subtitle)
-                    .font(.subheadline).foregroundStyle(.secondary)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.horizontal)
-                    .padding(.bottom, 12)
+                }
+                .frame(height: 112)
             }
             List(points) { point in
                 Button {
@@ -171,6 +239,12 @@ private struct DearActivityMapView: View {
         }
         .navigationTitle("\(title) · 地图")
         .navigationBarTitleDisplayMode(.inline)
+        .navigationDestination(isPresented: $showingPhoto) {
+            if let selectedPhoto {
+                DearPhotoDetailView(store: store, photo: selectedPhoto, spaceID: spaceID, activityID: activityID,
+                                    path: thumbnailPath(selectedPhoto), canDelete: false, onDeleted: { _ in })
+            }
+        }
         .onAppear { fitAllPoints() }
     }
 
@@ -513,31 +587,36 @@ struct DearSocialView: View {
         List {
             if !error.isEmpty { Section { Text(error).foregroundStyle(.red) } }
             if !notice.isEmpty { Section { Text(notice).foregroundStyle(.teal) } }
-            Section {
-                HStack(alignment: .top) {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(activities.contains(where: { $0.id == activityId }) ? (selectedSpace?.text("name") ?? "我的空间") : "已参加的活动")
-                            .font(.caption).foregroundStyle(.teal)
-                        Text(selectedActivity?.text("title") ?? "活动详情").font(.title2.bold())
-                        Text("邀请、照片、日常和成员仅属于这场活动。")
-                            .font(.caption).foregroundStyle(.secondary)
+            if selectedActivity != nil {
+                Section("生活分享") {
+                    ForEach(moments) { moment in
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text(moment.text("authorName")).font(.subheadline.bold())
+                            Text(moment.text("text")).textSelection(.enabled)
+                            if moment.flag("canDelete") {
+                                Button("删除我的记录", role: .destructive) { run { try await deleteMoment(moment) } }.font(.caption)
+                            }
+                        }.padding(.vertical, 4)
                     }
-                    Spacer()
+                    if moments.isEmpty { Text("还没有分享的日常。").foregroundStyle(.secondary) }
+                    Button("刷新日常") { run { try await loadMoments() } }.disabled(busy)
                 }
             }
             Section {
                 let points = DearActivityMapPoint.points(checkIns: checkIns, photos: photos)
                 NavigationLink {
-                    DearActivityMapView(title: selectedActivity?.text("title") ?? "活动", points: points)
+                    DearActivityMapView(store: store, title: selectedActivity?.text("title") ?? "活动",
+                                        spaceID: activityTenantId, activityID: activityId,
+                                        points: points, photos: photos)
                 } label: {
                     Label("活动地图", systemImage: "map")
                 }
-                .disabled(points.isEmpty)
-                if points.isEmpty {
-                    Text("暂无带坐标的打卡或照片。")
+                .disabled(points.isEmpty && photos.isEmpty)
+                if points.isEmpty && photos.isEmpty {
+                    Text("暂无打卡或共享照片。")
                         .font(.caption).foregroundStyle(.secondary)
                 } else {
-                    Text("显示 \(checkIns.count) 条打卡中的定位记录，以及带照片定位的共享内容。")
+                    Text("\(points.filter { $0.photo == nil }.count) 个打卡点 · \(points.filter { $0.photo != nil }.count) 项定位照片或视频；其他照片也可在地图页查看。")
                         .font(.caption).foregroundStyle(.secondary)
                 }
             }
@@ -584,21 +663,6 @@ struct DearSocialView: View {
                             ForEach(photos) { photo in photoLink(photo) }
                         }
                         Button("刷新相册") { run { try await loadPhotos() } }.disabled(busy)
-                    }
-                    Section("生活分享 · \(selectedActivity.text("title"))") {
-                        Text("只向这场活动的成员展示。")
-                            .font(.caption).foregroundStyle(.secondary)
-                        ForEach(moments) { moment in
-                            VStack(alignment: .leading, spacing: 6) {
-                                Text(moment.text("authorName")).font(.subheadline.bold())
-                                Text(moment.text("text")).textSelection(.enabled)
-                                if moment.flag("canDelete") {
-                                    Button("删除我的记录", role: .destructive) { run { try await deleteMoment(moment) } }.font(.caption)
-                                }
-                            }.padding(.vertical, 4)
-                        }
-                        if moments.isEmpty { Text("还没有分享的日常。") .foregroundStyle(.secondary) }
-                        Button("刷新日常") { run { try await loadMoments() } }.disabled(busy)
                     }
                     Section("活动打卡") {
                         Button {
