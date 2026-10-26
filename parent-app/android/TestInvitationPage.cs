@@ -12,13 +12,13 @@ public sealed class TestInvitationPage : ContentPage
     private const string SessionKey = "linko_family_atlas_share_session";
     private readonly NativeSessionHandler session;
     private readonly HttpClient client;
-    private readonly VerticalStackLayout body = new() { Spacing = 16, Padding = new Thickness(20, 24, 20, 36) };
-    private readonly VerticalStackLayout invitationCard = new() { Spacing = 14, IsVisible = false };
+    private readonly VerticalStackLayout body = new() { Spacing = 12, Padding = new Thickness(16, 12, 16, 16) };
+    private readonly VerticalStackLayout invitationCard = new() { Spacing = 10, IsVisible = false };
     private readonly Label title = new() { FontSize = 23, FontAttributes = FontAttributes.Bold, HorizontalTextAlignment = TextAlignment.Center };
     private readonly Label description = new() { TextColor = Colors.DimGray, HorizontalTextAlignment = TextAlignment.Center };
     private readonly Label error = new() { TextColor = Colors.DarkRed, HorizontalTextAlignment = TextAlignment.Center };
     private readonly Label link = new() { LineBreakMode = LineBreakMode.CharacterWrap, TextColor = Color.FromArgb("#0F766E") };
-    private readonly Image qr = new() { WidthRequest = 220, HeightRequest = 220, HorizontalOptions = LayoutOptions.Center };
+    private readonly Image qr = new() { WidthRequest = 184, HeightRequest = 184, HorizontalOptions = LayoutOptions.Center };
     private readonly ActivityIndicator progress = new();
     private readonly Button generate = new() { Text = "登录并生成邀请" };
     private Uri? invitation;
@@ -34,10 +34,10 @@ public sealed class TestInvitationPage : ContentPage
             () => SecureStorage.Default.GetAsync(SessionKey),
             value => value is null ? ClearSessionAsync() : SecureStorage.Default.SetAsync(SessionKey, value));
         client = new HttpClient(session) { BaseAddress = Origin, Timeout = TimeSpan.FromSeconds(25) };
-        body.Add(new Label { Text = "✉", FontSize = 46, HorizontalTextAlignment = TextAlignment.Center });
+        body.Add(new Label { Text = "✉", FontSize = 34, HorizontalTextAlignment = TextAlignment.Center });
         body.Add(title);
         body.Add(description);
-        invitationCard.Add(new Border { Content = qr, Padding = 18, BackgroundColor = Colors.White,
+        invitationCard.Add(new Border { Content = qr, Padding = 8, BackgroundColor = Colors.White,
             StrokeThickness = 0, HorizontalOptions = LayoutOptions.Center });
         invitationCard.Add(new Label { Text = "扫码打开邀请", FontAttributes = FontAttributes.Bold,
             HorizontalTextAlignment = TextAlignment.Center });
@@ -66,7 +66,7 @@ public sealed class TestInvitationPage : ContentPage
         generate.Clicked += async (_, _) => await CreateAsync();
         body.Add(generate);
         body.Add(error);
-        Content = new ScrollView { Content = body };
+        Content = new ScrollView { Content = body, VerticalScrollBarVisibility = ScrollBarVisibility.Never };
     }
 
     protected override async void OnAppearing()

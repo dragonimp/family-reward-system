@@ -472,19 +472,18 @@ struct AccountView: View {
             List {
                 Section("用户与权益") {
                     HStack {
-                        VStack(alignment: .leading, spacing: 2) {
-                            Label(userInfo?.username ?? store.profile?.text("username") ?? "账号", systemImage: "person.crop.circle.fill")
-                            if let name = userInfo?.displayName, name != userInfo?.username {
-                                Text(name).font(.caption).foregroundStyle(.secondary)
+                        Link(destination: URL(string: "https://auth.ai.xmkurt.com/personal/info")!) {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Label(userInfo?.username ?? store.profile?.text("username") ?? "账号", systemImage: "person.crop.circle.fill")
+                                if let name = userInfo?.displayName, name != userInfo?.username {
+                                    Text(name).font(.caption).foregroundStyle(.secondary)
+                                }
                             }
-                        }
+                        }.buttonStyle(.plain)
                         Spacer()
                         Button { logout = true } label: {
                             Label("退出登录", systemImage: "rectangle.portrait.and.arrow.right")
                         }.font(.subheadline)
-                    }
-                    Link(destination: URL(string: "https://auth.ai.xmkurt.com/personal/info")!) {
-                        Label("账号资料", systemImage: "person.crop.circle")
                     }
                     Link(destination: URL(string: "https://auth.ai.xmkurt.com/personal/info?section=password")!) {
                         Label("修改密码", systemImage: "key")
@@ -492,14 +491,11 @@ struct AccountView: View {
                     Button { deleteAccount = true } label: {
                         Label("账号注销", systemImage: "person.crop.circle.badge.xmark")
                     }
-                    Link(destination: URL(string: "https://pay.ai.xmkurt.com/account")!) {
+                    NavigationLink { RemoteRecords(store: store, title: "套餐权益", path: "/api/subscription", mode: .subscription) } label: {
                         Label("套餐权益", systemImage: "checkmark.seal")
                     }
                 }
                 Section("应用与设置") {
-                    NavigationLink { RemoteRecords(store: store, title: "家庭订阅", path: "/api/subscription", mode: .subscription) } label: {
-                        Label("家庭订阅", systemImage: "checkmark.seal.fill")
-                    }
                     NavigationLink { GenealogyView(store: store) } label: { Label("家族族谱", systemImage: "person.3.sequence.fill") }
                     NavigationLink { MembersView(store: store) } label: { Label("家庭成员", systemImage: "person.3.fill") }
                     NavigationLink { FamilyInvitationHub(store: store) } label: { Label("邀请家人", systemImage: "envelope.open.fill") }
@@ -543,9 +539,9 @@ struct AccountView: View {
                     NavigationLink { MomentTestInvitationView() } label: {
                         Label("测试邀请", systemImage: "square.and.arrow.up")
                     }
-                    Text("生成 Linko Moment 专属链接，扫码或通过系统分享邀请朋友。")
-                        .font(.footnote).foregroundStyle(.secondary)
                 }
+                Text("Linko Moment \(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "未知") (\(Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "未知"))")
+                    .font(.caption2).foregroundStyle(.secondary).frame(maxWidth: .infinity)
             }.readablePage().navigationTitle("我的")
                 .task { await loadResources() }
                 .task(id: store.identity.isAuthenticated) {
@@ -590,20 +586,20 @@ private struct MomentTestInvitationView: View {
 
     var body: some View {
         ScrollView {
-            VStack(spacing: 20) {
+            VStack(spacing: 12) {
                 Image(systemName: "envelope.open.fill")
-                    .font(.system(size: 38)).foregroundStyle(.white)
-                    .frame(width: 76, height: 76)
-                    .background(.teal.gradient, in: RoundedRectangle(cornerRadius: 22))
+                    .font(.system(size: 30)).foregroundStyle(.white)
+                    .frame(width: 60, height: 60)
+                    .background(.teal.gradient, in: RoundedRectangle(cornerRadius: 18))
                 Text(details?.title ?? "专属测试邀请").font(.title2.bold())
                 Text(details?.description ?? "正在读取邀请活动…")
                     .font(.subheadline).foregroundStyle(.secondary).multilineTextAlignment(.center)
 
                 if let invitation {
-                    VStack(spacing: 18) {
+                    VStack(spacing: 10) {
                         if let image = qrImage(invitation.url) {
                             Image(uiImage: image).interpolation(.none).resizable()
-                                .frame(width: 220, height: 220).padding(18)
+                                .frame(width: 184, height: 184).padding(8)
                                 .background(.white, in: RoundedRectangle(cornerRadius: 18))
                                 .accessibilityLabel("邀请链接二维码")
                         }
@@ -623,7 +619,7 @@ private struct MomentTestInvitationView: View {
                             }.buttonStyle(.borderedProminent)
                         }
                     }
-                    .padding(20).frame(maxWidth: .infinity)
+                    .padding(14).frame(maxWidth: .infinity)
                     .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 24))
                 } else if busy { ProgressView("正在生成邀请链接…") }
 
@@ -632,8 +628,9 @@ private struct MomentTestInvitationView: View {
                 }.disabled(busy).buttonStyle(.bordered)
                 if let error { Text(error).font(.footnote).foregroundStyle(.red) }
             }
-            .padding(20).frame(maxWidth: 500).frame(maxWidth: .infinity)
+            .padding(14).frame(maxWidth: 500).frame(maxWidth: .infinity)
         }
+        .scrollIndicators(.hidden)
         .background(Color.teal.opacity(0.06))
         .navigationTitle("专属测试邀请")
         .navigationBarTitleDisplayMode(.inline)
@@ -913,8 +910,21 @@ struct RemoteRecords: View {
                     Text(object.text("inviteCode")).font(.title.monospacedDigit()).textSelection(.enabled)
                     if let url = URL(string: object.text("inviteUrl")), url.scheme == "https" { ShareLink("分享家庭邀请", item: url) }
                 } else if mode == .subscription {
-                    LabeledContent("基础功能", value: object.flag("standardIncluded") ? "已包含" : "未开通")
-                    LabeledContent("VIP 表盘", value: object.flag("vipWatchFaces") ? "已开通" : "未开通")
+                    Section("当前权益") {
+                        if let fields = object.fields["subscription"] as? [String: Any] {
+                            let current = Record(fields: fields)
+                            Text(current.text("planCode") == "vip-home-plus" ? "VIP 家庭+" : current.text("planCode"))
+                                .font(.headline)
+                            Text("有效至 \(String(current.text("expiresAt").prefix(10)))")
+                                .font(.footnote).foregroundStyle(.secondary)
+                        } else {
+                            Text("标准版 · 基础功能已包含")
+                        }
+                    }
+                    Section("套餐功能") {
+                        Label("基础功能" + (object.flag("standardIncluded") ? " · 已包含" : " · 未开通"), systemImage: "checkmark.circle")
+                        Label("VIP 表盘" + (object.flag("vipWatchFaces") ? " · 已开通" : " · 未开通"), systemImage: "checkmark.seal")
+                    }
                 }
             }
             ForEach(Array(rows.enumerated()), id: \.offset) { _, row in

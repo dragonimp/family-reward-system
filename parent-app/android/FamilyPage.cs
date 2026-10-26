@@ -195,26 +195,43 @@ public sealed class FamilyPage : ContentPage
         content.Add(Heading("我的", 21));
         content.Add(Heading("用户与权益", 17));
         var accountRow = new Grid { ColumnDefinitions = new ColumnDefinitionCollection { new(GridLength.Star), new(GridLength.Auto) }, ColumnSpacing = 8 };
-        accountRow.Add(new Label { Text = "👤 " + (store.Profile?.Text("username") ?? "家长"), FontSize = 18, VerticalTextAlignment = TextAlignment.Center }, 0, 0);
+        var userLabel = new Label { Text = "👤 " + (store.Profile?.Text("username") ?? "家长"), FontSize = 18, VerticalTextAlignment = TextAlignment.Center };
+        var profileTap = new TapGestureRecognizer();
+        profileTap.Tapped += async (_, _) => await Browser.Default.OpenAsync(new Uri("https://auth.ai.xmkurt.com/personal/info"), BrowserLaunchMode.SystemPreferred);
+        userLabel.GestureRecognizers.Add(profileTap);
+        SemanticProperties.SetDescription(userLabel, "打开用户中心个人信息");
+        accountRow.Add(userLabel, 0, 0);
         accountRow.Add(Button("↪ 退出登录", () => _ = Logout()), 1, 0);
         content.Add(accountRow);
-        content.Add(Button("刷新", () => _ = Run(store.LoadAsync)));
+        content.Add(Button("🔑 修改密码", () => _ = Browser.Default.OpenAsync(new Uri("https://auth.ai.xmkurt.com/personal/info?section=password"), BrowserLaunchMode.SystemPreferred)));
+        content.Add(Button("🚫 账号注销", () => _ = DeleteAccount()));
+        content.Add(Button("✦ 套餐权益", () => _ = Navigation.PushAsync(new SubscriptionBenefitsPage(store))));
+        content.Add(Button("↻ 刷新", () => _ = Run(store.LoadAsync)));
         content.Add(Heading("应用与设置", 17));
-        content.Add(Button("家庭与成员", () => { tab = "家庭"; Render(); }));
+        content.Add(Button("♙ 家庭与成员", () => { tab = "家庭"; Render(); }));
         content.Add(Heading("帮助与隐私", 17));
-        content.Add(new Label { Text = $"Android 版本 {AppInfo.Current.VersionString} · 数据与网页版共用" });
-        content.Add(Button("隐私政策与应用资料", () => _ = Navigation.PushAsync(new AtlasInformationPage(false))));
+        content.Add(Button("▣ 隐私政策", () => _ = Navigation.PushAsync(new AtlasInformationPage(false, "privacyPolicyUrl"))));
+        content.Add(Button("▤ 用户协议", () => _ = Navigation.PushAsync(new AtlasInformationPage(false, "termsUrl"))));
+        content.Add(Button("▧ 使用手册", () => _ = Navigation.PushAsync(new AtlasInformationPage(false, "userManualUrl"))));
+        content.Add(Button("↑ 版本升级", () => _ = Navigation.PushAsync(new MomentVersionPage())));
         content.Add(Heading("邀请与反馈", 17));
-        content.Add(Button("心愿墙与意见墙", () => _ = Navigation.PushAsync(new FeedbackWallPage(store))));
-        content.Add(Button("同行共创成员", () => _ = Navigation.PushAsync(new AtlasInformationPage(true))));
-        content.Add(Button("生成专属测试邀请", () => _ = Navigation.PushAsync(new TestInvitationPage())));
-        content.Add(new Label { Text = "生成 Linko Moment 专属链接，扫码或通过系统分享邀请朋友。", TextColor = Colors.DimGray, FontSize = 12 });
+        content.Add(Button("◉ 意见反馈", () => _ = Navigation.PushAsync(new FeedbackWallPage(store))));
+        content.Add(Button("♧ 同行共创", () => _ = Navigation.PushAsync(new AtlasInformationPage(true))));
+        content.Add(Button("➤ 测试邀请", () => _ = Navigation.PushAsync(new TestInvitationPage())));
+        content.Add(new Label { Text = $"Linko Moment {AppInfo.Current.VersionString} ({AppInfo.Current.BuildString})",
+            TextColor = Colors.DimGray, FontSize = 12, HorizontalTextAlignment = TextAlignment.Center });
     }
 
     private async Task Logout()
     {
         if (!await DisplayAlertAsync("退出登录", "清除本机登录凭据？", "退出", "取消")) return;
         store.Logout(); childId = null; tab = "家庭"; Render();
+    }
+
+    private async Task DeleteAccount()
+    {
+        if (!await DisplayAlertAsync("前往用户中心注销账号？", "账号注销会影响同一用户中心账号使用的其他应用。用户中心还会要求进一步确认。", "继续注销", "取消")) return;
+        await Browser.Default.OpenAsync(new Uri("https://auth.ai.xmkurt.com/personal/info?deleteAccount=1"), BrowserLaunchMode.SystemPreferred);
     }
 
     private async Task CreateFamily()

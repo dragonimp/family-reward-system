@@ -7,13 +7,17 @@ public sealed class AtlasInformationPage : ContentPage
     private static readonly HttpClient Client = new() { BaseAddress = new Uri("https://home.ai.impx.net/"),
         Timeout = TimeSpan.FromSeconds(15) };
     private readonly bool members;
+    private readonly string? resourceKey;
     private readonly VerticalStackLayout body = new() { Spacing = 14, Padding = new Thickness(20, 20, 20, 36) };
     private bool loading;
 
-    public AtlasInformationPage(bool members)
+    public AtlasInformationPage(bool members, string? resourceKey = null)
     {
         this.members = members;
-        Title = members ? "同行共创成员" : "隐私与帮助";
+        this.resourceKey = resourceKey;
+        Title = members ? "同行共创" : resourceKey switch {
+            "privacyPolicyUrl" => "隐私政策", "termsUrl" => "用户协议",
+            "userManualUrl" => "使用手册", _ => "隐私与帮助" };
         BackgroundColor = Color.FromArgb("#F4F8F7");
         Content = new ScrollView { Content = body };
     }
@@ -82,6 +86,7 @@ public sealed class AtlasInformationPage : ContentPage
         foreach (var (key, label) in new[] { ("privacyPolicyUrl", "隐私政策"), ("termsUrl", "用户协议"),
                      ("userManualUrl", "使用手册"), ("supportUrl", "联系支持") })
         {
+            if (resourceKey is not null && resourceKey != key) continue;
             var raw = root.GetProperty(key).GetString();
             if (Uri.TryCreate(raw, UriKind.Absolute, out var url) && url.Scheme == Uri.UriSchemeHttps
                 && url.UserInfo.Length == 0)

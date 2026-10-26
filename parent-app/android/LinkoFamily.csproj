@@ -9,8 +9,8 @@
     <Nullable>enable</Nullable>
     <ApplicationTitle>Linko Moment</ApplicationTitle>
     <ApplicationId>net.impx.happylife.parent.android</ApplicationId>
-    <ApplicationDisplayVersion>20261024-parent-login-android.1</ApplicationDisplayVersion>
-    <ApplicationVersion>7</ApplicationVersion>
+    <ApplicationDisplayVersion>20261027-menu-standard-android.1</ApplicationDisplayVersion>
+    <ApplicationVersion>8</ApplicationVersion>
     <SupportedOSPlatformVersion>26</SupportedOSPlatformVersion>
     <AgentIdentityNativeClientProject Condition="'$(AgentIdentityNativeClientProject)' == ''">$(MSBuildThisFileDirectory)../../../AgentIdentity/src/AgentIdentity.NativeClient/AgentIdentity.NativeClient.csproj</AgentIdentityNativeClientProject>
   </PropertyGroup>
