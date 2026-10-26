@@ -74,6 +74,8 @@ struct DearSocialView: View {
     @State private var joinedActivities: [DearRecord] = []
     @State private var activities: [DearRecord] = []
     @State private var photos: [DearRecord] = []
+    @State private var selectedPhoto: DearRecord?
+    @State private var showingPhoto = false
     @State private var selectedPhotos: [PhotosPickerItem] = []
     @AppStorage("dearPhotoViewMode") private var photoViewMode = "grid"
     @State private var photoLocationName = ""
@@ -283,7 +285,7 @@ struct DearSocialView: View {
             }
             .refreshable { await refresh() }
             .task { await refresh() }
-            .onChange(of: spaceId) { _, _ in activityId = ""; showingActivity = false; showingActivityManagement = false; activities = []; photos = []; activityError = ""; activityLoading = true; run { try await loadActivities() } }
+            .onChange(of: spaceId) { _, _ in activityId = ""; showingActivity = false; showingPhoto = false; selectedPhoto = nil; showingActivityManagement = false; activities = []; photos = []; activityError = ""; activityLoading = true; run { try await loadActivities() } }
             .navigationDestination(isPresented: $showingActivity) { activityDetail }
             .sheet(isPresented: $showingActivityManagement) { activityManagement }
             .sheet(isPresented: $showingSpaceMembers) {
@@ -347,13 +349,11 @@ struct DearSocialView: View {
                     }
             }.buttonStyle(.plain).disabled(batchDownloading)
         } else {
-            NavigationLink {
-                DearPhotoDetailView(store: store, photo: photo, spaceID: activityTenantId, activityID: activityId,
-                                    path: path,
-                                    canDelete: photo.text("sourceSubject") == activityMembers.first(where: { $0.flag("isSelf") })?.subject,
-                                    onDeleted: { try await loadPhotos() })
+            Button {
+                selectedPhoto = photo
+                showingPhoto = true
             } label: { photoCard(photo, path: path) }
-                .buttonStyle(.plain)
+            .buttonStyle(.plain)
         }
     }
 
@@ -522,6 +522,22 @@ struct DearSocialView: View {
         .listStyle(.insetGrouped)
         .readablePage()
         .navigationTitle(selectedActivity?.text("title") ?? "活动详情")
+        .navigationDestination(isPresented: $showingPhoto) {
+            if let selectedPhoto {
+                DearPhotoDetailView(store: store, photo: selectedPhoto, spaceID: activityTenantId, activityID: activityId,
+                                    path: base + "tenants/\(activityTenantId)/activities/\(activityId)/native-photos/\(selectedPhoto.id)/thumbnail",
+                                    canDelete: selectedPhoto.text("sourceSubject") == activityMembers.first(where: { $0.flag("isSelf") })?.subject,
+                                    onDeleted: { localCopyRemoved in
+                                        showingPhoto = false
+                                        photos.removeAll { $0.id == selectedPhoto.id }
+                                        if !localCopyRemoved { self.error = "分享已删除，本机副本暂未清理；App 会继续重试。" }
+                                        Task {
+                                            do { try await loadPhotos() }
+                                            catch { self.error = "相册刷新失败：\(error.localizedDescription)" }
+                                        }
+                                    })
+            }
+        }
         .sheet(isPresented: $showingCheckIn) { checkInSheet }
         .onChange(of: checkInLocator.location?.timestamp) { _, value in
             guard pendingCheckIn, value != nil else { return }
@@ -534,7 +550,7 @@ struct DearSocialView: View {
             error = value
         }
         .onDisappear { pendingCheckIn = false }
-        .onChange(of: activityId) { _, _ in showingActivityManagement = false; inviteLink = ""; inviteUsername = ""; momentDraft = ""; momentRequestID = UUID(); photoLocationName = ""; selectingPhotoDownloads = false; selectedPhotoIDs.removeAll(); batchOriginalURLs = [] }
+        .onChange(of: activityId) { _, _ in showingActivityManagement = false; showingPhoto = false; selectedPhoto = nil; inviteLink = ""; inviteUsername = ""; momentDraft = ""; momentRequestID = UUID(); photoLocationName = ""; selectingPhotoDownloads = false; selectedPhotoIDs.removeAll(); batchOriginalURLs = [] }
         .onChange(of: selectedPhotos) { _, selected in
             guard !selected.isEmpty else { return }
             let targetSpace = activityTenantId, targetActivity = activityId
@@ -1011,14 +1027,13 @@ private struct DearPhotoPreview: View {
 }
 
 private struct DearPhotoDetailView: View {
-    @Environment(\.dismiss) private var dismiss
     @ObservedObject var store: FamilyStore
     let photo: DearRecord
     let spaceID: String
     let activityID: String
     let path: String
     let canDelete: Bool
-    let onDeleted: () async throws -> Void
+    let onDeleted: (Bool) -> Void
     @State private var image: UIImage?
     @State private var error: String?
     @State private var originalURL: URL?
@@ -1107,9 +1122,8 @@ private struct DearPhotoDetailView: View {
         deleting = true; originalError = nil
         defer { deleting = false }
         do {
-            try await store.photoSource.revoke(photoID: photo.id, spaceID: spaceID, activityID: activityID)
-            try await onDeleted()
-            dismiss()
+            let localCopyRemoved = try await store.photoSource.revoke(photoID: photo.id, spaceID: spaceID, activityID: activityID)
+            onDeleted(localCopyRemoved)
         } catch { originalError = error.localizedDescription }
     }
 }

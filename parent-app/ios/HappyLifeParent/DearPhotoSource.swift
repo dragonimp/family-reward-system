@@ -20,6 +20,18 @@ import UniformTypeIdentifiers
     private struct Index: Codable {
         var deviceID: String?
         var photos: [SharedPhoto] = []
+        var pendingRemoval: [SharedPhoto] = []
+
+        init() { }
+
+        private enum CodingKeys: String, CodingKey { case deviceID, photos, pendingRemoval }
+
+        init(from decoder: Decoder) throws {
+            let values = try decoder.container(keyedBy: CodingKeys.self)
+            deviceID = try values.decodeIfPresent(String.self, forKey: .deviceID)
+            photos = try values.decodeIfPresent([SharedPhoto].self, forKey: .photos) ?? []
+            pendingRemoval = try values.decodeIfPresent([SharedPhoto].self, forKey: .pendingRemoval) ?? []
+        }
     }
 
     weak var store: FamilyStore?
@@ -154,6 +166,7 @@ import UniformTypeIdentifiers
     private func enableExistingDevice() async {
         guard let store, let subject = try? await currentSubject(), let root = try? directory(for: subject),
               let index = try? readIndex(at: root) else { return }
+        if !index.pendingRemoval.isEmpty { _ = try? cleanPendingRemoval(at: root) }
         guard let deviceID = index.deviceID else { enabledForSession = true; return }
         do {
             var body: [String: Any] = ["id": deviceID]
@@ -270,17 +283,36 @@ import UniformTypeIdentifiers
         }
     }
 
-    func revoke(photoID: String, spaceID: String, activityID: String) async throws {
+    func revoke(photoID: String, spaceID: String, activityID: String) async throws -> Bool {
         guard UUID(uuidString: photoID) != nil, UUID(uuidString: spaceID) != nil,
               UUID(uuidString: activityID) != nil, let store else { throw APIError.message("照片或视频标识无效。") }
         let prefix = "/api/dear/social/tenants/\(spaceID)/activities/\(activityID)"
         _ = try await store.call(prefix + "/live/photos/\(photoID)", method: "DELETE")
-        guard let subject = try? await currentSubject(), let root = try? directory(for: subject) else { return }
+        guard let subject = try? await currentSubject(), let root = try? directory(for: subject) else { return true }
         var index = try readIndex(at: root)
         let removed = index.photos.filter { $0.id == photoID && $0.spaceID == spaceID && $0.activityID == activityID }
         index.photos.removeAll { $0.id == photoID && $0.spaceID == spaceID && $0.activityID == activityID }
+        index.pendingRemoval.append(contentsOf: removed)
         try writeIndex(index, at: root)
-        for item in removed { try? FileManager.default.removeItem(at: root.appendingPathComponent(item.fileName)) }
+        _ = try cleanPendingRemoval(at: root)
+        let remaining = try readIndex(at: root).pendingRemoval
+        return !remaining.contains {
+            $0.id == photoID && $0.spaceID == spaceID && $0.activityID == activityID
+        }
+    }
+
+    private func cleanPendingRemoval(at root: URL) throws -> Bool {
+        var index = try readIndex(at: root)
+        var failed: [SharedPhoto] = []
+        for item in index.pendingRemoval {
+            let path = root.appendingPathComponent(item.fileName)
+            do {
+                if FileManager.default.fileExists(atPath: path.path) { try FileManager.default.removeItem(at: path) }
+            } catch { failed.append(item) }
+        }
+        index.pendingRemoval = failed
+        try writeIndex(index, at: root)
+        return failed.isEmpty
     }
 
     func refreshPreviews(spaceID: String, activityID: String, rows: [[String: Any]]) async {
@@ -572,6 +604,7 @@ import UniformTypeIdentifiers
         guard !Task.isCancelled, let store, store.identity.isAuthenticated,
               let subject = try? await currentSubject(), let root = try? directory(for: subject),
               let index = try? readIndex(at: root), let deviceID = index.deviceID else { return }
+        if !index.pendingRemoval.isEmpty { _ = try? cleanPendingRemoval(at: root) }
         do {
             let rows = try await store.call("/api/dear/social/photo-devices/\(deviceID)/requests") as? [[String: Any]] ?? []
             if rows.isEmpty { store.photoRequestNotice = nil; store.photoTransferProgress = nil; return }
