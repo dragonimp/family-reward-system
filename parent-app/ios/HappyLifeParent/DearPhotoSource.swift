@@ -171,9 +171,13 @@ import UniformTypeIdentifiers
         do {
             var body: [String: Any] = ["id": deviceID]
             if let pushToken { body["pushToken"] = pushToken }
-            _ = try await store.call("/api/dear/social/photo-devices", method: "POST", body: body)
+            let response = try await store.call("/api/dear/social/photo-devices", method: "POST", body: body) as? [String: Any]
             enabledForSession = true
-            if !index.photos.isEmpty { _ = await enableNotificationsIfNeeded() }
+            // A server upgrade can invalidate an older encrypted APNs token.
+            // Re-register even when the device has no local originals left.
+            if !index.photos.isEmpty || (response?["pushRegistered"] as? Bool) == false {
+                _ = await enableNotificationsIfNeeded()
+            }
         } catch { }
     }
 
