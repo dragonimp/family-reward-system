@@ -167,15 +167,21 @@ import UniformTypeIdentifiers
         guard let store, let subject = try? await currentSubject(), let root = try? directory(for: subject),
               let index = try? readIndex(at: root) else { return }
         if !index.pendingRemoval.isEmpty { _ = try? cleanPendingRemoval(at: root) }
-        guard let deviceID = index.deviceID else { enabledForSession = true; return }
         do {
-            var body: [String: Any] = ["id": deviceID]
+            var body: [String: Any] = [:]
+            if let deviceID = index.deviceID { body["id"] = deviceID }
             if let pushToken { body["pushToken"] = pushToken }
             let response = try await store.call("/api/dear/social/photo-devices", method: "POST", body: body) as? [String: Any]
+            guard let deviceID = response?["id"] as? String, UUID(uuidString: deviceID) != nil else { return }
+            if index.deviceID == nil {
+                var updated = index
+                updated.deviceID = deviceID
+                try writeIndex(updated, at: root)
+            }
             enabledForSession = true
-            // A server upgrade can invalidate an older encrypted APNs token.
-            // Re-register even when the device has no local originals left.
-            if !index.photos.isEmpty || (response?["pushRegistered"] as? Bool) == false {
+            // Every signed-in phone may alert the sharer, even if another
+            // device holds the original. Re-register invalidated tokens too.
+            if (response?["pushRegistered"] as? Bool) == false {
                 _ = await enableNotificationsIfNeeded()
             }
         } catch { }
