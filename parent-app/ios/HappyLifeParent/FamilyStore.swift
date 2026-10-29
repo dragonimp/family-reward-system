@@ -4,7 +4,7 @@ import AgentIdentity
 import WatchConnectivity
 
 @MainActor final class FamilyStore: NSObject, ObservableObject {
-    let identity = AgentIdentitySession(origin: URL(string: "https://happylife.ai.xmkurt.com")!, callback: URL(string: "linkofamily://login-complete/")!, keychainService: "net.impx.happylife.parent.identity")
+    let identity = AgentIdentitySession(origin: URL(string: "https://happylife.ai.xmkurt.com")!, callback: URL(string: "linkofamily://login-complete/")!, keychainService: "net.impx.happylife.identity")
     private let base = URL(string: "https://happylife.ai.xmkurt.com")!
     private let session = URLSession(configuration: .ephemeral)
     let photoSource = DearPhotoSource()

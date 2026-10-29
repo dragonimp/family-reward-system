@@ -575,7 +575,7 @@ private struct MomentTestInvitationView: View {
     @StateObject private var atlasIdentity = AgentIdentitySession(
         origin: URL(string: "https://home.ai.impx.net")!,
         callback: URL(string: "linkofamily://login-complete/")!,
-        keychainService: "net.impx.happylife.parent.atlasShareIdentity")
+        keychainService: "net.impx.happylife.atlasShareIdentity")
     @State private var invitation: Invitation?
     @State private var details: Details?
     @State private var busy = false

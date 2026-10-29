@@ -18,7 +18,7 @@ with tempfile.TemporaryDirectory(prefix="happylife-parent-ipa-") as directory:
     app = Path(directory) / "Payload/Linko Moment.app"
     subprocess.run(["codesign", "--verify", "--deep", "--strict", str(app)], check=True)
     info = plistlib.loads((app / "Info.plist").read_bytes())
-    expected = "net.impx.happylife.parent"
+    expected = "net.impx.happylife"
     signature = subprocess.run(["codesign", "-dv", str(app)], capture_output=True, text=True, check=True)
     fields = dict(line.split("=", 1) for line in signature.stderr.splitlines() if "=" in line)
     assert info["CFBundleIdentifier"] == expected
@@ -34,14 +34,14 @@ with tempfile.TemporaryDirectory(prefix="happylife-parent-ipa-") as directory:
     assert entitlements["application-identifier"] == "JQPH54K7SD." + expected
     assert entitlements.get("get-task-allow") is False
     assert entitlements.get("aps-environment") == "production"
-    assert "group.net.impx.happylife.parent" in entitlements.get("com.apple.security.application-groups", [])
+    assert "group.net.impx.happylife" in entitlements.get("com.apple.security.application-groups", [])
     profile = plistlib.loads(subprocess.run(
         ["security", "cms", "-D", "-i", str(app / "embedded.mobileprovision")],
         capture_output=True, check=True).stdout)
     assert profile["TeamIdentifier"] == ["JQPH54K7SD"]
     assert profile["Entitlements"]["application-identifier"] == entitlements["application-identifier"]
     assert profile["Entitlements"].get("aps-environment") == "production"
-    assert "group.net.impx.happylife.parent" in profile["Entitlements"].get("com.apple.security.application-groups", [])
+    assert "group.net.impx.happylife" in profile["Entitlements"].get("com.apple.security.application-groups", [])
     assert profile["ExpirationDate"].replace(tzinfo=datetime.timezone.utc) > datetime.datetime.now(datetime.timezone.utc)
     assert not profile.get("ProvisionedDevices") and not profile.get("ProvisionsAllDevices")
     assert (app / "Assets.car").is_file()
@@ -73,10 +73,10 @@ with tempfile.TemporaryDirectory(prefix="happylife-parent-ipa-") as directory:
     subprocess.run(["codesign", "--verify", "--strict", str(share)], check=True)
     se = plistlib.loads(subprocess.run(["codesign", "-d", "--entitlements", ":-", str(share)], capture_output=True, check=True).stdout)
     assert se["application-identifier"] == "JQPH54K7SD." + expected + ".share"
-    assert "group.net.impx.happylife.parent" in se.get("com.apple.security.application-groups", [])
+    assert "group.net.impx.happylife" in se.get("com.apple.security.application-groups", [])
     sp = plistlib.loads(subprocess.run(["security", "cms", "-D", "-i", str(share / "embedded.mobileprovision")], capture_output=True, check=True).stdout)
     assert sp["Entitlements"]["application-identifier"] == se["application-identifier"]
-    assert "group.net.impx.happylife.parent" in sp["Entitlements"].get("com.apple.security.application-groups", [])
+    assert "group.net.impx.happylife" in sp["Entitlements"].get("com.apple.security.application-groups", [])
     print("PASS: embedded Watch app, independent companion configuration, matching versions and distribution profile")
     print("PASS:", expected, info["CFBundleShortVersionString"], info["CFBundleVersion"], "App Store signature/profile/icon/native frameworks/callback")
     print("SHA256:", hashlib.sha256(ipa.read_bytes()).hexdigest())

@@ -10,7 +10,7 @@ from pathlib import Path
 info = plistlib.loads(Path('../../parent-app/ios/WatchInfo.plist').read_bytes())
 assert info['WKApplication'] and info['WKRunsIndependentlyOfCompanionApp']
 assert not info.get('WKWatchOnly', False)
-assert info['WKCompanionAppBundleIdentifier'] == 'net.impx.happylife.parent'
+assert info['WKCompanionAppBundleIdentifier'] == 'net.impx.happylife'
 print('PASS: companion watch configuration')
 PY
 xcrun --sdk macosx swiftc HappyLifeWatch/WatchAPI.swift HappyLifeWatch/DeviceCredential.swift \

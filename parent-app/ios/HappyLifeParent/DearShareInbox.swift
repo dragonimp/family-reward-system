@@ -1,7 +1,7 @@
 import Foundation
 
 enum DearShareInbox {
-    static let groupID = "group.net.impx.happylife.parent"
+    static let groupID = "group.net.impx.happylife"
 
     struct Activity: Codable, Identifiable {
         let id: String

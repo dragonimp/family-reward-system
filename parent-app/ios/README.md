@@ -1,6 +1,6 @@
 # Linko Moment 原生 iOS
 
-SwiftUI 原生界面，iPhone、iPad / iOS 17+。当前工程版本 1.2.35（44），Bundle ID `net.impx.happylife.parent`。业务页面不包含 WebView。
+SwiftUI 原生界面，iPhone、iPad / iOS 17+。当前工程版本 1.2.35（44），Bundle ID `net.impx.happylife`。业务页面不包含 WebView。
 
 ## 1.2.35（44）：Linko Moment
 
@@ -121,7 +121,7 @@ HAPPYLIFE_PARENT_EXPORT_OPTIONS="$PWD/parent-app/ios/build/UploadOptions.plist" 
 
 ## 1.2.0（6）：配套且独立的 Apple Watch
 
-统一入口为本目录 HappyLifeParent scheme；归档同时包含 iPhone 和 Watch App。Watch Target 直接引用 `watch-app/apple/HappyLifeWatch` 源文件及资产，不复制业务实现。新手表 Bundle ID 为 `net.impx.happylife.parent.watchkitapp`，配套 iPhone 为 `net.impx.happylife.parent`；`WKRunsIndependentlyOfCompanionApp=true`，不设置 `WKWatchOnly`。手表直接联网并保留独立钥匙串和扫码绑定，不共享家长令牌。
+统一入口为本目录 HappyLifeParent scheme；归档同时包含 iPhone 和 Watch App。Watch Target 直接引用 `watch-app/apple/HappyLifeWatch` 源文件及资产，不复制业务实现。新手表 Bundle ID 为 `net.impx.happylife.watchkitapp`，配套 iPhone 为 `net.impx.happylife`；`WKRunsIndependentlyOfCompanionApp=true`，不设置 `WKWatchOnly`。手表直接联网并保留独立钥匙串和扫码绑定，不共享家长令牌。
 
 新 Watch 标识与旧独立“家加分”不是同一安装身份，旧版用户需要安装新版并重新绑定；服务端家庭和孩子数据不迁移、不删除。旧 Watch App（ASC 6812457571）的测试构建在统一版本内部可安装后按用户要求停用。旧独立工程的构建和发布入口已移除，后续发布仅使用统一入口。
 
