@@ -35,7 +35,10 @@ dotnet publish "$source_dir/parent-app/android/LinkoFamily.csproj" \
   -p:PublishDir="$ATLAS_BUILD_WORK/publish/" \
   -v:minimal
 
-find "$ATLAS_BUILD_WORK/publish" -maxdepth 1 -type f \( -name '*-Signed.aab' -o -name '*-Signed.apk' \) \
+find "$ATLAS_BUILD_WORK/publish" -maxdepth 1 -type f -name '*-Signed.aab' \
+  -exec cp {} "$ATLAS_BUILD_OUTPUT/" \;
+# .NET MAUI places the signed APK in bin even when PublishDir is set.
+find "$source_dir/parent-app/android/bin/Release/net10.0-android" -maxdepth 1 -type f -name '*-Signed.apk' \
   -exec cp {} "$ATLAS_BUILD_OUTPUT/" \;
 if ! find "$ATLAS_BUILD_OUTPUT" -maxdepth 1 -type f -name '*-Signed.aab' | grep -q .; then
   echo 'Signed AAB was not produced.' >&2
