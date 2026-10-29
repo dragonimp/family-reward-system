@@ -23,7 +23,7 @@
 - 后端 Debug 构建、Linux x64 Release 发布通过。
 - `dotnet run --project tests/WatchPairing/WatchPairing.csproj`：令牌隔离、二维码结构、失败不消耗设备码、并发幂等、重放限制、过期通过。
 - `PGDATABASE=family_watch_pairing_test_20260916 dotnet run --project tests/WatchPairing.Integration/WatchPairing.Integration.csproj`：隔离本地 PostgreSQL 测试库；验证 HTTP 完整流程、未登录、伪造身份头、跨家长拒绝、并发确认、实际孩子积分读取、已有设备冲突、服务实例重建后的批准恢复以及解绑失效。测试认证处理器仅位于测试项目。
-- `bash watch-app/apple/verify.sh`：原生 API/状态测试、钥匙串待绑定恢复、断网恢复、批准/过期分支及 watchOS Release 构建通过。
+- `bash watch-app/apple/verify.sh`：随 iPhone 发布的手表端原生 API/状态测试、钥匙串待绑定恢复、断网恢复及批准/过期分支；Watch 构建由 `parent-app/ios/verify.sh` 验证。
 - `archive.sh` / `export.sh`：MyVnc 同团队专用密钥签名的 1.0.0（2）通过最终 IPA 校验。
 - Apple Vision 已独立解码实际生成的二维码，结果与家长绑定 URL 完全一致。
 - 桌面浏览器工具返回 `cgWindowNotFound`，家长页面实际浏览器验收待补；40mm 手表模拟器已完成截图检查，修正二维码尺寸后首屏同时显示完整二维码和设备码，Apple Vision 成功识别截图中的生产绑定 URL。用户真机扫码验收仍待完成。

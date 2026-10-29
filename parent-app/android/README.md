@@ -1,5 +1,9 @@
 # Linko Moment Android 家长端
 
+Android 手机端提交标识为 `net.impx.happylife`。儿童手表端使用独立的 Android 手表包及其既有商店材料；本目录只构建手机 App。
+
+首个以此包名提交商店的版本为 `1.0.0 (9)`；上架准备材料见 `docs/publishing/android-phone/README.md`。旧包名 `net.impx.happylife.parent.android` 与此包不构成系统级覆盖升级。
+
 `20261024-moment-invite-android.1` 在“我的”提供原生测试邀请页，使用 Atlas 账号调用应用专属邀请接口，显示二维码、链接、复制、系统分享与重新生成；项目成员及隐私资料从 Atlas 的公开应用接口读取。此前的 `20261017-dear-feedback-android.1` 增加心愿墙与意见墙。Apple TestFlight 等获取地址由 Atlas 应用后台管理，客户端不保存直链。
 
 首版 Android 手机客户端与 Web、iOS 共用 `https://happylife.ai.impx.net` 后端。原生界面使用 .NET MAUI；用户中心登录和令牌续期复用 `AgentIdentity.NativeClient`，本应用仅在 Android SecureStorage 保存会话，不另建账号或业务令牌。
