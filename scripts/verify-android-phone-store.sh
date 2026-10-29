@@ -28,7 +28,8 @@ for _ in $(seq 1 120); do
 done
 [[ "$("$adb" -s emulator-5592 shell getprop sys.boot_completed | tr -d '\r')" == 1 ]]
 "$adb" -s emulator-5592 install -r "$SIGNED_APK"
-"$adb" -s emulator-5592 shell monkey -p net.impx.happylife 1
+"$adb" -s emulator-5592 shell am start -W \
+  -n net.impx.happylife/crc641f44f5f2569e3f99.MainActivity
 sleep 5
 "$adb" -s emulator-5592 shell dumpsys activity activities > "$ATLAS_BUILD_LOGS/activity.txt"
 rg -q 'net\.impx\.happylife' "$ATLAS_BUILD_LOGS/activity.txt"
