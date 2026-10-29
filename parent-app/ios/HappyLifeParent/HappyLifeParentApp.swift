@@ -132,6 +132,7 @@ struct FamilyRoot: View {
             FamilyHome(store: store).tabItem { Label("群组", systemImage: "person.3.fill") }
                 .badge(store.requests.filter { $0.text("status") == "pending" }.count)
             DearSocialView(store: store).tabItem { Label("活动", systemImage: "photo.on.rectangle.angled") }
+            ExerciseView(userID: store.profile?.text("unifiedUserId") ?? "").id(store.profile?.text("unifiedUserId") ?? "").tabItem { Label("运动", systemImage: "figure.walk") }
             FamilyChatView(store: store).tabItem { Label("AI 对话", systemImage: "bubble.left.and.bubble.right.fill") }
             AccountView(store: store).tabItem { Label("我的", systemImage: "person.crop.circle") }
         }

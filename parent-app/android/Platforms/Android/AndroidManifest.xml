@@ -3,4 +3,5 @@
 	<application android:allowBackup="false" android:icon="@mipmap/familyicon" android:roundIcon="@mipmap/familyicon" android:supportsRtl="true"></application>
 	<uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
 	<uses-permission android:name="android.permission.INTERNET" />
+	<uses-permission android:name="android.permission.ACTIVITY_RECOGNITION" />
 </manifest>

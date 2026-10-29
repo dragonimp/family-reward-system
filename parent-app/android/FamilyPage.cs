@@ -13,6 +13,8 @@ public sealed class FamilyPage : ContentPage
     private string tab = "家庭";
     private int? childId;
     private string? note;
+    private ExercisePanel? exercise;
+    private string? exerciseUser;
 
     public FamilyPage(FamilyStore store)
     {
@@ -30,9 +32,12 @@ public sealed class FamilyPage : ContentPage
     protected override async void OnAppearing()
     {
         base.OnAppearing();
+        if (Window != null) { Window.Stopped -= WindowStopped; Window.Stopped += WindowStopped; }
         if (store.Authenticated || busy) return;
         await Run(store.RestoreAsync);
     }
+
+    private void WindowStopped(object? sender, EventArgs e) => exercise?.Suspend();
 
     private async Task Run(Func<Task> action)
     {
@@ -54,11 +59,11 @@ public sealed class FamilyPage : ContentPage
     {
         content.Children.Clear();
         content.Add(Heading("Linko Moment", 27));
-        if (!store.Authenticated) { LoginContent(); return; }
+        if (!store.Authenticated) { exercise?.Suspend(); exercise = null; exerciseUser = null; LoginContent(); return; }
         if (!store.ParentReady) { ParentProfileUnavailableContent(); return; }
         if (childId is int id) { ChildContent(id); return; }
         var tabs = new HorizontalStackLayout { Spacing = 7 };
-        foreach (var name in new[] { "家庭", "审批", "记录", "我的" })
+        foreach (var name in new[] { "家庭", "审批", "记录", "运动", "我的" })
         {
             var selected = name == tab;
             tabs.Add(Button(name, () => { tab = name; Render(); }, selected));
@@ -68,6 +73,13 @@ public sealed class FamilyPage : ContentPage
         {
             case "审批": ApprovalContent(); break;
             case "记录": LedgerContent(); break;
+            case "运动":
+                var user = store.Profile?.Text("unifiedUserId") ?? "";
+                if (exercise == null || exerciseUser != user)
+                {
+                    exercise?.Suspend(); exercise = new ExercisePanel(user); exerciseUser = user;
+                }
+                content.Add(exercise); exercise.Show(); break;
             case "我的": AccountContent(); break;
             default: FamilyContent(); break;
         }
