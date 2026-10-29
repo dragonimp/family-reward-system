@@ -31,7 +31,7 @@ dotnet publish "$source_dir/parent-app/android/LinkoFamily.csproj" \
   -p:AndroidSigningKeyAlias="$ANDROID_SIGNING_KEY_ALIAS" \
   -p:AndroidSigningKeyPass="file:$ANDROID_SIGNING_PASSWORD_FILE" \
   -p:AndroidSigningStorePass="file:$ANDROID_SIGNING_PASSWORD_FILE" \
-  -p:AndroidPackageFormats='aab;apk' \
+  -p:AndroidPackageFormats=aab%3Bapk \
   -p:PublishDir="$ATLAS_BUILD_WORK/publish/" \
   -v:minimal
 
