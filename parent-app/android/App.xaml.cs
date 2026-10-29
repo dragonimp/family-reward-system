@@ -2,10 +2,17 @@ namespace LinkoFamily;
 
 public partial class App : Application
 {
-    private readonly FamilyStore store = new();
-
     public App() => InitializeComponent();
 
     protected override Window CreateWindow(IActivationState? activationState)
-        => new(new FamilyPage(store));
+    {
+        if (Preferences.Default.Get(PrivacyPolicyPage.ConsentKey, false))
+            return new Window(new FamilyPage(new FamilyStore()));
+
+        Window? window = null;
+        var gate = new PrivacyGatePage(() =>
+            window!.Page = new FamilyPage(new FamilyStore()));
+        window = new Window(gate);
+        return window;
+    }
 }

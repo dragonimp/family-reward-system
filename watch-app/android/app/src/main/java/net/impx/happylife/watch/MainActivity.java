@@ -3,6 +3,7 @@ package net.impx.happylife.watch;
 import android.Manifest;
 import android.annotation.SuppressLint;
 import android.app.Activity;
+import android.app.AlertDialog;
 import android.content.pm.PackageManager;
 import android.graphics.Color;
 import android.net.ConnectivityManager;
@@ -17,11 +18,13 @@ import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
 import android.widget.FrameLayout;
+import android.widget.LinearLayout;
 import android.widget.TextView;
 
 public class MainActivity extends Activity {
     private static final int AUDIO_PERMISSION_REQUEST = 41;
     private static final String TRUSTED_WATCH_HOST = "happylife.ai.impx.net";
+    private static final String PRIVACY_CONSENT_KEY = "privacy_1_1_accepted";
     private WebView webView;
     private TextView offlineView;
     private PermissionRequest pendingAudioRequest;
@@ -41,13 +44,19 @@ public class MainActivity extends Activity {
         offlineView.setGravity(android.view.Gravity.CENTER);
         offlineView.setVisibility(View.GONE);
 
-        root.addView(webView, new FrameLayout.LayoutParams(
-            FrameLayout.LayoutParams.MATCH_PARENT,
-            FrameLayout.LayoutParams.MATCH_PARENT));
-        root.addView(offlineView, new FrameLayout.LayoutParams(
-            FrameLayout.LayoutParams.MATCH_PARENT,
-            FrameLayout.LayoutParams.MATCH_PARENT));
-        setContentView(root);
+        root.addView(webView, new FrameLayout.LayoutParams(-1, -1));
+        root.addView(offlineView, new FrameLayout.LayoutParams(-1, -1));
+        LinearLayout layout = new LinearLayout(this);
+        layout.setOrientation(LinearLayout.VERTICAL);
+        layout.addView(root, new LinearLayout.LayoutParams(-1, 0, 1));
+        TextView privacyLink = new TextView(this);
+        privacyLink.setText("隐私政策");
+        privacyLink.setTextColor(Color.rgb(22, 100, 58));
+        privacyLink.setTextSize(12);
+        privacyLink.setGravity(android.view.Gravity.CENTER);
+        privacyLink.setOnClickListener(view -> showPrivacyPolicy(false));
+        layout.addView(privacyLink, new LinearLayout.LayoutParams(-1, 32));
+        setContentView(layout);
 
         WebSettings settings = webView.getSettings();
         settings.setJavaScriptEnabled(true);
@@ -84,7 +93,39 @@ public class MainActivity extends Activity {
             }
         });
 
-        loadWatchEntry();
+        if (getPreferences(MODE_PRIVATE).getBoolean(PRIVACY_CONSENT_KEY, false)) {
+            loadWatchEntry();
+        } else {
+            showPrivacyPolicy(true);
+        }
+    }
+
+    private void showPrivacyPolicy(boolean firstRun) {
+        WebView policy = new WebView(this);
+        AlertDialog.Builder dialog = new AlertDialog.Builder(this)
+            .setTitle("Linko Moment 隐私政策")
+            .setView(policy);
+        if (firstRun) {
+            dialog.setCancelable(false)
+                .setPositiveButton("同意并继续", (d, which) -> {
+                    getPreferences(MODE_PRIVATE).edit().putBoolean(PRIVACY_CONSENT_KEY, true).apply();
+                    loadWatchEntry();
+                })
+                .setNegativeButton("拒绝", (d, which) -> finish());
+        } else {
+            dialog.setPositiveButton("关闭", (d, which) -> d.dismiss());
+        }
+        AlertDialog shown = dialog.show();
+        if (firstRun) shown.getButton(AlertDialog.BUTTON_POSITIVE).setEnabled(false);
+        policy.setWebViewClient(new WebViewClient() {
+            @Override
+            public void onPageFinished(WebView view, String url) {
+                if (firstRun && "file:///android_asset/privacy.html".equals(url)) {
+                    shown.getButton(AlertDialog.BUTTON_POSITIVE).setEnabled(true);
+                }
+            }
+        });
+        policy.loadUrl("file:///android_asset/privacy.html");
     }
 
     private void handleWebPermissionRequest(PermissionRequest request) {

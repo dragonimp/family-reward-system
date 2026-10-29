@@ -91,6 +91,7 @@ public sealed class FamilyPage : ContentPage
         content.Add(new Label { Text = "家庭、积分与成长记录和现有网页版共用数据。", TextColor = Colors.DimGray });
         content.Add(Button("用户中心登录", () => _ = BeginLogin(false), true));
         content.Add(Button("注册用户中心账号", () => _ = BeginLogin(true)));
+        content.Add(Button("查看隐私政策", () => _ = Navigation.PushModalAsync(new PrivacyPolicyPage())));
         if (loginCancellation is not null)
         {
             content.Add(new Label { Text = store.DisplayCode is null ? "正在打开用户中心…" : $"本次登录验证码：{store.DisplayCode}" });
@@ -222,7 +223,7 @@ public sealed class FamilyPage : ContentPage
         content.Add(Heading("应用与设置", 17));
         content.Add(Button("♙ 家庭与成员", () => { tab = "家庭"; Render(); }));
         content.Add(Heading("帮助与隐私", 17));
-        content.Add(Button("▣ 隐私政策", () => _ = Navigation.PushAsync(new AtlasInformationPage(false, "privacyPolicyUrl"))));
+        content.Add(Button("▣ 隐私政策", () => _ = Navigation.PushModalAsync(new PrivacyPolicyPage())));
         content.Add(Button("▤ 用户协议", () => _ = Navigation.PushAsync(new AtlasInformationPage(false, "termsUrl"))));
         content.Add(Button("▧ 使用手册", () => _ = Navigation.PushAsync(new AtlasInformationPage(false, "userManualUrl"))));
         content.Add(Button("↑ 版本升级", () => _ = Navigation.PushAsync(new MomentVersionPage())));
