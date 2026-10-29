@@ -23,6 +23,7 @@ public sealed class PrivacyPolicyPage : ContentPage
             Text = "Linko Moment 隐私政策",
             FontSize = 20,
             FontAttributes = FontAttributes.Bold,
+            TextColor = Color.FromArgb("#173B35"),
             VerticalTextAlignment = TextAlignment.Center
         }, 0, 0);
         header.Add(close, 1, 0);
@@ -60,7 +61,11 @@ public sealed class PrivacyPolicyPage : ContentPage
 public sealed class PrivacyGatePage : ContentPage
 {
     private readonly WebView policy = new();
-    private readonly Button agree = new() { Text = "同意并继续", IsEnabled = false };
+    private readonly Button agree = new()
+    {
+        Text = "同意并继续", IsEnabled = false,
+        BackgroundColor = Color.FromArgb("#0F766E"), TextColor = Colors.White
+    };
     private readonly Label message = new() { TextColor = Colors.DimGray, FontSize = 13 };
     private bool loaded;
 
@@ -73,15 +78,20 @@ public sealed class PrivacyGatePage : ContentPage
             Preferences.Default.Set(PrivacyPolicyPage.ConsentKey, true);
             onAgree();
         };
-        var reject = new Button { Text = "拒绝" };
+        var reject = new Button
+        {
+            Text = "拒绝", BackgroundColor = Colors.White,
+            TextColor = Color.FromArgb("#0F766E")
+        };
         reject.Clicked += (_, _) =>
             message.Text = "你已拒绝隐私政策，应用功能不会启动。可以关闭应用，或阅读后重新选择。";
 
         var header = new VerticalStackLayout { Padding = new Thickness(16, 16, 16, 8), Spacing = 8 };
         header.Add(new Label { Text = "使用 Linko Moment 前，请阅读隐私政策",
-            FontSize = 20, FontAttributes = FontAttributes.Bold });
+            FontSize = 20, FontAttributes = FontAttributes.Bold,
+            TextColor = Color.FromArgb("#173B35") });
         header.Add(new Label { Text = "我们处理账号、家庭与孩子资料，以及你主动提交的活动内容。下方可直接阅读全文。请选择同意或拒绝。",
-            FontSize = 14 });
+            FontSize = 14, TextColor = Color.FromArgb("#36534D") });
         var footer = new VerticalStackLayout { Padding = new Thickness(16, 8, 16, 16), Spacing = 6 };
         footer.Add(message);
         footer.Add(agree);
