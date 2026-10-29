@@ -1,3 +1,4 @@
+import AgentIdentity
 import SwiftUI
 import CoreMotion
 import CryptoKit
@@ -25,7 +26,7 @@ import CryptoKit
         let decoder = JSONDecoder(); decoder.dateDecodingStrategy = .iso8601
         do { archive = try decoder.decode(Archive.self, from: Data(contentsOf: file)) }
         catch let error as NSError where error.domain == NSCocoaErrorDomain && error.code == NSFileReadNoSuchFileError { }
-        catch { readable = false; message = "运动记录暂时无法读取，请重新打开页面后重试。原记录已保留。" }
+        catch { readable = false; message = String(localized: "运动记录暂时无法读取，请重新打开页面后重试。原记录已保留。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)) }
     }
 
     private func save() {
@@ -34,7 +35,7 @@ import CryptoKit
             try FileManager.default.createDirectory(at: file.deletingLastPathComponent(), withIntermediateDirectories: true)
             let encoder = JSONEncoder(); encoder.dateEncodingStrategy = .iso8601
             try encoder.encode(archive).write(to: file, options: [.atomic, .completeFileProtectionUntilFirstUserAuthentication])
-        } catch { message = "运动记录尚未保存：\(error.localizedDescription)。请保留页面并重试保存。" }
+        } catch { message = String(localized: "运动记录尚未保存：\(momentDisplayError(error))。请保留页面并重试保存。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)) }
     }
     func retrySave() { guard readable else { return }; message = nil; save() }
 
@@ -78,16 +79,16 @@ import CryptoKit
     private func observe() {
         stopObserving()
         guard let active, active.running, let index = active.intervals.indices.last else { return }
-        guard supported else { message = "此设备不支持计步，可继续使用运动计时。"; return }
+        guard supported else { message = String(localized: "此设备不支持计步，可继续使用运动计时。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)); return }
         if CMPedometer.authorizationStatus() == .denied || CMPedometer.authorizationStatus() == .restricted {
-            message = "未获得运动与健身权限，可在系统设置中开启；计时仍可使用。"; return
+            message = String(localized: "未获得运动与健身权限，可在系统设置中开启；计时仍可使用。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)); return
         }
         let revision = generation
         pedometer.startUpdates(from: active.intervals[index].start) { [weak self] data, error in
             Task { @MainActor [weak self] in
                 guard let self, self.generation == revision, self.active?.id == active.id else { return }
                 if let data { self.archive.active?.intervals[index].steps = data.numberOfSteps.intValue; self.save() }
-                if let error { self.message = "计步暂不可用：\(error.localizedDescription)。计时仍可使用。" }
+                if let error { self.message = String(localized: "计步暂不可用：\(momentDisplayError(error))。计时仍可使用。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)) }
             }
         }
     }
@@ -101,7 +102,7 @@ import CryptoKit
             let end = interval.end ?? Date()
             if end.timeIntervalSince(interval.start) >= 7 * 86400 || interval.start < Date().addingTimeInterval(-7 * 86400) {
                 archive.active?.intervals[index].steps = nil
-                message = "部分运动已超过系统计步保留期，步数无法完整获取。"; continue
+                message = String(localized: "部分运动已超过系统计步保留期，步数无法完整获取。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)); continue
             }
             if interval.end != nil && interval.steps != nil { continue }
             let result: (CMPedometerData?, Error?) = await withCheckedContinuation { continuation in
@@ -109,7 +110,7 @@ import CryptoKit
             }
             guard archive.active?.id == active.id else { return }
             if let data = result.0 { archive.active?.intervals[index].steps = data.numberOfSteps.intValue }
-            if let error = result.1 { message = "计步暂不可用：\(error.localizedDescription)。已保留计时记录。" }
+            if let error = result.1 { message = String(localized: "计步暂不可用：\(momentDisplayError(error))。已保留计时记录。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)) }
         }
         save()
     }
@@ -126,66 +127,66 @@ struct ExerciseView: View {
         NavigationStack {
             List {
                 Section {
-                    Label("动一动，记录自己的节奏", systemImage: "figure.walk")
+                    Label(String(localized: "动一动，记录自己的节奏", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), systemImage: "figure.walk")
                         .font(.title3.bold()).padding(.vertical, 8)
-                    Text("带上手机，随时开始一场散步或轻运动。").foregroundStyle(.secondary)
+                    Text(String(localized: "带上手机，随时开始一场散步或轻运动。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))).foregroundStyle(.secondary)
                 }
-                Section(exercise.active?.kind ?? "开始运动") {
+                Section(exercise.active.map { exerciseKindTitle($0.kind) } ?? String(localized: "开始运动", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) {
                     if let active = exercise.active {
                         TimelineView(.periodic(from: .now, by: 1)) { context in
                             VStack(spacing: 12) {
                                 Text(ExerciseSession.clock(active.duration(at: context.date)))
                                     .font(.system(size: 44, weight: .semibold, design: .rounded)).monospacedDigit()
-                                    .accessibilityLabel("运动时长")
-                                Text(active.steps.map { "\($0) 步" } ?? "步数待获取")
+                                    .accessibilityLabel(String(localized: "运动时长", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)))
+                                Text(active.steps.map { String(localized: "\($0) 步", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)) } ?? String(localized: "步数待获取", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)))
                                     .font(.title2).monospacedDigit()
-                                Text(active.running ? "运动中" : "已暂停").foregroundStyle(active.running ? .teal : .secondary)
+                                Text(active.running ? String(localized: "运动中", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)) : String(localized: "已暂停", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))).foregroundStyle(active.running ? .teal : .secondary)
                             }.frame(maxWidth: .infinity).padding(.vertical, 18)
                         }
                         HStack {
-                            Button(active.running ? "暂停" : "继续") {
+                            Button(active.running ? String(localized: "暂停", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)) : String(localized: "继续", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) {
                                 if active.running { Task { await exercise.pause() } } else { exercise.resume() }
                             }.buttonStyle(.borderedProminent)
                             Spacer()
-                            Button("结束并保存", role: .destructive) { confirmFinish = true }.buttonStyle(.bordered)
+                            Button(String(localized: "结束并保存", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), role: .destructive) { confirmFinish = true }.buttonStyle(.bordered)
                         }.disabled(exercise.busy)
                     } else {
-                        Picker("运动项目", selection: $kind) {
-                            Text("散步").tag("散步"); Text("慢跑").tag("慢跑"); Text("自由运动").tag("自由运动")
+                        Picker(String(localized: "运动项目", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), selection: $kind) {
+                            Text(String(localized: "散步", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))).tag("散步"); Text(String(localized: "慢跑", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))).tag("慢跑"); Text(String(localized: "自由运动", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))).tag("自由运动")
                         }.pickerStyle(.segmented)
                         Button { exercise.start(kind: kind) } label: {
-                            Label("开始\(kind)", systemImage: "play.fill").frame(maxWidth: .infinity).padding(.vertical, 8)
+                            Label(String(localized: "开始\(exerciseKindTitle(kind))", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), systemImage: "play.fill").frame(maxWidth: .infinity).padding(.vertical, 8)
                         }.buttonStyle(.borderedProminent)
                     }
-                    Text("暂停期间不计时、不计步。锁屏后计时继续，返回时读取系统步数。步数来自本机，可能稍有延迟。")
+                    Text(String(localized: "暂停期间不计时、不计步。锁屏后计时继续，返回时读取系统步数。步数来自本机，可能稍有延迟。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)))
                         .font(.footnote).foregroundStyle(.secondary)
                 }
                 if let message = exercise.message {
-                    Section("提示") {
+                    Section(String(localized: "提示", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) {
                         Text(message).font(.footnote)
-                        Button("重试读取步数") { Task { await exercise.refresh() } }
-                        Button("重试保存记录") { exercise.retrySave() }
-                        Button("打开系统设置") { if let url = URL(string: UIApplication.openSettingsURLString) { UIApplication.shared.open(url) } }
+                        Button(String(localized: "重试读取步数", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) { Task { await exercise.refresh() } }
+                        Button(String(localized: "重试保存记录", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) { exercise.retrySave() }
+                        Button(String(localized: "打开系统设置", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) { if let url = URL(string: UIApplication.openSettingsURLString) { UIApplication.shared.open(url) } }
                     }
                 }
                 Section {
                     if exercise.history.isEmpty {
-                        ContentUnavailableView("还没有运动记录", systemImage: "figure.walk", description: Text("完成一次运动后，时长和步数会保存在这里。"))
+                        ContentUnavailableView(String(localized: "还没有运动记录", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), systemImage: "figure.walk", description: Text(String(localized: "完成一次运动后，时长和步数会保存在这里。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))))
                     }
                     ForEach(exercise.history) { item in
                         VStack(alignment: .leading, spacing: 6) {
-                            HStack { Text(item.kind).bold(); Spacer(); Text(ExerciseSession.clock(item.duration(at: item.endedAt ?? .now))).monospacedDigit() }
+                            HStack { Text(exerciseKindTitle(item.kind)).bold(); Spacer(); Text(ExerciseSession.clock(item.duration(at: item.endedAt ?? .now))).monospacedDigit() }
                             HStack {
                                 Text(item.startedAt, format: .dateTime.year().month().day().hour().minute())
                                 Spacer()
-                                Text(item.steps.map { "\($0) 步" } ?? "步数未获取")
+                                Text(item.steps.map { String(localized: "\($0) 步", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)) } ?? String(localized: "步数未获取", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)))
                             }.font(.caption).foregroundStyle(.secondary)
                         }.padding(.vertical, 4)
                     }
-                } header: { Text("运动记录 · 当地时间") } footer: { Text("记录按当前账号保存在此手机，暂不跨设备同步。") }
-            }.navigationTitle("运动").readablePage()
-                .confirmationDialog("结束本次运动并保存记录？", isPresented: $confirmFinish, titleVisibility: .visible) {
-                    Button("结束并保存") { Task { await exercise.finish() } }
+                } header: { Text(String(localized: "运动记录 · 当地时间", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) } footer: { Text(String(localized: "记录按当前账号保存在此手机，暂不跨设备同步。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) }
+            }.navigationTitle(String(localized: "运动", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))).readablePage()
+                .confirmationDialog(String(localized: "结束本次运动并保存记录？", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), isPresented: $confirmFinish, titleVisibility: .visible) {
+                    Button(String(localized: "结束并保存", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) { Task { await exercise.finish() } }
                 }
                 .task { await exercise.refresh() }
                 .onChange(of: phase) { _, value in
@@ -194,5 +195,15 @@ struct ExerciseView: View {
                 }
                 .onDisappear { exercise.stopObserving() }
         }
+    }
+}
+
+private func exerciseKindTitle(_ value: String) -> String {
+    let locale = Locale(identifier: AgentIdentityLanguage.current)
+    switch value {
+    case "散步": return String(localized: "散步", bundle: AgentIdentityLanguage.appBundle(), locale: locale)
+    case "慢跑": return String(localized: "慢跑", bundle: AgentIdentityLanguage.appBundle(), locale: locale)
+    case "自由运动": return String(localized: "自由运动", bundle: AgentIdentityLanguage.appBundle(), locale: locale)
+    default: return value
     }
 }

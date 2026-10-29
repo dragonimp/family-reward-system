@@ -1,3 +1,4 @@
+import AgentIdentity
 import CryptoKit
 import Foundation
 import UIKit
@@ -126,13 +127,13 @@ import UniformTypeIdentifiers
                     try? FileManager.default.removeItem(at: url)
                     imported += 1
                 } catch {
-                    store.error = "相册分享尚未完成：\(error.localizedDescription)。打开 App 后会重试。"
+                    store.error = String(localized: "相册分享尚未完成：\(momentDisplayError(error))。打开 App 后会重试。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))
                     break
                 }
             }
             if batch.items.isEmpty { try? FileManager.default.removeItem(at: directory) }
         }
-        if imported > 0 { store.photoRequestNotice = "已从相册共享 \(imported) 项到活动；请保持 App 打开，以便他人获取原文件。" }
+        if imported > 0 { store.photoRequestNotice = String(localized: "已从相册共享 \(imported) 项到活动；请保持 App 打开，以便他人获取原文件。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)) }
     }
 
     private func enableNotificationsIfNeeded() async -> Bool {
@@ -157,6 +158,7 @@ import UniformTypeIdentifiers
         guard let token, let deviceID else { return }
         Task {
             var request = URLRequest(url: URL(string: "/api/dear/social/photo-devices/\(deviceID)", relativeTo: base)!.absoluteURL)
+            request.setValue(AgentIdentityLanguage.current, forHTTPHeaderField: "Accept-Language")
             request.httpMethod = "DELETE"; request.timeoutInterval = 15
             request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
             _ = try? await session.data(for: request)
@@ -189,16 +191,16 @@ import UniformTypeIdentifiers
 
     func publish(_ imageData: Data, spaceID: String, activityID: String, name: String, locationName: String = "") async throws {
         guard imageData.count > 0, imageData.count <= 50 * 1024 * 1024,
-              UIImage(data: imageData) != nil else { throw APIError.message("照片文件无效或超过 50 MB。") }
+              UIImage(data: imageData) != nil else { throw APIError.message(String(localized: "照片文件无效或超过 50 MB。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) }
         guard let source = CGImageSourceCreateWithData(imageData as CFData, nil),
               let identifier = CGImageSourceGetType(source) as String?,
-              let type = UTType(identifier) else { throw APIError.message("无法识别照片格式。") }
+              let type = UTType(identifier) else { throw APIError.message(String(localized: "无法识别照片格式。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) }
         let format: (mime: String, ext: String)
         if type.conforms(to: .jpeg) { format = ("image/jpeg", "jpg") }
         else if type.conforms(to: .png) { format = ("image/png", "png") }
         else if type.conforms(to: .heic) { format = ("image/heic", "heic") }
         else if type.conforms(to: .webP) { format = ("image/webp", "webp") }
-        else { throw APIError.message("该照片格式暂不支持共享。") }
+        else { throw APIError.message(String(localized: "该照片格式暂不支持共享。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) }
         let temporary = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + "." + format.ext)
         try imageData.write(to: temporary, options: .atomic)
         defer { try? FileManager.default.removeItem(at: temporary) }
@@ -208,21 +210,21 @@ import UniformTypeIdentifiers
 
     func publishVideo(at url: URL, spaceID: String, activityID: String, locationName: String = "") async throws {
         let length = try url.resourceValues(forKeys: [.fileSizeKey]).fileSize ?? 0
-        guard (1...500 * 1024 * 1024).contains(length) else { throw APIError.message("视频必须在 500 MB 以内。") }
+        guard (1...500 * 1024 * 1024).contains(length) else { throw APIError.message(String(localized: "视频必须在 500 MB 以内。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) }
         let type = url.pathExtension.lowercased() == "mp4" ? "video/mp4" : "video/quicktime"
-        let name = type == "video/mp4" ? "iPhone视频.mp4" : "iPhone视频.mov"
+        let name = type == "video/mp4" ? String(localized: "iPhone视频.mp4", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)) : String(localized: "iPhone视频.mov", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))
         try await publishMedia(at: url, contentType: type, spaceID: spaceID, activityID: activityID, name: name, locationName: locationName)
     }
 
     private func publishMedia(at sourceURL: URL, contentType: String, spaceID: String, activityID: String, name: String, locationName: String) async throws {
-        guard !publishing else { throw APIError.message("另一张照片正在共享，请稍后重试。") }
+        guard !publishing else { throw APIError.message(String(localized: "另一张照片正在共享，请稍后重试。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) }
         publishing = true
         defer { publishing = false }
         let length = try sourceURL.resourceValues(forKeys: [.fileSizeKey]).fileSize ?? 0
         let limit = contentType.starts(with: "video/") ? 500 * 1024 * 1024 : 50 * 1024 * 1024
         guard UUID(uuidString: spaceID) != nil, UUID(uuidString: activityID) != nil,
-              length > 0, length <= limit else { throw APIError.message("照片或视频文件超过大小限制。") }
-        guard let store else { throw APIError.message("活动服务暂不可用。") }
+              length > 0, length <= limit else { throw APIError.message(String(localized: "照片或视频文件超过大小限制。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) }
+        guard let store else { throw APIError.message(String(localized: "活动服务暂不可用。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) }
         let subject = try await currentSubject()
         let root = try directory(for: subject)
         var index = try readIndex(at: root)
@@ -231,7 +233,7 @@ import UniformTypeIdentifiers
         let device = try await store.call("/api/dear/social/photo-devices", method: "POST",
                                           body: deviceBody) as? [String: Any]
         guard let deviceID = device?["id"] as? String, UUID(uuidString: deviceID) != nil else {
-            throw APIError.message("照片分享设备登记失败。")
+            throw APIError.message(String(localized: "照片分享设备登记失败。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)))
         }
         index.deviceID = deviceID
         try writeIndex(index, at: root)
@@ -256,7 +258,7 @@ import UniformTypeIdentifiers
             try? FileManager.default.removeItem(at: localURL)
             throw error
         }
-        let displayName = String(name.prefix(200)).isEmpty ? "共享媒体.jpg" : String(name.prefix(200))
+        let displayName = String(name.prefix(200)).isEmpty ? String(localized: "共享媒体.jpg", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)) : String(name.prefix(200))
         let prefix = "/api/dear/social/tenants/\(spaceID)/activities/\(activityID)"
         var publishedID: String?
         do {
@@ -266,7 +268,7 @@ import UniformTypeIdentifiers
                 "deviceId": deviceID, "fileName": displayName, "contentType": contentType,
                 "length": length, "sha256": sha, "locationName": String(locationName.trimmingCharacters(in: .whitespacesAndNewlines).prefix(200))]) as? [String: Any]
             guard let photoID = response?["id"] as? String, UUID(uuidString: photoID) != nil else {
-                throw APIError.message("照片登记回执无效。")
+                throw APIError.message(String(localized: "照片登记回执无效。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)))
             }
             publishedID = photoID
             index.photos.append(SharedPhoto(id: photoID, spaceID: spaceID, activityID: activityID,
@@ -279,7 +281,7 @@ import UniformTypeIdentifiers
             }
             start()
             if !(await enableNotificationsIfNeeded()) {
-                store.error = "有人请求原图时需要通知提醒。请在系统设置中允许 Linko Moment 发送通知，并保持 App 打开完成传输。"
+                store.error = String(localized: "有人请求原图时需要通知提醒。请在系统设置中允许 Linko Moment 发送通知，并保持 App 打开完成传输。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))
             }
         } catch {
             if let publishedID {
@@ -295,7 +297,7 @@ import UniformTypeIdentifiers
 
     func revoke(photoID: String, spaceID: String, activityID: String) async throws -> Bool {
         guard UUID(uuidString: photoID) != nil, UUID(uuidString: spaceID) != nil,
-              UUID(uuidString: activityID) != nil, let store else { throw APIError.message("照片或视频标识无效。") }
+              UUID(uuidString: activityID) != nil, let store else { throw APIError.message(String(localized: "照片或视频标识无效。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) }
         let prefix = "/api/dear/social/tenants/\(spaceID)/activities/\(activityID)"
         _ = try await store.call(prefix + "/live/photos/\(photoID)", method: "DELETE")
         guard let subject = try? await currentSubject(), let root = try? directory(for: subject) else { return true }
@@ -376,9 +378,9 @@ import UniformTypeIdentifiers
     func downloadOriginal(photoID: String, spaceID: String, activityID: String,
                           progress: ((Double) -> Void)? = nil) async throws -> URL {
         guard UUID(uuidString: photoID) != nil, UUID(uuidString: spaceID) != nil,
-              UUID(uuidString: activityID) != nil else { throw APIError.message("照片标识无效。") }
+              UUID(uuidString: activityID) != nil else { throw APIError.message(String(localized: "照片标识无效。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) }
         if let local = await localOriginal(photoID: photoID, spaceID: spaceID, activityID: activityID) { return local }
-        guard let store, let token = store.identity.accessToken else { throw APIError.message("请先登录用户中心。") }
+        guard let store, let token = store.identity.accessToken else { throw APIError.message(String(localized: "请先登录用户中心。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) }
         let value = try await store.call("/api/dear/social/tenants/\(spaceID)/activities/\(activityID)/photo-requests",
                                          method: "POST", body: ["photoId": photoID, "operationId": UUID().uuidString])
         guard let request = value as? [String: Any], let id = request["id"] as? String,
@@ -387,7 +389,7 @@ import UniformTypeIdentifiers
               length > 0, length <= (contentType.hasPrefix("video/") ? 500 : 50) * 1024 * 1024,
               let sha = request["sha256"] as? String,
               sha.count == 64, sha.allSatisfy({ $0.isHexDigit }) else {
-            throw APIError.message("原图请求回执无效。")
+            throw APIError.message(String(localized: "原图请求回执无效。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)))
         }
         let subject = try await currentSubject()
         let subjectKey = SHA256.hash(data: Data(subject.utf8)).map { String(format: "%02x", $0) }.joined()
@@ -437,7 +439,7 @@ import UniformTypeIdentifiers
         if !FileManager.default.fileExists(atPath: partialURL.path) &&
             !FileManager.default.createFile(atPath: partialURL.path, contents: nil,
                     attributes: [.protectionKey: FileProtectionType.completeUntilFirstUserAuthentication]) {
-            throw APIError.message("无法保存接收的原文件。")
+            throw APIError.message(String(localized: "无法保存接收的原文件。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)))
         }
         let offset = try partialURL.resourceValues(forKeys: [.fileSizeKey]).fileSize ?? 0
         var digest = SHA256()
@@ -466,6 +468,7 @@ import UniformTypeIdentifiers
                                      URLQueryItem(name: "offset", value: String(offset))]
             if offset > 0 { components.queryItems?.append(URLQueryItem(name: "prefixSha256", value: prefix)) }
             var socketRequest = URLRequest(url: components.url!)
+            socketRequest.setValue(AgentIdentityLanguage.current, forHTTPHeaderField: "Accept-Language")
             socketRequest.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
             socketRequest.timeoutInterval = contentType.hasPrefix("video/") ? 1805 : 305
             let socket = session.webSocketTask(with: socketRequest)
@@ -479,13 +482,13 @@ import UniformTypeIdentifiers
                 case .string(let text):
                     guard let bytes = text.data(using: .utf8),
                           let marker = try? JSONSerialization.jsonObject(with: bytes) as? [String: Any],
-                          let kind = marker["kind"] as? String else { throw APIError.message("原图传输消息无效。") }
+                          let kind = marker["kind"] as? String else { throw APIError.message(String(localized: "原图传输消息无效。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) }
                     if kind == "start" && !started {
                         guard (marker["length"] as? NSNumber)?.intValue == length,
                               (marker["offset"] as? NSNumber)?.intValue == offset,
                               (marker["sha256"] as? String)?.caseInsensitiveCompare(sha) == .orderedSame else {
                             badPartial = true
-                            throw APIError.message("原图续传信息不匹配。")
+                            throw APIError.message(String(localized: "原图续传信息不匹配。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)))
                         }
                         started = true
                     } else if kind == "end" && started {
@@ -494,7 +497,7 @@ import UniformTypeIdentifiers
                               digest.finalize().map({ String(format: "%02x", $0) }).joined().caseInsensitiveCompare(sha) == .orderedSame,
                               (contentType.hasPrefix("video/") || UIImage(contentsOfFile: partialURL.path) != nil) else {
                             badPartial = true
-                            throw APIError.message("原文件完整性校验失败。")
+                            throw APIError.message(String(localized: "原文件完整性校验失败。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)))
                         }
                         _ = try await store.call("/api/dear/social/photo-requests/\(id)/complete", method: "POST", body: [:])
                         try output.close()
@@ -504,12 +507,12 @@ import UniformTypeIdentifiers
                         return finalURL
                     } else if kind == "reset" {
                         badPartial = true
-                        throw APIError.message("本地部分文件与分享源不一致，再次获取将从头开始。")
-                    } else { throw APIError.message("原图传输顺序无效。") }
+                        throw APIError.message(String(localized: "本地部分文件与分享源不一致，再次获取将从头开始。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)))
+                    } else { throw APIError.message(String(localized: "原图传输顺序无效。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) }
                 case .data(let chunk):
                     guard started, received + chunk.count <= length else {
                         badPartial = true
-                        throw APIError.message("原图大小不匹配。")
+                        throw APIError.message(String(localized: "原图大小不匹配。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)))
                     }
                     try output.write(contentsOf: chunk)
                     digest.update(data: chunk)
@@ -517,7 +520,7 @@ import UniformTypeIdentifiers
                     if received == length || received % (1024 * 1024) < chunk.count {
                         progress?(Double(received) / Double(length))
                     }
-                @unknown default: throw APIError.message("原图传输格式无效。")
+                @unknown default: throw APIError.message(String(localized: "原图传输格式无效。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)))
                 }
             }
         } catch {
@@ -532,7 +535,7 @@ import UniformTypeIdentifiers
         guard let store, store.identity.isAuthenticated,
               let me = try await store.call("/api/dear/social/me") as? [String: Any],
               let subject = me["subject"] as? String, !subject.isEmpty else {
-            throw APIError.message("请先在 iPhone 上登录 Linko Moment。")
+            throw APIError.message(String(localized: "请先在 iPhone 上登录 Linko Moment。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)))
         }
         subjectCache = subject
         return subject
@@ -571,7 +574,7 @@ import UniformTypeIdentifiers
             digest.update(data: chunk)
             if remaining != nil { remaining! -= chunk.count }
         }
-        if remaining != nil && remaining != 0 { throw APIError.message("续传原文件已发生变化。") }
+        if remaining != nil && remaining != 0 { throw APIError.message(String(localized: "续传原文件已发生变化。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) }
         return digest.finalize().map { String(format: "%02x", $0) }.joined()
     }
 
@@ -583,7 +586,7 @@ import UniformTypeIdentifiers
             image = (try? generator.copyCGImage(at: .zero, actualTime: nil)).map(UIImage.init(cgImage:))
         } else { image = UIImage(contentsOfFile: fileURL.path) }
         guard let image, image.size.width > 0, image.size.height > 0 else {
-            throw APIError.message("无法处理照片预览。")
+            throw APIError.message(String(localized: "无法处理照片预览。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)))
         }
         let scale = min(360 / image.size.width, 360 / image.size.height, 1)
         let size = CGSize(width: image.size.width * scale, height: image.size.height * scale)
@@ -594,20 +597,21 @@ import UniformTypeIdentifiers
             image.draw(in: CGRect(origin: .zero, size: size))
         }
         guard let jpeg = rendered.jpegData(compressionQuality: 0.65), jpeg.count <= 256 * 1024 else {
-            throw APIError.message("照片预览无法压缩。")
+            throw APIError.message(String(localized: "照片预览无法压缩。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)))
         }
         return jpeg
     }
 
     private func uploadThumbnail(_ data: Data, prefix: String, photoID: String, revision: String) async throws {
-        guard let store, let token = store.identity.accessToken else { throw APIError.message("登录已过期。") }
+        guard let store, let token = store.identity.accessToken else { throw APIError.message(String(localized: "登录已过期。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) }
         var request = URLRequest(url: URL(string: prefix + "/native-photos/\(photoID)/thumbnail", relativeTo: base)!.absoluteURL)
+        request.setValue(AgentIdentityLanguage.current, forHTTPHeaderField: "Accept-Language")
         request.httpMethod = "PUT"; request.httpBody = data; request.timeoutInterval = 30
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         request.setValue("image/jpeg", forHTTPHeaderField: "Content-Type")
         request.setValue(revision, forHTTPHeaderField: "X-Photo-Revision")
         let (_, response) = try await session.data(for: request)
-        guard (response as? HTTPURLResponse)?.statusCode == 200 else { throw APIError.message("预览上传失败。") }
+        guard (response as? HTTPURLResponse)?.statusCode == 200 else { throw APIError.message(String(localized: "预览上传失败。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) }
     }
 
     private func poll() async {
@@ -618,7 +622,7 @@ import UniformTypeIdentifiers
         do {
             let rows = try await store.call("/api/dear/social/photo-devices/\(deviceID)/requests") as? [[String: Any]] ?? []
             if rows.isEmpty { store.photoRequestNotice = nil; store.photoTransferProgress = nil; return }
-            store.photoRequestNotice = "有活动成员正在请求原图，请保持 App 打开直到传输完成。"
+            store.photoRequestNotice = String(localized: "有活动成员正在请求原图，请保持 App 打开直到传输完成。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))
             store.photoTransferProgress = nil
             defer { store.photoRequestNotice = nil; store.photoTransferProgress = nil }
             for request in rows {
@@ -646,7 +650,7 @@ import UniformTypeIdentifiers
     }
 
     private func sendOriginal(at url: URL, length: Int, requestID: String) async throws {
-        guard let store, let token = store.identity.accessToken else { throw APIError.message("登录已过期。") }
+        guard let store, let token = store.identity.accessToken else { throw APIError.message(String(localized: "登录已过期。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) }
         let input = try FileHandle(forReadingFrom: url)
         defer { try? input.close() }
         var components = URLComponents(url: base, resolvingAgainstBaseURL: false)!
@@ -654,6 +658,7 @@ import UniformTypeIdentifiers
         components.path = "/api/dear/social/photo-requests/\(requestID)/transfer"
         components.queryItems = [URLQueryItem(name: "role", value: "source"), URLQueryItem(name: "protocol", value: "2")]
         var request = URLRequest(url: components.url!)
+        request.setValue(AgentIdentityLanguage.current, forHTTPHeaderField: "Accept-Language")
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         let task = session.webSocketTask(with: request)
         task.resume()
@@ -665,14 +670,14 @@ import UniformTypeIdentifiers
               let offset = (control["offset"] as? NSNumber)?.intValue,
               offset >= 0, offset < length,
               let prefix = control["prefixSha256"] as? String else {
-            throw APIError.message("续传请求无效。")
+            throw APIError.message(String(localized: "续传请求无效。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)))
         }
         let localPrefix = offset == 0 ? "" : try await Task.detached(priority: .utility) {
             try Self.fileSHA256(url, limit: offset)
         }.value
         guard localPrefix.caseInsensitiveCompare(prefix) == .orderedSame else {
             try? await task.send(.string("{\"kind\":\"reset\"}"))
-            throw APIError.message("已接收部分与本机原文件不匹配，请重新获取。")
+            throw APIError.message(String(localized: "已接收部分与本机原文件不匹配，请重新获取。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)))
         }
         try input.seek(toOffset: UInt64(offset))
         try await task.send(.string("{\"kind\":\"ready\"}"))
@@ -681,17 +686,17 @@ import UniformTypeIdentifiers
         var reportedPercent = -1
         while let chunk = try input.read(upToCount: 16 * 1024), !chunk.isEmpty {
             try Task.checkCancellation()
-            guard sent + chunk.count <= length else { throw APIError.message("原文件已发生变化。") }
+            guard sent + chunk.count <= length else { throw APIError.message(String(localized: "原文件已发生变化。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) }
             try await task.send(.data(chunk))
             sent += chunk.count
             let percent = Int(Double(sent) / Double(length) * 100)
             if percent / 5 != reportedPercent / 5 {
-                store.photoRequestNotice = "正在实时传输原文件：\(percent)%；请保持 App 打开。"
+                store.photoRequestNotice = String(localized: "正在实时传输原文件：\(percent)%；请保持 App 打开。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))
                 store.photoTransferProgress = Double(sent) / Double(length)
                 reportedPercent = percent
             }
         }
-        guard sent == length else { throw APIError.message("原文件已发生变化。") }
+        guard sent == length else { throw APIError.message(String(localized: "原文件已发生变化。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) }
         // Linko confirms receipt only after the other device has consumed all bytes.
         do { _ = try await task.receive() }
         catch {

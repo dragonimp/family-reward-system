@@ -1,3 +1,4 @@
+import AgentIdentityLocalization
 import Foundation
 import Security
 
@@ -35,6 +36,6 @@ enum DeviceCredential {
     }
 
     private static func failure(_ status: OSStatus) -> APIError {
-        APIError(status: 0, message: "设备凭据存储不可用（\(status)），请解锁手表后重试")
+        APIError(status: 0, message: String(localized: "设备凭据存储不可用（\(status)），请解锁手表后重试", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)))
     }
 }

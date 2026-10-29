@@ -36,56 +36,59 @@ import WatchConnectivity
     }
     var scope: String { groupID == 0 ? "" : "familyGroupId=\(groupID)" }
     var ready: Bool { profile?.text("role") == "parent" && profile?.flag("needsRole") == false }
-    var selectedFamily: String { groups.first(where: { $0.id == groupID })?.text("name") ?? "我的群组" }
+    var selectedFamily: String { groups.first(where: { $0.id == groupID })?.text("name") ?? String(localized: "我的群组", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)) }
 
     func call(_ path: String, method: String = "GET", body: [String: Any]? = nil) async throws -> Any {
-        guard let token = identity.accessToken else { throw APIError.message("请先登录用户中心。") }
+        guard let token = identity.accessToken else { throw APIError.message(String(localized: "请先登录用户中心。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) }
         let current = revision
         var request = URLRequest(url: URL(string: path, relativeTo: base)!.absoluteURL)
+        request.setValue(AgentIdentityLanguage.current, forHTTPHeaderField: "Accept-Language")
         request.httpMethod = method; request.timeoutInterval = 30
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         request.setValue("application/json", forHTTPHeaderField: "Accept")
         if let body { request.httpBody = try JSONSerialization.data(withJSONObject: body); request.setValue("application/json", forHTTPHeaderField: "Content-Type") }
         let (data, response) = try await session.data(for: request)
         guard current == revision, token == identity.accessToken else { throw CancellationError() }
-        guard let response = response as? HTTPURLResponse, response.url?.host == base.host else { throw APIError.message("网络响应无效。") }
+        guard let response = response as? HTTPURLResponse, response.url?.host == base.host else { throw APIError.message(String(localized: "网络响应无效。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) }
         let value = (try? JSONSerialization.jsonObject(with: data)) ?? [:]
-        if response.statusCode == 401 { logout(); throw APIError.message("登录已过期，请重新登录。") }
+        if response.statusCode == 401 { logout(); throw APIError.message(String(localized: "登录已过期，请重新登录。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) }
         guard (200..<300).contains(response.statusCode) else {
             let detail = value as? [String: Any]
-            throw APIError.message(detail?["error"] as? String ?? detail?["message"] as? String ?? "请求失败（\(response.statusCode)），请重试。")
+            throw APIError.message(detail?["error"] as? String ?? detail?["message"] as? String ?? String(localized: "请求失败（\(response.statusCode)），请重试。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)))
         }
         return value
     }
     func authenticatedImage(_ path: String) async throws -> UIImage {
-        guard let token = identity.accessToken else { throw APIError.message("请先登录用户中心。") }
+        guard let token = identity.accessToken else { throw APIError.message(String(localized: "请先登录用户中心。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) }
         let current = revision
         var request = URLRequest(url: URL(string: path, relativeTo: base)!.absoluteURL)
+        request.setValue(AgentIdentityLanguage.current, forHTTPHeaderField: "Accept-Language")
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         request.timeoutInterval = 30
         let (data, response) = try await session.data(for: request)
         guard current == revision, token == identity.accessToken else { throw CancellationError() }
         guard let response = response as? HTTPURLResponse, response.url?.host == base.host else {
-            throw APIError.message("照片预览网络响应无效。")
+            throw APIError.message(String(localized: "照片预览网络响应无效。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)))
         }
         guard response.statusCode == 200 else {
-            throw APIError.message("照片预览读取失败（\(response.statusCode)），请刷新相册。")
+            throw APIError.message(String(localized: "照片预览读取失败（\(response.statusCode)），请刷新相册。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)))
         }
-        guard let image = UIImage(data: data) else { throw APIError.message("照片预览格式无效。") }
+        guard let image = UIImage(data: data) else { throw APIError.message(String(localized: "照片预览格式无效。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) }
         return image
     }
     func streamChat(sessionID: String, message: String) async throws {
-        guard let token = identity.accessToken else { throw APIError.message("请先登录用户中心。") }
+        guard let token = identity.accessToken else { throw APIError.message(String(localized: "请先登录用户中心。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) }
         let current = revision
         var request = URLRequest(url: URL(string: "/api/agentfree/chat/stream", relativeTo: base)!.absoluteURL)
+        request.setValue(AgentIdentityLanguage.current, forHTTPHeaderField: "Accept-Language")
         request.httpMethod = "POST"
         request.timeoutInterval = 600
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.httpBody = try JSONSerialization.data(withJSONObject: ["sessionId": sessionID, "message": message, "attachments": []])
         let (stream, response) = try await session.bytes(for: request)
-        guard let response = response as? HTTPURLResponse, response.url?.host == base.host else { throw APIError.message("对话响应无效。") }
-        guard (200..<300).contains(response.statusCode) else { throw APIError.message("对话请求失败（\(response.statusCode)）。") }
+        guard let response = response as? HTTPURLResponse, response.url?.host == base.host else { throw APIError.message(String(localized: "对话响应无效。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) }
+        guard (200..<300).contains(response.statusCode) else { throw APIError.message(String(localized: "对话请求失败（\(response.statusCode)）。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) }
         for try await _ in stream.lines {
             guard current == revision, token == identity.accessToken else { throw CancellationError() }
         }
@@ -98,13 +101,13 @@ import WatchConnectivity
         defer { if current == revision { loading = false } }
         do {
             let info = try await call("/api/user/profile?channel=pc")
-            guard let fields = info as? [String: Any] else { throw APIError.message("无法读取家长身份。") }
+            guard let fields = info as? [String: Any] else { throw APIError.message(String(localized: "无法读取家长身份。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) }
             profile = Record(fields: fields)
             guard ready else { return }
             groups = try Record.list(await call("/api/family-groups"))
             if !groups.contains(where: { $0.id == groupID }) { groupID = groups.first?.id ?? 0 }
             try await loadFamily()
-        } catch is CancellationError {} catch { if current == revision { self.error = error.localizedDescription } }
+        } catch is CancellationError {} catch { if current == revision { self.error = momentDisplayError(error) } }
     }
     func loadFamily() async throws {
         // Clear old family data before loading the selected scope.
@@ -126,7 +129,7 @@ import WatchConnectivity
         let creditRows: [[String: Any]]
         do {
             let overview = try await call("/api/credit/overview") as? [String: Any]
-            guard let rows = overview?["children"] as? [[String: Any]] else { throw APIError.message("信用分数据格式不正确。") }
+            guard let rows = overview?["children"] as? [[String: Any]] else { throw APIError.message(String(localized: "信用分数据格式不正确。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) }
             creditRows = rows
         } catch {
             if strictCredit { throw error }
@@ -147,7 +150,7 @@ import WatchConnectivity
         let current = revision
         let updated = try await fetchChildren(strictCredit: true)
         let ledger = try await call("/api/transactions?page=1&pageSize=30") as? [String: Any]
-        guard let data = ledger?["data"] as? [String: Any] else { throw APIError.message("无法读取最新积分记录。") }
+        guard let data = ledger?["data"] as? [String: Any] else { throw APIError.message(String(localized: "无法读取最新积分记录。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) }
         let items = try Record.list(data["items"] as Any)
         guard current == revision else { throw CancellationError() }
         children = updated
@@ -159,11 +162,11 @@ import WatchConnectivity
     func refreshIfStale() async {
         guard ready, Date().timeIntervalSince(lastRefresh) > 5 else { return }
         do { try await refreshBalancesAndLedger() }
-        catch is CancellationError {} catch { self.error = error.localizedDescription }
+        catch is CancellationError {} catch { self.error = momentDisplayError(error) }
     }
     func loadLedger(page: Int) async throws {
         let result = try await call("/api/transactions?page=\(page)&pageSize=30") as? [String: Any]
-        guard let data = result?["data"] as? [String: Any] else { throw APIError.message("无法读取积分记录。") }
+        guard let data = result?["data"] as? [String: Any] else { throw APIError.message(String(localized: "无法读取积分记录。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) }
         let items = try Record.list(data["items"] as Any)
         ledgerPage = page; ledgerTotal = (data["total"] as? NSNumber)?.intValue ?? 0
         transactions = page == 1 ? items : transactions + items
@@ -192,7 +195,7 @@ extension FamilyStore: WCSessionDelegate {
                              replyHandler: @escaping ([String: Any]) -> Void) {
         Task { @MainActor in
             do { replyHandler(try await watchActivityReply(message)) }
-            catch { replyHandler(["error": error.localizedDescription]) }
+            catch { replyHandler(["error": momentDisplayError(error)]) }
         }
     }
 
@@ -205,17 +208,17 @@ extension FamilyStore: WCSessionDelegate {
             do {
                 guard let data, let spaceID = metadata["spaceId"] as? String,
                       let activityID = metadata["activityId"] as? String else {
-                    throw APIError.message("照片传输文件无效。")
+                    throw APIError.message(String(localized: "照片传输文件无效。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)))
                 }
                 try await photoSource.publish(data, spaceID: spaceID, activityID: activityID,
-                                              name: metadata["name"] as? String ?? "手表照片.jpg")
+                                              name: metadata["name"] as? String ?? String(localized: "手表照片.jpg", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)))
                 photoTransferStatuses[operationID] = "published"
-            } catch { photoTransferStatuses[operationID] = "error: \(error.localizedDescription)" }
+            } catch { photoTransferStatuses[operationID] = "error: \(momentDisplayError(error))" }
         }
     }
 
     private func watchActivityReply(_ message: [String: Any]) async throws -> [String: Any] {
-        guard identity.isAuthenticated else { throw APIError.message("请先在配对的 iPhone 上登录 Linko Moment。") }
+        guard identity.isAuthenticated else { throw APIError.message(String(localized: "请先在配对的 iPhone 上登录 Linko Moment。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) }
         let base = "/api/dear/social/tenants"
         switch message["action"] as? String {
         case "photoTransferStatus":
@@ -230,7 +233,7 @@ extension FamilyStore: WCSessionDelegate {
             return ["items": rows.filter { ($0["joined"] as? Bool) != true }.map {
                 ["id": $0["id"] as? String ?? "", "tenantId": $0["tenantId"] as? String ?? "",
                                            "activityId": $0["activityId"] as? String ?? "",
-                 "title": $0["activityTitle"] as? String ?? "活动"] }]
+                 "title": $0["activityTitle"] as? String ?? String(localized: "活动", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))] }]
         case "createSpace":
             let name = try watchText(message, key: "name", limit: 200)
             _ = try await call(base, method: "POST", body: ["name": name])
@@ -239,7 +242,7 @@ extension FamilyStore: WCSessionDelegate {
              "photos", "thumbnail", "moments", "createMoment", "deleteMoment", "checkins", "createCheckIn",
              "members", "renameActivity", "deleteActivity", "inviteUsername", "inviteLink", "deletePhoto":
             guard let spaceID = message["spaceId"] as? String, UUID(uuidString: spaceID) != nil else {
-                throw APIError.message("空间标识无效。")
+                throw APIError.message(String(localized: "空间标识无效。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)))
             }
             if message["action"] as? String == "renameSpace" {
                 let name = try watchText(message, key: "name", limit: 200)
@@ -262,7 +265,7 @@ extension FamilyStore: WCSessionDelegate {
                 return ["ok": true]
             }
             guard let activityID = message["activityId"] as? String, UUID(uuidString: activityID) != nil else {
-                throw APIError.message("活动标识无效。")
+                throw APIError.message(String(localized: "活动标识无效。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)))
             }
             let prefix = base + "/\(spaceID)/activities/\(activityID)"
             switch message["action"] as? String {
@@ -295,11 +298,11 @@ extension FamilyStore: WCSessionDelegate {
                 guard let latitude = message["latitude"] as? Double, (-90...90).contains(latitude),
                       let longitude = message["longitude"] as? Double, (-180...180).contains(longitude),
                       let altitude = message["altitudeMeters"] as? Double, altitude.isFinite else {
-                    throw APIError.message("手表位置无效，请重新定位。")
+                    throw APIError.message(String(localized: "手表位置无效，请重新定位。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)))
                 }
                 let address = try watchText(message, key: "address", limit: 500)
                 let note = (message["note"] as? String ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
-                guard note.count <= 1000 else { throw APIError.message("备注不能超过 1000 字。") }
+                guard note.count <= 1000 else { throw APIError.message(String(localized: "备注不能超过 1000 字。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) }
                 _ = try await call(prefix + "/checkins", method: "POST", body: ["requestId": requestID,
                     "latitude": latitude, "longitude": longitude, "altitudeMeters": altitude,
                     "address": address, "note": note.isEmpty ? address : note])
@@ -316,14 +319,14 @@ extension FamilyStore: WCSessionDelegate {
                 let value = try await call(prefix + "/invites/link", method: "POST", body: [:]) as? [String: Any]
                 guard let token = value?["token"] as? String,
                       let safe = token.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) else {
-                    throw APIError.message("邀请链接无效。")
+                    throw APIError.message(String(localized: "邀请链接无效。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)))
                 }
                 return ["url": "https://happylife.ai.xmkurt.com/dear?invite=\(safe)"]
             case "acceptInvitation":
                 let me = try await call("/api/dear/social/me") as? [String: Any]
                 guard let username = me?["username"] as? String,
                       let safe = username.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) else {
-                    throw APIError.message("无法确认当前用户名。")
+                    throw APIError.message(String(localized: "无法确认当前用户名。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)))
                 }
                 _ = try await call(prefix + "/invites/username/\(safe)/accept", method: "POST", body: [:])
                 return ["ok": true]
@@ -345,7 +348,7 @@ extension FamilyStore: WCSessionDelegate {
                 let page = Array(photos.dropFirst(offset).prefix(30))
                 return ["hasMore": offset + page.count < photos.count, "items": page.map { photo in
                     ["id": photo["id"] as? String ?? "",
-                     "name": photo["originalFileName"] as? String ?? "照片",
+                     "name": photo["originalFileName"] as? String ?? String(localized: "照片", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)),
                      "author": photo["sourceDisplayName"] as? String ?? "",
                      "available": photo["thumbnailAvailable"] as? Bool ?? false,
                      "canDelete": !subject.isEmpty && (photo["sourceSubject"] as? String) == subject] as [String: Any]
@@ -353,7 +356,7 @@ extension FamilyStore: WCSessionDelegate {
             }
             guard let photoID = message["photoId"] as? String, UUID(uuidString: photoID) != nil,
                   photos.contains(where: { ($0["id"] as? String) == photoID && ($0["thumbnailAvailable"] as? Bool) == true }) else {
-                throw APIError.message("照片预览不可用，请在 iPhone 上查看。")
+                throw APIError.message(String(localized: "照片预览不可用，请在 iPhone 上查看。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)))
             }
             let image = try await authenticatedImage(prefix + "/native-photos/\(photoID)/thumbnail")
             let renderer = UIGraphicsImageRenderer(size: CGSize(width: 240, height: 240))
@@ -366,28 +369,28 @@ extension FamilyStore: WCSessionDelegate {
                                            width: size.width, height: size.height))
             }
             guard let data = preview.jpegData(compressionQuality: 0.55), data.count <= 100_000 else {
-                throw APIError.message("照片预览过大，请在 iPhone 上查看。")
+                throw APIError.message(String(localized: "照片预览过大，请在 iPhone 上查看。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)))
             }
             return ["image": data]
         default:
-            throw APIError.message("手表活动请求无效。")
+            throw APIError.message(String(localized: "手表活动请求无效。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)))
         }
     }
 
     private func watchRows(_ value: Any) throws -> [[String: Any]] {
-        guard let rows = value as? [[String: Any]] else { throw APIError.message("活动数据暂时不可用。") }
+        guard let rows = value as? [[String: Any]] else { throw APIError.message(String(localized: "活动数据暂时不可用。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) }
         return rows
     }
 
     private func watchText(_ message: [String: Any], key: String, limit: Int) throws -> String {
         let value = (message[key] as? String ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !value.isEmpty, value.count <= limit else { throw APIError.message("输入内容须为 1 至 \(limit) 字。") }
+        guard !value.isEmpty, value.count <= limit else { throw APIError.message(String(localized: "输入内容须为 1 至 \(limit) 字。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) }
         return value
     }
 
     private func watchUUID(_ message: [String: Any], key: String) throws -> String {
         guard let value = message[key] as? String, UUID(uuidString: value) != nil else {
-            throw APIError.message("请求标识无效。")
+            throw APIError.message(String(localized: "请求标识无效。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)))
         }
         return value
     }

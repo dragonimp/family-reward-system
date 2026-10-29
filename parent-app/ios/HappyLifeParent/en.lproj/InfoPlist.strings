@@ -1,0 +1,3 @@
+"NSCameraUsageDescription" = "Linko Moment uses the camera to scan watch pairing QR codes.";
+"NSLocationWhenInUseUsageDescription" = "Linko Moment uses your location to record exercise routes and activity check-ins when you choose to use these features.";
+"NSMotionUsageDescription" = "Linko Moment uses motion data to count steps during your exercise sessions.";

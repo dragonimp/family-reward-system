@@ -1,3 +1,4 @@
+import AgentIdentity
 import SwiftUI
 import CoreLocation
 import PhotosUI
@@ -32,7 +33,7 @@ enum DearPhotoLocation {
 
     private static func coordinates(latitude: Double, longitude: Double) -> String? {
         guard latitude.isFinite, longitude.isFinite, abs(latitude) <= 90, abs(longitude) <= 180 else { return nil }
-        return String(format: "%@ %.5f，%@ %.5f", latitude < 0 ? "南纬" : "北纬", abs(latitude), longitude < 0 ? "西经" : "东经", abs(longitude))
+        return String(format: "%@ %.5f，%@ %.5f", latitude < 0 ? String(localized: "南纬", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)) : String(localized: "北纬", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), abs(latitude), longitude < 0 ? String(localized: "西经", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)) : String(localized: "东经", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), abs(longitude))
     }
 }
 
@@ -63,7 +64,7 @@ private struct DearRecord: Identifiable {
     func flag(_ key: String) -> Bool { data[key] as? Bool ?? false }
     func number(_ key: String) -> Double { data[key] as? Double ?? 0 }
     static func list(_ value: Any) throws -> [DearRecord] {
-        guard let values = value as? [[String: Any]] else { throw APIError.message("Linko Social 返回的数据格式不正确。") }
+        guard let values = value as? [[String: Any]] else { throw APIError.message(String(localized: "Linko Social 返回的数据格式不正确。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) }
         return values.map { DearRecord(data: $0) }
     }
 }
@@ -80,13 +81,13 @@ private struct DearActivityMapPoint: Identifiable {
         let visits = checkIns.compactMap { item -> Self? in
             guard let coordinate = coordinate(latitude: item.data["latitude"], longitude: item.data["longitude"]) else { return nil }
             let address = item.text("address")
-            let subtitle = "\(address.isEmpty ? item.dateText("createdAt") : address) · 海拔 \(String(format: "%.1f", item.number("altitudeMeters"))) 米"
-            return Self(id: "checkin-\(item.id)", title: item.text("authorName").isEmpty ? "活动打卡" : "\(item.text("authorName"))的打卡",
+            let subtitle = String(localized: "\(address.isEmpty ? item.dateText("createdAt") : address) · 海拔 \(String(format: "%.1f", item.number("altitudeMeters"))) 米", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))
+            return Self(id: "checkin-\(item.id)", title: item.text("authorName").isEmpty ? String(localized: "活动打卡", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)) : String(localized: "\(item.text("authorName"))的打卡", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)),
                         subtitle: subtitle, coordinate: coordinate, systemImage: "mappin.circle.fill", photo: nil)
         }
         let pictures = photos.compactMap { item -> Self? in
             guard let coordinate = photoCoordinate(item.text("locationName")) else { return nil }
-            let title = item.text("originalFileName").isEmpty ? "活动照片" : item.text("originalFileName")
+            let title = item.text("originalFileName").isEmpty ? String(localized: "活动照片", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)) : item.text("originalFileName")
             return Self(id: "photo-\(item.id)", title: title,
                         subtitle: "\(item.text("sourceDisplayName")) · \(item.dateText("createdAt"))",
                         coordinate: coordinate, systemImage: item.text("contentType").hasPrefix("video/") ? "video.fill" : "photo.fill",
@@ -108,9 +109,9 @@ private struct DearActivityMapPoint: Identifiable {
         guard parts.count == 2 else { return nil }
         let latitudeText = parts[0].trimmingCharacters(in: .whitespaces)
         let longitudeText = parts[1].trimmingCharacters(in: .whitespaces)
-        let south = latitudeText.hasPrefix("南纬")
-        let west = longitudeText.hasPrefix("西经")
-        guard (south || latitudeText.hasPrefix("北纬")), (west || longitudeText.hasPrefix("东经")),
+        let south = latitudeText.hasPrefix(String(localized: "南纬", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)))
+        let west = longitudeText.hasPrefix(String(localized: "西经", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)))
+        guard (south || latitudeText.hasPrefix(String(localized: "北纬", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)))), (west || longitudeText.hasPrefix(String(localized: "东经", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)))),
               let latitude = Double(latitudeText.dropFirst(2).trimmingCharacters(in: .whitespaces)),
               let longitude = Double(longitudeText.dropFirst(2).trimmingCharacters(in: .whitespaces)) else { return nil }
         return coordinate(latitude: NSNumber(value: south ? -latitude : latitude),
@@ -143,8 +144,8 @@ private struct DearActivityMapView: View {
     var body: some View {
         VStack(spacing: 0) {
             if points.isEmpty {
-                ContentUnavailableView("暂无地图位置", systemImage: "map",
-                                       description: Text("照片没有记录坐标时仍可在下方查看，但无法固定到地图上。"))
+                ContentUnavailableView(String(localized: "暂无地图位置", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), systemImage: "map",
+                                       description: Text(String(localized: "照片没有记录坐标时仍可在下方查看，但无法固定到地图上。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))))
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
                 Map(position: $cameraPosition) {
@@ -191,17 +192,17 @@ private struct DearActivityMapView: View {
                     }
                     Spacer(minLength: 0)
                     if let photo = selectedPoint.photo {
-                        Button("查看") { openPhoto(photo) }.font(.subheadline)
+                        Button(String(localized: "查看", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) { openPhoto(photo) }.font(.subheadline)
                     }
                 }
                 .padding(12)
             }
             if !photos.isEmpty {
                 HStack {
-                    Text("活动照片与视频").font(.subheadline.bold())
+                    Text(String(localized: "活动照片与视频", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))).font(.subheadline.bold())
                     Spacer()
                     let unlocated = photos.count - points.filter { $0.photo != nil }.count
-                    if unlocated > 0 { Text("\(unlocated) 项未定位").font(.caption).foregroundStyle(.secondary) }
+                    if unlocated > 0 { Text(String(localized: "\(unlocated) 项未定位", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))).font(.caption).foregroundStyle(.secondary) }
                 }
                 .padding(.horizontal)
                 ScrollView(.horizontal) {
@@ -211,7 +212,7 @@ private struct DearActivityMapView: View {
                                 VStack(alignment: .leading, spacing: 4) {
                                     DearPhotoPreview(store: store, path: thumbnailPath(photo))
                                         .frame(width: 82, height: 82)
-                                    Text(photo.text("originalFileName").isEmpty ? "照片" : photo.text("originalFileName"))
+                                    Text(photo.text("originalFileName").isEmpty ? String(localized: "照片", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)) : photo.text("originalFileName"))
                                         .font(.caption2).lineLimit(1).frame(width: 82, alignment: .leading)
                                 }
                             }.buttonStyle(.plain)
@@ -237,7 +238,7 @@ private struct DearActivityMapView: View {
             }
             .frame(height: min(CGFloat(points.count) * 70 + 16, 220))
         }
-        .navigationTitle("\(title) · 地图")
+        .navigationTitle(String(localized: "\(title) · 地图", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)))
         .navigationBarTitleDisplayMode(.inline)
         .navigationDestination(isPresented: $showingPhoto) {
             if let selectedPhoto {
@@ -331,7 +332,7 @@ struct DearSocialView: View {
     }
     private func activityDate(_ item: DearRecord) -> String {
         let key = item.text("startsAt").isEmpty ? "createdAt" : "startsAt"
-        return (key == "createdAt" ? "创建于 " : "活动日期 ") + item.dateText(key)
+        return (key == "createdAt" ? String(localized: "创建于 ", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)) : String(localized: "活动日期 ", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) + item.dateText(key)
     }
     private func activityDateValue(_ item: DearRecord) -> Date {
         let value = item.text("startsAt").isEmpty ? item.text("createdAt") : item.text("startsAt")
@@ -350,18 +351,18 @@ struct DearSocialView: View {
                     }
                 }
                 if invitations.contains(where: { !$0.flag("joined") }) {
-                    Section("待确认的活动邀请") {
+                    Section(String(localized: "待确认的活动邀请", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) {
                         ForEach(invitations.filter { !$0.flag("joined") }) { invitation in
                             HStack {
                                 Text(invitation.text("activityTitle"))
                                 Spacer()
-                                Button("确认加入") { run { try await accept(invitation) } }.disabled(busy)
+                                Button(String(localized: "确认加入", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) { run { try await accept(invitation) } }.disabled(busy)
                             }
                         }
                     }
                 }
-                Section("我的空间") {
-                    if visibleSpaces.isEmpty { Text("请用右上角“…”新增个人空间。") .foregroundStyle(.secondary) }
+                Section(String(localized: "我的空间", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) {
+                    if visibleSpaces.isEmpty { Text(String(localized: "请用右上角“…”新增个人空间。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) .foregroundStyle(.secondary) }
                     else {
                         HStack {
                             Picker("", selection: $spaceId) {
@@ -371,27 +372,27 @@ struct DearSocialView: View {
                             .frame(maxWidth: .infinity, alignment: .leading)
                             Menu {
                                 if selectedSpace?.text("role") == "owner" {
-                                    Button("编辑基本信息", systemImage: "pencil") {
+                                    Button(String(localized: "编辑基本信息", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), systemImage: "pencil") {
                                         editedSpaceName = selectedSpace?.text("name") ?? ""
                                         showingSpaceRename = true
                                     }
                                 }
-                                Button("查看空间成员", systemImage: "person.2") { run { try await loadSpaceMembers() } }
+                                Button(String(localized: "查看空间成员", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), systemImage: "person.2") { run { try await loadSpaceMembers() } }
                                 if selectedSpace?.text("role") == "owner" {
-                                    Button("删除空间", systemImage: "trash", role: .destructive) { showingSpaceDelete = true }
+                                    Button(String(localized: "删除空间", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), systemImage: "trash", role: .destructive) { showingSpaceDelete = true }
                                 }
-                            } label: { Image(systemName: "ellipsis.circle").accessibilityLabel("管理当前空间") }
+                            } label: { Image(systemName: "ellipsis.circle").accessibilityLabel(String(localized: "管理当前空间", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) }
                             .disabled(busy)
                         }
                     }
-                    Text("每个人管理自己的空间，同一活动可收藏到多个空间。")
+                    Text(String(localized: "每个人管理自己的空间，同一活动可收藏到多个空间。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)))
                         .font(.caption).foregroundStyle(.secondary)
                 }
                 if selectedSpace?.text("role") == "owner" || !joinedActivities.isEmpty {
-                    Section("活动列表") {
-                        if activityLoading { Text("正在读取已有活动…").foregroundStyle(.secondary) }
+                    Section(String(localized: "活动列表", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) {
+                        if activityLoading { Text(String(localized: "正在读取已有活动…", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))).foregroundStyle(.secondary) }
                         if !activityError.isEmpty { Text(activityError).foregroundStyle(.red) }
-                        if allActivities.isEmpty && !activityLoading && activityError.isEmpty { Text("还没有活动").foregroundStyle(.secondary) }
+                        if allActivities.isEmpty && !activityLoading && activityError.isEmpty { Text(String(localized: "还没有活动", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))).foregroundStyle(.secondary) }
                         else {
                             ForEach(allActivities) { item in
                                 HStack {
@@ -411,7 +412,7 @@ struct DearSocialView: View {
                                     }
                                     }.buttonStyle(.plain)
                                     Menu {
-                                        Button("活动管理", systemImage: "gearshape") {
+                                        Button(String(localized: "活动管理", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), systemImage: "gearshape") {
                                             activityId = item.id
                                             editedActivityName = item.text("title")
                                             editedActivityDescription = item.text("description")
@@ -419,39 +420,39 @@ struct DearSocialView: View {
                                             showingActivityManagement = true
                                         }
                                         if item.flag("isBookmarked") {
-                                            Button("取消收藏", systemImage: "bookmark.slash", role: .destructive) { run { try await removeBookmark(item) } }
+                                            Button(String(localized: "取消收藏", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), systemImage: "bookmark.slash", role: .destructive) { run { try await removeBookmark(item) } }
                                         } else if selectedSpace?.text("role") == "owner" && item.text("sourceTenantId") != spaceId && !activities.contains(where: { $0.id == item.id }) {
-                                            Button("收藏到当前空间", systemImage: "bookmark") { run { try await addBookmark(item) } }
+                                            Button(String(localized: "收藏到当前空间", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), systemImage: "bookmark") { run { try await addBookmark(item) } }
                                         }
-                                    } label: { Image(systemName: "ellipsis.circle").accessibilityLabel("管理\(item.text("title"))") }
+                                    } label: { Image(systemName: "ellipsis.circle").accessibilityLabel(String(localized: "管理\(item.text("title"))", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) }
                                     .disabled(busy)
                                 }
                             }
                         }
                         if selectedSpace?.text("role") == "owner" {
                             HStack {
-                                TextField("例如：周末野餐", text: $activityName)
-                                Button("添加") { run { try await createActivity() } }
+                                TextField(String(localized: "例如：周末野餐", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), text: $activityName)
+                                Button(String(localized: "添加", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) { run { try await createActivity() } }
                                     .disabled(busy || activityName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                             }
                         }
                     }
                 }
-                Section("好友关系 · 跨空间") {
-                    DisclosureGroup("查看好友与申请") {
-                        if relationships.isEmpty { Text("还没有好友关系或申请。") .foregroundStyle(.secondary) }
+                Section(String(localized: "好友关系 · 跨空间", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) {
+                    DisclosureGroup(String(localized: "查看好友与申请", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) {
+                        if relationships.isEmpty { Text(String(localized: "还没有好友关系或申请。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) .foregroundStyle(.secondary) }
                         ForEach(relationships) { relation in
                             HStack {
                                 VStack(alignment: .leading) {
                                     Text(relation.text("peerName"))
-                                    Text(relation.text("status") == "accepted" ? "朋友" : relation.text("direction") == "incoming" ? "邀请你成为朋友" : "等待对方确认")
+                                    Text(relation.text("status") == "accepted" ? String(localized: "朋友", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)) : relation.text("direction") == "incoming" ? String(localized: "邀请你成为朋友", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)) : String(localized: "等待对方确认", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)))
                                         .font(.caption).foregroundStyle(.secondary)
                                 }
                                 Spacer()
                                 if relation.text("status") == "pending" && relation.text("direction") == "incoming" {
-                                    Button("接受") { run { try await acceptFriend(relation) } }.disabled(busy)
+                                    Button(String(localized: "接受", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) { run { try await acceptFriend(relation) } }.disabled(busy)
                                 }
-                                Button(relation.text("status") == "accepted" ? "解除" : "移除", role: .destructive) {
+                                Button(relation.text("status") == "accepted" ? String(localized: "解除", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)) : String(localized: "移除", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), role: .destructive) {
                                     run { try await removeFriend(relation) }
                                 }.disabled(busy)
                             }
@@ -459,25 +460,25 @@ struct DearSocialView: View {
                     }
                 }
                 if showLogout {
-                    Section { Link("隐私政策与支持", destination: URL(string: "https://happylife.ai.xmkurt.com/legal/linko-family-privacy.html")!) }
+                    Section { Link(String(localized: "隐私政策与支持", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), destination: URL(string: "https://happylife.ai.xmkurt.com/legal/linko-family-privacy.html")!) }
                 }
             }
             .listStyle(.insetGrouped)
             .readablePage()
-            .navigationTitle("活动与分享")
+            .navigationTitle(String(localized: "活动与分享", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)))
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Menu {
-                        Button("新增空间", systemImage: "plus") { spaceName = ""; showingSpaceCreate = true }
+                        Button(String(localized: "新增空间", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), systemImage: "plus") { spaceName = ""; showingSpaceCreate = true }
                         if selectedSpace?.text("role") == "owner" {
-                            Button("修改空间名称", systemImage: "pencil") { editedSpaceName = selectedSpace?.text("name") ?? ""; showingSpaceRename = true }
-                            Button("删除空间", systemImage: "trash", role: .destructive) { showingSpaceDelete = true }
+                            Button(String(localized: "修改空间名称", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), systemImage: "pencil") { editedSpaceName = selectedSpace?.text("name") ?? ""; showingSpaceRename = true }
+                            Button(String(localized: "删除空间", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), systemImage: "trash", role: .destructive) { showingSpaceDelete = true }
                         }
-                        Button("刷新", systemImage: "arrow.clockwise") { run { try await load() } }
-                    } label: { Image(systemName: "ellipsis.circle").accessibilityLabel("空间菜单") }
+                        Button(String(localized: "刷新", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), systemImage: "arrow.clockwise") { run { try await load() } }
+                    } label: { Image(systemName: "ellipsis.circle").accessibilityLabel(String(localized: "空间菜单", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) }
                     .disabled(busy)
                 }
-                if showLogout { ToolbarItem(placement: .topBarLeading) { Button("退出") { store.logout() } } }
+                if showLogout { ToolbarItem(placement: .topBarLeading) { Button(String(localized: "退出", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) { store.logout() } } }
             }
             .refreshable { await refresh() }
             .task { await refresh() }
@@ -488,18 +489,18 @@ struct DearSocialView: View {
                 NavigationStack {
                     List {
                         if selectedSpace?.text("role") == "owner" {
-                            Text("先邀请对方加入本空间的活动，再从活动访客设为空间成员。空间成员可查看本空间的所有原生活动；收藏活动仍遵循原活动权限。")
+                            Text(String(localized: "先邀请对方加入本空间的活动，再从活动访客设为空间成员。空间成员可查看本空间的所有原生活动；收藏活动仍遵循原活动权限。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)))
                                 .font(.footnote).foregroundStyle(.secondary)
                         }
                         ForEach(spaceMembers) { member in
                             HStack {
                                 Text(member.text("displayName"))
                                 Spacer()
-                                Text(member.text("role") == "owner" ? "空间主人" : member.text("role") == "member" ? "空间成员" : "活动访客")
+                                Text(member.text("role") == "owner" ? String(localized: "空间主人", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)) : member.text("role") == "member" ? String(localized: "空间成员", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)) : String(localized: "活动访客", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)))
                                     .foregroundStyle(.secondary)
                                 if selectedSpace?.text("role") == "owner" && member.text("role") != "owner" {
                                     Menu {
-                                        Button(member.text("role") == "member" ? "改为活动访客" : "设为空间成员") {
+                                        Button(member.text("role") == "member" ? String(localized: "改为活动访客", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)) : String(localized: "设为空间成员", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) {
                                             run { try await setSpaceMemberRole(member,
                                                 role: member.text("role") == "member" ? "guest" : "member") }
                                         }
@@ -508,25 +509,25 @@ struct DearSocialView: View {
                             }
                         }
                     }
-                    .navigationTitle("空间成员")
-                    .toolbar { ToolbarItem(placement: .topBarTrailing) { Button("完成") { showingSpaceMembers = false } } }
+                    .navigationTitle(String(localized: "空间成员", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)))
+                    .toolbar { ToolbarItem(placement: .topBarTrailing) { Button(String(localized: "完成", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) { showingSpaceMembers = false } } }
                 }
             }
             .onChange(of: activityId) { _, _ in photos = []; moments = []; checkIns = []; activityMembers = []; run { try await loadDetails() } }
-            .alert("新增空间", isPresented: $showingSpaceCreate) {
-                TextField("空间名称", text: $spaceName)
-                Button("取消", role: .cancel) { }
-                Button("创建") { run { try await createSpace() } }
-            } message: { Text("此空间由你管理，可收藏参加过的活动。") }
-            .alert("修改空间名称", isPresented: $showingSpaceRename) {
-                TextField("空间名称", text: $editedSpaceName)
-                Button("取消", role: .cancel) { }
-                Button("保存") { run { try await renameSpace() } }
-            } message: { Text("更新你的空间名称。") }
-            .confirmationDialog("删除空间「\(selectedSpace?.text("name") ?? "")」？", isPresented: $showingSpaceDelete, titleVisibility: .visible) {
-                Button("确认删除空间", role: .destructive) { run { try await deleteSpace() } }
-                Button("取消", role: .cancel) { }
-            } message: { Text("仅可删除没有活动、其他成员或分享记录的空间。") }
+            .alert(String(localized: "新增空间", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), isPresented: $showingSpaceCreate) {
+                TextField(String(localized: "空间名称", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), text: $spaceName)
+                Button(String(localized: "取消", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), role: .cancel) { }
+                Button(String(localized: "创建", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) { run { try await createSpace() } }
+            } message: { Text(String(localized: "此空间由你管理，可收藏参加过的活动。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) }
+            .alert(String(localized: "修改空间名称", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), isPresented: $showingSpaceRename) {
+                TextField(String(localized: "空间名称", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), text: $editedSpaceName)
+                Button(String(localized: "取消", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), role: .cancel) { }
+                Button(String(localized: "保存", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) { run { try await renameSpace() } }
+            } message: { Text(String(localized: "更新你的空间名称。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) }
+            .confirmationDialog(String(localized: "删除空间「\(selectedSpace?.text("name") ?? "")」？", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), isPresented: $showingSpaceDelete, titleVisibility: .visible) {
+                Button(String(localized: "确认删除空间", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), role: .destructive) { run { try await deleteSpace() } }
+                Button(String(localized: "取消", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), role: .cancel) { }
+            } message: { Text(String(localized: "仅可删除没有活动、其他成员或分享记录的空间。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) }
         }
     }
 
@@ -561,9 +562,9 @@ struct DearSocialView: View {
                     .frame(maxWidth: isGrid ? .infinity : nil)
                     .overlay(alignment: .bottomLeading) {
                         VStack(alignment: .leading, spacing: 1) {
-                            Text(photo.text("sourceDisplayName").isEmpty ? "活动成员" : photo.text("sourceDisplayName"))
-                            Text(photo.text("createdAt").isEmpty ? "正在分享" : photo.dateText("createdAt"))
-                            Text(photo.text("locationName").isEmpty ? "地点未记录" : photo.text("locationName"))
+                            Text(photo.text("sourceDisplayName").isEmpty ? String(localized: "活动成员", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)) : photo.text("sourceDisplayName"))
+                            Text(photo.text("createdAt").isEmpty ? String(localized: "正在分享", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)) : photo.dateText("createdAt"))
+                            Text(photo.text("locationName").isEmpty ? String(localized: "地点未记录", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)) : photo.text("locationName"))
                                 .lineLimit(2).minimumScaleFactor(0.8)
                         }
                         .font(.system(size: 10)).foregroundStyle(.white)
@@ -574,13 +575,13 @@ struct DearSocialView: View {
                 if !isGrid {
                     VStack(alignment: .leading, spacing: 5) {
                         Text(photo.text("originalFileName")).font(.subheadline.bold()).lineLimit(2)
-                        if photo.text("contentType").hasPrefix("video/") { Label("视频", systemImage: "play.rectangle.fill").font(.caption) }
-                        if !photo.flag("thumbnailAvailable") { Text("预览尚未就绪，点开可重试").font(.caption).foregroundStyle(.secondary) }
+                        if photo.text("contentType").hasPrefix("video/") { Label(String(localized: "视频", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), systemImage: "play.rectangle.fill").font(.caption) }
+                        if !photo.flag("thumbnailAvailable") { Text(String(localized: "预览尚未就绪，点开可重试", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))).font(.caption).foregroundStyle(.secondary) }
                     }
                 }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .accessibilityLabel("\(photo.text("originalFileName"))，\(photo.text("sourceDisplayName"))，\(photo.dateText("createdAt"))，\(photo.text("locationName").isEmpty ? "地点未记录" : photo.text("locationName"))")
+        .accessibilityLabel(String(localized: "\(photo.text("originalFileName"))，\(photo.text("sourceDisplayName"))，\(photo.dateText("createdAt"))，\(photo.text("locationName").isEmpty ? String(localized: "地点未记录", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)) : photo.text("locationName"))", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)))
     }
 
     private var activityDetail: some View {
@@ -588,73 +589,73 @@ struct DearSocialView: View {
             if !error.isEmpty { Section { Text(error).foregroundStyle(.red) } }
             if !notice.isEmpty { Section { Text(notice).foregroundStyle(.teal) } }
             if selectedActivity != nil {
-                Section("生活分享") {
+                Section(String(localized: "生活分享", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) {
                     ForEach(moments) { moment in
                         VStack(alignment: .leading, spacing: 6) {
                             Text(moment.text("authorName")).font(.subheadline.bold())
                             Text(moment.text("text")).textSelection(.enabled)
                             if moment.flag("canDelete") {
-                                Button("删除我的记录", role: .destructive) { run { try await deleteMoment(moment) } }.font(.caption)
+                                Button(String(localized: "删除我的记录", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), role: .destructive) { run { try await deleteMoment(moment) } }.font(.caption)
                             }
                         }.padding(.vertical, 4)
                     }
-                    if moments.isEmpty { Text("还没有分享的日常。").foregroundStyle(.secondary) }
-                    Button("刷新日常") { run { try await loadMoments() } }.disabled(busy)
+                    if moments.isEmpty { Text(String(localized: "还没有分享的日常。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))).foregroundStyle(.secondary) }
+                    Button(String(localized: "刷新日常", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) { run { try await loadMoments() } }.disabled(busy)
                 }
             }
             Section {
                 let points = DearActivityMapPoint.points(checkIns: checkIns, photos: photos)
                 NavigationLink {
-                    DearActivityMapView(store: store, title: selectedActivity?.text("title") ?? "活动",
+                    DearActivityMapView(store: store, title: selectedActivity?.text("title") ?? String(localized: "活动", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)),
                                         spaceID: activityTenantId, activityID: activityId,
                                         points: points, photos: photos)
                 } label: {
-                    Label("活动地图", systemImage: "map")
+                    Label(String(localized: "活动地图", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), systemImage: "map")
                 }
                 .disabled(points.isEmpty && photos.isEmpty)
                 if points.isEmpty && photos.isEmpty {
-                    Text("暂无打卡或共享照片。")
+                    Text(String(localized: "暂无打卡或共享照片。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)))
                         .font(.caption).foregroundStyle(.secondary)
                 } else {
-                    Text("\(points.filter { $0.photo == nil }.count) 个打卡点 · \(points.filter { $0.photo != nil }.count) 项定位照片或视频；其他照片也可在地图页查看。")
+                    Text(String(localized: "\(points.filter { $0.photo == nil }.count) 个打卡点 · \(points.filter { $0.photo != nil }.count) 项定位照片或视频；其他照片也可在地图页查看。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)))
                         .font(.caption).foregroundStyle(.secondary)
                 }
             }
                 if let selectedActivity {
-                    Section("照片与视频 · \(selectedActivity.text("title"))") {
-                        PhotosPicker("多选共享 iPhone 照片或视频", selection: $selectedPhotos, maxSelectionCount: 50,
+                    Section(String(localized: "照片与视频 · \(selectedActivity.text("title"))", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) {
+                        PhotosPicker(String(localized: "多选共享 iPhone 照片或视频", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), selection: $selectedPhotos, maxSelectionCount: 50,
                                      matching: .any(of: [.images, .videos]), preferredItemEncoding: .current)
                             .disabled(busy)
-                        TextField("照片地点（可选，供活动成员查看）", text: $photoLocationName)
+                        TextField(String(localized: "照片地点（可选，供活动成员查看）", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), text: $photoLocationName)
                             .textInputAutocapitalization(.sentences)
-                        Text("优先显示照片自带的定位；无定位时使用填写地点。")
+                        Text(String(localized: "优先显示照片自带的定位；无定位时使用填写地点。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)))
                             .font(.caption).foregroundStyle(.secondary)
-                        Picker("显示方式", selection: $photoViewMode) {
-                            Text("网格").tag("grid")
-                            Text("列表").tag("list")
+                        Picker(String(localized: "显示方式", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), selection: $photoViewMode) {
+                            Text(String(localized: "网格", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))).tag("grid")
+                            Text(String(localized: "列表", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))).tag("list")
                         }.pickerStyle(.segmented)
-                        Button(selectingPhotoDownloads ? "完成多选" : "多选下载原文件") {
+                        Button(selectingPhotoDownloads ? String(localized: "完成多选", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)) : String(localized: "多选下载原文件", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) {
                             selectingPhotoDownloads.toggle()
                             selectedPhotoIDs.removeAll(); batchOriginalURLs = []; batchDownloadError = ""; batchDownloadProgress = 0
                         }.disabled(batchDownloading)
                         if selectingPhotoDownloads {
-                            Text("已选 \(selectedPhotoIDs.count) 项") .font(.caption).foregroundStyle(.secondary)
-                            Button(batchDownloading ? "正在获取原文件…" : "获取选中原文件") {
+                            Text(String(localized: "已选 \(selectedPhotoIDs.count) 项", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) .font(.caption).foregroundStyle(.secondary)
+                            Button(batchDownloading ? String(localized: "正在获取原文件…", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)) : String(localized: "获取选中原文件", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) {
                                 Task { await downloadSelectedPhotos() }
                             }.disabled(selectedPhotoIDs.isEmpty || batchDownloading)
                             if batchDownloading || batchDownloadProgress > 0 && batchDownloadProgress < 1 {
-                                ProgressView(value: batchDownloadProgress).accessibilityLabel("多选原文件接收进度")
+                                ProgressView(value: batchDownloadProgress).accessibilityLabel(String(localized: "多选原文件接收进度", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)))
                             }
                             if !batchOriginalURLs.isEmpty {
                                 ShareLink(items: batchOriginalURLs) {
-                                    Label("保存或分享已获取的 \(batchOriginalURLs.count) 项", systemImage: "square.and.arrow.up")
+                                    Label(String(localized: "保存或分享已获取的 \(batchOriginalURLs.count) 项", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), systemImage: "square.and.arrow.up")
                                 }
                             }
                             if !batchDownloadError.isEmpty { Text(batchDownloadError).font(.caption).foregroundStyle(.red) }
                         }
-                        Text("原图留在此 iPhone；对方获取原图时，请保持 Linko Moment 打开。")
+                        Text(String(localized: "原图留在此 iPhone；对方获取原图时，请保持 Linko Moment 打开。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)))
                             .font(.caption).foregroundStyle(.secondary)
-                        if photos.isEmpty { Text("还没有分享的照片或视频").foregroundStyle(.secondary) }
+                        if photos.isEmpty { Text(String(localized: "还没有分享的照片或视频", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))).foregroundStyle(.secondary) }
                         if photoViewMode == "grid" {
                             LazyVGrid(columns: [GridItem(.flexible(), spacing: 8), GridItem(.flexible(), spacing: 8)], spacing: 8) {
                                 ForEach(photos) { photo in photoLink(photo) }
@@ -662,17 +663,17 @@ struct DearSocialView: View {
                         } else {
                             ForEach(photos) { photo in photoLink(photo) }
                         }
-                        Button("刷新相册") { run { try await loadPhotos() } }.disabled(busy)
+                        Button(String(localized: "刷新相册", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) { run { try await loadPhotos() } }.disabled(busy)
                     }
-                    Section("活动打卡") {
+                    Section(String(localized: "活动打卡", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) {
                         Button {
                             checkInNote = ""; checkInRequestID = UUID(); pendingCheckIn = true
                             checkInLocator.locate()
                         } label: {
-                            Label(pendingCheckIn ? "正在定位并打卡…" : "在当前位置打卡", systemImage: "location.circle")
+                            Label(pendingCheckIn ? String(localized: "正在定位并打卡…", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)) : String(localized: "在当前位置打卡", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), systemImage: "location.circle")
                         }.disabled(busy || pendingCheckIn)
                         if let latest = checkIns.first {
-                            Label(String(format: "最近打卡海拔 %.1f 米", latest.number("altitudeMeters")), systemImage: "mountain.2.fill")
+                            Label(String(format: String(localized: "最近打卡海拔 %.1f 米", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), latest.number("altitudeMeters")), systemImage: "mountain.2.fill")
                                 .font(.subheadline.weight(.semibold))
                         }
                         ForEach(checkIns) { checkIn in
@@ -690,7 +691,7 @@ struct DearSocialView: View {
                                     Text(checkIn.dateText("createdAt")).font(.caption).foregroundStyle(.secondary)
                                 }
                                 Text(checkIn.text("note"))
-                                Label(String(format: "海拔 %.1f 米", checkIn.number("altitudeMeters")), systemImage: "mountain.2")
+                                Label(String(format: String(localized: "海拔 %.1f 米", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), checkIn.number("altitudeMeters")), systemImage: "mountain.2")
                                     .font(.subheadline)
                                 Text(checkIn.text("address")).font(.caption).foregroundStyle(.secondary)
                                 if let latitude = checkIn.data["latitude"] as? Double,
@@ -700,30 +701,30 @@ struct DearSocialView: View {
                                 }
                             }}.buttonStyle(.plain).padding(.vertical, 4).disabled(busy || pendingCheckIn)
                         }
-                        if checkIns.isEmpty { Text("还没有打卡记录。") .foregroundStyle(.secondary) }
+                        if checkIns.isEmpty { Text(String(localized: "还没有打卡记录。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) .foregroundStyle(.secondary) }
                     }
-                    Section("活动成员") {
-                        Text("同一活动不会自动建立好友关系，需要对方确认。")
+                    Section(String(localized: "活动成员", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) {
+                        Text(String(localized: "同一活动不会自动建立好友关系，需要对方确认。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)))
                             .font(.caption).foregroundStyle(.secondary)
                         ForEach(activityMembers.filter { !$0.flag("isSelf") }, id: \.subject) { member in
                             HStack {
                                 Text(member.text("displayName"))
                                 Spacer()
                                 if let relation = relationships.first(where: { $0.text("peerSubject") == member.subject }) {
-                                    Text(relation.text("status") == "accepted" ? "已是朋友" : "待确认")
+                                    Text(relation.text("status") == "accepted" ? String(localized: "已是朋友", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)) : String(localized: "待确认", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)))
                                         .font(.caption).foregroundStyle(.secondary)
-                                } else { Text("尚未成为好友").font(.caption).foregroundStyle(.secondary) }
+                                } else { Text(String(localized: "尚未成为好友", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))).font(.caption).foregroundStyle(.secondary) }
                             }
                         }
                         if activityMembers.filter({ !$0.flag("isSelf") }).isEmpty {
-                            Text("邀请其他人参加活动后，可以互相申请好友。") .foregroundStyle(.secondary)
+                            Text(String(localized: "邀请其他人参加活动后，可以互相申请好友。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) .foregroundStyle(.secondary)
                         }
                     }
                 }
         }
         .listStyle(.insetGrouped)
         .readablePage()
-        .navigationTitle(selectedActivity?.text("title") ?? "活动详情")
+        .navigationTitle(selectedActivity?.text("title") ?? String(localized: "活动详情", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)))
         .navigationDestination(isPresented: $showingPhoto) {
             if let selectedPhoto {
                 DearPhotoDetailView(store: store, photo: selectedPhoto, spaceID: activityTenantId, activityID: activityId,
@@ -732,10 +733,10 @@ struct DearSocialView: View {
                                     onDeleted: { localCopyRemoved in
                                         showingPhoto = false
                                         photos.removeAll { $0.id == selectedPhoto.id }
-                                        if !localCopyRemoved { self.error = "分享已删除，本机副本暂未清理；App 会继续重试。" }
+                                        if !localCopyRemoved { self.error = String(localized: "分享已删除，本机副本暂未清理；App 会继续重试。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)) }
                                         Task {
                                             do { try await loadPhotos() }
-                                            catch { self.error = "相册刷新失败：\(error.localizedDescription)" }
+                                            catch { self.error = String(localized: "相册刷新失败：\(momentDisplayError(error))", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)) }
                                         }
                                     })
             }
@@ -764,31 +765,31 @@ struct DearSocialView: View {
                     do {
                         if item.supportedContentTypes.contains(where: { $0.conforms(to: .movie) }) {
                             guard let video = try await item.loadTransferable(type: DearPickedVideo.self) else {
-                                throw APIError.message("无法读取所选视频。")
+                                throw APIError.message(String(localized: "无法读取所选视频。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)))
                             }
                             defer { try? FileManager.default.removeItem(at: video.url) }
                             try await store.photoSource.publishVideo(at: video.url, spaceID: targetSpace, activityID: targetActivity, locationName: photoLocationName)
                         } else {
                             guard let data = try await item.loadTransferable(type: Data.self) else {
-                                throw APIError.message("无法读取所选照片。")
+                                throw APIError.message(String(localized: "无法读取所选照片。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)))
                             }
                             let embedded = DearPhotoLocation.label(for: item, data: data)
                             try await store.photoSource.publish(data, spaceID: targetSpace, activityID: targetActivity,
-                                                                name: "iPhone照片", locationName: embedded ?? photoLocationName)
+                                                                name: String(localized: "iPhone照片", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), locationName: embedded ?? photoLocationName)
                         }
                         completed += 1
                     } catch {
-                        failures.append("第 \(index + 1) 项：\(error.localizedDescription)")
+                        failures.append(String(localized: "第 \(index + 1) 项：\(momentDisplayError(error))", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)))
                     }
                 }
                 try await loadPhotos()
-                notice = "已共享 \(completed) 项；请保持此 iPhone 可以响应原文件请求。"
+                notice = String(localized: "已共享 \(completed) 项；请保持此 iPhone 可以响应原文件请求。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))
                 if !failures.isEmpty { error = failures.joined(separator: "；") }
             }
         }
         .refreshable {
             do { try await loadDetails(); try await loadRelationships() }
-            catch { self.error = error.localizedDescription }
+            catch { self.error = momentDisplayError(error) }
         }
     }
 
@@ -796,34 +797,34 @@ struct DearSocialView: View {
         NavigationStack {
             Form {
                 if !error.isEmpty { Text(error).foregroundStyle(.red) }
-                Section("当前位置") {
-                    if checkInLocator.fetching { ProgressView("正在获取位置和地址…") }
+                Section(String(localized: "当前位置", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) {
+                    if checkInLocator.fetching { ProgressView(String(localized: "正在获取位置和地址…", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) }
                     if !checkInLocator.error.isEmpty { Text(checkInLocator.error).foregroundStyle(.red) }
                     if let selectedCheckIn {
                         Text(checkInLocator.location == nil ? selectedCheckIn.text("address") : checkInLocator.address)
-                        Text(String(format: "纬度 %.6f，经度 %.6f", checkInLocator.location?.coordinate.latitude ?? selectedCheckIn.number("latitude"), checkInLocator.location?.coordinate.longitude ?? selectedCheckIn.number("longitude")))
-                        Text(String(format: "海拔 %.1f 米", checkInLocator.location?.altitude ?? selectedCheckIn.number("altitudeMeters")))
+                        Text(String(format: String(localized: "纬度 %.6f，经度 %.6f", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), checkInLocator.location?.coordinate.latitude ?? selectedCheckIn.number("latitude"), checkInLocator.location?.coordinate.longitude ?? selectedCheckIn.number("longitude")))
+                        Text(String(format: String(localized: "海拔 %.1f 米", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), checkInLocator.location?.altitude ?? selectedCheckIn.number("altitudeMeters")))
                     }
                     if selectedCheckIn?.flag("canEdit") == true {
-                        Button("重新定位") { checkInLocator.locate() }.disabled(checkInLocator.fetching)
+                        Button(String(localized: "重新定位", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) { checkInLocator.locate() }.disabled(checkInLocator.fetching)
                     }
                 }
-                Section("备注") {
-                    TextField("默认填写当前位置地址", text: $checkInNote, axis: .vertical)
+                Section(String(localized: "备注", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) {
+                    TextField(String(localized: "默认填写当前位置地址", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), text: $checkInNote, axis: .vertical)
                         .lineLimit(2...5)
                         .disabled(selectedCheckIn?.flag("canEdit") != true)
-                    Text("留空时使用上方地址作为备注。") .font(.caption).foregroundStyle(.secondary)
+                    Text(String(localized: "留空时使用上方地址作为备注。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) .font(.caption).foregroundStyle(.secondary)
                 }
             }
-            .navigationTitle(selectedCheckIn?.flag("canEdit") == true ? "修改打卡" : "打卡详情")
+            .navigationTitle(selectedCheckIn?.flag("canEdit") == true ? String(localized: "修改打卡", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)) : String(localized: "打卡详情", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)))
             .onChange(of: checkInLocator.address) { _, address in
                 if checkInNote.isEmpty { checkInNote = address }
             }
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) { Button("关闭") { showingCheckIn = false } }
+                ToolbarItem(placement: .cancellationAction) { Button(String(localized: "关闭", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) { showingCheckIn = false } }
                 if selectedCheckIn?.flag("canEdit") == true {
                     ToolbarItem(placement: .confirmationAction) {
-                        Button("保存") { run { try await updateCheckIn() } }
+                        Button(String(localized: "保存", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) { run { try await updateCheckIn() } }
                             .disabled(checkInLocator.fetching || busy || checkInNote.count > 1000)
                     }
                 }
@@ -837,87 +838,87 @@ struct DearSocialView: View {
                 if !error.isEmpty { Section { Text(error).foregroundStyle(.red) } }
                 if !notice.isEmpty { Section { Text(notice).foregroundStyle(.teal) } }
                 if selectedActivity?.flag("canEdit") == true {
-                    Section("基本信息") {
-                        TextField("活动名称", text: $editedActivityName)
-                        TextField("活动介绍", text: $editedActivityDescription, axis: .vertical)
+                    Section(String(localized: "基本信息", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) {
+                        TextField(String(localized: "活动名称", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), text: $editedActivityName)
+                        TextField(String(localized: "活动介绍", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), text: $editedActivityDescription, axis: .vertical)
                             .lineLimit(2...5)
-                        DatePicker("活动日期", selection: $editedActivityDate, displayedComponents: .date)
-                        Button("保存基本信息") { run { try await updateActivity() } }
+                        DatePicker(String(localized: "活动日期", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), selection: $editedActivityDate, displayedComponents: .date)
+                        Button(String(localized: "保存基本信息", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) { run { try await updateActivity() } }
                             .disabled(busy || editedActivityName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || editedActivityDescription.count > 2000)
-                        Button("删除活动", systemImage: "trash", role: .destructive) {
+                        Button(String(localized: "删除活动", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), systemImage: "trash", role: .destructive) {
                             showingActivityDelete = true
                         }.disabled(busy)
                     }
                 }
                 if selectedActivity?.flag("canEdit") == true {
-                    Section("邀请参加") {
+                    Section(String(localized: "邀请参加", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) {
                         HStack {
-                            TextField("用户中心用户名", text: $inviteUsername).textInputAutocapitalization(.never)
-                            Button("邀请") { run { try await inviteByName() } }
+                            TextField(String(localized: "用户中心用户名", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), text: $inviteUsername).textInputAutocapitalization(.never)
+                            Button(String(localized: "邀请", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) { run { try await inviteByName() } }
                                 .disabled(busy || inviteUsername.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                         }
-                        Button("生成七天有效的邀请链接") { run { try await createInviteLink() } }.disabled(busy)
+                        Button(String(localized: "生成七天有效的邀请链接", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) { run { try await createInviteLink() } }.disabled(busy)
                         if let url = URL(string: inviteLink), url.scheme == "https" {
-                            ShareLink(item: url) { Label("分享邀请链接", systemImage: "square.and.arrow.up") }
+                            ShareLink(item: url) { Label(String(localized: "分享邀请链接", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), systemImage: "square.and.arrow.up") }
                         }
-                        Text("对方确认加入后才能查看这场活动的分享。")
+                        Text(String(localized: "对方确认加入后才能查看这场活动的分享。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)))
                             .font(.caption).foregroundStyle(.secondary)
                     }
                 }
-                Section("发布日常") {
+                Section(String(localized: "发布日常", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) {
                     TextEditor(text: $momentDraft).frame(minHeight: 90)
-                        .accessibilityLabel("写下生活日常")
+                        .accessibilityLabel(String(localized: "写下生活日常", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)))
                         .onChange(of: momentDraft) { _, _ in momentRequestID = UUID() }
-                    Button("发布日常") { run { try await publishMoment() } }
+                    Button(String(localized: "发布日常", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) { run { try await publishMoment() } }
                         .disabled(busy || momentDraft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || momentDraft.count > 1000)
                 }
-                Section("活动成员与好友") {
+                Section(String(localized: "活动成员与好友", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) {
                     ForEach(activityMembers.filter { !$0.flag("isSelf") }, id: \.subject) { member in
                         HStack {
                             Text(member.text("displayName"))
                             Spacer()
                             if let relation = relationships.first(where: { $0.text("peerSubject") == member.subject }) {
-                                Text(relation.text("status") == "accepted" ? "已是朋友" : "待确认")
+                                Text(relation.text("status") == "accepted" ? String(localized: "已是朋友", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)) : String(localized: "待确认", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)))
                                     .font(.caption).foregroundStyle(.secondary)
                             } else {
-                                Button("申请好友") { run { try await requestFriend(member) } }.disabled(busy)
+                                Button(String(localized: "申请好友", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) { run { try await requestFriend(member) } }.disabled(busy)
                             }
                             if isActivityCreator {
-                                Button("移出活动", role: .destructive) { memberToRemove = member }.disabled(busy)
+                                Button(String(localized: "移出活动", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), role: .destructive) { memberToRemove = member }.disabled(busy)
                             }
                         }
                     }
                     if activityMembers.filter({ !$0.flag("isSelf") }).isEmpty {
-                        Text("邀请其他人参加活动后，可以互相申请好友。") .foregroundStyle(.secondary)
+                        Text(String(localized: "邀请其他人参加活动后，可以互相申请好友。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) .foregroundStyle(.secondary)
                     }
                 }
             }
-            .navigationTitle("管理 · \(selectedActivity?.text("title") ?? "活动")")
-            .toolbar { ToolbarItem(placement: .topBarTrailing) { Button("完成") { showingActivityManagement = false } } }
-            .confirmationDialog("删除活动「\(selectedActivity?.text("title") ?? "")」？", isPresented: $showingActivityDelete, titleVisibility: .visible) {
-                Button("确认删除活动", role: .destructive) { run { try await deleteActivity() } }
-                Button("取消", role: .cancel) { }
-            } message: { Text("仅可删除没有其他成员、照片或日常记录的活动；已发出的邀请会失效。") }
-            .confirmationDialog("将「\(memberToRemove?.text("displayName") ?? "")」移出活动？", isPresented: Binding(
+            .navigationTitle(String(localized: "管理 · \(selectedActivity?.text("title") ?? String(localized: "活动", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)))", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)))
+            .toolbar { ToolbarItem(placement: .topBarTrailing) { Button(String(localized: "完成", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) { showingActivityManagement = false } } }
+            .confirmationDialog(String(localized: "删除活动「\(selectedActivity?.text("title") ?? "")」？", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), isPresented: $showingActivityDelete, titleVisibility: .visible) {
+                Button(String(localized: "确认删除活动", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), role: .destructive) { run { try await deleteActivity() } }
+                Button(String(localized: "取消", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), role: .cancel) { }
+            } message: { Text(String(localized: "仅可删除没有其他成员、照片或日常记录的活动；已发出的邀请会失效。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) }
+            .confirmationDialog(String(localized: "将「\(memberToRemove?.text("displayName") ?? "")」移出活动？", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), isPresented: Binding(
                 get: { memberToRemove != nil }, set: { if !$0 { memberToRemove = nil } }), titleVisibility: .visible) {
-                Button("确认移出", role: .destructive) {
+                Button(String(localized: "确认移出", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), role: .destructive) {
                     guard let member = memberToRemove else { return }
                     memberToRemove = nil
                     run { try await removeActivityMember(member) }
                 }
-                Button("取消", role: .cancel) { memberToRemove = nil }
-            } message: { Text("移出后，对方将无法查看这场活动的新内容；已有邀请链接仍可再次用于加入。") }
+                Button(String(localized: "取消", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), role: .cancel) { memberToRemove = nil }
+            } message: { Text(String(localized: "移出后，对方将无法查看这场活动的新内容；已有邀请链接仍可再次用于加入。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) }
         }
     }
 
     private func run(_ work: @escaping () async throws -> Void) {
         Task { busy = true; error = ""; notice = ""; defer { busy = false }
-            do { try await work() } catch { self.error = error.localizedDescription }
+            do { try await work() } catch { self.error = momentDisplayError(error) }
         }
     }
     private func refresh() async {
         do { try await load() }
-        catch is CancellationError {} catch { self.error = error.localizedDescription }
+        catch is CancellationError {} catch { self.error = momentDisplayError(error) }
     }
     private func load() async throws {
         error = ""
@@ -932,9 +933,9 @@ struct DearSocialView: View {
         }
         if spaceId == previousSpace && !spaceId.isEmpty { try await loadActivities() }
         do { invitations = try DearRecord.list(await store.call(base + "invites/username/pending")) }
-        catch { self.error = "活动邀请暂时无法读取：\(error.localizedDescription)" }
+        catch { self.error = String(localized: "活动邀请暂时无法读取：\(momentDisplayError(error))", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)) }
         do { try await loadRelationships() }
-        catch { self.error = "好友关系暂时无法读取：\(error.localizedDescription)" }
+        catch { self.error = String(localized: "好友关系暂时无法读取：\(momentDisplayError(error))", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)) }
     }
     private func loadActivities() async throws {
         guard !spaceId.isEmpty else { activityLoading = false; return }
@@ -944,7 +945,7 @@ struct DearSocialView: View {
         let loaded: [DearRecord]
         do { loaded = try DearRecord.list(await store.call(base + "spaces/\(requestedSpace)/activities")) }
         catch {
-            activityError = "活动读取失败：\(error.localizedDescription)"
+            activityError = String(localized: "活动读取失败：\(momentDisplayError(error))", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))
             throw error
         }
         guard requestedSpace == spaceId else { return }
@@ -954,7 +955,7 @@ struct DearSocialView: View {
         if !loaded.contains(where: { $0.id == activityId }) && !joinedActivities.contains(where: { $0.id == activityId }) { activityId = ""; showingActivity = false }
         if activityId == previousActivity && !activityId.isEmpty {
             do { try await loadDetails() }
-            catch { self.error = "活动内容暂时无法读取：\(error.localizedDescription)" }
+            catch { self.error = String(localized: "活动内容暂时无法读取：\(momentDisplayError(error))", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)) }
         }
     }
     private func loadSpaceMembers() async throws {
@@ -997,7 +998,7 @@ struct DearSocialView: View {
                     batchDownloadProgress = (Double(index) + fraction) / Double(selected.count)
                 }
                 batchOriginalURLs.append(url)
-            } catch { failures.append("\(photo.text("originalFileName"))：\(error.localizedDescription)") }
+            } catch { failures.append("\(photo.text("originalFileName"))：\(momentDisplayError(error))") }
             batchDownloadProgress = Double(index + 1) / Double(selected.count)
         }
         if !failures.isEmpty { batchDownloadError = failures.joined(separator: "；") }
@@ -1011,9 +1012,9 @@ struct DearSocialView: View {
         checkIns = try DearRecord.list(await store.call(base + "tenants/\(activityTenantId)/activities/\(activityId)/checkins"))
     }
     private func createCheckIn() async throws {
-        guard let location = checkInLocator.location, !checkInLocator.fetching else { throw APIError.message("请先获取当前位置。") }
+        guard let location = checkInLocator.location, !checkInLocator.fetching else { throw APIError.message(String(localized: "请先获取当前位置。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) }
         let note = checkInNote.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard note.count <= 1000 else { throw APIError.message("备注不能超过 1000 字。") }
+        guard note.count <= 1000 else { throw APIError.message(String(localized: "备注不能超过 1000 字。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) }
         _ = try await store.call(base + "tenants/\(activityTenantId)/activities/\(activityId)/checkins", method: "POST", body: [
             "requestId": checkInRequestID.uuidString,
             "latitude": location.coordinate.latitude, "longitude": location.coordinate.longitude,
@@ -1021,12 +1022,12 @@ struct DearSocialView: View {
             "note": note.isEmpty ? checkInLocator.address : note
         ])
         checkInRequestID = UUID(); try await loadCheckIns()
-        notice = String(format: "打卡已保存，海拔 %.1f 米。", location.altitude)
+        notice = String(format: String(localized: "打卡已保存，海拔 %.1f 米。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), location.altitude)
     }
     private func updateCheckIn() async throws {
-        guard let selectedCheckIn, selectedCheckIn.flag("canEdit") else { throw APIError.message("只能修改自己的打卡。") }
+        guard let selectedCheckIn, selectedCheckIn.flag("canEdit") else { throw APIError.message(String(localized: "只能修改自己的打卡。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) }
         let note = checkInNote.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard note.count <= 1000 else { throw APIError.message("备注不能超过 1000 字。") }
+        guard note.count <= 1000 else { throw APIError.message(String(localized: "备注不能超过 1000 字。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) }
         let location = checkInLocator.location
         let address = location == nil ? selectedCheckIn.text("address") : checkInLocator.address
         _ = try await store.call(base + "tenants/\(activityTenantId)/activities/\(activityId)/checkins/\(selectedCheckIn.id)", method: "PATCH", body: [
@@ -1035,7 +1036,7 @@ struct DearSocialView: View {
             "altitudeMeters": location?.altitude ?? selectedCheckIn.number("altitudeMeters"),
             "address": address, "note": note.isEmpty ? address : note
         ])
-        showingCheckIn = false; self.selectedCheckIn = nil; try await loadCheckIns(); notice = "打卡已更新。"
+        showingCheckIn = false; self.selectedCheckIn = nil; try await loadCheckIns(); notice = String(localized: "打卡已更新。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))
     }
     private func loadMembers() async throws {
         guard !activityTenantId.isEmpty, !activityId.isEmpty else { return }
@@ -1044,63 +1045,63 @@ struct DearSocialView: View {
     private func removeActivityMember(_ member: DearRecord) async throws {
         guard isActivityCreator, !member.flag("isSelf"),
               let encoded = member.subject.addingPercentEncoding(withAllowedCharacters: .alphanumerics)
-        else { throw APIError.message("只有活动创建者可以移除其他成员。") }
+        else { throw APIError.message(String(localized: "只有活动创建者可以移除其他成员。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) }
         _ = try await store.call(base + "tenants/\(activityTenantId)/activities/\(activityId)/members/\(encoded)", method: "DELETE")
         try await loadMembers()
-        notice = "已将成员移出活动。"
+        notice = String(localized: "已将成员移出活动。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))
     }
     private func loadRelationships() async throws {
         relationships = try DearRecord.list(await store.call(base + "relationships"))
     }
     private func requestFriend(_ member: DearRecord) async throws {
         _ = try await store.call(base + "relationships/requests", method: "POST", body: ["targetSubject": member.subject, "tenantId": activityTenantId, "activityId": activityId])
-        try await loadRelationships(); notice = "好友申请已发出。"
+        try await loadRelationships(); notice = String(localized: "好友申请已发出。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))
     }
     private func acceptFriend(_ relation: DearRecord) async throws {
         _ = try await store.call(base + "relationships/\(relation.id)/accept", method: "POST", body: [:])
-        try await loadRelationships(); notice = "已确认好友关系。"
+        try await loadRelationships(); notice = String(localized: "已确认好友关系。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))
     }
     private func removeFriend(_ relation: DearRecord) async throws {
         _ = try await store.call(base + "relationships/\(relation.id)", method: "DELETE")
-        try await loadRelationships(); notice = "关系已移除。"
+        try await loadRelationships(); notice = String(localized: "关系已移除。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))
     }
     private func publishMoment() async throws {
         let body = momentDraft.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !body.isEmpty, body.count <= 1000 else { throw APIError.message("请填写 1 至 1000 字的日常内容。") }
+        guard !body.isEmpty, body.count <= 1000 else { throw APIError.message(String(localized: "请填写 1 至 1000 字的日常内容。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) }
         _ = try await store.call(base + "tenants/\(activityTenantId)/activities/\(activityId)/moments", method: "POST", body: ["text": body, "requestId": momentRequestID.uuidString])
-        momentDraft = ""; momentRequestID = UUID(); try await loadMoments(); notice = "日常已发布。"
+        momentDraft = ""; momentRequestID = UUID(); try await loadMoments(); notice = String(localized: "日常已发布。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))
     }
     private func deleteMoment(_ moment: DearRecord) async throws {
         _ = try await store.call(base + "tenants/\(activityTenantId)/activities/\(activityId)/moments/\(moment.id)", method: "DELETE")
-        try await loadMoments(); notice = "日常已删除。"
+        try await loadMoments(); notice = String(localized: "日常已删除。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))
     }
     private func createSpace() async throws {
         let value = try await store.call(base + "tenants", method: "POST", body: ["name": spaceName.trimmingCharacters(in: .whitespacesAndNewlines)])
         let item = DearRecord(data: value as? [String: Any] ?? [:])
-        spaceName = ""; try await load(); spaceId = item.id; notice = "空间已创建。"
+        spaceName = ""; try await load(); spaceId = item.id; notice = String(localized: "空间已创建。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))
     }
     private func addBookmark(_ item: DearRecord) async throws {
-        guard selectedSpace?.text("role") == "owner" else { throw APIError.message("请先选择自己的空间。") }
+        guard selectedSpace?.text("role") == "owner" else { throw APIError.message(String(localized: "请先选择自己的空间。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) }
         _ = try await store.call(base + "spaces/\(spaceId)/bookmarks", method: "POST", body: ["sourceTenantId": item.text("sourceTenantId"), "activityId": item.id])
-        try await loadActivities(); notice = "活动已收藏到空间。"
+        try await loadActivities(); notice = String(localized: "活动已收藏到空间。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))
     }
     private func removeBookmark(_ item: DearRecord) async throws {
-        guard selectedSpace?.text("role") == "owner" else { throw APIError.message("只有空间所有者可以取消收藏。") }
+        guard selectedSpace?.text("role") == "owner" else { throw APIError.message(String(localized: "只有空间所有者可以取消收藏。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) }
         _ = try await store.call(base + "spaces/\(spaceId)/bookmarks/\(item.text("sourceTenantId"))/\(item.id)", method: "DELETE")
-        try await loadActivities(); notice = "已取消收藏，原活动仍在。"
+        try await loadActivities(); notice = String(localized: "已取消收藏，原活动仍在。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))
     }
     private func renameSpace() async throws {
-        guard selectedSpace?.text("role") == "owner" else { throw APIError.message("只有空间所有者可以修改名称。") }
+        guard selectedSpace?.text("role") == "owner" else { throw APIError.message(String(localized: "只有空间所有者可以修改名称。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) }
         let name = editedSpaceName.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !name.isEmpty && name.count <= 200 else { throw APIError.message("请填写不超过 200 字的空间名称。") }
+        guard !name.isEmpty && name.count <= 200 else { throw APIError.message(String(localized: "请填写不超过 200 字的空间名称。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) }
         _ = try await store.call(base + "tenants/\(spaceId)", method: "PATCH", body: ["name": name])
-        try await load(); notice = "空间名称已更新。"
+        try await load(); notice = String(localized: "空间名称已更新。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))
     }
     private func deleteSpace() async throws {
-        guard selectedSpace?.text("role") == "owner" else { throw APIError.message("只有空间所有者可以删除空间。") }
+        guard selectedSpace?.text("role") == "owner" else { throw APIError.message(String(localized: "只有空间所有者可以删除空间。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) }
         _ = try await store.call(base + "tenants/\(spaceId)", method: "DELETE")
         spaceId = ""; activityId = ""; activities = []
-        try await load(); notice = "空间已删除。"
+        try await load(); notice = String(localized: "空间已删除。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))
     }
     private func createActivity() async throws {
         let value = try await store.call(base + "tenants/\(spaceId)/activities", method: "POST", body: [
@@ -1108,41 +1109,41 @@ struct DearSocialView: View {
             "startsAt": ISO8601DateFormatter().string(from: Date())
         ])
         let item = DearRecord(data: value as? [String: Any] ?? [:])
-        activityName = ""; try await loadActivities(); activityId = item.id; showingActivity = true; notice = "活动已创建。"
+        activityName = ""; try await loadActivities(); activityId = item.id; showingActivity = true; notice = String(localized: "活动已创建。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))
     }
     private func updateActivity() async throws {
-        guard selectedActivity?.flag("canEdit") == true else { throw APIError.message("只有活动组织者可以修改基本信息。") }
+        guard selectedActivity?.flag("canEdit") == true else { throw APIError.message(String(localized: "只有活动组织者可以修改基本信息。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) }
         let name = editedActivityName.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !name.isEmpty && name.count <= 200 else { throw APIError.message("请填写不超过 200 字的活动名称。") }
-        guard editedActivityDescription.count <= 2000 else { throw APIError.message("活动介绍不能超过 2000 字。") }
+        guard !name.isEmpty && name.count <= 200 else { throw APIError.message(String(localized: "请填写不超过 200 字的活动名称。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) }
+        guard editedActivityDescription.count <= 2000 else { throw APIError.message(String(localized: "活动介绍不能超过 2000 字。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) }
         _ = try await store.call(base + "tenants/\(activityTenantId)/activities/\(activityId)", method: "PATCH", body: [
             "title": name, "description": editedActivityDescription,
             "startsAt": ISO8601DateFormatter().string(from: editedActivityDate)
         ])
-        try await load(); notice = "活动基本信息已更新。"
+        try await load(); notice = String(localized: "活动基本信息已更新。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))
     }
     private func deleteActivity() async throws {
-        guard selectedActivity?.flag("canEdit") == true else { throw APIError.message("只有活动组织者可以删除活动。") }
+        guard selectedActivity?.flag("canEdit") == true else { throw APIError.message(String(localized: "只有活动组织者可以删除活动。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) }
         _ = try await store.call(base + "tenants/\(activityTenantId)/activities/\(activityId)", method: "DELETE")
         showingActivityManagement = false; showingActivity = false; activityId = ""
-        try await load(); notice = "活动已删除。"
+        try await load(); notice = String(localized: "活动已删除。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))
     }
     private func inviteByName() async throws {
         _ = try await store.call(base + "tenants/\(activityTenantId)/activities/\(activityId)/invites/username", method: "POST", body: ["username": inviteUsername.trimmingCharacters(in: .whitespacesAndNewlines)])
-        inviteUsername = ""; notice = "邀请已发出，等待对方确认。"
+        inviteUsername = ""; notice = String(localized: "邀请已发出，等待对方确认。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))
     }
     private func createInviteLink() async throws {
         let value = try await store.call(base + "tenants/\(activityTenantId)/activities/\(activityId)/invites/link", method: "POST", body: [:])
         guard let token = (value as? [String: Any])?["token"] as? String,
-              let safe = token.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) else { throw APIError.message("邀请链接无效。") }
+              let safe = token.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) else { throw APIError.message(String(localized: "邀请链接无效。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) }
         inviteLink = "https://happylife.ai.xmkurt.com/dear?invite=\(safe)"
     }
     private func accept(_ invitation: DearRecord) async throws {
         let me = try await store.call(base + "me") as? [String: Any] ?? [:]
         guard let username = me["username"] as? String,
-              let safe = username.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) else { throw APIError.message("无法确认用户名。") }
+              let safe = username.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) else { throw APIError.message(String(localized: "无法确认用户名。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) }
         _ = try await store.call(base + "tenants/\(invitation.text("tenantId"))/activities/\(invitation.text("activityId"))/invites/username/\(safe)/accept", method: "POST", body: [:])
-        try await load(); activityId = invitation.text("activityId"); showingActivity = true; notice = "已加入共同活动，可收藏到自己的空间。"
+        try await load(); activityId = invitation.text("activityId"); showingActivity = true; notice = String(localized: "已加入共同活动，可收藏到自己的空间。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))
     }
 }
 
@@ -1170,7 +1171,7 @@ private final class DearCheckInLocator: NSObject, ObservableObject, CLLocationMa
         switch manager.authorizationStatus {
         case .authorizedWhenInUse, .authorizedAlways: manager.requestLocation()
         case .notDetermined: manager.requestWhenInUseAuthorization()
-        default: fetching = false; error = "请在系统设置中允许此 App 使用位置后重试。"
+        default: fetching = false; error = String(localized: "请在系统设置中允许此 App 使用位置后重试。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))
         }
     }
 
@@ -1178,7 +1179,7 @@ private final class DearCheckInLocator: NSObject, ObservableObject, CLLocationMa
         guard fetching else { return }
         switch manager.authorizationStatus {
         case .authorizedWhenInUse, .authorizedAlways: manager.requestLocation()
-        case .denied, .restricted: fetching = false; error = "位置访问未获授权，请在系统设置中开启。"
+        case .denied, .restricted: fetching = false; error = String(localized: "位置访问未获授权，请在系统设置中开启。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))
         default: break
         }
     }
@@ -1186,7 +1187,7 @@ private final class DearCheckInLocator: NSObject, ObservableObject, CLLocationMa
     func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
         guard fetching else { return }
         guard let current = locations.last(where: { $0.horizontalAccuracy >= 0 && $0.verticalAccuracy >= 0 && abs($0.timestamp.timeIntervalSinceNow) < 120 }) else {
-            fetching = false; error = "没有获取到有效的位置与海拔，请重试。"; return
+            fetching = false; error = String(localized: "没有获取到有效的位置与海拔，请重试。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)); return
         }
         geocoder.reverseGeocodeLocation(current) { [weak self] placemarks, _ in
             guard let self else { return }
@@ -1199,7 +1200,7 @@ private final class DearCheckInLocator: NSObject, ObservableObject, CLLocationMa
     }
 
     func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {
-        fetching = false; self.error = "定位失败：\(error.localizedDescription)"
+        fetching = false; self.error = String(localized: "定位失败：\(momentDisplayError(error))", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))
     }
 }
 
@@ -1214,7 +1215,7 @@ private struct DearPhotoPreview: View {
             else if failed {
                 VStack(spacing: 4) {
                     Image(systemName: "photo.badge.exclamationmark")
-                    Text("预览失败").font(.caption2)
+                    Text(String(localized: "预览失败", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))).font(.caption2)
                 }.foregroundStyle(.secondary)
             }
             else { ProgressView() }
@@ -1255,43 +1256,43 @@ private struct DearPhotoDetailView: View {
                     Image(uiImage: image).resizable().scaledToFit()
                         .clipShape(RoundedRectangle(cornerRadius: 12))
                 } else if let error {
-                    ContentUnavailableView("无法显示照片预览", systemImage: "photo.badge.exclamationmark",
+                    ContentUnavailableView(String(localized: "无法显示照片预览", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), systemImage: "photo.badge.exclamationmark",
                                            description: Text(error))
-                    Button("重试") { Task { await load() } }
-                } else { ProgressView("正在加载照片") }
+                    Button(String(localized: "重试", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) { Task { await load() } }
+                } else { ProgressView(String(localized: "正在加载照片", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) }
                 Text(photo.text("originalFileName")).font(.headline)
-                Text("分享者：\(photo.text("sourceDisplayName"))").font(.subheadline).foregroundStyle(.secondary)
-                Text("分享时间：\(photo.dateText("createdAt"))").font(.subheadline).foregroundStyle(.secondary)
-                Text("地点：\(photo.text("locationName").isEmpty ? "未记录" : photo.text("locationName"))")
+                Text(String(localized: "分享者：\(photo.text("sourceDisplayName"))", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))).font(.subheadline).foregroundStyle(.secondary)
+                Text(String(localized: "分享时间：\(photo.dateText("createdAt"))", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))).font(.subheadline).foregroundStyle(.secondary)
+                Text(String(localized: "地点：\(photo.text("locationName").isEmpty ? String(localized: "未记录", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)) : photo.text("locationName"))", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)))
                     .font(.subheadline).foregroundStyle(.secondary)
                 if let originalURL {
-                    ShareLink(item: originalURL) { Label("分享原文件", systemImage: "square.and.arrow.up") }
+                    ShareLink(item: originalURL) { Label(String(localized: "分享原文件", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), systemImage: "square.and.arrow.up") }
                 } else {
                     Button {
                         Task { await fetchOriginal() }
                     } label: {
-                        Label(fetchingOriginal ? "正在实时接收：\(Int(transferProgress * 100))%" : originalError == nil ? "获取原文件" : "继续获取原文件", systemImage: "arrow.down.circle")
+                        Label(fetchingOriginal ? String(localized: "正在实时接收：\(Int(transferProgress * 100))%", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)) : originalError == nil ? String(localized: "获取原文件", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)) : String(localized: "继续获取原文件", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), systemImage: "arrow.down.circle")
                     }.disabled(fetchingOriginal)
                 }
                 if fetchingOriginal || transferProgress > 0 && transferProgress < 1 {
                     ProgressView(value: transferProgress)
-                        .accessibilityLabel("原文件接收进度")
+                        .accessibilityLabel(String(localized: "原文件接收进度", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)))
                 }
                 if let originalError { Text(originalError).font(.footnote).foregroundStyle(.red) }
                 if canDelete {
-                    Button("删除分享", role: .destructive) { showingDelete = true }.disabled(deleting)
+                    Button(String(localized: "删除分享", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), role: .destructive) { showingDelete = true }.disabled(deleting)
                 }
-                Text("原文件从分享者设备传来，获取时请保持对方的分享应用打开。")
+                Text(String(localized: "原文件从分享者设备传来，获取时请保持对方的分享应用打开。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)))
                     .font(.footnote).foregroundStyle(.secondary)
             }
             .frame(maxWidth: .infinity)
             .padding()
         }
-        .navigationTitle(isVideo ? "视频" : "照片")
-        .confirmationDialog("删除这项分享？", isPresented: $showingDelete, titleVisibility: .visible) {
-            Button("删除分享", role: .destructive) { Task { await deleteSharedMedia() } }
-            Button("取消", role: .cancel) { }
-        } message: { Text("活动成员将无法再获取此文件；iPhone 相册中的原文件不会删除。") }
+        .navigationTitle(isVideo ? String(localized: "视频", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)) : String(localized: "照片", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)))
+        .confirmationDialog(String(localized: "删除这项分享？", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), isPresented: $showingDelete, titleVisibility: .visible) {
+            Button(String(localized: "删除分享", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), role: .destructive) { Task { await deleteSharedMedia() } }
+            Button(String(localized: "取消", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), role: .cancel) { }
+        } message: { Text(String(localized: "活动成员将无法再获取此文件；iPhone 相册中的原文件不会删除。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) }
         .task(id: path) { await load() }
     }
 
@@ -1301,7 +1302,7 @@ private struct DearPhotoDetailView: View {
         catch {
             if let local = await store.photoSource.localOriginal(photoID: photo.id, spaceID: spaceID, activityID: activityID),
                let localImage = UIImage(contentsOfFile: local.path) { image = localImage }
-            else { self.error = error.localizedDescription }
+            else { self.error = momentDisplayError(error) }
         }
     }
 
@@ -1313,11 +1314,11 @@ private struct DearPhotoDetailView: View {
                 transferProgress = $0
             }
             if !isVideo {
-                guard let decoded = UIImage(contentsOfFile: url.path) else { throw APIError.message("原图无法显示。") }
+                guard let decoded = UIImage(contentsOfFile: url.path) else { throw APIError.message(String(localized: "原图无法显示。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) }
                 originalImage = decoded
             }
             originalURL = url
-        } catch { originalError = error.localizedDescription }
+        } catch { originalError = momentDisplayError(error) }
     }
 
     private func deleteSharedMedia() async {
@@ -1326,6 +1327,6 @@ private struct DearPhotoDetailView: View {
         do {
             let localCopyRemoved = try await store.photoSource.revoke(photoID: photo.id, spaceID: spaceID, activityID: activityID)
             onDeleted(localCopyRemoved)
-        } catch { originalError = error.localizedDescription }
+        } catch { originalError = momentDisplayError(error) }
     }
 }

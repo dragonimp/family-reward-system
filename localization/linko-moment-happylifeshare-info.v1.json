@@ -1,0 +1,10 @@
+{
+  "catalogVersion": 1,
+  "messages": {
+    "moment.displayname": {
+      "iosKey": "CFBundleDisplayName",
+      "zh-Hans": "Linko Moment",
+      "en": "Linko Moment"
+    }
+  }
+}
