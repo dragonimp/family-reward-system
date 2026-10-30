@@ -17,22 +17,9 @@ export HAPPYLIFE_PARENT_BUILD_ROOT="$ATLAS_BUILD_WORK/ios"
 export HAPPYLIFE_PARENT_EXPORT_DIR="$ATLAS_BUILD_OUTPUT"
 export HAPPYLIFE_PARENT_EXPORT_OPTIONS="$ATLAS_BUILD_WORK/ios/ExportOptions.plist"
 mkdir -p "$HAPPYLIFE_PARENT_BUILD_ROOT"
-python3 - "$source_dir" "$HAPPYLIFE_PARENT_EXPORT_OPTIONS" <<'PY'
-from pathlib import Path
-import plistlib, re, sys
-root = Path(sys.argv[1])
-pbx = (root/'parent-app/ios/HappyLifeParent.xcodeproj/project.pbxproj').read_text()
-versions = set(re.findall(r'MARKETING_VERSION = ([^;]+);', pbx))
-builds = set(re.findall(r'CURRENT_PROJECT_VERSION = ([^;]+);', pbx))
-assert len(versions) == len(builds) == 1
-version, build = next(iter(versions)), next(iter(builds))
-assert re.fullmatch(r'[0-9]+(\.[0-9]+){1,2}', version)
-assert re.fullmatch(r'[0-9]+(\.[0-9]+)*', build)
-options = plistlib.loads((root/'parent-app/ios/ExportOptions.example.plist').read_bytes())
-options['teamID'] = 'JQPH54K7SD'
-Path(sys.argv[2]).write_bytes(plistlib.dumps(options))
-print(f'Version preflight: {version} ({build}), phone/watch/share match')
-PY
+python3 "$source_dir/scripts/prepare-moment-ios-release.py" "$source_dir" \
+  "$HAPPYLIFE_PARENT_EXPORT_OPTIONS" "$ATLAS_BUILD_OUTPUT/release-identity.json" \
+  "${MOMENT_IOS_RELEASE_FLAVOR:-successor}"
 xcrun swiftc "$source_dir/parent-app/ios/HappyLifeParent/ExerciseSession.swift" \
   "$source_dir/parent-app/ios/Tests/ExerciseSessionTests.swift" -o "$ATLAS_BUILD_WORK/exercise-tests"
 "$ATLAS_BUILD_WORK/exercise-tests"

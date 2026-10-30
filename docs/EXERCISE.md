@@ -31,3 +31,7 @@
 Android 根据前台步数乘本次步长估算，默认 70 厘米/步，开始前可在 20–200 厘米范围调整；运动中和记录明确标注“估算”。步长随本次运动保存，暂停不累计。旧记录无距离/步长字段时可继续读取，显示“距离未获取”，不追溯编造历史公里数。没有新增定位权限。
 
 公里数模型验证覆盖多区间求和、暂停排除、零距离、缺失数据、旧记录兼容与重启恢复。iOS 版本 1.2.57 (66)。
+
+### 发布到现有 TestFlight 应用
+
+`MOMENT_IOS_RELEASE_FLAVOR=existing-testflight` 使用 `scripts/build-moment-ios.sh` 为现有 `linko-family-ios` 应用生成更新包。构建在临时源码副本中映射主应用、Watch、分享扩展、App Group 和钥匙串服务到已绑定的 `net.impx.happylife.parent` 身份，保留现有安装的数据入口；主工作区为后续新应用准备的标识不变。脚本按 Bundle ID、团队、有效期、分发类型和所需能力选择本机受控签名资料，缺失时在归档前失败。IPA 校验使用同一身份，正式产物保存 release-identity.json。默认 successor 仍使用新应用身份，不静默回退。
