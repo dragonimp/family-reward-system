@@ -22,8 +22,8 @@ from pathlib import Path
 import plistlib,sys
 app=Path(sys.argv[1]); flavor=sys.argv[2]
 assert flavor in ('legacy','successor')
-english='XLinko Moment' if flavor=='legacy' else 'Linko Moment'
-chinese='XLinko Moment' if flavor=='legacy' else '灵可时刻'
+english='LinkoXMoment' if flavor=='legacy' else 'Linko Moment'
+chinese='LinkoXMoment' if flavor=='legacy' else '灵可时刻'
 for bundle in [app,app/'Watch/Linko Moment Watch.app']:
     for locale,name in [('en',english),('zh-Hans',chinese)]:
         directory=bundle/(locale+'.lproj');directory.mkdir(exist_ok=True)

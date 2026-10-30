@@ -15,8 +15,8 @@ if flavor not in ('legacy', 'successor'):
     raise SystemExit('Explicit legacy or successor release flavor required')
 team = 'JQPH54K7SD'
 base = 'net.impx.happylife.parent' if flavor == 'legacy' else 'net.impx.happylife'
-english_name = 'XLinko Moment' if flavor == 'legacy' else 'Linko Moment'
-chinese_name = 'XLinko Moment' if flavor == 'legacy' else '灵可时刻'
+english_name = 'LinkoXMoment' if flavor == 'legacy' else 'Linko Moment'
+chinese_name = 'LinkoXMoment' if flavor == 'legacy' else '灵可时刻'
 if flavor == 'legacy':
     paths = ['parent-app/ios/HappyLifeParent.xcodeproj/project.pbxproj',
              'parent-app/ios/HappyLifeParent/HappyLifeParent.entitlements',

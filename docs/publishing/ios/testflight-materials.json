@@ -1,8 +1,8 @@
 {
   "names": {
     "legacy": {
-      "en-US": "XLinko Moment",
-      "zh-Hans": "XLinko Moment"
+      "en-US": "LinkoXMoment",
+      "zh-Hans": "LinkoXMoment"
     },
     "successor": {
       "en-US": "Linko Moment",
@@ -21,9 +21,9 @@
       "whatToTest": "Test User Center sign-in/sign-out and access with an existing account; circles, activities, posts and photos; adding content through the system share extension; family members, reward rules and points history; exercise pause/resume/completion and distance totals; local-time display and English/Chinese app names. Apple Watch checks are optional; review can be completed on iPhone. The legacy name gains an X prefix; the successor is Linko Moment (灵可时刻). Use test data and do not make real payments."
     }
   },
-  "reviewNotes": "Use the existing shared User Center review login supplied in the review login fields. No SMS, personal registration, Apple Watch hardware or purchase is required for the iPhone review flow. Open the app, sign in, and review circles/activities, the family reward and points pages, and Exercise. Exercise supports starting a session, pausing/resuming and viewing completed records; distance is a training record and is not a medical measurement. The system share extension is available from the iOS share sheet. Use test content only.\n\nMigration explanation: net.impx.happylife.parent is our existing app and its name now has an X prefix. net.impx.happylife is the successor, named Linko Moment / 灵可时刻. Existing User Center accounts and server-side services remain usable without a migration fee or mandatory repurchase. Local-only data remain in the respective app sandbox. The old app remains available during migration and will not be removed before the successor is publicly available and service continuity is verified.",
+  "reviewNotes": "Use the existing shared User Center review login supplied in the review login fields. No SMS, personal registration, Apple Watch hardware or purchase is required for the iPhone review flow. Open the app, sign in, and review circles/activities, the family reward and points pages, and Exercise. Exercise supports starting a session, pausing/resuming and viewing completed records; distance is a training record and is not a medical measurement. The system share extension is available from the iOS share sheet. Use test content only.\n\nMigration explanation: net.impx.happylife.parent is our existing app and its name is now LinkoXMoment. net.impx.happylife is the successor, named Linko Moment / 灵可时刻. Existing User Center accounts and server-side services remain usable without a migration fee or mandatory repurchase. Local-only data remain in the respective app sandbox. The old app remains available during migration and will not be removed before the successor is publicly available and service continuity is verified.",
   "storeWhatsNew": {
-    "zh-Hans": "旧版名称更新为 XLinko Moment，并同步当前最新的圈子活动、照片分享、家庭积分和运动记录功能。支持训练暂停/继续、完成记录和公里数统计。原账号及原应用数据继续保留；新版应用中文名为“灵可时刻”。",
-    "en-US": "Renames the legacy app to XLinko Moment and includes the current circles, activity/photo sharing, family points and exercise features. Exercise supports pause/resume, completed records and distance totals. Existing accounts and data in this app are retained. The successor is Linko Moment (灵可时刻)."
+    "zh-Hans": "旧版名称更新为 LinkoXMoment，并同步当前最新的圈子活动、照片分享、家庭积分和运动记录功能。支持训练暂停/继续、完成记录和公里数统计。原账号及原应用数据继续保留；新版应用中文名为“灵可时刻”。",
+    "en-US": "Renames the legacy app to LinkoXMoment and includes the current circles, activity/photo sharing, family points and exercise features. Exercise supports pause/resume, completed records and distance totals. Existing accounts and data in this app are retained. The successor is Linko Moment (灵可时刻)."
   }
 }
