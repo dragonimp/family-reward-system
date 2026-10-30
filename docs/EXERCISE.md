@@ -32,6 +32,8 @@ Android 根据前台步数乘本次步长估算，默认 70 厘米/步，开始�
 
 公里数模型验证覆盖多区间求和、暂停排除、零距离、缺失数据、旧记录兼容与重启恢复。iOS 版本 1.2.57 (66)。
 
-### 发布到现有 TestFlight 应用
+### 发布身份
 
-`MOMENT_IOS_RELEASE_FLAVOR=existing-testflight` 使用 `scripts/build-moment-ios.sh` 为现有 `linko-family-ios` 应用生成更新包。构建在临时源码副本中映射主应用、Watch、分享扩展、App Group 和钥匙串服务到已绑定的 `net.impx.happylife.parent` 身份，保留现有安装的数据入口；主工作区为后续新应用准备的标识不变。脚本按 Bundle ID、团队、有效期、分发类型和所需能力选择本机受控签名资料，缺失时在归档前失败。IPA 校验使用同一身份，正式产物保存 release-identity.json。默认 successor 仍使用新应用身份，不静默回退。
+公里数功能使用新应用身份 `net.impx.happylife` 发布；Atlas 项目 `family-reward` 与应用记录 `linko-family-ios` 保持不变。旧 ID 的本次发布任务已通过一次性、有备份和校验和记录的操作脚本取消，禁止继续向旧应用分发。
+
+构建脚本只接受 successor 身份，按 Bundle ID、团队、有效期、分发类型和所需能力选择本机受控签名资料，缺失时在归档前失败。正式产物保存 release-identity.json。发布前先核对 Apple 新应用登记、App Group/推送/Watch/分享扩展签名，以及原 Atlas 应用记录的发布绑定；不得以旧身份绕过缺失配置。
