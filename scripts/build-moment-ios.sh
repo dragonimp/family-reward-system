@@ -11,7 +11,9 @@ git -C "$root" diff --quiet HEAD -- parent-app/ios watch-app/apple scripts/build
 source_dir="$ATLAS_BUILD_WORK/source"
 mkdir -p "$source_dir"
 git -C "$root" archive "$commit" | tar -x -C "$source_dir"
-ln -s "$root/../AgentIdentity" "$ATLAS_BUILD_WORK/AgentIdentity"
+common="$(git -C "$root" rev-parse --path-format=absolute --git-common-dir)"
+ln -s "$(dirname "$(dirname "$common")")/AgentIdentity" "$ATLAS_BUILD_WORK/AgentIdentity"
+export MOMENT_IOS_RELEASE_FLAVOR="${MOMENT_IOS_RELEASE_FLAVOR:-successor}"
 export DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer
 export HAPPYLIFE_PARENT_BUILD_ROOT="$ATLAS_BUILD_WORK/ios"
 export HAPPYLIFE_PARENT_EXPORT_DIR="$ATLAS_BUILD_OUTPUT"
@@ -19,7 +21,7 @@ export HAPPYLIFE_PARENT_EXPORT_OPTIONS="$ATLAS_BUILD_WORK/ios/ExportOptions.plis
 mkdir -p "$HAPPYLIFE_PARENT_BUILD_ROOT"
 python3 "$source_dir/scripts/prepare-moment-ios-release.py" "$source_dir" \
   "$HAPPYLIFE_PARENT_EXPORT_OPTIONS" "$ATLAS_BUILD_OUTPUT/release-identity.json" \
-  "${MOMENT_IOS_RELEASE_FLAVOR:-successor}"
+  "$MOMENT_IOS_RELEASE_FLAVOR"
 xcrun swiftc "$source_dir/parent-app/ios/HappyLifeParent/ExerciseSession.swift" \
   "$source_dir/parent-app/ios/Tests/ExerciseSessionTests.swift" -o "$ATLAS_BUILD_WORK/exercise-tests"
 "$ATLAS_BUILD_WORK/exercise-tests"

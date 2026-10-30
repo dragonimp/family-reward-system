@@ -11,10 +11,26 @@ import sys
 
 source, options_path, manifest_path = map(Path, sys.argv[1:4])
 flavor = sys.argv[4]
-if flavor != 'successor':
-    raise SystemExit('Moment releases must use the new application identity; old-ID updates are disabled')
+if flavor not in ('legacy', 'successor'):
+    raise SystemExit('Explicit legacy or successor release flavor required')
 team = 'JQPH54K7SD'
-base = 'net.impx.happylife'
+base = 'net.impx.happylife.parent' if flavor == 'legacy' else 'net.impx.happylife'
+english_name = 'XLinko Moment' if flavor == 'legacy' else 'Linko Moment'
+chinese_name = 'XLinko Moment' if flavor == 'legacy' else '灵可时刻'
+if flavor == 'legacy':
+    paths = ['parent-app/ios/HappyLifeParent.xcodeproj/project.pbxproj',
+             'parent-app/ios/HappyLifeParent/HappyLifeParent.entitlements',
+             'parent-app/ios/HappyLifeShare/HappyLifeShare.entitlements',
+             'parent-app/ios/HappyLifeParent/DearShareInbox.swift', 'parent-app/ios/WatchInfo.plist']
+    for relative in paths:
+        path = source / relative
+        path.write_text(path.read_text().replace('net.impx.happylife', base))
+for relative in ['parent-app/ios/HappyLifeParent/Info.plist', 'parent-app/ios/WatchInfo.plist']:
+    path = source / relative
+    info = plistlib.loads(path.read_bytes())
+    info['CFBundleDisplayName'] = english_name
+    info['CFBundleLocalizations'] = ['en', 'zh-Hans']
+    path.write_bytes(plistlib.dumps(info))
 pbx = (source / 'parent-app/ios/HappyLifeParent.xcodeproj/project.pbxproj').read_text()
 versions = set(re.findall(r'MARKETING_VERSION = ([^;]+);', pbx))
 builds = set(re.findall(r'CURRENT_PROJECT_VERSION = ([^;]+);', pbx))
@@ -24,6 +40,7 @@ assert re.fullmatch(r'[0-9]+(\.[0-9]+){1,2}', version)
 assert re.fullmatch(r'[0-9]+(\.[0-9]+)*', build)
 options = plistlib.loads((source / 'parent-app/ios/ExportOptions.example.plist').read_bytes())
 options['teamID'] = team
+options['provisioningProfiles'] = {base + suffix: '' for suffix in ('', '.watchkitapp', '.share')}
 automatic = os.environ.get('MOMENT_IOS_AUTOMATIC_SIGNING') == '1'
 if automatic:
     # Explicit bootstrap only: Xcode contacts Apple with the existing team API identity.
@@ -57,6 +74,7 @@ else:
         options['provisioningProfiles'][bundle] = selected['UUID']
 options_path.write_bytes(plistlib.dumps(options))
 manifest = {'flavor': flavor, 'bundleId': base, 'appGroup': 'group.' + base,
-            'version': version, 'build': build, 'team': team, 'automaticSigning': automatic}
+            'version': version, 'build': build, 'team': team, 'automaticSigning': automatic,
+            'name': english_name, 'chineseName': chinese_name}
 manifest_path.write_text(json.dumps(manifest, indent=2) + '\n')
 print(f'Version/profile preflight: {version} ({build}), {flavor}, {base}')

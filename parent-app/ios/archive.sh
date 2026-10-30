@@ -17,14 +17,28 @@ xcodebuild -project HappyLifeParent.xcodeproj -scheme HappyLifeParent \
   -archivePath "$build_root/Linko Family-signed.xcarchive" \
   -derivedDataPath "$build_root/DerivedData" CODE_SIGNING_ALLOWED=NO IPHONEOS_DEPLOYMENT_TARGET=17.0 archive
 app="$build_root/Linko Family-signed.xcarchive/Products/Applications/Linko Moment.app"
+python3 - "$app" "${MOMENT_IOS_RELEASE_FLAVOR:-successor}" <<'LOCALIZE'
+from pathlib import Path
+import plistlib,sys
+app=Path(sys.argv[1]); flavor=sys.argv[2]
+assert flavor in ('legacy','successor')
+english='XLinko Moment' if flavor=='legacy' else 'Linko Moment'
+chinese='XLinko Moment' if flavor=='legacy' else '灵可时刻'
+for bundle in [app,app/'Watch/Linko Moment Watch.app']:
+    for locale,name in [('en',english),('zh-Hans',chinese)]:
+        directory=bundle/(locale+'.lproj');directory.mkdir(exist_ok=True)
+        (directory/'InfoPlist.strings').write_bytes(plistlib.dumps({'CFBundleDisplayName':name,'CFBundleName':name},fmt=plistlib.FMT_BINARY))
+LOCALIZE
+base=net.impx.happylife
+[[ "${MOMENT_IOS_RELEASE_FLAVOR:-successor}" != legacy ]] || base=net.impx.happylife.parent
 # This supplies the team's identity to the archive; export must still embed
 # an App Store provisioning profile for this app before it is distributable.
 codesign --force --sign "$APPLE_SIGNING_IDENTITY" --keychain "$APPLE_SIGNING_KEYCHAIN" \
-  --identifier net.impx.happylife.watchkitapp "$app/Watch/Linko Moment Watch.app"
+  --identifier "$base.watchkitapp" "$app/Watch/Linko Moment Watch.app"
 codesign --force --sign "$APPLE_SIGNING_IDENTITY" --keychain "$APPLE_SIGNING_KEYCHAIN" \
   --entitlements "$PWD/HappyLifeShare/HappyLifeShare.entitlements" \
-  --identifier net.impx.happylife.share "$app/PlugIns/Linko Moment Share.appex"
+  --identifier "$base.share" "$app/PlugIns/Linko Moment Share.appex"
 codesign --force --sign "$APPLE_SIGNING_IDENTITY" --keychain "$APPLE_SIGNING_KEYCHAIN" \
   --entitlements "$PWD/HappyLifeParent/HappyLifeParent.entitlements" \
-  --identifier net.impx.happylife "$app"
+  --identifier "$base" "$app"
 codesign --verify --deep --strict "$app"
