@@ -14,7 +14,7 @@
   "localizations": {
     "zh-Hans": {
       "description": "灵可时刻（Linko Moment）用于记录日常、分享活动和管理家庭协作。可在圈子中交流，记录与查看照片和动态，维护家庭成员、奖励规则及积分账本，并使用运动栏目记录训练与公里数。支持 iPhone 原生操作、系统分享入口，以及可选的 Apple Watch 配套功能。请使用测试内容，避免上传不必要的个人资料；通过 TestFlight 提交问题、复现步骤和截图。",
-      "whatToTest": "请重点测试：1. 用户中心登录、退出及原账号访问；2. 圈子、活动、动态和照片的查看与管理；3. 系统分享入口向活动添加内容；4. 家庭成员、奖励规则、积分账本和历史记录；5. 运动记录、暂停/继续、完成后查看及公里数统计；6. 中文/英文名称和当地时间显示；7. 有 Apple Watch 时验证配套入口，没有手表也可完成 iPhone 流程。旧版名称增加 X；新版中文名为“灵可时刻”。请使用测试数据，不进行真实支付。"
+      "whatToTest": "请重点测试：1. 用户中心登录、退出及原账号访问；2. 圈子、活动、动态和照片的查看与管理；3. 系统分享入口向活动添加内容；4. 家庭成员、奖励规则、积分账本和历史记录；5. 运动记录、暂停/继续、完成后查看及公里数统计；6. 中文/英文名称和当地时间显示；7. 有 Apple Watch 时验证配套入口，没有手表也可完成 iPhone 流程。旧版名称改为 LinkoXMoment；新版中文名为“灵可时刻”。请使用测试数据，不进行真实支付。"
     },
     "en-US": {
       "description": "Linko Moment brings everyday moments, activity sharing and family collaboration together. Browse and manage circles, activities, photos and posts; maintain family members, reward rules and points history; and record exercise sessions and distance. The iPhone app includes a system share extension and optional companion Apple Watch features. Use test content and avoid unnecessary personal data. Report reproducible issues through TestFlight with steps and screenshots.",
