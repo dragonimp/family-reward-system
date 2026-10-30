@@ -37,3 +37,5 @@ Android 根据前台步数乘本次步长估算，默认 70 厘米/步，开始�
 公里数功能使用新应用身份 `net.impx.happylife` 发布；Atlas 项目 `family-reward` 与应用记录 `linko-family-ios` 保持不变。旧 ID 的本次发布任务已通过一次性、有备份和校验和记录的操作脚本取消，禁止继续向旧应用分发。
 
 构建脚本只接受 successor 身份，按 Bundle ID、团队、有效期、分发类型和所需能力选择本机受控签名资料，缺失时在归档前失败。正式产物保存 release-identity.json。发布前先核对 Apple 新应用登记、App Group/推送/Watch/分享扩展签名，以及原 Atlas 应用记录的发布绑定；不得以旧身份绕过缺失配置。
+
+新身份首次签名可显式设置 `MOMENT_IOS_AUTOMATIC_SIGNING=1`，通过现有团队受限 API 身份调用 Xcode 自动配置分发资料；不变更 Bundle ID、App Group 或 IPA 验证规则。Apple 拒绝时保留实际错误，不退回旧 ID 或删除扩展能力。
