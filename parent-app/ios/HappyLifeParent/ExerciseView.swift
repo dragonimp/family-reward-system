@@ -17,6 +17,7 @@ import CryptoKit
     var active: ExerciseSession? { archive.active }
     var history: [ExerciseSession] { archive.history }
     var supported: Bool { CMPedometer.isStepCountingAvailable() }
+    var distanceSupported: Bool { CMPedometer.isDistanceAvailable() }
 
     init(userID: String) {
         let key = SHA256.hash(data: Data(userID.utf8)).map { String(format: "%02x", $0) }.joined()
@@ -86,7 +87,11 @@ import CryptoKit
         pedometer.startUpdates(from: active.intervals[index].start) { [weak self] data, error in
             Task { @MainActor [weak self] in
                 guard let self, self.generation == revision, self.active?.id == active.id else { return }
-                if let data { self.archive.active?.intervals[index].steps = data.numberOfSteps.intValue; self.save() }
+                if let data {
+                    self.archive.active?.intervals[index].steps = data.numberOfSteps.intValue
+                    self.archive.active?.intervals[index].distanceMeters = data.distance?.doubleValue
+                    self.save()
+                }
                 if let error { self.message = "计步暂不可用：\(error.localizedDescription)。计时仍可使用。" }
             }
         }
@@ -99,16 +104,22 @@ import CryptoKit
         for index in active.intervals.indices {
             let interval = active.intervals[index]
             let end = interval.end ?? Date()
+            if interval.end != nil && interval.steps != nil && (!distanceSupported || interval.distanceMeters != nil) { continue }
             if end.timeIntervalSince(interval.start) >= 7 * 86400 || interval.start < Date().addingTimeInterval(-7 * 86400) {
-                archive.active?.intervals[index].steps = nil
-                message = "部分运动已超过系统计步保留期，步数无法完整获取。"; continue
+                if interval.end == nil {
+                    archive.active?.intervals[index].steps = nil
+                    archive.active?.intervals[index].distanceMeters = nil
+                }
+                message = "部分运动已超过系统数据保留期，步数或距离无法完整获取。"; continue
             }
-            if interval.end != nil && interval.steps != nil { continue }
             let result: (CMPedometerData?, Error?) = await withCheckedContinuation { continuation in
                 pedometer.queryPedometerData(from: interval.start, to: end) { continuation.resume(returning: ($0, $1)) }
             }
             guard archive.active?.id == active.id else { return }
-            if let data = result.0 { archive.active?.intervals[index].steps = data.numberOfSteps.intValue }
+            if let data = result.0 {
+                archive.active?.intervals[index].steps = data.numberOfSteps.intValue
+                archive.active?.intervals[index].distanceMeters = data.distance?.doubleValue
+            }
             if let error = result.1 { message = "计步暂不可用：\(error.localizedDescription)。已保留计时记录。" }
         }
         save()
@@ -137,6 +148,9 @@ struct ExerciseView: View {
                                 Text(ExerciseSession.clock(active.duration(at: context.date)))
                                     .font(.system(size: 44, weight: .semibold, design: .rounded)).monospacedDigit()
                                     .accessibilityLabel("运动时长")
+                                Text(active.distanceMeters == nil && !exercise.distanceSupported ? "此设备不支持距离估算" : active.distanceText)
+                                    .font(.title.bold()).monospacedDigit()
+                                    .accessibilityLabel("运动距离，\(active.distanceText)")
                                 Text(active.steps.map { "\($0) 步" } ?? "步数待获取")
                                     .font(.title2).monospacedDigit()
                                 Text(active.running ? "运动中" : "已暂停").foregroundStyle(active.running ? .teal : .secondary)
@@ -157,24 +171,25 @@ struct ExerciseView: View {
                             Label("开始\(kind)", systemImage: "play.fill").frame(maxWidth: .infinity).padding(.vertical, 8)
                         }.buttonStyle(.borderedProminent)
                     }
-                    Text("暂停期间不计时、不计步。锁屏后计时继续，返回时读取系统步数。步数来自本机，可能稍有延迟。")
+                    Text("暂停期间不计时、不计步、不累计距离。锁屏后计时继续，返回时读取系统数据。公里数由系统根据步行或跑步估算，非 GPS 轨迹；数据可能稍有延迟，不支持时显示未获取。")
                         .font(.footnote).foregroundStyle(.secondary)
                 }
                 if let message = exercise.message {
                     Section("提示") {
                         Text(message).font(.footnote)
-                        Button("重试读取步数") { Task { await exercise.refresh() } }
+                        Button("重试读取步数与距离") { Task { await exercise.refresh() } }
                         Button("重试保存记录") { exercise.retrySave() }
                         Button("打开系统设置") { if let url = URL(string: UIApplication.openSettingsURLString) { UIApplication.shared.open(url) } }
                     }
                 }
                 Section {
                     if exercise.history.isEmpty {
-                        ContentUnavailableView("还没有运动记录", systemImage: "figure.walk", description: Text("完成一次运动后，时长和步数会保存在这里。"))
+                        ContentUnavailableView("还没有运动记录", systemImage: "figure.walk", description: Text("完成一次运动后，时长、步数和公里数会保存在这里。"))
                     }
                     ForEach(exercise.history) { item in
                         VStack(alignment: .leading, spacing: 6) {
                             HStack { Text(item.kind).bold(); Spacer(); Text(ExerciseSession.clock(item.duration(at: item.endedAt ?? .now))).monospacedDigit() }
+                            Text(item.distanceText).font(.headline).monospacedDigit()
                             HStack {
                                 Text(item.startedAt, format: .dateTime.year().month().day().hour().minute())
                                 Spacer()

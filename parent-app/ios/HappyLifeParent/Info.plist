@@ -3,7 +3,7 @@
 <plist version="1.0">
 <dict>
 	<key>NSMotionUsageDescription</key>
-	<string>在您开始运动后读取本机步数，用于散步、慢跑等运动记录。</string>
+	<string>在您开始运动后读取本机步数和估算距离，用于散步、慢跑等运动记录。</string>
 	<key>NSCameraUsageDescription</key>
 	<string>扫描孩子手表的二维码以填写配对码并确认绑定。</string>
 	<key>NSLocationWhenInUseUsageDescription</key>

@@ -4,6 +4,7 @@ struct ExerciseInterval: Codable {
     var start: Date
     var end: Date?
     var steps: Int?
+    var distanceMeters: Double?
 }
 
 struct ExerciseSession: Codable, Identifiable {
@@ -17,6 +18,13 @@ struct ExerciseSession: Codable, Identifiable {
         guard intervals.allSatisfy({ $0.steps != nil }) else { return nil }
         return intervals.reduce(0) { $0 + ($1.steps ?? 0) }
     }
+    var distanceMeters: Double? {
+        guard !intervals.isEmpty, intervals.allSatisfy({ $0.distanceMeters != nil }) else { return nil }
+        return intervals.reduce(0) { $0 + ($1.distanceMeters ?? 0) }
+    }
+    var distanceText: String {
+        distanceMeters.map { String(format: "%.2f 公里", $0 / 1000) } ?? "距离未获取"
+    }
     func duration(at now: Date) -> TimeInterval {
         intervals.reduce(0) { $0 + max(0, ($1.end ?? now).timeIntervalSince($1.start)) }
     }
@@ -24,6 +32,7 @@ struct ExerciseSession: Codable, Identifiable {
         guard running, !intervals.isEmpty else { return }
         intervals[intervals.count - 1].end = now
         intervals[intervals.count - 1].steps = nil
+        intervals[intervals.count - 1].distanceMeters = nil
     }
     mutating func resume(at now: Date) {
         guard !running, endedAt == nil else { return }

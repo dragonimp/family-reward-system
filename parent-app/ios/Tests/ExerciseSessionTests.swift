@@ -39,6 +39,31 @@ import Foundation
         precondition(local.string(from: restored.startedAt) == "2026-10-30 08:59:50")
         precondition(ExerciseSession.clock(3661) == "01:01:01")
         precondition(ExerciseSession.clock(-1) == "00:00:00")
+        var distanceSession = ExerciseSession(kind: "慢跑", startedAt: start,
+            intervals: [ExerciseInterval(start: start, steps: 100, distanceMeters: 1234)])
+        precondition(distanceSession.distanceMeters == 1234 && distanceSession.distanceText == "1.23 公里")
+        distanceSession.pause(at: start.addingTimeInterval(10))
+        precondition(distanceSession.distanceMeters == nil)
+        distanceSession.intervals[0].distanceMeters = 1500
+        distanceSession.resume(at: start.addingTimeInterval(30))
+        precondition(distanceSession.distanceMeters == nil)
+        distanceSession.intervals[1].distanceMeters = 250
+        precondition(distanceSession.distanceMeters == 1750)
+        distanceSession.pause(at: start.addingTimeInterval(40))
+        distanceSession.intervals[1].distanceMeters = 300
+        distanceSession.endedAt = start.addingTimeInterval(40)
+        precondition(distanceSession.distanceMeters == 1800 && distanceSession.duration(at: start.addingTimeInterval(99)) == 20)
+        let savedDistance = try decoder.decode(ExerciseSession.self, from: encoder.encode(distanceSession))
+        precondition(savedDistance.distanceMeters == 1800)
+        let legacy = try JSONSerialization.jsonObject(with: data) as! [String: Any]
+        var legacyJSON = legacy
+        legacyJSON["intervals"] = (legacy["intervals"] as! [[String: Any]]).map { item in
+            var item = item; item.removeValue(forKey: "distanceMeters"); return item
+        }
+        let oldRecord = try decoder.decode(ExerciseSession.self, from: JSONSerialization.data(withJSONObject: legacyJSON))
+        precondition(oldRecord.steps == 18 && oldRecord.distanceMeters == nil && oldRecord.distanceText == "距离未获取")
+        precondition(ExerciseSession(kind: "散步", startedAt: start, intervals: [ExerciseInterval(start: start, distanceMeters: 0)]).distanceText == "0.00 公里")
+        print("PASS: distance totals, pause exclusion, persistence, legacy archive compatibility")
         print("PASS: pause/resume, interval steps, completed immutability, restart persistence, local time across midnight")
     }
 }
