@@ -25,5 +25,9 @@
   "storeWhatsNew": {
     "zh-Hans": "旧版名称更新为 LinkoXMoment，并同步当前最新的圈子活动、照片分享、家庭积分和运动记录功能。支持训练暂停/继续、完成记录和公里数统计。原账号及原应用数据继续保留；新版应用中文名为“灵可时刻”。",
     "en-US": "Renames the legacy app to LinkoXMoment and includes the current circles, activity/photo sharing, family points and exercise features. Exercise supports pause/resume, completed records and distance totals. Existing accounts and data in this app are retained. The successor is Linko Moment (灵可时刻)."
+  },
+  "storeKeywords": {
+    "zh-Hans": "时刻,圈子,活动,照片,家庭,积分,奖励,运动,训练,里程",
+    "en-US": "moments,circles,activities,photos,family,points,rewards,exercise,workouts,distance"
   }
 }
