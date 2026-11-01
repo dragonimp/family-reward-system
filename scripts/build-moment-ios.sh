@@ -62,5 +62,17 @@ printf '%s\n' "$commit" > "$ATLAS_BUILD_OUTPUT/source-commit.txt"
 shasum -a 256 "$ATLAS_BUILD_OUTPUT/Linko Moment.ipa" "$ATLAS_BUILD_OUTPUT/Linko-Moment-symbols.zip" > "$ATLAS_BUILD_OUTPUT/sha256.txt"
 echo 'PASS: signed IPA, symbols and source receipt ready'
 
-# Xcode services can finish shortly after export; allow their descriptors to close before managed cleanup.
-sleep 3
+# Release only this completed build's idle asset helper before managed workspace cleanup.
+python3 - <<'CLEANUP'
+import os,signal,subprocess,time
+work=os.environ['ATLAS_BUILD_WORK']
+result=subprocess.run(['lsof','-a','-d','cwd','-Fpcn'],capture_output=True,text=True)
+pid=command=None
+for line in result.stdout.splitlines():
+    if line.startswith('p'):pid=int(line[1:]);command=None
+    elif line.startswith('c'):command=line[1:]
+    elif line.startswith('n') and command=='ibtoold' and (line[1:]==work or line[1:].startswith(work+'/')):
+        try:os.kill(pid,signal.SIGTERM)
+        except ProcessLookupError:pass
+time.sleep(3)
+CLEANUP
