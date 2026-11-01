@@ -110,7 +110,7 @@ private actor PhotoPreviewLoader {
     var selectedFamily: String { groups.first(where: { $0.id == groupID })?.text("name") ?? "我的群组" }
 
     func call(_ path: String, method: String = "GET", body: [String: Any]? = nil) async throws -> Any {
-        guard let token = identity.accessToken else { throw APIError.message("请先登录用户中心。") }
+        guard let token = try await identity.validAccessToken() else { throw APIError.message("请先登录用户中心。") }
         let current = revision
         var request = URLRequest(url: URL(string: path, relativeTo: base)!.absoluteURL)
         request.httpMethod = method; request.timeoutInterval = 30
@@ -133,7 +133,7 @@ private actor PhotoPreviewLoader {
         return value
     }
     func authenticatedImage(_ path: String) async throws -> UIImage {
-        guard let token = identity.accessToken else { throw APIError.message("请先登录用户中心。") }
+        guard let token = try await identity.validAccessToken() else { throw APIError.message("请先登录用户中心。") }
         let current = revision
         var request = URLRequest(url: URL(string: path, relativeTo: base)!.absoluteURL)
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
@@ -144,7 +144,7 @@ private actor PhotoPreviewLoader {
         return image
     }
     func streamChat(sessionID: String, message: String) async throws {
-        guard let token = identity.accessToken else { throw APIError.message("请先登录用户中心。") }
+        guard let token = try await identity.validAccessToken() else { throw APIError.message("请先登录用户中心。") }
         let current = revision
         var request = URLRequest(url: URL(string: "/api/agentfree/chat/stream", relativeTo: base)!.absoluteURL)
         request.httpMethod = "POST"
