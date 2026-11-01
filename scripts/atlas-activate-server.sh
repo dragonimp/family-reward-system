@@ -122,7 +122,12 @@ PY
 /usr/bin/dotnet "$updater" upgrade-static-site "$static_profile" > "$stage/web-status.json"
 
 [[ "$(readlink "$site")" == "$candidate" ]]
-python3 /opt/Atlas/downloads/family-points-api-credit/current/deploy/moment-domain/activate-moment-domain.py edge
+if [[ -f /etc/moment-domain-migrations/moment-canonical-happylife-20261101-v1-edge.json ]]; then
+  python3 -c 'import json; assert json.load(open("/etc/moment-domain-migrations/moment-canonical-happylife-20261101-v1-edge.json"))["status"] == "completed"'
+else
+  python3 /opt/Atlas/downloads/family-points-api-credit/current/deploy/moment-domain/activate-moment-domain.py edge
+fi
+python3 /opt/Atlas/downloads/family-points-api-credit/current/deploy/moment-native-auth/restore-native-auth-origin.py
 curl -fsS https://happylife.ai.impx.net/version.json | python3 -c 'import json,sys; assert json.load(sys.stdin)["version"]==sys.argv[1]' "$version"
 curl -fsS https://happylife.ai.impx.net/health >/dev/null
 printf '{"summary":"家庭应用 API 和网页已通过 Atlas 发布并验证","evidence":"release=%s source_commit=%s api_operation=%s web_journal=%s"}\n' "$version" "$source_commit" "$operation" "$journal"

@@ -20,7 +20,7 @@ downstreamBuilder.WebHost.UseUrls("http://127.0.0.1:0");
 await using var downstream = downstreamBuilder.Build();
 downstream.UseWebSockets();
 downstream.Map("/api/{**path}", async context => {
-    if (context.Request.Headers.Authorization != "Bearer service-test") { context.Response.StatusCode = 401; return; }
+    if (context.Request.Headers.Authorization != "Bearer " + TestTokens.Service) { context.Response.StatusCode = 401; return; }
     if (context.Request.Headers.Origin != "https://happylife.ai.impx.net") { context.Response.StatusCode = 403; return; }
     if (context.Request.Path.Value!.EndsWith("/signal")) {
         using var socket = await context.WebSockets.AcceptWebSocketAsync();
@@ -44,6 +44,7 @@ builder.WebHost.UseUrls("http://127.0.0.1:0");
 builder.Configuration.AddInMemoryCollection(new Dictionary<string,string?> {
     ["LinkoSocial:Origin"] = "https://happylife.ai.impx.net", ["LinkoSocial:BackendOrigin"] = Address(downstream), ["LinkoSocial:ApplicationKey"] = "linko.ai"
 });
+builder.Services.AddSingleton<SocialServiceTokens>();
 builder.Services.AddSingleton(new AgentIdentityOptions { Authority = "https://identity.example.test", ClientId = "happylife.ai", CookieName = "happylife_access_token" });
 builder.Services.AddAuthentication("test").AddScheme<AuthenticationSchemeOptions, TestAuth>("test", _ => {});
 builder.Services.AddAuthorization();
@@ -83,18 +84,26 @@ await socket.CloseOutputAsync(WebSocketCloseStatus.NormalClosure,"done",Cancella
 client.DefaultRequestHeaders.Authorization = null;
 client.DefaultRequestHeaders.Add("Cookie", "happylife_access_token=family-test");
 Check((await client.GetAsync("/api/dear/social/me")).IsSuccessStatusCode, "shared browser cookie");
+await Task.WhenAll(Enumerable.Range(0, 20).Select(_ => client.GetAsync("/api/dear/social/me")));
+Check(ExchangeHandler.Count == 1, "concurrent previews coalesce the User Center exchange");
+client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", "family-test-two");
+Check((await client.GetAsync("/api/dear/social/me")).IsSuccessStatusCode && ExchangeHandler.Count == 2, "rotated source token uses a separate exchange");
 Console.WriteLine($"PASS: {assertions} Moment gateway HTTP, identity exchange and WebSocket checks");
 
 sealed class TestAuth(IOptionsMonitor<AuthenticationSchemeOptions> options, ILoggerFactory logger, UrlEncoder encoder) : AuthenticationHandler<AuthenticationSchemeOptions>(options, logger, encoder) {
  protected override Task<AuthenticateResult> HandleAuthenticateAsync() {
-  var token = Request.Headers.Authorization.ToString() == "Bearer family-test" || Request.Cookies["happylife_access_token"] == "family-test";
+  var token = Request.Headers.Authorization.ToString() is "Bearer family-test" or "Bearer family-test-two" || Request.Cookies["happylife_access_token"] == "family-test";
   return Task.FromResult(token ? AuthenticateResult.Success(new AuthenticationTicket(new ClaimsPrincipal(new ClaimsIdentity([new Claim("sub","test")],"test")),"test")) : AuthenticateResult.NoResult());
  }
 }
 sealed class ExchangeHandler : HttpMessageHandler {
+ public static int Count;
  protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request,CancellationToken ct) {
   var body = JsonDocument.Parse(await request.Content!.ReadAsStringAsync(ct)).RootElement;
-  if (request.RequestUri!.AbsoluteUri != "https://identity.example.test/oauth/native-service-token" || request.Headers.Authorization?.ToString() != "Bearer family-test" || body.GetProperty("sourceClientId").GetString() != "happylife.ai" || body.GetProperty("targetClientId").GetString() != "linko.ai") throw new Exception("incorrect SDK application exchange");
-  return new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent("{\"access_token\":\"service-test\"}",Encoding.UTF8,"application/json") };
+  if (request.RequestUri!.AbsoluteUri != "https://identity.example.test/oauth/native-service-token" || request.Headers.Authorization?.ToString() is not ("Bearer family-test" or "Bearer family-test-two") || body.GetProperty("sourceClientId").GetString() != "happylife.ai" || body.GetProperty("targetClientId").GetString() != "linko.ai") throw new Exception("incorrect SDK application exchange");
+  Interlocked.Increment(ref Count);
+  return new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(JsonSerializer.Serialize(new { access_token = TestTokens.Service }),Encoding.UTF8,"application/json") };
  }
 }
+
+static class TestTokens { public const string Service = "test.eyJleHAiOjQxMDI0NDQ4MDB9.signature"; }

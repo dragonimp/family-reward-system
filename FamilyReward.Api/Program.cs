@@ -103,6 +103,7 @@ builder.Services.AddCors(options =>
         policy.AllowAnyOrigin().AllowAnyHeader().AllowAnyMethod());
 });
 builder.Services.AddHttpClient();
+builder.Services.AddSingleton<SocialServiceTokens>();
 builder.Services.AddHttpClient("dear-social-sso", client => client.Timeout = TimeSpan.FromSeconds(15));
 builder.Services.AddHttpClient("dear-social-api", client => client.Timeout = TimeSpan.FromSeconds(45))
     .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler { AllowAutoRedirect = false });

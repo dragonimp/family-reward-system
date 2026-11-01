@@ -17,7 +17,7 @@ internal static class LinkoSocialGateway
             return Results.Ok(new { origin = origin.GetLeftPart(UriPartial.Authority), apiPathPrefix = "/api/dear/social", transport = "connect-datachannel-v1" });
         }).RequireAuthorization();
         app.MapMethods("/api/dear/social/{**path}", Methods, async (HttpContext context, string? path,
-            IHttpClientFactory clients, IConfiguration configuration, AgentIdentityOptions identity, CancellationToken ct) =>
+            IHttpClientFactory clients, IConfiguration configuration, AgentIdentityOptions identity, SocialServiceTokens tokens, CancellationToken ct) =>
         {
             if (!Allowed(context.Request.Method, path)) return Results.NotFound();
             var originText = configuration["LinkoSocial:Origin"];
@@ -35,8 +35,7 @@ internal static class LinkoSocialGateway
 
             try
             {
-                var serviceToken = await new NativeSsoClient(clients.CreateClient("dear-social-sso"))
-                    .ExchangeApplicationAsync(new Uri(identity.Authority), identity.ClientId, applicationKey, token, ct);
+                var serviceToken = await tokens.GetAsync(token, applicationKey, identity, clients, ct);
                 var destination = new Uri(backend, "/api/" + path + context.Request.QueryString);
                 if (context.WebSockets.IsWebSocketRequest)
                 {

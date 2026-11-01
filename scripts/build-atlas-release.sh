@@ -57,6 +57,8 @@ NODE
 mkdir -p "$stage/api/migrations"
 cp "$root/scripts/migrations/"*.sql "$stage/api/migrations/"
 cp "$root/scripts/run-db-migrations.sh" "$stage/api/migrations/run-db-migrations.sh"
+mkdir -p "$stage/api/deploy/moment-native-auth"
+cp "$root/deploy/native-auth-origin/"* "$stage/api/deploy/moment-native-auth/"
 mkdir -p "$stage/api/deploy/moment-domain"
 cp "$root/deploy/activate-moment-domain.py" "$root/deploy/happylife.ai.impx.net.nginx.conf" "$root/deploy/happylife.ai.xmkurt.com.nginx.conf" "$stage/api/deploy/moment-domain/"
 cp "$linko_root/deploy/nginx-linko-ai-impx.conf" "$stage/api/deploy/moment-domain/linko.ai.impx.net.nginx.conf"

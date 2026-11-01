@@ -2,6 +2,7 @@
   <PropertyGroup><TargetFramework>net10.0</TargetFramework><Nullable>enable</Nullable><ImplicitUsings>enable</ImplicitUsings></PropertyGroup>
   <ItemGroup>
     <Compile Include="../../FamilyReward.Api/LinkoSocialGateway.cs" Link="LinkoSocialGateway.cs" />
+    <Compile Include="../../FamilyReward.Api/SocialServiceTokens.cs" Link="SocialServiceTokens.cs" />
     <ProjectReference Include="../../../AgentIdentity/src/AgentIdentity.NativeClient/AgentIdentity.NativeClient.csproj" />
     <ProjectReference Include="../../../AgentIdentity/src/AgentIdentity.Sdk/AgentIdentity.Sdk.csproj" />
   </ItemGroup>
