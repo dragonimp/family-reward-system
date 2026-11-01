@@ -22,7 +22,8 @@ export AGENTIDENTITY_ROOT="$AgentIdentityRoot"
 export FAMILY_REWARD_SHARED_PROJECTS_ROOT="$ATLAS_BUILD_WORK/source"
 (cd "$ATLAS_BUILD_WORK/source/Linko" && bash scripts/check-moment-connect.sh)
 for project in Linko family-reward-system; do
-  version="$(date +%Y%m%d-%H%M%S)-activity-$(git -C "$projects/$project" rev-parse --short HEAD)"
+  frozen_commit="$(awk -v project="$project" '$1 == project {print $2}' "$ATLAS_BUILD_OUTPUT/source-commits.txt")"
+  version="$(date +%Y%m%d-%H%M%S)-activity-${frozen_commit:0:7}"
   [[ "$version" =~ ^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$ && "$version" != latest ]] || exit 2
   echo "$project $version" | tee -a "$ATLAS_BUILD_OUTPUT/service-versions.txt"
   bash "$ATLAS_BUILD_WORK/source/$project/scripts/build-atlas-release.sh" "$version" "$ATLAS_BUILD_OUTPUT/$project" \
