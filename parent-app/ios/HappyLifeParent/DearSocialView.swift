@@ -168,6 +168,21 @@ extension DearPhotoLocation {
     }
 }
 
+private enum PhotoDisplayImage {
+    static func load(_ url: URL) async throws -> UIImage {
+        try await Task.detached(priority: .utility) {
+            guard let source = CGImageSourceCreateWithURL(url as CFURL, [kCGImageSourceShouldCache: false] as CFDictionary),
+                  let thumbnail = CGImageSourceCreateThumbnailAtIndex(source, 0, [
+                    kCGImageSourceCreateThumbnailFromImageAlways: true,
+                    kCGImageSourceCreateThumbnailWithTransform: true,
+                    kCGImageSourceThumbnailMaxPixelSize: 2048,
+                    kCGImageSourceShouldCacheImmediately: true
+                  ] as CFDictionary) else { throw APIError.message("原图无法显示。") }
+            return UIImage(cgImage: thumbnail)
+        }.value
+    }
+}
+
 private struct DearPhotoPlaceView: View {
     let photo: DearRecord
     @State private var resolvedName: String?
@@ -218,10 +233,7 @@ private struct DearRecord: Identifiable {
     var subject: String { text("subject") }
     func text(_ key: String) -> String { data[key] as? String ?? "" }
     func dateText(_ key: String) -> String {
-        let formatter = ISO8601DateFormatter()
-        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        let raw = text(key)
-        let date = formatter.date(from: raw) ?? ISO8601DateFormatter().date(from: raw)
+        let date = key == "createdAt" ? (sortDate == .distantPast ? nil : sortDate) : ActivityListDate.parse(text(key))
         return date.map { "\($0.formatted(date: .abbreviated, time: .shortened))（当地时间）" } ?? "时间未知"
     }
     func flag(_ key: String) -> Bool { data[key] as? Bool ?? false }
@@ -1402,7 +1414,9 @@ struct DearSocialView: View {
     }
     private func loadPhotos() async throws {
         guard !activityTenantId.isEmpty, !activityId.isEmpty else { return }
-        let loaded = try DearRecord.list(await store.call(base + "tenants/\(activityTenantId)/activities/\(activityId)/live/photos"))
+        let tenant = activityTenantId, activity = activityId
+        let loaded = try DearRecord.list(await store.call(base + "tenants/\(tenant)/activities/\(activity)/live/photos"))
+        guard !Task.isCancelled, tenant == activityTenantId, activity == activityId else { return }
         photos = loaded
     }
     private var canDeleteSelectedPhotos: Bool {
@@ -1689,6 +1703,7 @@ private struct DearPhotoPreview: View {
         .clipShape(RoundedRectangle(cornerRadius: 10))
         .task(id: path) {
             do { image = try await store.authenticatedImage(path); failed = false }
+            catch is CancellationError { }
             catch { image = nil; failed = true }
         }
     }
@@ -1804,6 +1819,7 @@ private struct DearPhotoGalleryView: View {
                     DearPhotoDetailView(store: store, photo: photo, spaceID: spaceID, activityID: activityID,
                                         path: "/api/dear/social/tenants/\(spaceID)/activities/\(activityID)/native-photos/\(photo.id)/thumbnail",
                                         canDelete: allowsDeletion && photo.flag("canDelete"),
+                                        active: photo.id == selectedID,
                                         onDeleted: { removed in onDeleted(photo.id, removed); dismiss() },
                                         onSwipeDown: { dismiss() })
                         .tag(photo.id)
@@ -1831,6 +1847,7 @@ private struct DearPhotoDetailView: View {
     let activityID: String
     let path: String
     let canDelete: Bool
+    var active = true
     let onDeleted: (Bool) -> Void
     var onSwipeDown: (() -> Void)? = nil
     @State private var dismissOffset = 0.0
@@ -1899,7 +1916,7 @@ private struct DearPhotoDetailView: View {
                         .accessibilityLabel("原文件接收进度")
                 }
                 if let originalError { Text(originalError).font(.footnote).foregroundStyle(.red) }
-                DearPhotoCommentsView(store: store, spaceID: spaceID, activityID: activityID, photoID: photo.id)
+                if active { DearPhotoCommentsView(store: store, spaceID: spaceID, activityID: activityID, photoID: photo.id) }
                 if canDelete {
                     Button("删除分享", role: .destructive) { showingDelete = true }.disabled(deleting)
                 }
@@ -1913,7 +1930,10 @@ private struct DearPhotoDetailView: View {
             Button("删除分享", role: .destructive) { Task { await deleteSharedMedia() } }
             Button("取消", role: .cancel) { }
         } message: { Text("活动成员将无法再获取此文件；iPhone 相册中的原文件不会删除。") }
-        .task(id: path) { await load() }
+        .task(id: path + String(active)) {
+            if active { await load() }
+            else { player?.pause(); player = nil; image = nil; originalImage = nil }
+        }
         .onDisappear { player?.pause() }
     }
 
@@ -1924,11 +1944,12 @@ private struct DearPhotoDetailView: View {
             player = AVPlayer(url: local)
             return
         }
-        do { image = try await store.authenticatedImage(path) }
+        do { let loaded = try await store.authenticatedImage(path); if !Task.isCancelled { image = loaded } }
+        catch is CancellationError { }
         catch {
             if let local = await store.photoSource.localOriginal(photoID: photo.id, spaceID: spaceID, activityID: activityID),
-               let localImage = UIImage(contentsOfFile: local.path) { image = await localImage.byPreparingThumbnail(ofSize: CGSize(width: 2048, height: 2048)) }
-            else { self.error = error.localizedDescription }
+               let localImage = try? await PhotoDisplayImage.load(local) { if !Task.isCancelled { image = localImage } }
+            else if !Task.isCancelled { self.error = error.localizedDescription }
         }
     }
 
@@ -1940,8 +1961,7 @@ private struct DearPhotoDetailView: View {
                 downloadStatus = "正在接收原文件"; transferProgress = $0
             }
             if !isVideo {
-                guard let decoded = UIImage(contentsOfFile: url.path) else { throw APIError.message("原图无法显示。") }
-                originalImage = await decoded.byPreparingThumbnail(ofSize: CGSize(width: 2048, height: 2048)) ?? image
+                originalImage = try await PhotoDisplayImage.load(url)
             }
             originalURL = url
             if isVideo { player = AVPlayer(url: url) }

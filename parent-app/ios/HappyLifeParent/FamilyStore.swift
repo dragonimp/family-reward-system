@@ -16,6 +16,54 @@ import WatchConnectivity
     }
 }
 
+// Only visible cells request previews. Decode off the main actor, coalesce duplicates,
+// bound simultaneous requests and let NSCache shed decoded images under memory pressure.
+private actor PhotoPreviewLoader {
+    private let session: URLSession = {
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.httpMaximumConnectionsPerHost = 4
+        configuration.timeoutIntervalForRequest = 20
+        return URLSession(configuration: configuration)
+    }()
+    private let cache: NSCache<NSString, UIImage> = {
+        let value = NSCache<NSString, UIImage>(); value.countLimit = 64; value.totalCostLimit = 32 * 1024 * 1024
+        return value
+    }()
+    private var expiry: [String: Date] = [:]
+    private var pending: [String: Task<UIImage, Error>] = [:]
+    private var active = 0
+    private var waiters: [CheckedContinuation<Void, Never>] = []
+    func image(_ request: URLRequest, key: String) async throws -> UIImage {
+        if let expires = expiry[key], expires > Date(), let image = cache.object(forKey: key as NSString) { return image }
+        if let task = pending[key] { return try await task.value }
+        let task = Task { try await fetch(request) }
+        pending[key] = task
+        defer { pending.removeValue(forKey: key) }
+        let image = try await task.value
+        cache.setObject(image, forKey: key as NSString, cost: image.cgImage.map { $0.bytesPerRow * $0.height } ?? 512 * 1024)
+        expiry = expiry.filter { $0.value > Date() }
+        expiry[key] = Date().addingTimeInterval(60)
+        return image
+    }
+    private func fetch(_ request: URLRequest) async throws -> UIImage {
+        if active < 4 { active += 1 }
+        else { await withCheckedContinuation { waiters.append($0) } }
+        defer {
+            if waiters.isEmpty { active -= 1 } else { waiters.removeFirst().resume() }
+        }
+        try Task.checkCancellation()
+        let (data, response) = try await session.data(for: request)
+        guard let response = response as? HTTPURLResponse, response.statusCode == 200,
+              response.url?.host == request.url?.host, data.count <= 512 * 1024,
+              let image = UIImage(data: data) else { throw APIError.message("照片预览读取失败，请重试。") }
+        return await image.byPreparingForDisplay() ?? image
+    }
+    func clear() {
+        pending.values.forEach { $0.cancel() }; pending.removeAll()
+        cache.removeAllObjects(); expiry.removeAll()
+    }
+}
+
 @MainActor final class FamilyStore: NSObject, ObservableObject {
     let identity = AgentIdentitySession(origin: URL(string: "https://happylife.ai.xmkurt.com")!, callback: URL(string: "linkofamily://login-complete/")!, keychainService: "net.impx.happylife.identity")
     private let base = URL(string: "https://happylife.ai.xmkurt.com")!
@@ -45,6 +93,7 @@ import WatchConnectivity
     @Published var error: String?
     @Published var ledgerPage = 1
     @Published var ledgerTotal = 0
+    private let photoPreviews = PhotoPreviewLoader()
     private var revision = UUID()
     private var lastRefresh = Date.distantPast
     override init() {
@@ -71,7 +120,7 @@ import WatchConnectivity
         let (data, response) = try await session.data(for: request)
         guard current == revision, token == identity.accessToken else { throw CancellationError() }
         guard let response = response as? HTTPURLResponse, response.url?.host == base.host else { throw APIError.message("网络响应无效。") }
-        let value = (try? JSONSerialization.jsonObject(with: data)) ?? [:]
+        let value = (try? await Task.detached(priority: .utility) { try JSONSerialization.jsonObject(with: data) }.value) ?? [:]
         if response.statusCode == 401 { logout(); throw APIError.message("登录已过期，请重新登录。") }
         guard (200..<300).contains(response.statusCode) else {
             let detail = value as? [String: Any]
@@ -85,18 +134,10 @@ import WatchConnectivity
         var request = URLRequest(url: URL(string: path, relativeTo: base)!.absoluteURL)
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         request.timeoutInterval = 30
-        let (data, response) = try await session.data(for: request)
+        let image = try await photoPreviews.image(request, key: current.uuidString + path)
+        try Task.checkCancellation()
         guard current == revision, token == identity.accessToken else { throw CancellationError() }
-        guard let response = response as? HTTPURLResponse, response.url?.host == base.host else {
-            throw APIError.message("照片预览网络响应无效。")
-        }
-        guard response.statusCode == 200 else {
-            throw APIError.message("照片预览读取失败（\(response.statusCode)），请刷新相册。")
-        }
-        guard let image = UIImage(data: data) else { throw APIError.message("照片预览格式无效。") }
-        let prepared = await image.byPreparingForDisplay() ?? image
-        guard current == revision, token == identity.accessToken else { throw CancellationError() }
-        return prepared
+        return image
     }
     func streamChat(sessionID: String, message: String) async throws {
         guard let token = identity.accessToken else { throw APIError.message("请先登录用户中心。") }
@@ -196,6 +237,7 @@ import WatchConnectivity
         groupID = id; revision = UUID(); await load()
     }
     func logout() {
+        Task { await photoPreviews.clear() }
         DearShareInbox.clearCatalog()
         notifications.reset(token: identity.accessToken)
         photoSource.logout(token: identity.accessToken)

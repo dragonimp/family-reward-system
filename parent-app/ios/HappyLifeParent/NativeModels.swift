@@ -61,6 +61,10 @@ enum WatchPairingCode {
 
 // Activity timestamps use the device time zone; calendar-only dates retain their day.
 enum ActivityListDate {
+    private static let fractional: ISO8601DateFormatter = {
+        let value = ISO8601DateFormatter(); value.formatOptions = [.withInternetDateTime, .withFractionalSeconds]; return value
+    }()
+    private static let whole = ISO8601DateFormatter()
     static func parse(_ raw: String, timeZone: TimeZone = .autoupdatingCurrent) -> Date? {
         if raw.range(of: "^[0-9]{4}-[0-9]{2}-[0-9]{2}$", options: .regularExpression) != nil {
             let formatter = DateFormatter()
@@ -71,9 +75,7 @@ enum ActivityListDate {
             formatter.isLenient = false
             return formatter.date(from: raw)
         }
-        let formatter = ISO8601DateFormatter()
-        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        return formatter.date(from: raw) ?? ISO8601DateFormatter().date(from: raw)
+        return fractional.date(from: raw) ?? whole.date(from: raw)
     }
 
     static func value(startsAt: String, createdAt: String, timeZone: TimeZone = .autoupdatingCurrent) -> Date? {
