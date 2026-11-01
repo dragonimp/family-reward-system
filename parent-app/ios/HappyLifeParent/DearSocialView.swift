@@ -313,7 +313,6 @@ private struct DearActivityMapView: View {
     @State private var cameraPosition: MapCameraPosition = .automatic
     @State private var selectedPointID: String?
     @State private var selectedPhoto: DearRecord?
-    @State private var showingPhoto = false
 
     private var selectedPoint: DearActivityMapPoint? { points.first { $0.id == selectedPointID } }
     private func thumbnailPath(_ photo: DearRecord) -> String {
@@ -322,7 +321,6 @@ private struct DearActivityMapView: View {
 
     private func openPhoto(_ photo: DearRecord) {
         selectedPhoto = photo
-        showingPhoto = true
     }
 
     var body: some View {
@@ -424,12 +422,10 @@ private struct DearActivityMapView: View {
         }
         .navigationTitle("\(title) · 地图")
         .navigationBarTitleDisplayMode(.inline)
-        .fullScreenCover(isPresented: $showingPhoto) {
-            if let selectedPhoto {
+        .fullScreenCover(item: $selectedPhoto) { selectedPhoto in
                 DearPhotoGalleryView(store: store, photos: photos, initialPhotoID: selectedPhoto.id,
                                      spaceID: spaceID, activityID: activityID, allowsDeletion: false,
                                      onDeleted: { _, _ in })
-            }
         }
         .onAppear { fitAllPoints() }
     }
@@ -465,7 +461,6 @@ struct DearSocialView: View {
     @State private var activities: [DearRecord] = []
     @State private var photos: [DearRecord] = []
     @State private var selectedPhoto: DearRecord?
-    @State private var showingPhoto = false
     @State private var selectedPhotos: [PhotosPickerItem] = []
     @State private var cameraMode: DearCamera.Mode?
     @State private var cameraTarget: DearCaptureTarget?
@@ -704,7 +699,7 @@ struct DearSocialView: View {
             }
             .refreshable { await refresh() }
             .task { await refresh() }
-            .onChange(of: spaceId) { _, _ in activityId = ""; showingActivity = false; showingPhoto = false; selectedPhoto = nil; showingActivityManagement = false; activities = []; photos = []; activityError = ""; activityLoading = true; run { try await loadActivities() } }
+            .onChange(of: spaceId) { _, _ in activityId = ""; showingActivity = false; selectedPhoto = nil; showingActivityManagement = false; activities = []; photos = []; activityError = ""; activityLoading = true; run { try await loadActivities() } }
             .navigationDestination(isPresented: $showingActivity) { activityDetail }
             .sheet(isPresented: $showingActivityManagement) { activityManagement }
             .sheet(isPresented: $showingActivityCreate) { activityCreateSheet }
@@ -771,8 +766,7 @@ struct DearSocialView: View {
         } else {
             Button {
                 selectedPhoto = photo
-                showingPhoto = true
-            } label: { photoCard(photo, path: path) }
+                    } label: { photoCard(photo, path: path) }
             .buttonStyle(.plain)
         }
     }
@@ -824,7 +818,7 @@ struct DearSocialView: View {
             if selectingPhotoDownloads {
                 if !selectedPhotoIDs.insert(photo.id).inserted { selectedPhotoIDs.remove(photo.id) }
                 batchOriginalURLs = []
-            } else { selectedPhoto = photo; showingPhoto = true }
+            } else { selectedPhoto = photo }
         } label: {
             VStack(spacing: 3) {
                 GeometryReader { proxy in
@@ -1007,7 +1001,10 @@ struct DearSocialView: View {
                 }.padding(.vertical, 6)
                 }
             }
-            if activityTimeline.isEmpty { Text("还没有动态，拍照、写日常或打卡，留下活动的第一刻。") .foregroundStyle(.secondary).font(.subheadline) }
+            if activityTimeline.isEmpty {
+                if busy { ProgressView("正在异步加载活动照片与动态…").font(.subheadline) }
+                else { Text("还没有动态，拍照、写日常或打卡，留下活动的第一刻。").foregroundStyle(.secondary).font(.subheadline) }
+            }
         }
     }
 
@@ -1066,8 +1063,7 @@ struct DearSocialView: View {
                 } label: { Image(systemName: "ellipsis").accessibilityLabel("更多活动操作") }
             }
         }
-        .fullScreenCover(isPresented: $showingPhoto) {
-            if let selectedPhoto {
+        .fullScreenCover(item: $selectedPhoto) { selectedPhoto in
                 DearPhotoGalleryView(store: store, photos: photos, initialPhotoID: selectedPhoto.id,
                                      spaceID: activityTenantId, activityID: activityId,
                                      allowsDeletion: true,
@@ -1079,7 +1075,6 @@ struct DearSocialView: View {
                                              catch { self.error = "相册刷新失败：\(error.localizedDescription)" }
                                          }
                                      })
-            }
         }
         .alert("照片默认地点", isPresented: $showingPhotoLocation) {
             TextField("地点名称（可选）", text: $photoLocationName)
@@ -1134,7 +1129,7 @@ struct DearSocialView: View {
             error = value
         }
         .onDisappear { pendingCheckIn = false }
-        .onChange(of: activityId) { _, _ in photoToDelete = nil; showingActivityManagement = false; showingPhoto = false; selectedPhoto = nil; inviteLink = ""; inviteUsername = ""; momentDraft = ""; momentRequestID = UUID(); photoLocationName = ""; selectingPhotoDownloads = false; selectedPhotoIDs.removeAll(); batchOriginalURLs = [] }
+        .onChange(of: activityId) { _, _ in photoToDelete = nil; showingActivityManagement = false; selectedPhoto = nil; inviteLink = ""; inviteUsername = ""; momentDraft = ""; momentRequestID = UUID(); photoLocationName = ""; selectingPhotoDownloads = false; selectedPhotoIDs.removeAll(); batchOriginalURLs = [] }
         .onChange(of: selectedPhotos) { _, selected in
             guard !selected.isEmpty else { return }
             let targetSpace = activityTenantId, targetActivity = activityId
