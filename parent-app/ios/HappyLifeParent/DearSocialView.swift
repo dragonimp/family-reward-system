@@ -466,6 +466,7 @@ struct DearSocialView: View {
     @State private var batchDeleting = false
     @State private var showingBatchDelete = false
     @State private var photoToDelete: DearRecord?
+    @State private var showingPhotoLocation = false
     @State private var batchDownloadError = ""
     @State private var moments: [DearRecord] = []
     @State private var checkIns: [DearRecord] = []
@@ -791,6 +792,47 @@ struct DearSocialView: View {
         .accessibilityLabel("\(nickname)，\(photo.text("originalFileName"))，\(photo.dateText("createdAt"))")
     }
 
+    private var photoGridRows: [[DearRecord]] {
+        stride(from: 0, to: photos.count, by: 5).map { Array(photos[$0..<min($0 + 5, photos.count)]) }
+    }
+
+    private func photoGridTile(_ photo: DearRecord) -> some View {
+        let nickname = photo.text("sourceDisplayName").isEmpty ? "活动成员" : photo.text("sourceDisplayName")
+        let path = base + "tenants/\(activityTenantId)/activities/\(activityId)/native-photos/\(photo.id)/thumbnail"
+        return Button {
+            if selectingPhotoDownloads {
+                if !selectedPhotoIDs.insert(photo.id).inserted { selectedPhotoIDs.remove(photo.id) }
+                batchOriginalURLs = []
+            } else { selectedPhoto = photo; showingPhoto = true }
+        } label: {
+            VStack(spacing: 3) {
+                GeometryReader { proxy in
+                    DearPhotoPreview(store: store, path: path)
+                        .frame(width: proxy.size.width, height: proxy.size.height)
+                        .overlay(alignment: .topLeading) {
+                            Text(nickname).font(.system(size: 9, weight: .semibold)).lineLimit(1)
+                                .foregroundStyle(.white).padding(3).background(.black.opacity(0.4))
+                        }
+                        .overlay(alignment: .bottomTrailing) {
+                            if photo.text("contentType").hasPrefix("video/") {
+                                Image(systemName: "play.circle.fill").foregroundStyle(.white).padding(3)
+                            }
+                        }
+                        .overlay(alignment: .topTrailing) {
+                            if selectingPhotoDownloads {
+                                Image(systemName: selectedPhotoIDs.contains(photo.id) ? "checkmark.circle.fill" : "circle")
+                                    .foregroundStyle(selectedPhotoIDs.contains(photo.id) ? .teal : .white).padding(3)
+                            }
+                        }
+                }.aspectRatio(1, contentMode: .fit)
+            }
+        }.buttonStyle(.plain).disabled(batchDownloading || batchDeleting)
+        .accessibilityLabel("\(nickname)，\(photo.text("originalFileName"))")
+        .contextMenu {
+            if photo.flag("canDelete") { Button("删除分享", role: .destructive) { photoToDelete = photo } }
+        }
+    }
+
     private var activityCreateSheet: some View {
         NavigationStack {
             Form {
@@ -841,13 +883,15 @@ struct DearSocialView: View {
     private var activityPhotoSection: some View {
         Section {
             HStack {
-                Button { Task { await openCamera(.photo) } } label: { Label("拍照", systemImage: "camera") }
+                PhotosPicker(selection: $selectedPhotos, maxSelectionCount: 50, matching: .any(of: [.images, .videos]), preferredItemEncoding: .current) {
+                    Label("分享照片 / 视频", systemImage: "photo.badge.plus")
+                }.buttonStyle(.borderedProminent).tint(.teal)
                 Spacer()
-                Button { Task { await openCamera(.video) } } label: { Label("录制视频", systemImage: "video") }
-            }.buttonStyle(.borderless)
-                .disabled(busy || requestingCamera || capturedMedia != nil || batchDeleting || batchDownloading)
-            Text("拍摄确认后自动保存到系统相册并共享到当前活动；视频最长 3 分钟。")
-                .font(.caption).foregroundStyle(.secondary)
+                Menu {
+                    Button { Task { await openCamera(.photo) } } label: { Label("拍照", systemImage: "camera") }
+                    Button { Task { await openCamera(.video) } } label: { Label("录制视频", systemImage: "video") }
+                } label: { Image(systemName: "camera").font(.title3).accessibilityLabel("拍摄并分享") }
+            }.disabled(busy || requestingCamera || capturedMedia != nil || batchDeleting || batchDownloading)
             if let capturedMedia {
                 Text(capturedMedia.savedToLibrary ? "已保存到系统相册，尚未共享到活动。" : "拍摄内容尚未保存并共享，请重试。")
                     .font(.caption).foregroundStyle(.secondary)
@@ -861,26 +905,11 @@ struct DearSocialView: View {
                     }
                 }.buttonStyle(.borderless).disabled(busy)
             }
-            HStack {
-                PhotosPicker(selection: $selectedPhotos, maxSelectionCount: 50, matching: .any(of: [.images, .videos]), preferredItemEncoding: .current) {
-                    Label("分享照片 / 视频", systemImage: "photo.badge.plus")
-                }.disabled(busy || batchDeleting || batchDownloading)
-                Spacer()
-                Picker("显示方式", selection: $photoViewMode) {
-                    Image(systemName: "rectangle").tag("grid").accessibilityLabel("大图")
-                    Image(systemName: "list.bullet").tag("list").accessibilityLabel("紧凑")
-                }.pickerStyle(.segmented).frame(width: 105)
-            }
-            DisclosureGroup("添加照片地点（可选）") {
-                TextField("照片地点", text: $photoLocationName)
-                Text("优先使用照片自带定位；未记录定位时使用此处填写的地点。")
-                    .font(.caption).foregroundStyle(.secondary)
-            }.font(.subheadline)
-            if !photos.isEmpty {
-                Button(selectingPhotoDownloads ? "完成多选" : "多选管理") {
-                    selectingPhotoDownloads.toggle(); selectedPhotoIDs.removeAll(); batchOriginalURLs = []; batchDownloadError = ""; batchDownloadProgress = 0
-                }.disabled(batchDownloading || batchDeleting)
-            }
+            Picker("展现样式", selection: $photoViewMode) {
+                Label("大图", systemImage: "rectangle").tag("grid")
+                Label("紧凑", systemImage: "list.bullet").tag("list")
+                Label("网格 · 每行5张", systemImage: "square.grid.3x3").tag("tiles")
+            }.pickerStyle(.menu)
             if selectingPhotoDownloads {
                 Text("已选 \(selectedPhotoIDs.count) 项").font(.caption).foregroundStyle(.secondary)
                 HStack {
@@ -895,7 +924,7 @@ struct DearSocialView: View {
                 if !batchOriginalURLs.isEmpty { ShareLink(items: batchOriginalURLs) { Label("保存或分享 \(batchOriginalURLs.count) 项", systemImage: "square.and.arrow.up") } }
                 if !batchDownloadError.isEmpty { Text(batchDownloadError).font(.caption).foregroundStyle(.red) }
             }
-        } header: { Text("发布与管理").textCase(nil) }
+        } header: { Text("照片分享").textCase(nil) }
     }
 
     private var activityTimeline: [DearTimelineEntry] {
@@ -910,15 +939,16 @@ struct DearSocialView: View {
     }
 
     private var activityTimelineSection: some View {
-        Section("活动动态 · 照片、打卡与日常") {
-            HStack {
-                Button { momentDraft = ""; momentRequestID = UUID(); error = ""; showingMomentCreate = true } label: { Label("写日常", systemImage: "square.and.pencil") }
-                Spacer()
-                Button {
-                    checkInNote = ""; checkInRequestID = UUID(); pendingCheckIn = true; checkInLocator.locate()
-                } label: { Label(pendingCheckIn ? "正在定位…" : "打卡", systemImage: "location.circle") }
-            }.disabled(busy || pendingCheckIn)
-            ForEach(activityTimeline, id: \.id) { entry in
+        Section(photoViewMode == "tiles" ? "照片与视频" : "活动动态 · 照片、打卡与日常") {
+            if photoViewMode == "tiles" {
+                ForEach(Array(photoGridRows.enumerated()), id: \.offset) { _, row in
+                    HStack(alignment: .top, spacing: 4) {
+                        ForEach(row) { photo in photoGridTile(photo).frame(maxWidth: .infinity) }
+                        ForEach(0..<(5 - row.count), id: \.self) { _ in Color.clear.frame(maxWidth: .infinity).aspectRatio(1, contentMode: .fit) }
+                    }.listRowInsets(EdgeInsets(top: 4, leading: 8, bottom: 4, trailing: 8))
+                }
+            }
+            ForEach(activityTimeline.filter { photoViewMode != "tiles" || $0.kind != .photo }, id: \.id) { entry in
                 if entry.kind == .photo {
                     VStack(alignment: .leading, spacing: 10) {
                         photoLink(entry.record)
@@ -927,7 +957,7 @@ struct DearSocialView: View {
                             Button("删除分享", role: .destructive) { photoToDelete = entry.record }
                                 .buttonStyle(.borderless).disabled(busy || batchDeleting || batchDownloading)
                         }
-                        DearPhotoCommentsView(store: store, spaceID: activityTenantId, activityID: activityId, photoID: entry.record.id)
+                        DearPhotoCommentsView(store: store, spaceID: activityTenantId, activityID: activityId, photoID: entry.record.id, allowsComposition: false)
                             .id("\(activityTenantId)/\(activityId)/\(entry.record.id)")
                     }.padding(.vertical, 8)
                 } else {
@@ -967,40 +997,12 @@ struct DearSocialView: View {
             if let selectedActivity {
                 Section {
                     VStack(alignment: .leading, spacing: 8) {
-                        Text(selectedActivity.text("title")).font(.title2.bold())
                         HStack { Label(activityDate(selectedActivity), systemImage: "calendar"); Spacer(); Label("\(activityMembers.count) 位成员", systemImage: "person.2") }
                             .font(.caption).foregroundStyle(.secondary)
-                        if !selectedActivity.text("description").isEmpty { Text(selectedActivity.text("description")).font(.subheadline).foregroundStyle(.secondary) }
-                        Button {
-                            editedActivityName = selectedActivity.text("title"); editedActivityDescription = selectedActivity.text("description")
-                            editedActivityDate = activityDateValue(selectedActivity); showingActivityManagement = true
-                        } label: { Label("管理与邀请", systemImage: "person.badge.plus") }.font(.subheadline)
                     }.padding(.vertical, 4)
                 }
                 activityPhotoSection
                 activityTimelineSection
-                Section("活动地图") {
-                    let points = DearActivityMapPoint.points(checkIns: checkIns, photos: photos)
-                    NavigationLink {
-                        DearActivityMapView(store: store, title: selectedActivity.text("title"), spaceID: activityTenantId, activityID: activityId, points: points, photos: photos)
-                    } label: {
-                        Label("查看地图 · \(checkIns.count) 次打卡 · \(photos.count) 项照片与视频", systemImage: "map.fill").font(.subheadline)
-                    }.disabled(points.isEmpty && photos.isEmpty)
-                }
-                Section {
-                    DisclosureGroup("活动成员与好友关系") {
-                        ForEach(activityMembers, id: \.subject) { member in
-                            HStack {
-                                Text(member.text("displayName")); Spacer()
-                                if member.flag("isSelf") { Text("我").foregroundStyle(.secondary) }
-                                else if let relation = relationships.first(where: { $0.text("peerSubject") == member.subject }) {
-                                    Text(relation.text("status") == "accepted" ? "朋友" : "待确认").foregroundStyle(.secondary)
-                                }
-                            }.font(.subheadline)
-                        }
-                        Text("好友关系需要双方确认，可在活动管理中发起申请。") .font(.caption).foregroundStyle(.secondary)
-                    }
-                }
             }
         }
         .listStyle(.insetGrouped)
@@ -1019,11 +1021,28 @@ struct DearSocialView: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
-                if let url = URL(string: "https://happylife.ai.xmkurt.com/dear/spaces/\(activityTenantId)/activities/\(activityId)") {
-                    ShareLink(item: url, subject: Text(selectedActivity?.text("title") ?? "活动")) {
-                        Label("分享活动链接", systemImage: "square.and.arrow.up")
+                Menu {
+                    if let url = URL(string: "https://happylife.ai.xmkurt.com/dear/spaces/\(activityTenantId)/activities/\(activityId)") {
+                        ShareLink(item: url, subject: Text(selectedActivity?.text("title") ?? "活动")) { Label("分享活动链接", systemImage: "square.and.arrow.up") }
                     }
-                }
+                    Button {
+                        editedActivityName = selectedActivity?.text("title") ?? ""; editedActivityDescription = selectedActivity?.text("description") ?? ""
+                        editedActivityDate = selectedActivity.map(activityDateValue) ?? Date(); showingActivityManagement = true
+                    } label: { Label("活动管理与邀请", systemImage: "person.badge.plus") }
+                    Button {
+                        selectingPhotoDownloads.toggle(); selectedPhotoIDs.removeAll(); batchOriginalURLs = []; batchDownloadError = ""; batchDownloadProgress = 0
+                    } label: { Label(selectingPhotoDownloads ? "完成多选" : "批量下载或删除", systemImage: "checkmark.circle") }
+                        .disabled(photos.isEmpty || batchDownloading || batchDeleting)
+                    Button { showingPhotoLocation = true } label: { Label("照片默认地点", systemImage: "mappin") }
+                    Divider()
+                    Button { momentDraft = ""; momentRequestID = UUID(); error = ""; showingMomentCreate = true } label: { Label("写日常", systemImage: "square.and.pencil") }
+                    Button { checkInNote = ""; checkInRequestID = UUID(); pendingCheckIn = true; checkInLocator.locate() } label: { Label("打卡", systemImage: "location.circle") }
+                        .disabled(busy || pendingCheckIn)
+                    let points = DearActivityMapPoint.points(checkIns: checkIns, photos: photos)
+                    NavigationLink {
+                        DearActivityMapView(store: store, title: selectedActivity?.text("title") ?? "活动地图", spaceID: activityTenantId, activityID: activityId, points: points, photos: photos)
+                    } label: { Label("活动地图", systemImage: "map") }.disabled(points.isEmpty && photos.isEmpty)
+                } label: { Image(systemName: "ellipsis").accessibilityLabel("更多活动操作") }
             }
         }
         .fullScreenCover(isPresented: $showingPhoto) {
@@ -1041,6 +1060,10 @@ struct DearSocialView: View {
                                      })
             }
         }
+        .alert("照片默认地点", isPresented: $showingPhotoLocation) {
+            TextField("地点名称（可选）", text: $photoLocationName)
+            Button("完成", role: .cancel) { }
+        } message: { Text("优先使用照片自带定位；未记录定位时使用此处填写的地点。") }
         .confirmationDialog("删除这项分享？", isPresented: Binding(get: { photoToDelete != nil }, set: { if !$0 { photoToDelete = nil } }), titleVisibility: .visible) {
             if let photo = photoToDelete {
                 Button("删除分享", role: .destructive) {
@@ -1676,6 +1699,7 @@ private struct DearPhotoCommentsView: View {
     let spaceID: String
     let activityID: String
     let photoID: String
+    var allowsComposition = true
     @State private var comments: [DearRecord] = []
     @State private var draft = ""
     @State private var requestID = UUID()
@@ -1709,11 +1733,12 @@ private struct DearPhotoCommentsView: View {
                 Button(expanded ? "收起点评" : "展开点评") { expanded.toggle() }.font(.caption)
             }
             if expanded && hasMore { Button("加载更多点评") { perform { try await load(reset: false) } }.font(.caption).disabled(busy) }
-            if loaded && comments.isEmpty { Text("还没有点评，说说这张照片吧。").font(.caption).foregroundStyle(.secondary) }
+            if allowsComposition && loaded && comments.isEmpty { Text("还没有点评，说说这张照片吧。").font(.caption).foregroundStyle(.secondary) }
             if !failure.isEmpty {
                 Text(failure).font(.caption).foregroundStyle(.red)
                 Button("重新加载点评") { perform { try await load(reset: true) } }.font(.caption).disabled(busy)
             }
+            if allowsComposition {
             HStack(alignment: .bottom) {
                 TextField("点评这张照片…", text: $draft, axis: .vertical).lineLimit(1...4)
                     .textFieldStyle(.roundedBorder).disabled(busy)
@@ -1728,6 +1753,7 @@ private struct DearPhotoCommentsView: View {
                 }.disabled(busy || draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || draft.utf16.count > 1000)
             }
             if draft.utf16.count > 1000 { Text("点评最多 1000 字，请缩短后发表。").font(.caption).foregroundStyle(.red) }
+            }
         }.buttonStyle(.borderless)
             .frame(maxWidth: .infinity, alignment: .leading)
             .task { do { try await load(reset: true) } catch is CancellationError { } catch { failure = error.localizedDescription } }
