@@ -1,6 +1,14 @@
 import Foundation
 @main struct NativeModelTests {
     static func main() throws {
+        precondition(PhotoViewerSwipe.shouldDismiss(horizontal: 5, vertical: 130, predictedVertical: 150))
+        precondition(PhotoViewerSwipe.shouldDismiss(horizontal: 5, vertical: 45, predictedVertical: 270))
+        precondition(!PhotoViewerSwipe.shouldDismiss(horizontal: 180, vertical: 60, predictedVertical: 300))
+        precondition(!PhotoViewerSwipe.shouldDismiss(horizontal: 0, vertical: -150, predictedVertical: -300))
+        precondition(!PhotoViewerSwipe.shouldDismiss(horizontal: 0, vertical: 15, predictedVertical: 300))
+        precondition(!PhotoViewerSwipe.shouldDismiss(horizontal: 0, vertical: 50, predictedVertical: 70))
+        precondition(!PhotoViewerSwipe.shouldDismiss(horizontal: .nan, vertical: 150, predictedVertical: 200))
+        print("PASS: photo viewer down-dismiss threshold, flick, horizontal and upward isolation")
         let raw = Data("""
         [{"id":7,"name":"测试孩子","score":12.5,"cash":0,"items":2,"isPublic":false}, {"id":8,"name":"另一个孩子","score":-2}]
         """.utf8)

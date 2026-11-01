@@ -295,10 +295,11 @@ private struct DearActivityMapView: View {
         }
         .navigationTitle("\(title) · 地图")
         .navigationBarTitleDisplayMode(.inline)
-        .navigationDestination(isPresented: $showingPhoto) {
+        .fullScreenCover(isPresented: $showingPhoto) {
             if let selectedPhoto {
-                DearPhotoDetailView(store: store, photo: selectedPhoto, spaceID: spaceID, activityID: activityID,
-                                    path: thumbnailPath(selectedPhoto), canDelete: false, onDeleted: { _ in })
+                DearPhotoGalleryView(store: store, photos: photos, initialPhotoID: selectedPhoto.id,
+                                     spaceID: spaceID, activityID: activityID, ownerSubject: nil,
+                                     onDeleted: { _, _ in })
             }
         }
         .onAppear { fitAllPoints() }
@@ -901,20 +902,19 @@ struct DearSocialView: View {
                 }
             }
         }
-        .navigationDestination(isPresented: $showingPhoto) {
+        .fullScreenCover(isPresented: $showingPhoto) {
             if let selectedPhoto {
-                DearPhotoDetailView(store: store, photo: selectedPhoto, spaceID: activityTenantId, activityID: activityId,
-                                    path: base + "tenants/\(activityTenantId)/activities/\(activityId)/native-photos/\(selectedPhoto.id)/thumbnail",
-                                    canDelete: selectedPhoto.text("sourceSubject") == activityMembers.first(where: { $0.flag("isSelf") })?.subject,
-                                    onDeleted: { localCopyRemoved in
-                                        showingPhoto = false
-                                        photos.removeAll { $0.id == selectedPhoto.id }
-                                        if !localCopyRemoved { self.error = "分享已删除，本机副本暂未清理；App 会继续重试。" }
-                                        Task {
-                                            do { try await loadPhotos() }
-                                            catch { self.error = "相册刷新失败：\(error.localizedDescription)" }
-                                        }
-                                    })
+                DearPhotoGalleryView(store: store, photos: photos, initialPhotoID: selectedPhoto.id,
+                                     spaceID: activityTenantId, activityID: activityId,
+                                     ownerSubject: activityMembers.first(where: { $0.flag("isSelf") })?.subject,
+                                     onDeleted: { photoID, localCopyRemoved in
+                                         photos.removeAll { $0.id == photoID }
+                                         if !localCopyRemoved { self.error = "分享已删除，本机副本暂未清理；App 会继续重试。" }
+                                         Task {
+                                             do { try await loadPhotos() }
+                                             catch { self.error = "相册刷新失败：\(error.localizedDescription)" }
+                                         }
+                                     })
             }
         }
         .confirmationDialog("删除选中的 \(selectedPhotoIDs.count) 项分享？", isPresented: $showingBatchDelete, titleVisibility: .visible) {
@@ -1609,6 +1609,53 @@ private struct DearPhotoCommentsView: View {
     }
 }
 
+private struct DearPhotoGalleryView: View {
+    @ObservedObject var store: FamilyStore
+    let photos: [DearRecord]
+    let spaceID: String
+    let activityID: String
+    let ownerSubject: String?
+    let onDeleted: (String, Bool) -> Void
+    @Environment(\.dismiss) private var dismiss
+    @State private var selectedID: String
+
+    init(store: FamilyStore, photos: [DearRecord], initialPhotoID: String, spaceID: String, activityID: String,
+         ownerSubject: String?, onDeleted: @escaping (String, Bool) -> Void) {
+        self.store = store; self.spaceID = spaceID; self.activityID = activityID
+        self.ownerSubject = ownerSubject; self.onDeleted = onDeleted
+        self.photos = photos.sorted {
+            let left = ActivityListDate.parse($0.text("createdAt")) ?? .distantPast
+            let right = ActivityListDate.parse($1.text("createdAt")) ?? .distantPast
+            return left == right ? $0.id < $1.id : left > right
+        }
+        _selectedID = State(initialValue: photos.contains(where: { $0.id == initialPhotoID }) ? initialPhotoID : photos.first?.id ?? "")
+    }
+    var body: some View {
+        NavigationStack {
+            TabView(selection: $selectedID) {
+                ForEach(photos) { photo in
+                    DearPhotoDetailView(store: store, photo: photo, spaceID: spaceID, activityID: activityID,
+                                        path: "/api/dear/social/tenants/\(spaceID)/activities/\(activityID)/native-photos/\(photo.id)/thumbnail",
+                                        canDelete: ownerSubject != nil && photo.text("sourceSubject") == ownerSubject,
+                                        onDeleted: { removed in onDeleted(photo.id, removed); dismiss() },
+                                        onSwipeDown: { dismiss() })
+                        .tag(photo.id)
+                }
+            }
+            .tabViewStyle(.page(indexDisplayMode: .never))
+            .navigationTitle("\((photos.firstIndex(where: { $0.id == selectedID }) ?? 0) + 1) / \(photos.count)")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarLeading) { Button { dismiss() } label: { Image(systemName: "xmark").accessibilityLabel("关闭照片查看") } }
+                ToolbarItem(placement: .bottomBar) { Text("左右切换 · 下拉照片返回列表").font(.caption).foregroundStyle(.secondary) }
+            }
+            .onChange(of: selectedID) { _, _ in
+                UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
+            }
+        }
+    }
+}
+
 private struct DearPhotoDetailView: View {
     @ObservedObject var store: FamilyStore
     let photo: DearRecord
@@ -1617,6 +1664,9 @@ private struct DearPhotoDetailView: View {
     let path: String
     let canDelete: Bool
     let onDeleted: (Bool) -> Void
+    var onSwipeDown: (() -> Void)? = nil
+    @State private var dismissOffset = 0.0
+    @State private var downwardDrag: Bool?
     @State private var image: UIImage?
     @State private var error: String?
     @State private var originalURL: URL?
@@ -1631,16 +1681,37 @@ private struct DearPhotoDetailView: View {
     var body: some View {
         ScrollView {
             VStack(spacing: 16) {
-                if isVideo, let player {
-                    VideoPlayer(player: player).frame(minHeight: 240)
-                } else if let image = originalImage ?? image {
-                    Image(uiImage: image).resizable().scaledToFit()
-                        .clipShape(RoundedRectangle(cornerRadius: 12))
-                } else if let error {
-                    ContentUnavailableView("无法显示照片预览", systemImage: "photo.badge.exclamationmark",
-                                           description: Text(error))
-                    Button("重试") { Task { await load() } }
-                } else { ProgressView("正在加载照片") }
+                Group {
+                    if isVideo, let player {
+                        VideoPlayer(player: player).frame(minHeight: 240)
+                    } else if let image = originalImage ?? image {
+                        Image(uiImage: image).resizable().scaledToFit()
+                            .clipShape(RoundedRectangle(cornerRadius: 12))
+                    } else if let error {
+                        ContentUnavailableView("无法显示照片预览", systemImage: "photo.badge.exclamationmark",
+                                                   description: Text(error))
+                        Button("重试") { Task { await load() } }
+                    } else { ProgressView("正在加载照片") }
+                }
+                .contentShape(Rectangle())
+                .offset(y: dismissOffset)
+                .scaleEffect(1 - min(dismissOffset / 1200, 0.15))
+                .simultaneousGesture(DragGesture(minimumDistance: 20)
+                    .onChanged { value in
+                        guard onSwipeDown != nil else { return }
+                        if downwardDrag == nil {
+                            downwardDrag = value.translation.height > 0 && value.translation.height > abs(value.translation.width) * 1.25
+                        }
+                        if downwardDrag == true { dismissOffset = max(0, value.translation.height) }
+                    }
+                    .onEnded { value in
+                        let close = downwardDrag == true && PhotoViewerSwipe.shouldDismiss(
+                            horizontal: value.translation.width, vertical: value.translation.height,
+                            predictedVertical: value.predictedEndTranslation.height)
+                        downwardDrag = nil
+                        if close { onSwipeDown?() }
+                        else { withAnimation(.spring(response: 0.25, dampingFraction: 0.85)) { dismissOffset = 0 } }
+                    })
                 Text(photo.text("originalFileName")).font(.headline)
                 Text("分享者：\(photo.text("sourceDisplayName"))").font(.subheadline).foregroundStyle(.secondary)
                 Text("分享时间：\(photo.dateText("createdAt"))").font(.subheadline).foregroundStyle(.secondary)
@@ -1670,7 +1741,6 @@ private struct DearPhotoDetailView: View {
             .frame(maxWidth: .infinity)
             .padding()
         }
-        .navigationTitle(isVideo ? "视频" : "照片")
         .confirmationDialog("删除这项分享？", isPresented: $showingDelete, titleVisibility: .visible) {
             Button("删除分享", role: .destructive) { Task { await deleteSharedMedia() } }
             Button("取消", role: .cancel) { }

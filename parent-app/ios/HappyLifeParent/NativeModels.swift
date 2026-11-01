@@ -91,3 +91,12 @@ enum ActivityListDate {
         return (parse(startsAt, timeZone: timeZone) == nil ? "创建于 " : "活动日期 ") + formatter.string(from: date)
     }
 }
+
+// Keep dismissal directional so a page swipe, short drag or upward pan cannot close the viewer.
+enum PhotoViewerSwipe {
+    static func shouldDismiss(horizontal: Double, vertical: Double, predictedVertical: Double) -> Bool {
+        guard horizontal.isFinite, vertical.isFinite, predictedVertical.isFinite,
+              vertical > 24, vertical > abs(horizontal) * 1.25 else { return false }
+        return vertical >= 110 || predictedVertical >= 240
+    }
+}
