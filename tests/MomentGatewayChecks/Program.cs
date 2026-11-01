@@ -74,6 +74,8 @@ Check(cacheEcho.GetProperty("sourceDevice").GetString() == "device-test" && cach
 Check((await client.GetAsync($"/api/dear/social/photo-requests/{requestId}/relay")).IsSuccessStatusCode, "authorized cached download route allowed");
 var liveIce = await client.GetStringAsync($"/api/dear/social/tenants/{tenant}/activities/{activity}/live/ice-servers");
 Check(liveIce.Contains("ice-servers"), "web photo viewer ICE configuration route");
+var shared = await client.PostAsJsonAsync($"/api/dear/social/tenants/{tenant}/activities/{activity}/live/photos", new { fileName = "progress.png", contentType = "image/png", length = 100 });
+Check(shared.IsSuccessStatusCode && (await shared.Content.ReadAsStringAsync()).Contains("progress.png"), "web source photo registration passes through the authenticated gateway");
 var ice = await client.GetStringAsync($"/api/dear/social/photo-requests/{requestId}/connect/ice?role=receiver");
 Check(ice.Contains("role=receiver"), "ICE role preserved");
 using var socket = new ClientWebSocket();
