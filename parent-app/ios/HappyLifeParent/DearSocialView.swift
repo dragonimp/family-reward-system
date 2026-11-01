@@ -298,7 +298,7 @@ private struct DearActivityMapView: View {
         .fullScreenCover(isPresented: $showingPhoto) {
             if let selectedPhoto {
                 DearPhotoGalleryView(store: store, photos: photos, initialPhotoID: selectedPhoto.id,
-                                     spaceID: spaceID, activityID: activityID, ownerSubject: nil,
+                                     spaceID: spaceID, activityID: activityID, allowsDeletion: false,
                                      onDeleted: { _, _ in })
             }
         }
@@ -780,7 +780,7 @@ struct DearSocialView: View {
                     Button(batchDeleting ? "正在删除…" : "删除分享", role: .destructive) { showingBatchDelete = true }
                         .disabled(!canDeleteSelectedPhotos || batchDownloading || batchDeleting)
                 }
-                Text("只能删除自己分享的内容；iPhone 相册原件保留。") .font(.caption).foregroundStyle(.secondary)
+                Text("分享者和活动 owner 可删除分享；iPhone 相册原件保留。") .font(.caption).foregroundStyle(.secondary)
                 if batchDownloading || batchDownloadProgress > 0 && batchDownloadProgress < 1 { ProgressView(value: batchDownloadProgress) }
                 if !batchOriginalURLs.isEmpty { ShareLink(items: batchOriginalURLs) { Label("保存或分享 \(batchOriginalURLs.count) 项", systemImage: "square.and.arrow.up") } }
                 if !batchDownloadError.isEmpty { Text(batchDownloadError).font(.caption).foregroundStyle(.red) }
@@ -836,7 +836,7 @@ struct DearSocialView: View {
                             }.font(.caption).disabled(busy || pendingCheckIn)
                         }
                     } else if entry.record.flag("canDelete") {
-                        Button("删除我的分享", role: .destructive) { run { try await deleteMoment(entry.record) } }.font(.caption)
+                        Button("删除日常分享", role: .destructive) { run { try await deleteMoment(entry.record) } }.font(.caption)
                     }
                     Text(entry.record.dateText("createdAt")).font(.caption2).foregroundStyle(.secondary)
                 }.padding(.vertical, 6)
@@ -906,7 +906,7 @@ struct DearSocialView: View {
             if let selectedPhoto {
                 DearPhotoGalleryView(store: store, photos: photos, initialPhotoID: selectedPhoto.id,
                                      spaceID: activityTenantId, activityID: activityId,
-                                     ownerSubject: activityMembers.first(where: { $0.flag("isSelf") })?.subject,
+                                     allowsDeletion: true,
                                      onDeleted: { photoID, localCopyRemoved in
                                          photos.removeAll { $0.id == photoID }
                                          if !localCopyRemoved { self.error = "分享已删除，本机副本暂未清理；App 会继续重试。" }
@@ -1253,10 +1253,9 @@ struct DearSocialView: View {
         photos = loaded
     }
     private var canDeleteSelectedPhotos: Bool {
-        guard let subject = activityMembers.first(where: { $0.flag("isSelf") })?.subject,
-              !subject.isEmpty, !selectedPhotoIDs.isEmpty else { return false }
+        guard !selectedPhotoIDs.isEmpty else { return false }
         let selected = photos.filter { selectedPhotoIDs.contains($0.id) }
-        return selected.count == selectedPhotoIDs.count && selected.allSatisfy { $0.text("sourceSubject") == subject }
+        return selected.count == selectedPhotoIDs.count && selected.allSatisfy { $0.flag("canDelete") }
     }
 
     private func deleteSelectedPhotos() async {
@@ -1614,15 +1613,15 @@ private struct DearPhotoGalleryView: View {
     let photos: [DearRecord]
     let spaceID: String
     let activityID: String
-    let ownerSubject: String?
+    let allowsDeletion: Bool
     let onDeleted: (String, Bool) -> Void
     @Environment(\.dismiss) private var dismiss
     @State private var selectedID: String
 
     init(store: FamilyStore, photos: [DearRecord], initialPhotoID: String, spaceID: String, activityID: String,
-         ownerSubject: String?, onDeleted: @escaping (String, Bool) -> Void) {
+         allowsDeletion: Bool, onDeleted: @escaping (String, Bool) -> Void) {
         self.store = store; self.spaceID = spaceID; self.activityID = activityID
-        self.ownerSubject = ownerSubject; self.onDeleted = onDeleted
+        self.allowsDeletion = allowsDeletion; self.onDeleted = onDeleted
         self.photos = photos.sorted {
             let left = ActivityListDate.parse($0.text("createdAt")) ?? .distantPast
             let right = ActivityListDate.parse($1.text("createdAt")) ?? .distantPast
@@ -1636,7 +1635,7 @@ private struct DearPhotoGalleryView: View {
                 ForEach(photos) { photo in
                     DearPhotoDetailView(store: store, photo: photo, spaceID: spaceID, activityID: activityID,
                                         path: "/api/dear/social/tenants/\(spaceID)/activities/\(activityID)/native-photos/\(photo.id)/thumbnail",
-                                        canDelete: ownerSubject != nil && photo.text("sourceSubject") == ownerSubject,
+                                        canDelete: allowsDeletion && photo.flag("canDelete"),
                                         onDeleted: { removed in onDeleted(photo.id, removed); dismiss() },
                                         onSwipeDown: { dismiss() })
                         .tag(photo.id)
@@ -1875,7 +1874,10 @@ private struct MomentNotificationDetail: View {
             }
             if requestID != nil {
                 Section("原文件下载请求") {
-                    if let request { Text(request.text("fileName")); Text(status) }
+                    if let request {
+                        Text("请求人：\(request.text("requesterDisplayName").isEmpty ? "成员 " + request.text("requester") : request.text("requesterDisplayName"))")
+                        Text(request.text("fileName")); Text(status)
+                    }
                     if !error.isEmpty { Text(error).foregroundStyle(.red) }
                     Button("刷新请求状态") { Task { await loadRequest() } }.disabled(refreshing)
                     if request?.text("status") == "waiting" || request?.text("status") == "transferring" {

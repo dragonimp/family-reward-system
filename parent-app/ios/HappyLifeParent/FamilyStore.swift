@@ -342,8 +342,6 @@ extension FamilyStore: WCSessionDelegate {
                 if photos.contains(where: { ($0["thumbnailAvailable"] as? Bool) == false }) {
                     photos = try watchRows(await call(prefix + "/live/photos"))
                 }
-                let me = try await call("/api/dear/social/me") as? [String: Any]
-                let subject = me?["subject"] as? String ?? ""
                 let offset = max(0, message["offset"] as? Int ?? 0)
                 let page = Array(photos.dropFirst(offset).prefix(30))
                 return ["hasMore": offset + page.count < photos.count, "items": page.map { photo in
@@ -351,7 +349,7 @@ extension FamilyStore: WCSessionDelegate {
                      "name": photo["originalFileName"] as? String ?? "照片",
                      "author": photo["sourceDisplayName"] as? String ?? "",
                      "available": photo["thumbnailAvailable"] as? Bool ?? false,
-                     "canDelete": !subject.isEmpty && (photo["sourceSubject"] as? String) == subject] as [String: Any]
+                     "canDelete": photo["canDelete"] as? Bool ?? false] as [String: Any]
                 }]
             }
             guard let photoID = message["photoId"] as? String, UUID(uuidString: photoID) != nil,
