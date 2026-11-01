@@ -1,0 +1,95 @@
+{
+  "version": "1.2.76",
+  "build": "85",
+  "sourceCommit": "afca3a7525ab2ef9c1021f97539f371968ef966a",
+  "branch": "main",
+  "githubSourceVerified": true,
+  "services": {
+    "linko": {
+      "version": "20261101-153939-activity-69bd6a8",
+      "source": "69bd6a8f9197ecf1a3c1adb4658d3fae7e78ee87",
+      "operation": "linko-activity-approval-20261101-69bd6a8",
+      "activeProcessReadback": true
+    },
+    "family-points": {
+      "version": "20261101-154012-activity-42c618b",
+      "source": "42c618b2febd4edd7f3c6d9ae9a3c321a2c4dacf",
+      "operation": "family-pipeline-20261101-154012-activity-42c618b-api",
+      "activeProcessReadback": true
+    },
+    "halo": {
+      "version": "20261101-150846-moment-title-12995fa",
+      "source": "12995fa93f7fcb34b9b2ffc305af2384a9739ec8",
+      "operation": "auto-e178f17cf1704248b37a3694be882956",
+      "activeProcessReadback": true,
+      "manualDispatch": "halo-moment-title-20261101-12995fa",
+      "manualDispatchOutcome": "failed-before-switch; automatic updater had already activated same release; not replayed"
+    }
+  },
+  "apple": {
+    "successor": {
+      "attempt": "15e728ea-32b9-4bbe-9ccd-fd9bc1db5ca0",
+      "bundle": "net.impx.happylife",
+      "ipaSha256": "0b78107877fb2d55ba9265df81bb853cfef12f30620fa91211ade69945ea56a0",
+      "state": "testflight_visible",
+      "appleState": "VALID",
+      "appleBuildId": "874fa3a5-c486-46ef-bccd-4a4e82049cc0",
+      "officialArtifactStoreReadback": "all 4 artifact hashes independently matched"
+    },
+    "legacy": {
+      "attempt": "507da5ad-b8c9-4a6a-bb73-cbbd4a8fa080",
+      "bundle": "net.impx.happylife.parent",
+      "ipaSha256": "64da700145b085cd5d7362faddee83eb89716f38396802d07a59d914f6c36682",
+      "state": "testflight_visible",
+      "appleState": "VALID",
+      "appleBuildId": "3395273a-b461-4326-bba4-c77293ba1c41",
+      "officialArtifactStoreReadback": "all 4 artifact hashes independently matched"
+    }
+  },
+  "checks": {
+    "linkoHttpWebSocket": 191,
+    "userCenterNotificationTests": 13,
+    "nativeModelAndExerciseChecks": "passed in both signed builds",
+    "geographyMigration": "linko-photo-geography-20261101-v1; backup, checksum ledger and independent schema readback verified; repeated test deployment skips",
+    "userCenterNativeLoginTests": 15
+  },
+  "performance": {
+    "device": "iPhone 13 Pro",
+    "mediaCount": 11,
+    "baselineVersion": "1.2.66(75)",
+    "newVersion": "1.2.73(82)",
+    "baselineDurationSeconds": 41.370665,
+    "newDurationSeconds": 41.542268,
+    "baselineMicrohangs": 3,
+    "newMicrohangs": 0,
+    "thresholdMs": 250,
+    "baselineMainThreadSampleMs": 1463,
+    "newMainThreadSampleMs": 193,
+    "baselineDateFormattingSampleMs": 995,
+    "newDateFormattingSampleMs": 0,
+    "scope": "manual list scrolling; no file transfer during baseline; not an FPS or universal throughput guarantee"
+  },
+  "notificationValidation": {
+    "systemPermission": "authorized on test phone",
+    "sdkRegistrationButton": "progress then User Center registration success on physical device",
+    "requesterNickname": "resolved in an existing request detail",
+    "apnsHistoricalReceipt": "one accepted; one TopicDisallowed; one old configuration error; physical banner not yet independently observed",
+    "appleTopicScope": "not verified because Apple browser session and User Center autofill token expired; renewal request expired without approval; not replayed",
+    "successorBundle": "net.impx.happylife",
+    "successorChannel": "app-store-successor",
+    "successorArrival": "not verified; historical successor receipt TopicDisallowed; legacy registration success does not establish successor arrival"
+  },
+  "deviceFinalValidation": "1.2.76(85) installed from TestFlight on legacy iPhone: first gallery open, left swipe 1/16 -> 2/16, right swipe 2/16 -> 1/16, down dismiss all passed. Newest-first grid matches gallery. Long-duration SDK renewal and successor physical push arrival not verified.",
+  "deviceChecks175": {
+    "installedVersion": "1.2.75(84)",
+    "firstGalleryOpen": "passed",
+    "downDismiss": "passed",
+    "detailsOnlyCommentInput": "passed",
+    "grid": "5 columns; media count increased to 16 during user activity",
+    "request": "f0324293-e9bc-4cbb-967f-077404844952",
+    "messageNickname": "passed",
+    "openMessageApproves": "pending_approval -> waiting; independently read back",
+    "stopSharing": "waiting -> cancelled; independently read back",
+    "videoBytesTransferred": "not completed; source device did not respond before manual stop"
+  }
+}
