@@ -210,6 +210,14 @@ private struct DearPhotoPlaceView: View {
     }
 }
 
+// Export the original file bytes to the share sheet, rather than a URL link.
+private struct DearOriginalFile: Transferable {
+    let url: URL
+    static var transferRepresentation: some TransferRepresentation {
+        FileRepresentation(exportedContentType: .data) { SentTransferredFile($0.url) }
+    }
+}
+
 private struct DearPickedVideo: Transferable {
     let url: URL
     static var transferRepresentation: some TransferRepresentation {
@@ -943,7 +951,7 @@ struct DearSocialView: View {
                 HStack {
                     Button("重试保存并共享") { shareCapturedMedia() }
                     Spacer()
-                    ShareLink(item: capturedMedia.url) { Label("另存或分享", systemImage: "square.and.arrow.up") }
+                    ShareLink(item: DearOriginalFile(url: capturedMedia.url), preview: SharePreview("原文件")) { Label("另存或分享", systemImage: "square.and.arrow.up") }
                     Button("移除", role: .destructive) {
                         try? FileManager.default.removeItem(at: capturedMedia.url)
                         self.capturedMedia = nil
@@ -966,7 +974,7 @@ struct DearSocialView: View {
                 }
                 Text("分享者和活动 owner 可删除分享；iPhone 相册原件保留。") .font(.caption).foregroundStyle(.secondary)
                 DearBatchProgress(presentation: batchProgress, active: batchDownloading)
-                if !batchOriginalURLs.isEmpty { ShareLink(items: batchOriginalURLs) { Label("保存或分享 \(batchOriginalURLs.count) 项", systemImage: "square.and.arrow.up") } }
+                if !batchOriginalURLs.isEmpty { ShareLink(items: batchOriginalURLs.map { DearOriginalFile(url: $0) }, preview: { SharePreview($0.url.lastPathComponent) }) { Label("保存或分享 \(batchOriginalURLs.count) 项", systemImage: "square.and.arrow.up") } }
                 if !batchDownloadError.isEmpty { Text(batchDownloadError).font(.caption).foregroundStyle(.red) }
             }
         } header: { Text("照片分享").textCase(nil) }
@@ -1892,6 +1900,8 @@ private struct DearPhotoDetailView: View {
     @State private var originalImage: UIImage?
     @State private var originalError: String?
     @State private var fetchingOriginal = false
+    @State private var savingOriginal = false
+    @State private var originalSaved = false
     @State private var downloadStatus = ""
     @State private var transferProgress = 0.0
     @State private var deleting = false
@@ -1939,7 +1949,14 @@ private struct DearPhotoDetailView: View {
                 Text("分享时间：\(photo.dateText("createdAt"))").font(.subheadline).foregroundStyle(.secondary)
                 DearPhotoPlaceView(photo: photo).font(.subheadline).foregroundStyle(.secondary)
                 if let originalURL {
-                    ShareLink(item: originalURL) { Label("分享原文件", systemImage: "square.and.arrow.up") }
+                    HStack(spacing: 20) {
+                        Button { Task { await saveOriginalToPhotos(originalURL) } } label: {
+                            Label(originalSaved ? "已保存到照片" : savingOriginal ? "正在保存…" : "保存到照片", systemImage: originalSaved ? "checkmark.circle" : "square.and.arrow.down")
+                        }.disabled(savingOriginal || originalSaved)
+                        ShareLink(item: DearOriginalFile(url: originalURL), preview: SharePreview(photo.text("originalFileName"))) {
+                            Label("分享原文件", systemImage: "square.and.arrow.up")
+                        }
+                    }
                 } else {
                     Button {
                         Task { await fetchOriginal() }
@@ -2006,6 +2023,26 @@ private struct DearPhotoDetailView: View {
             }
             originalURL = url
             if isVideo { player = AVPlayer(url: url) }
+        } catch { originalError = error.localizedDescription }
+    }
+
+    private func saveOriginalToPhotos(_ url: URL) async {
+        guard !savingOriginal && !originalSaved else { return }
+        savingOriginal = true; originalError = nil
+        defer { savingOriginal = false }
+        do {
+            guard url.isFileURL, FileManager.default.fileExists(atPath: url.path) else {
+                throw APIError.message("原文件尚未接收完成，请重新获取。")
+            }
+            let authorization = await PHPhotoLibrary.requestAuthorization(for: .addOnly)
+            guard authorization == .authorized || authorization == .limited else {
+                throw APIError.message("请在系统设置中允许添加照片，原文件仍保留在 App 中。")
+            }
+            let video = isVideo
+            try await PHPhotoLibrary.shared().performChanges {
+                PHAssetCreationRequest.forAsset().addResource(with: video ? .video : .photo, fileURL: url, options: nil)
+            }
+            originalSaved = true
         } catch { originalError = error.localizedDescription }
     }
 
