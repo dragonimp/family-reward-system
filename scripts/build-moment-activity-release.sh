@@ -6,12 +6,12 @@ set -euo pipefail
 export MSBUILDDISABLENODEREUSE=1 DOTNET_CLI_DO_NOT_USE_MSBUILD_SERVER=1
 projects=/Users/wengzhishan/Projects
 mkdir -p "$ATLAS_BUILD_WORK/source"
-for project in AgentIdentity MyVnc Linko family-reward-system; do
+for project in AgentIdentity MyVnc AgentFree Linko family-reward-system; do
   root="$projects/$project"
   commit="$(git -C "$root" rev-parse HEAD)"
   remote="$(git -C "$root" ls-remote origin refs/heads/main | cut -f1)"
   [[ "$commit" == "$remote" ]] || { echo "$project source is not pushed main"; exit 1; }
-  if [[ "$project" == AgentIdentity ]]; then
+  if [[ "$project" == AgentIdentity || "$project" == AgentFree ]]; then
     # The Family adapter verifies SDK ancestry through Git; keep that proof in
     # this disposable, detached dependency checkout without duplicating objects.
     git clone --quiet --shared --no-checkout "$root" "$ATLAS_BUILD_WORK/source/$project"
