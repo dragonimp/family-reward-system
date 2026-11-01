@@ -40,7 +40,9 @@ if new:
         raise SystemExit('New migration lacks a matching audited completion record; deployment stopped.')
 PY
 
-sudo -n atlas-managed-release publish-bundle family-points "$stage/bundle.json" > "$stage/atlas-publish-receipt.json"
+if [[ "${ATLAS_RELEASE_ALREADY_PUBLISHED:-0}" != 1 ]]; then
+  sudo -n atlas-managed-release publish-bundle family-points "$stage/bundle.json" > "$stage/atlas-publish-receipt.json"
+fi
 sudo -n atlas-managed-release preflight family-points | python3 -c 'import json,sys; d=json.load(sys.stdin); assert d["currentVersion"]==sys.argv[1]' "$version"
 
 profile="$stage/application-profile.json"
