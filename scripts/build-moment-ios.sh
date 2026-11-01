@@ -12,10 +12,10 @@ source_dir="$ATLAS_BUILD_WORK/source"
 mkdir -p "$source_dir"
 git -C "$root" archive "$commit" | tar -x -C "$source_dir"
 common="$(git -C "$root" rev-parse --path-format=absolute --git-common-dir)"
-ln -s "$(dirname "$(dirname "$common")")/AgentIdentity" "$ATLAS_BUILD_WORK/AgentIdentity"
+mkdir -p "$ATLAS_BUILD_WORK/AgentIdentity" "$ATLAS_BUILD_WORK/MyVnc"
 connect_root="$(dirname "$(dirname "$common")")/MyVnc"
 identity_root="$(dirname "$(dirname "$common")")/AgentIdentity"
-ln -s "$connect_root" "$ATLAS_BUILD_WORK/MyVnc"
+
 : "${CONNECT_RTC_LIBRARY_DIR:?Provide the matching committed ios-arm64 Connect native output}"
 python3 - "$connect_root" "$identity_root" "$CONNECT_RTC_LIBRARY_DIR" "$ATLAS_BUILD_OUTPUT" <<'SDK'
 import hashlib,json,subprocess,sys
@@ -28,7 +28,20 @@ for key,path,scope in [('connect',connect,['sdk/MyVnc.Realtime.Apple','native/rt
     assert commit==remote, key+' source is not pushed main'
     subprocess.run(['git','-C',str(path),'diff','--quiet','HEAD','--',*scope],check=True)
     receipts[key]=commit
-assert (native/'source-commit.txt').read_text().strip()==receipts['connect']
+    # Freeze only the public SDK inputs; unrelated concurrent app work stays outside the archive.
+    target=Path(__import__('os').environ['ATLAS_BUILD_WORK'])/('MyVnc' if key=='connect' else 'AgentIdentity')
+    package='sdk/MyVnc.Realtime.Apple' if key=='connect' else 'packages/AgentIdentity-iOS'
+    archive=subprocess.Popen(['git','-C',str(path),'archive',commit,package],stdout=subprocess.PIPE)
+    subprocess.run(['tar','-x','-C',str(target)],stdin=archive.stdout,check=True)
+    archive.stdout.close(); assert archive.wait()==0
+native_commit=(native/'source-commit.txt').read_text().strip()
+subprocess.run(['git','-C',str(connect),'merge-base','--is-ancestor',native_commit,receipts['connect']],check=True)
+for line in (native/'native-source-sha256.txt').read_text().splitlines():
+    expected,relative=line.split(None,1);relative=relative.strip()
+    assert relative.startswith('native/rtc/') and '..' not in Path(relative).parts
+    committed=subprocess.check_output(['git','-C',str(connect),'show',receipts['connect']+':'+relative])
+    assert hashlib.sha256(committed).hexdigest()==expected, 'Connect native source changed; rebuild native library'
+receipts['connectNativeBuildCommit']=native_commit
 assert (native/'native-version.txt').read_text().splitlines()[0]=='ios-arm64'
 receipts['nativeLibrarySha256']=hashlib.sha256((native/'libmyvnc-rtc.a').read_bytes()).hexdigest()
 (output/'sdk-dependencies.json').write_text(json.dumps(receipts,indent=2)+'\n')
