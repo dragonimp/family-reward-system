@@ -280,6 +280,8 @@ struct DearSocialView: View {
     @State private var batchOriginalURLs: [URL] = []
     @State private var batchDownloadProgress = 0.0
     @State private var batchDownloading = false
+    @State private var batchDeleting = false
+    @State private var showingBatchDelete = false
     @State private var batchDownloadError = ""
     @State private var moments: [DearRecord] = []
     @State private var checkIns: [DearRecord] = []
@@ -543,7 +545,7 @@ struct DearSocialView: View {
                             .font(.title2).foregroundStyle(selectedPhotoIDs.contains(photo.id) ? .teal : .white)
                             .padding(7)
                     }
-            }.buttonStyle(.plain).disabled(batchDownloading)
+            }.buttonStyle(.plain).disabled(batchDownloading || batchDeleting)
         } else {
             Button {
                 selectedPhoto = photo
@@ -633,15 +635,20 @@ struct DearSocialView: View {
                             Text("网格").tag("grid")
                             Text("列表").tag("list")
                         }.pickerStyle(.segmented)
-                        Button(selectingPhotoDownloads ? "完成多选" : "多选下载原文件") {
+                        Button(selectingPhotoDownloads ? "完成多选" : "多选管理照片与视频") {
                             selectingPhotoDownloads.toggle()
                             selectedPhotoIDs.removeAll(); batchOriginalURLs = []; batchDownloadError = ""; batchDownloadProgress = 0
-                        }.disabled(batchDownloading)
+                        }.disabled(batchDownloading || batchDeleting)
                         if selectingPhotoDownloads {
                             Text("已选 \(selectedPhotoIDs.count) 项") .font(.caption).foregroundStyle(.secondary)
                             Button(batchDownloading ? "正在获取原文件…" : "获取选中原文件") {
                                 Task { await downloadSelectedPhotos() }
-                            }.disabled(selectedPhotoIDs.isEmpty || batchDownloading)
+                            }.disabled(selectedPhotoIDs.isEmpty || batchDownloading || batchDeleting)
+                            Button(batchDeleting ? "正在删除…" : "删除选中的分享", role: .destructive) {
+                                showingBatchDelete = true
+                            }.disabled(selectedPhotoIDs.isEmpty || batchDownloading || batchDeleting || !canDeleteSelectedPhotos)
+                            Text("只能删除自己分享的照片与视频。")
+                                .font(.caption).foregroundStyle(.secondary)
                             if batchDownloading || batchDownloadProgress > 0 && batchDownloadProgress < 1 {
                                 ProgressView(value: batchDownloadProgress).accessibilityLabel("多选原文件接收进度")
                             }
@@ -724,6 +731,15 @@ struct DearSocialView: View {
         .listStyle(.insetGrouped)
         .readablePage()
         .navigationTitle(selectedActivity?.text("title") ?? "活动详情")
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                if let url = URL(string: "https://happylife.ai.xmkurt.com/dear/spaces/\(activityTenantId)/activities/\(activityId)") {
+                    ShareLink(item: url, subject: Text(selectedActivity?.text("title") ?? "活动")) {
+                        Label("分享活动链接", systemImage: "square.and.arrow.up")
+                    }
+                }
+            }
+        }
         .navigationDestination(isPresented: $showingPhoto) {
             if let selectedPhoto {
                 DearPhotoDetailView(store: store, photo: selectedPhoto, spaceID: activityTenantId, activityID: activityId,
@@ -740,6 +756,10 @@ struct DearSocialView: View {
                                     })
             }
         }
+        .confirmationDialog("删除选中的 \(selectedPhotoIDs.count) 项分享？", isPresented: $showingBatchDelete, titleVisibility: .visible) {
+            Button("删除选中的分享", role: .destructive) { Task { await deleteSelectedPhotos() } }
+            Button("取消", role: .cancel) { }
+        } message: { Text("活动成员将无法再获取这些文件；iPhone 相册中的原文件不会删除。") }
         .sheet(isPresented: $showingCheckIn) { checkInSheet }
         .onChange(of: checkInLocator.location?.timestamp) { _, value in
             guard pendingCheckIn, value != nil else { return }
@@ -983,9 +1003,42 @@ struct DearSocialView: View {
         }
         photos = loaded
     }
+    private var canDeleteSelectedPhotos: Bool {
+        guard let subject = activityMembers.first(where: { $0.flag("isSelf") })?.subject,
+              !subject.isEmpty, !selectedPhotoIDs.isEmpty else { return false }
+        let selected = photos.filter { selectedPhotoIDs.contains($0.id) }
+        return selected.count == selectedPhotoIDs.count && selected.allSatisfy { $0.text("sourceSubject") == subject }
+    }
+
+    private func deleteSelectedPhotos() async {
+        guard canDeleteSelectedPhotos, !batchDeleting, !batchDownloading else { return }
+        let selected = photos.filter { selectedPhotoIDs.contains($0.id) }
+        let targetSpace = activityTenantId, targetActivity = activityId
+        batchDeleting = true; batchDownloadError = ""; batchOriginalURLs = []
+        defer { batchDeleting = false }
+        var failures: [String] = []
+        var deleted = 0
+        var pendingCleanup = false
+        for photo in selected {
+            do {
+                let cleaned = try await store.photoSource.revoke(photoID: photo.id, spaceID: targetSpace, activityID: targetActivity)
+                deleted += 1
+                pendingCleanup = pendingCleanup || !cleaned
+                if targetSpace == activityTenantId && targetActivity == activityId {
+                    photos.removeAll { $0.id == photo.id }
+                    selectedPhotoIDs.remove(photo.id)
+                }
+            } catch { failures.append("\(photo.text("originalFileName"))：\(error.localizedDescription)") }
+        }
+        guard targetSpace == activityTenantId && targetActivity == activityId else { return }
+        notice = "已删除 \(deleted) 项分享。" + (pendingCleanup ? "部分本机副本暂未清理，App 会继续重试。" : "")
+        do { try await loadPhotos() } catch { failures.append("相册刷新失败：\(error.localizedDescription)") }
+        batchDownloadError = failures.joined(separator: "；")
+    }
+
     private func downloadSelectedPhotos() async {
         let selected = photos.filter { selectedPhotoIDs.contains($0.id) }
-        guard !selected.isEmpty else { return }
+        guard !selected.isEmpty, !batchDownloading, !batchDeleting else { return }
         let targetSpace = activityTenantId, targetActivity = activityId
         batchDownloading = true; batchDownloadProgress = 0; batchDownloadError = ""; batchOriginalURLs = []
         defer { batchDownloading = false }
@@ -1239,6 +1292,7 @@ private struct DearPhotoDetailView: View {
     @State private var image: UIImage?
     @State private var error: String?
     @State private var originalURL: URL?
+    @State private var player: AVPlayer?
     @State private var originalImage: UIImage?
     @State private var originalError: String?
     @State private var fetchingOriginal = false
@@ -1249,8 +1303,8 @@ private struct DearPhotoDetailView: View {
     var body: some View {
         ScrollView {
             VStack(spacing: 16) {
-                if isVideo, let originalURL {
-                    VideoPlayer(player: AVPlayer(url: originalURL)).frame(minHeight: 240)
+                if isVideo, let player {
+                    VideoPlayer(player: player).frame(minHeight: 240)
                 } else if let image = originalImage ?? image {
                     Image(uiImage: image).resizable().scaledToFit()
                         .clipShape(RoundedRectangle(cornerRadius: 12))
@@ -1293,10 +1347,16 @@ private struct DearPhotoDetailView: View {
             Button("取消", role: .cancel) { }
         } message: { Text("活动成员将无法再获取此文件；iPhone 相册中的原文件不会删除。") }
         .task(id: path) { await load() }
+        .onDisappear { player?.pause() }
     }
 
     private func load() async {
         image = nil; error = nil
+        if isVideo, let local = await store.photoSource.localOriginal(photoID: photo.id, spaceID: spaceID, activityID: activityID) {
+            originalURL = local
+            player = AVPlayer(url: local)
+            return
+        }
         do { image = try await store.authenticatedImage(path) }
         catch {
             if let local = await store.photoSource.localOriginal(photoID: photo.id, spaceID: spaceID, activityID: activityID),
@@ -1317,6 +1377,7 @@ private struct DearPhotoDetailView: View {
                 originalImage = decoded
             }
             originalURL = url
+            if isVideo { player = AVPlayer(url: url) }
         } catch { originalError = error.localizedDescription }
     }
 
