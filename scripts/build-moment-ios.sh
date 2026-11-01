@@ -61,3 +61,6 @@ PY
 printf '%s\n' "$commit" > "$ATLAS_BUILD_OUTPUT/source-commit.txt"
 shasum -a 256 "$ATLAS_BUILD_OUTPUT/Linko Moment.ipa" "$ATLAS_BUILD_OUTPUT/Linko-Moment-symbols.zip" > "$ATLAS_BUILD_OUTPUT/sha256.txt"
 echo 'PASS: signed IPA, symbols and source receipt ready'
+
+# Xcode services can finish shortly after export; allow their descriptors to close before managed cleanup.
+sleep 3
