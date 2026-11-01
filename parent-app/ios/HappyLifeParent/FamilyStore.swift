@@ -120,7 +120,11 @@ private actor PhotoPreviewLoader {
         let (data, response) = try await session.data(for: request)
         guard current == revision, token == identity.accessToken else { throw CancellationError() }
         guard let response = response as? HTTPURLResponse, response.url?.host == base.host else { throw APIError.message("网络响应无效。") }
-        let value = (try? await Task.detached(priority: .utility) { try JSONSerialization.jsonObject(with: data) }.value) ?? [:]
+        let decoding = Task.detached(priority: .utility) { () throws -> Any in
+            try JSONSerialization.jsonObject(with: data)
+        }
+        let value: Any = (try? await decoding.value) ?? [String: Any]()
+        guard current == revision, token == identity.accessToken else { throw CancellationError() }
         if response.statusCode == 401 { logout(); throw APIError.message("登录已过期，请重新登录。") }
         guard (200..<300).contains(response.statusCode) else {
             let detail = value as? [String: Any]
