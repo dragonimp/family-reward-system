@@ -5,6 +5,7 @@ set -euo pipefail
 : "${ATLAS_BUILD_LOGS:?run through host-build-output}"
 root="$(git rev-parse --show-toplevel)"
 commit="${MOMENT_RELEASE_COMMIT:-$(git -C "$root" rev-parse HEAD)}"
+commit="$(git -C "$root" rev-parse "$commit^{commit}")"
 remote="$(git -C "$root" ls-remote origin refs/heads/main | cut -f1)"
 git -C "$root" cat-file -e "$commit^{commit}"
 git -C "$root" merge-base --is-ancestor "$commit" "$remote" || { echo 'Release source must be included in origin/main.' >&2; exit 1; }
