@@ -321,7 +321,9 @@ private struct DearActivityMapView: View {
 
 private struct DearTimelineEntry: Identifiable {
     let id: String
-    let checkIn: Bool
+    enum Kind { case photo, moment, checkIn }
+    let kind: Kind
+    var checkIn: Bool { kind == .checkIn }
     let record: DearRecord
 }
 
@@ -644,7 +646,7 @@ struct DearSocialView: View {
         let nickname = photo.text("sourceDisplayName").isEmpty ? "活动成员" : photo.text("sourceDisplayName")
         return HStack(alignment: .top, spacing: 12) {
             DearPhotoPreview(store: store, path: path)
-                .frame(width: isGrid ? nil : 112, height: isGrid ? 168 : 112)
+                .frame(width: isGrid ? nil : 112, height: isGrid ? 240 : 112)
                 .frame(maxWidth: isGrid ? .infinity : nil)
                 .overlay(alignment: .topLeading) {
                     Label(nickname, systemImage: "person.crop.circle.fill")
@@ -714,7 +716,7 @@ struct DearSocialView: View {
                 TextField("分享这一刻…", text: $momentDraft, axis: .vertical).lineLimit(5...10)
                     .onChange(of: momentDraft) { _, _ in momentRequestID = UUID() }
             }
-            .navigationTitle("生活分享")
+            .navigationTitle("日常分享")
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) { Button("取消") { showingMomentCreate = false }.disabled(busy) }
                 ToolbarItem(placement: .confirmationAction) {
@@ -754,8 +756,8 @@ struct DearSocialView: View {
                 }.disabled(busy || batchDeleting || batchDownloading)
                 Spacer()
                 Picker("显示方式", selection: $photoViewMode) {
-                    Image(systemName: "square.grid.2x2").tag("grid").accessibilityLabel("网格")
-                    Image(systemName: "list.bullet").tag("list").accessibilityLabel("列表")
+                    Image(systemName: "rectangle").tag("grid").accessibilityLabel("大图")
+                    Image(systemName: "list.bullet").tag("list").accessibilityLabel("紧凑")
                 }.pickerStyle(.segmented).frame(width: 105)
             }
             DisclosureGroup("添加照片地点（可选）") {
@@ -782,20 +784,14 @@ struct DearSocialView: View {
                 if !batchOriginalURLs.isEmpty { ShareLink(items: batchOriginalURLs) { Label("保存或分享 \(batchOriginalURLs.count) 项", systemImage: "square.and.arrow.up") } }
                 if !batchDownloadError.isEmpty { Text(batchDownloadError).font(.caption).foregroundStyle(.red) }
             }
-            if photos.isEmpty {
-                ContentUnavailableView("一起留下活动回忆", systemImage: "photo.on.rectangle.angled", description: Text("分享照片和视频，活动成员可请求下载原文件。"))
-            } else if photoViewMode == "grid" {
-                LazyVGrid(columns: [GridItem(.adaptive(minimum: 150), spacing: 8)], spacing: 8) {
-                    ForEach(photos) { photo in photoLink(photo) }
-                }.listRowInsets(EdgeInsets(top: 8, leading: 12, bottom: 8, trailing: 12))
-            } else { ForEach(photos) { photo in photoLink(photo) } }
-        } header: { HStack { Text("共同相册"); Spacer(); Text("\(photos.count) 项") }.textCase(nil) }
+        } header: { Text("发布与管理").textCase(nil) }
     }
 
     private var activityTimeline: [DearTimelineEntry] {
-        let shared = moments.map { DearTimelineEntry(id: "moment:" + $0.id, checkIn: false, record: $0) }
-        let located = checkIns.map { DearTimelineEntry(id: "checkin:" + $0.id, checkIn: true, record: $0) }
-        return (shared + located).sorted {
+        let shared = moments.map { DearTimelineEntry(id: "moment:" + $0.id, kind: .moment, record: $0) }
+        let located = checkIns.map { DearTimelineEntry(id: "checkin:" + $0.id, kind: .checkIn, record: $0) }
+        let media = photos.map { DearTimelineEntry(id: "photo:" + $0.id, kind: .photo, record: $0) }
+        return (shared + located + media).sorted {
             let left = ActivityListDate.parse($0.record.text("createdAt")) ?? .distantPast
             let right = ActivityListDate.parse($1.record.text("createdAt")) ?? .distantPast
             return left == right ? $0.id < $1.id : left > right
@@ -803,15 +799,23 @@ struct DearSocialView: View {
     }
 
     private var activityTimelineSection: some View {
-        Section("生活动态 · 分享与打卡") {
+        Section("活动动态 · 照片、打卡与日常") {
             HStack {
-                Button { momentDraft = ""; momentRequestID = UUID(); error = ""; showingMomentCreate = true } label: { Label("写分享", systemImage: "square.and.pencil") }
+                Button { momentDraft = ""; momentRequestID = UUID(); error = ""; showingMomentCreate = true } label: { Label("写日常", systemImage: "square.and.pencil") }
                 Spacer()
                 Button {
                     checkInNote = ""; checkInRequestID = UUID(); pendingCheckIn = true; checkInLocator.locate()
                 } label: { Label(pendingCheckIn ? "正在定位…" : "打卡", systemImage: "location.circle") }
             }.disabled(busy || pendingCheckIn)
             ForEach(activityTimeline, id: \.id) { entry in
+                if entry.kind == .photo {
+                    VStack(alignment: .leading, spacing: 10) {
+                        photoLink(entry.record)
+                        Text(entry.record.dateText("createdAt")).font(.caption2).foregroundStyle(.secondary)
+                        DearPhotoCommentsView(store: store, spaceID: activityTenantId, activityID: activityId, photoID: entry.record.id)
+                            .id("\(activityTenantId)/\(activityId)/\(entry.record.id)")
+                    }.padding(.vertical, 8)
+                } else {
                 VStack(alignment: .leading, spacing: 8) {
                     HStack {
                         Label(entry.record.text("authorName"), systemImage: entry.checkIn ? "location.fill" : "text.bubble.fill")
@@ -835,8 +839,9 @@ struct DearSocialView: View {
                     }
                     Text(entry.record.dateText("createdAt")).font(.caption2).foregroundStyle(.secondary)
                 }.padding(.vertical, 6)
+                }
             }
-            if activityTimeline.isEmpty { Text("还没有动态，写下分享或打卡，留下活动的第一刻。") .foregroundStyle(.secondary).font(.subheadline) }
+            if activityTimeline.isEmpty { Text("还没有动态，拍照、写日常或打卡，留下活动的第一刻。") .foregroundStyle(.secondary).font(.subheadline) }
         }
     }
 
@@ -1527,6 +1532,83 @@ private struct DearPhotoPreview: View {
     }
 }
 
+private struct DearPhotoCommentsView: View {
+    @ObservedObject var store: FamilyStore
+    let spaceID: String
+    let activityID: String
+    let photoID: String
+    @State private var comments: [DearRecord] = []
+    @State private var draft = ""
+    @State private var requestID = UUID()
+    @State private var busy = false
+    @State private var failure = ""
+    @State private var loaded = false
+    @State private var hasMore = false
+    @State private var nextSkip = 0
+    @State private var expanded = false
+    private var route: String { "/api/dear/social/tenants/\(spaceID)/activities/\(activityID)/native-photos/\(photoID)/comments" }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Label("照片点评", systemImage: "text.bubble").font(.subheadline.weight(.semibold))
+            if !loaded && failure.isEmpty { ProgressView("正在加载点评…").font(.caption) }
+            ForEach(expanded ? comments : Array(comments.prefix(3))) { comment in
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack {
+                        Text(comment.text("authorName")).font(.caption.bold())
+                        Spacer()
+                        if comment.flag("canDelete") {
+                            Button("删除") { perform { _ = try await store.call(route + "/" + comment.id, method: "DELETE"); try await load(reset: true) } }
+                                .font(.caption).disabled(busy)
+                        }
+                    }
+                    Text(comment.text("text")).font(.subheadline).textSelection(.enabled)
+                    Text(comment.dateText("createdAt")).font(.caption2).foregroundStyle(.secondary)
+                }.padding(.vertical, 3)
+            }
+            if comments.count > 3 {
+                Button(expanded ? "收起点评" : "展开点评") { expanded.toggle() }.font(.caption)
+            }
+            if expanded && hasMore { Button("加载更多点评") { perform { try await load(reset: false) } }.font(.caption).disabled(busy) }
+            if loaded && comments.isEmpty { Text("还没有点评，说说这张照片吧。").font(.caption).foregroundStyle(.secondary) }
+            if !failure.isEmpty {
+                Text(failure).font(.caption).foregroundStyle(.red)
+                Button("重新加载点评") { perform { try await load(reset: true) } }.font(.caption).disabled(busy)
+            }
+            HStack(alignment: .bottom) {
+                TextField("点评这张照片…", text: $draft, axis: .vertical).lineLimit(1...4)
+                    .textFieldStyle(.roundedBorder).disabled(busy)
+                    .onChange(of: draft) { _, _ in requestID = UUID() }
+                Button("发表") {
+                    let text = draft.trimmingCharacters(in: .whitespacesAndNewlines), id = requestID
+                    perform {
+                        _ = try await store.call(route, method: "POST", body: ["text": text, "requestId": id.uuidString])
+                        draft = ""; requestID = UUID()
+                        try await load(reset: true)
+                    }
+                }.disabled(busy || draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || draft.utf16.count > 1000)
+            }
+            if draft.utf16.count > 1000 { Text("点评最多 1000 字，请缩短后发表。").font(.caption).foregroundStyle(.red) }
+        }.buttonStyle(.borderless)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .task { do { try await load(reset: true) } catch is CancellationError { } catch { failure = error.localizedDescription } }
+    }
+    @MainActor private func load(reset: Bool) async throws {
+        let skip = reset ? 0 : nextSkip
+        guard let result = try await store.call(route + "?skip=\(skip)") as? [String: Any] else { throw APIError.message("无法读取点评。") }
+        let rows = try DearRecord.list(result["items"])
+        if reset { comments = rows } else { comments += rows.filter { row in !comments.contains { $0.id == row.id } } }
+        nextSkip = result["nextSkip"] as? Int ?? skip + rows.count
+        hasMore = result["hasMore"] as? Bool ?? false
+        loaded = true; failure = ""
+    }
+    private func perform(_ action: @escaping () async throws -> Void) {
+        guard !busy else { return }
+        busy = true; failure = ""
+        Task { defer { busy = false }; do { try await action() } catch { failure = error.localizedDescription } }
+    }
+}
+
 private struct DearPhotoDetailView: View {
     @ObservedObject var store: FamilyStore
     let photo: DearRecord
@@ -1578,6 +1660,7 @@ private struct DearPhotoDetailView: View {
                         .accessibilityLabel("原文件接收进度")
                 }
                 if let originalError { Text(originalError).font(.footnote).foregroundStyle(.red) }
+                DearPhotoCommentsView(store: store, spaceID: spaceID, activityID: activityID, photoID: photo.id)
                 if canDelete {
                     Button("删除分享", role: .destructive) { showingDelete = true }.disabled(deleting)
                 }
