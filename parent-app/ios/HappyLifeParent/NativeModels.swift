@@ -58,3 +58,36 @@ enum WatchPairingCode {
         return value.range(of: "^[A-HJ-NP-Z2-9]{8}$", options: .regularExpression) != nil ? value : nil
     }
 }
+
+// Activity timestamps use the device time zone; calendar-only dates retain their day.
+enum ActivityListDate {
+    static func parse(_ raw: String, timeZone: TimeZone = .autoupdatingCurrent) -> Date? {
+        if raw.range(of: "^[0-9]{4}-[0-9]{2}-[0-9]{2}$", options: .regularExpression) != nil {
+            let formatter = DateFormatter()
+            formatter.locale = Locale(identifier: "en_US_POSIX")
+            formatter.calendar = Calendar(identifier: .gregorian)
+            formatter.timeZone = timeZone
+            formatter.dateFormat = "yyyy-MM-dd"
+            formatter.isLenient = false
+            return formatter.date(from: raw)
+        }
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return formatter.date(from: raw) ?? ISO8601DateFormatter().date(from: raw)
+    }
+
+    static func value(startsAt: String, createdAt: String, timeZone: TimeZone = .autoupdatingCurrent) -> Date? {
+        parse(startsAt, timeZone: timeZone) ?? parse(createdAt, timeZone: timeZone)
+    }
+
+    static func label(startsAt: String, createdAt: String, timeZone: TimeZone = .autoupdatingCurrent,
+                      locale: Locale = .autoupdatingCurrent) -> String {
+        guard let date = value(startsAt: startsAt, createdAt: createdAt, timeZone: timeZone) else { return "日期未设置" }
+        let formatter = DateFormatter()
+        formatter.locale = locale
+        formatter.timeZone = timeZone
+        formatter.dateStyle = .medium
+        formatter.timeStyle = .none
+        return (parse(startsAt, timeZone: timeZone) == nil ? "创建于 " : "活动日期 ") + formatter.string(from: date)
+    }
+}

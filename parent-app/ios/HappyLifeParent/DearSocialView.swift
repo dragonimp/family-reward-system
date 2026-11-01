@@ -323,7 +323,14 @@ struct DearSocialView: View {
 
     private var base: String { "/api/dear/social/" }
     private var selectedSpace: DearRecord? { spaces.first { $0.id == spaceId } }
-    private var allActivities: [DearRecord] { activities + joinedActivities.filter { joined in !activities.contains { $0.id == joined.id } } }
+    private var allActivities: [DearRecord] {
+        let combined = activities + joinedActivities.filter { joined in !activities.contains { $0.id == joined.id } }
+        return combined.sorted { left, right in
+            let leftDate = ActivityListDate.value(startsAt: left.text("startsAt"), createdAt: left.text("createdAt")) ?? .distantPast
+            let rightDate = ActivityListDate.value(startsAt: right.text("startsAt"), createdAt: right.text("createdAt")) ?? .distantPast
+            return leftDate == rightDate ? left.id < right.id : leftDate > rightDate
+        }
+    }
     private var selectedActivity: DearRecord? { allActivities.first { $0.id == activityId } }
     private var visibleSpaces: [DearRecord] { spaces.filter { $0.text("role") == "owner" || $0.text("role") == "member" } }
     private var activityTenantId: String { selectedActivity?.text("sourceTenantId") ?? spaceId }
@@ -332,14 +339,10 @@ struct DearSocialView: View {
         return activityMembers.contains { $0.flag("isSelf") && $0.subject == creator }
     }
     private func activityDate(_ item: DearRecord) -> String {
-        let key = item.text("startsAt").isEmpty ? "createdAt" : "startsAt"
-        return (key == "createdAt" ? "创建于 " : "活动日期 ") + item.dateText(key)
+        ActivityListDate.label(startsAt: item.text("startsAt"), createdAt: item.text("createdAt"))
     }
     private func activityDateValue(_ item: DearRecord) -> Date {
-        let value = item.text("startsAt").isEmpty ? item.text("createdAt") : item.text("startsAt")
-        let formatter = ISO8601DateFormatter()
-        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        return formatter.date(from: value) ?? ISO8601DateFormatter().date(from: value) ?? Date()
+        ActivityListDate.value(startsAt: item.text("startsAt"), createdAt: item.text("createdAt")) ?? Date()
     }
 
     var body: some View {

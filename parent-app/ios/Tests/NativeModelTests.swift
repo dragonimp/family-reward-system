@@ -21,6 +21,21 @@ import Foundation
         for invalid in ["ABCD1234", "123", "https://evil.test/children?watchCode=ABCD2345", "https://happylife.ai.impx.net/children?watchCode=ABCD2345&watchCode=EFGH2345", "https://happylife.ai.impx.net/other?watchCode=ABCD2345", "https://user@happylife.ai.impx.net/children?watchCode=ABCD2345"] {
             precondition(WatchPairingCode.parse(invalid) == nil)
         }
-        print("Native API model checks passed")
+        let utc = TimeZone(secondsFromGMT: 0)!
+        let losAngeles = TimeZone(identifier: "America/Los_Angeles")!
+        let tokyo = TimeZone(identifier: "Asia/Tokyo")!
+        let locale = Locale(identifier: "en_US")
+        let timestamp = "2026-11-01T01:00:00Z"
+        precondition(ActivityListDate.label(startsAt: timestamp, createdAt: "", timeZone: losAngeles, locale: locale) == "活动日期 Oct 31, 2026")
+        precondition(ActivityListDate.label(startsAt: timestamp, createdAt: "", timeZone: tokyo, locale: locale) == "活动日期 Nov 1, 2026")
+        for zone in [utc, losAngeles, tokyo] {
+            precondition(ActivityListDate.label(startsAt: "2026-11-01", createdAt: "", timeZone: zone, locale: locale) == "活动日期 Nov 1, 2026")
+        }
+        precondition(ActivityListDate.value(startsAt: "2026-11-01T09:00:00+08:00", createdAt: "", timeZone: utc) == ActivityListDate.parse(timestamp))
+        precondition(ActivityListDate.value(startsAt: "invalid", createdAt: timestamp) == ActivityListDate.parse(timestamp))
+        precondition(ActivityListDate.label(startsAt: "", createdAt: timestamp, timeZone: utc, locale: locale) == "创建于 Nov 1, 2026")
+        precondition(ActivityListDate.value(startsAt: "2026-02-30", createdAt: "") == nil)
+        precondition(ActivityListDate.label(startsAt: "", createdAt: "") == "日期未设置")
+        print("Native model and activity date checks passed: local dates, date-only values, offsets and fallback")
     }
 }
