@@ -59,7 +59,7 @@ private struct DearRecord: Identifiable {
         formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
         let raw = text(key)
         let date = formatter.date(from: raw) ?? ISO8601DateFormatter().date(from: raw)
-        return date?.formatted(date: .abbreviated, time: .shortened) ?? raw
+        return date.map { "\($0.formatted(date: .abbreviated, time: .shortened))（当地时间）" } ?? "时间未知"
     }
     func flag(_ key: String) -> Bool { data[key] as? Bool ?? false }
     func number(_ key: String) -> Double { data[key] as? Double ?? 0 }
