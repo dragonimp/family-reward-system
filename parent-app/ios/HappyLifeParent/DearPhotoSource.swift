@@ -39,6 +39,30 @@ import UniformTypeIdentifiers
 
     weak var store: FamilyStore?
     private var pump: Task<Void, Never>?
+    private var cacheTask: Task<Void, Never>?
+    private var cachedShares = Set<String>()
+    private var cacheRetries: [String: Date] = [:]
+    private(set) var currentDeviceID: String?
+
+    private var deviceModel: String {
+        var system = utsname(); uname(&system)
+        return withUnsafeBytes(of: &system.machine) { bytes in
+            String(decoding: bytes.prefix { $0 != 0 }, as: UTF8.self)
+        }
+    }
+    private var deviceInformation: [String: Any] {
+        ["deviceName": UIDevice.current.name, "deviceModel": deviceModel, "platform": "iOS " + UIDevice.current.systemVersion]
+    }
+    func deviceDescription(_ photo: DearRecord) -> String {
+        let id = photo.text("sourceDeviceId")
+        let name = photo.text("sourceDeviceName")
+        let model = photo.text("sourceDeviceModel")
+        let platform = photo.text("sourceDevicePlatform")
+        let detail = [name, model, platform].filter { !$0.isEmpty }.joined(separator: " · ")
+        let relation = id.isEmpty ? "来源设备未登记" : currentDeviceID == nil ? "来源设备" : id.caseInsensitiveCompare(currentDeviceID!) == .orderedSame ? "本机" : "其他设备"
+        return relation + (detail.isEmpty ? "" : " · " + detail)
+    }
+
     private var subjectCache: String?
     private var enabledForSession = false
     private var publishing = false
@@ -64,7 +88,7 @@ import UniformTypeIdentifiers
     }
 
     func stop() {
-        generation = UUID(); pump?.cancel(); pump = nil; enabledForSession = false
+        generation = UUID(); cacheTask?.cancel(); cacheTask = nil; cachedShares.removeAll(); cacheRetries.removeAll(); currentDeviceID = nil; pump?.cancel(); pump = nil; enabledForSession = false
         for task in sourceTasks.values { task.cancel() }; sourceTasks.removeAll()
         let active = Array(transfers.values); transfers.removeAll()
         for transfer in active { Task { await transfer.cancel() } }
@@ -165,7 +189,7 @@ import UniformTypeIdentifiers
               let index = try? readIndex(at: root) else { return }
         if !index.pendingRemoval.isEmpty { _ = try? cleanPendingRemoval(at: root) }
         do {
-            var body: [String: Any] = ["notificationApplicationKey": "happylife.ai", "transferProtocol": "connect-datachannel-v1"]
+            var body: [String: Any] = deviceInformation.merging(["notificationApplicationKey": "happylife.ai", "transferProtocol": "connect-datachannel-v1"]) { _, value in value }
             if let deviceID = index.deviceID { body["id"] = deviceID }
             let response = try await store.call("/api/dear/social/photo-devices", method: "POST", body: body) as? [String: Any]
             guard let deviceID = response?["id"] as? String, UUID(uuidString: deviceID) != nil else { return }
@@ -174,6 +198,7 @@ import UniformTypeIdentifiers
                 updated.deviceID = deviceID
                 try writeIndex(updated, at: root)
             }
+            currentDeviceID = deviceID; store.objectWillChange.send()
             enabledForSession = true
             // Every signed-in phone may alert the sharer, even if another
             // device holds the original. Re-register invalidated tokens too.
@@ -222,13 +247,13 @@ import UniformTypeIdentifiers
         let subject = try await currentSubject()
         let root = try directory(for: subject)
         var index = try readIndex(at: root)
-        let deviceBody: [String: Any] = ["id": index.deviceID as Any? ?? NSNull(), "notificationApplicationKey": "happylife.ai", "transferProtocol": "connect-datachannel-v1"]
+        let deviceBody = deviceInformation.merging(["id": index.deviceID as Any? ?? NSNull(), "notificationApplicationKey": "happylife.ai", "transferProtocol": "connect-datachannel-v1"]) { _, value in value }
         let device = try await store.call("/api/dear/social/photo-devices", method: "POST",
                                           body: deviceBody) as? [String: Any]
         guard let deviceID = device?["id"] as? String, UUID(uuidString: deviceID) != nil else {
             throw APIError.message("照片分享设备登记失败。")
         }
-        index.deviceID = deviceID
+        index.deviceID = deviceID; currentDeviceID = deviceID
         try writeIndex(index, at: root)
         enabledForSession = true
 
@@ -437,7 +462,7 @@ import UniformTypeIdentifiers
             }
             try? FileManager.default.removeItem(at: finalURL)
         }
-        var current = request
+        var current = (try await store.call("/api/dear/social/photo-requests/\(id)") as? [String: Any]) ?? request
         let expectedGeneration = generation
         while current["status"] as? String == "pending_approval" {
             status?("等待分享者打开消息同意…")
@@ -453,8 +478,16 @@ import UniformTypeIdentifiers
         if let state = current["status"] as? String, ["cancelled", "expired", "revoked", "unavailable", "failed"].contains(state) {
             throw APIError.message("本次分享已停止、已过期或不可用，请重新发起下载请求。")
         }
-        status?("已同意，正在连接原件设备…")
         let manifest = try connectManifest(current)
+        if current["serverCached"] as? Bool == true {
+            status?("正在从服务器缓存接收原文件…")
+            let relayRequest = try await relayRequest(path: "/api/dear/social/photo-requests/\(id)/relay")
+            try await RealtimeFileRelay.receive(to: partialURL, manifest: manifest, request: relayRequest)
+            guard expectedGeneration == generation else { try? FileManager.default.removeItem(at: partialURL); throw CancellationError() }
+            _ = try await store.call("/api/dear/social/photo-requests/\(id)/complete", method: "POST", body: [:])
+            try FileManager.default.moveItem(at: partialURL, to: finalURL); progress?(1); return finalURL
+        }
+        status?("已同意，正在连接原件设备…")
 
         let transfer = RealtimeFileTransfer(), transferID = UUID()
         transfers[transferID] = transfer
@@ -469,11 +502,16 @@ import UniformTypeIdentifiers
             } onCancel: { Task { await transfer.cancel() } }
         } catch {
             try Task.checkCancellation()
-            if let latest = try? await store.call("/api/dear/social/photo-requests/\(id)") as? [String: Any],
-               let state = latest["status"] as? String, ["cancelled", "expired", "revoked", "unavailable"].contains(state) {
+            let latest = try? await store.call("/api/dear/social/photo-requests/\(id)") as? [String: Any]
+            if let state = latest?["status"] as? String, ["cancelled", "expired", "revoked", "unavailable"].contains(state) {
                 throw APIError.message("本次分享已停止、已过期或不可用，请重新发起下载请求。")
             }
-            throw error
+            guard expectedGeneration == generation else { throw CancellationError() }
+            if latest?["serverCached"] as? Bool == true {
+                status?("设备直传中断，正在从服务器缓存接收…")
+                let cached = try await relayRequest(path: "/api/dear/social/photo-requests/\(id)/relay")
+                try await RealtimeFileRelay.receive(to: partialURL, manifest: manifest, request: cached)
+            } else { throw error }
         }
         // Connect returns only after peer acknowledgement and durable SHA validation.
         _ = try await store.call("/api/dear/social/photo-requests/\(id)/complete", method: "POST", body: [:])
@@ -510,6 +548,43 @@ import UniformTypeIdentifiers
                 return request
             }
             return (request("ice"), request("signal"))
+        }
+    }
+
+    private func relayRequest(path: String, method: String = "GET") async throws -> URLRequest {
+        guard let store else { throw CancellationError() }
+        let token = try await store.identity.validAccessToken()
+        var request = URLRequest(url: URL(string: path, relativeTo: base)!.absoluteURL)
+        request.httpMethod = method; request.timeoutInterval = 30 * 60
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        return request
+    }
+
+    private func startCaching(index: Index, root: URL) {
+        guard cacheTask == nil, let deviceID = index.deviceID,
+              let photo = index.photos.reversed().first(where: { !cachedShares.contains($0.id + $0.sha256) && (cacheRetries[$0.id] ?? .distantPast) < Date() }) else { return }
+        let expected = generation
+        cacheTask = Task { [weak self] in
+            guard let self else { return }
+            defer { if expected == generation { cacheTask = nil } }
+            let prefix = "/api/dear/social/tenants/\(photo.spaceID)/activities/\(photo.activityID)/native-photos/\(photo.id)/relay"
+            do {
+                let state = try await store?.call(prefix) as? [String: Any]
+                if state?["cached"] as? Bool != true {
+                    let path = root.appendingPathComponent(photo.fileName)
+                    guard (try? path.resourceValues(forKeys: [.fileSizeKey]).fileSize) == photo.length else { cachedShares.insert(photo.id + photo.sha256); return }
+                    var request = try await relayRequest(path: prefix, method: "PUT")
+                    request.setValue(deviceID, forHTTPHeaderField: "X-Source-Device")
+                    request.setValue(photo.sha256, forHTTPHeaderField: "X-Photo-Revision")
+                    request.setValue("application/octet-stream", forHTTPHeaderField: "Content-Type")
+                    request.setValue(String(photo.length), forHTTPHeaderField: "Content-Length")
+                    try Task.checkCancellation()
+                    guard expected == generation else { throw CancellationError() }
+                    try await RealtimeFileRelay.upload(file: path, request: request)
+                }
+                guard expected == generation else { return }
+                cachedShares.insert(photo.id + photo.sha256)
+            } catch { if expected == generation { cacheRetries[photo.id] = Date().addingTimeInterval(60) } }
         }
     }
 
@@ -611,6 +686,7 @@ import UniformTypeIdentifiers
         polling = true
         defer { polling = false }
         if !index.pendingRemoval.isEmpty { _ = try? cleanPendingRemoval(at: root) }
+        startCaching(index: index, root: root)
         do {
             let rows = try await store.call("/api/dear/social/photo-devices/\(deviceID)/requests") as? [[String: Any]] ?? []
             if rows.isEmpty && sourceTasks.isEmpty { store.photoRequestNotice = nil; store.photoTransferProgress = nil; return }

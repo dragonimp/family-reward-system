@@ -105,7 +105,7 @@ builder.Services.AddCors(options =>
 builder.Services.AddHttpClient();
 builder.Services.AddSingleton<SocialServiceTokens>();
 builder.Services.AddHttpClient("dear-social-sso", client => client.Timeout = TimeSpan.FromSeconds(15));
-builder.Services.AddHttpClient("dear-social-api", client => client.Timeout = TimeSpan.FromSeconds(45))
+builder.Services.AddHttpClient("dear-social-api", client => client.Timeout = TimeSpan.FromMinutes(30))
     .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler { AllowAutoRedirect = false });
 builder.Services.AddHttpClient("agent-pay");
 builder.Services.AddSingleton<XiaotiancaiDeviceTestEmailService>();

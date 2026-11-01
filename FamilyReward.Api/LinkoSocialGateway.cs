@@ -47,7 +47,12 @@ internal static class LinkoSocialGateway
                 outgoing.Headers.TryAddWithoutValidation("Origin", origin.GetLeftPart(UriPartial.Authority));
                 if (context.Request.ContentLength is > 0 || context.Request.Headers.ContainsKey("Transfer-Encoding"))
                 {
+                    var bodyLimit = context.Features.Get<Microsoft.AspNetCore.Http.Features.IHttpMaxRequestBodySizeFeature>();
+                    if (path?.EndsWith("/relay", StringComparison.Ordinal) == true && bodyLimit is { IsReadOnly: false }) bodyLimit.MaxRequestBodySize = 500L * 1024 * 1024;
                     outgoing.Content = new StreamContent(context.Request.Body);
+                    outgoing.Content.Headers.ContentLength = context.Request.ContentLength;
+                    if (context.Request.Headers.TryGetValue("X-Source-Device", out var sourceDevice))
+                        outgoing.Headers.TryAddWithoutValidation("X-Source-Device", sourceDevice.ToString());
                     if (MediaTypeHeaderValue.TryParse(context.Request.ContentType, out var contentType))
                         outgoing.Content.Headers.ContentType = contentType;
                     if (context.Request.Headers.TryGetValue("X-Photo-Revision", out var revision))
@@ -96,6 +101,9 @@ internal static class LinkoSocialGateway
         var upload = Pump(downstream, upstream, lifetime.Token);
         var download = Pump(upstream, downstream, lifetime.Token);
         await Task.WhenAny(upload, download);
+        // Let the forwarded close handshake finish before disposing the sockets;
+        // immediate cancellation can reset the connection ahead of the last frame.
+        await Task.WhenAny(Task.WhenAll(upload, download), Task.Delay(TimeSpan.FromSeconds(5), ct));
         await lifetime.CancelAsync();
         try { await Task.WhenAll(upload, download); }
         catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
@@ -140,6 +148,7 @@ internal static class LinkoSocialGateway
         if (s.Length == 1 && s[0] == "photo-devices") return method == "POST";
         if (s.Length == 2 && s[0] == "photo-devices" && Guid.TryParse(s[1], out _)) return method == "DELETE";
         if (s.Length == 3 && s[0] == "photo-devices" && Guid.TryParse(s[1], out _) && s[2] == "requests") return method == "GET";
+        if (s.Length == 3 && s[0] == "photo-requests" && Guid.TryParse(s[1], out _) && s[2] == "relay") return method == "GET";
         if (s.Length == 2 && s[0] == "photo-requests" && Guid.TryParse(s[1], out _)) return method == "GET";
         if (s.Length == 3 && s[0] == "photo-requests" && Guid.TryParse(s[1], out _) && s[2] is "unavailable" or "complete" or "cancel" or "begin" or "confirm" or "approve") return method == "POST";
         if (s.Length == 1 && s[0] == "tenants") return method is "GET" or "POST";
@@ -185,7 +194,7 @@ internal static class LinkoSocialGateway
             if (s.Length == 7 && s[4] == "native-photos" && Guid.TryParse(s[5], out _) && s[6] == "comments") return method is "GET" or "POST";
             if (s.Length == 8 && s[4] == "native-photos" && Guid.TryParse(s[5], out _) && s[6] == "comments" && Guid.TryParse(s[7], out _)) return method == "DELETE";
             if (s.Length == 5 && s[4] == "photo-requests") return method == "POST";
-            if (s.Length == 7 && s[4] == "native-photos" && Guid.TryParse(s[5], out _) && s[6] == "thumbnail") return method is "GET" or "PUT";
+            if (s.Length == 7 && s[4] == "native-photos" && Guid.TryParse(s[5], out _) && s[6] is "thumbnail" or "relay") return method is "GET" or "PUT";
         }
         if (s.Length == 3 && s[0] == "invites" && s[1] == "username" && s[2] == "pending") return method == "GET";
         if (s.Length == 1 && s[0] == "relationships") return method == "GET";

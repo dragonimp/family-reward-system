@@ -128,6 +128,7 @@ else
   python3 /opt/Atlas/downloads/family-points-api-credit/current/deploy/moment-domain/activate-moment-domain.py edge
 fi
 python3 /opt/Atlas/downloads/family-points-api-credit/current/deploy/moment-native-auth/restore-native-auth-origin.py
+python3 /opt/Atlas/downloads/family-points-api-credit/current/deploy/moment-cache/enable-relay-body-size.py
 curl -fsS https://happylife.ai.impx.net/version.json | python3 -c 'import json,sys; assert json.load(sys.stdin)["version"]==sys.argv[1]' "$version"
 curl -fsS https://happylife.ai.impx.net/health >/dev/null
 printf '{"summary":"家庭应用 API 和网页已通过 Atlas 发布并验证","evidence":"release=%s source_commit=%s api_operation=%s web_journal=%s"}\n' "$version" "$source_commit" "$operation" "$journal"

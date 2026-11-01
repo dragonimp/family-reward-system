@@ -57,6 +57,8 @@ NODE
 mkdir -p "$stage/api/migrations"
 cp "$root/scripts/migrations/"*.sql "$stage/api/migrations/"
 cp "$root/scripts/run-db-migrations.sh" "$stage/api/migrations/run-db-migrations.sh"
+mkdir -p "$stage/api/deploy/moment-cache"
+cp "$root/deploy/moment-cache/"* "$stage/api/deploy/moment-cache/"
 mkdir -p "$stage/api/deploy/moment-native-auth"
 cp "$root/deploy/native-auth-origin/"* "$stage/api/deploy/moment-native-auth/"
 mkdir -p "$stage/api/deploy/moment-domain"

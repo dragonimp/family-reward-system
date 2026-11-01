@@ -154,7 +154,7 @@ struct FamilyRoot: View {
     }
     private var main: some View {
         TabView {
-            FamilyHome(store: store).tabItem { Label("群组", systemImage: "person.3.fill") }
+            FamilyHome(store: store).tabItem { Label("成长", systemImage: "person.3.fill") }
                 .badge(store.requests.filter { $0.text("status") == "pending" }.count)
             DearSocialView(store: store).tabItem { Label("活动", systemImage: "photo.on.rectangle.angled") }
             ExerciseView(userID: store.profile?.text("unifiedUserId") ?? "").id(store.profile?.text("unifiedUserId") ?? "").tabItem { Label("运动", systemImage: "figure.walk") }

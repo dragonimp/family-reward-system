@@ -34,7 +34,7 @@ downstream.Map("/api/{**path}", async context => {
     } else {
         using var reader = new StreamReader(context.Request.Body);
         await context.Response.WriteAsJsonAsync(new { path = context.Request.Path.Value, query = context.Request.QueryString.Value,
-            revision = context.Request.Headers["X-Photo-Revision"].ToString(), body = await reader.ReadToEndAsync() });
+            sourceDevice = context.Request.Headers["X-Source-Device"].ToString(), length = context.Request.ContentLength, revision = context.Request.Headers["X-Photo-Revision"].ToString(), body = await reader.ReadToEndAsync() });
     }
 });
 await downstream.StartAsync();
@@ -67,6 +67,11 @@ upload.Headers.Add("X-Photo-Revision", "sha-revision");
 var reply = await client.SendAsync(upload); reply.EnsureSuccessStatusCode();
 var echo = JsonDocument.Parse(await reply.Content.ReadAsStringAsync()).RootElement;
 Check(echo.GetProperty("revision").GetString() == "sha-revision" && echo.GetProperty("body").GetString() == "preview", "preview upload and revision preserved");
+using var cacheUpload = new HttpRequestMessage(HttpMethod.Put, path.Replace("/thumbnail", "/relay")) { Content = new StringContent("original") };
+cacheUpload.Headers.Add("X-Source-Device", "device-test"); cacheUpload.Headers.Add("X-Photo-Revision", "revision-test");
+var cacheEcho = JsonDocument.Parse(await (await client.SendAsync(cacheUpload)).Content.ReadAsStringAsync()).RootElement;
+Check(cacheEcho.GetProperty("sourceDevice").GetString() == "device-test" && cacheEcho.GetProperty("length").GetInt64() == 8, "relay upload preserves device, revision and streaming content length");
+Check((await client.GetAsync($"/api/dear/social/photo-requests/{requestId}/relay")).IsSuccessStatusCode, "authorized cached download route allowed");
 var liveIce = await client.GetStringAsync($"/api/dear/social/tenants/{tenant}/activities/{activity}/live/ice-servers");
 Check(liveIce.Contains("ice-servers"), "web photo viewer ICE configuration route");
 var ice = await client.GetStringAsync($"/api/dear/social/photo-requests/{requestId}/connect/ice?role=receiver");
