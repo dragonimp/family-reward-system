@@ -1939,6 +1939,11 @@ private struct DearPhotoDetailView: View {
 
     private func load() async {
         image = nil; error = nil
+        if let originalURL {
+            if isVideo { player = AVPlayer(url: originalURL) }
+            else if let loaded = try? await PhotoDisplayImage.load(originalURL), !Task.isCancelled { originalImage = loaded }
+            return
+        }
         if isVideo, let local = await store.photoSource.localOriginal(photoID: photo.id, spaceID: spaceID, activityID: activityID) {
             originalURL = local
             player = AVPlayer(url: local)
