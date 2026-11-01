@@ -140,7 +140,7 @@ import UniformTypeIdentifiers
 
     private func enableNotificationsIfNeeded() async -> Bool {
         guard let store, UIApplication.shared.applicationState == .active else { return false }
-        await store.notifications.enable()
+        await store.notifications.resume()
         let settings = await UNUserNotificationCenter.current().notificationSettings()
         return settings.authorizationStatus == .authorized || settings.authorizationStatus == .provisional
     }
@@ -634,6 +634,10 @@ import UniformTypeIdentifiers
     @Published var unreadCount = 0
     @Published var error = ""
     @Published var pushRegistrationError = ""
+    @Published var notificationStatus = "正在读取系统通知状态…"
+    @Published var authorizationStatus: UNAuthorizationStatus = .notDetermined
+    @Published var enabling = false
+    @Published var registering = false
     @Published var showingInbox = false
     @Published var selectedMessageID: Int64?
     private var generation = UUID()
@@ -643,6 +647,8 @@ import UniformTypeIdentifiers
     private var applicationKey: String?
     private var registrationTail: Task<Void, Never>?
     private var deviceToken: String?
+    private var registrationTimeout: Task<Void, Never>?
+    private var registrationAttempt = UUID()
     private let installationID: String = {
         let key = "moment.notifications.installation"
         if let value = UserDefaults.standard.string(forKey: key) { return value }
@@ -679,21 +685,83 @@ import UniformTypeIdentifiers
             if expected == generation, requestID == inboxRequestID { self.error = "消息通知暂时无法读取，请重试。" }
         }
     }
+    var enableButtonTitle: String {
+        if enabling { return "正在请求通知权限…" }
+        if registering { return "正在登记系统通知…" }
+        switch authorizationStatus {
+        case .denied: return "前往系统设置开启通知"
+        case .authorized: return "重新登记系统通知"
+        default: return "启用系统通知"
+        }
+    }
     func resume() async {
         let settings = await UNUserNotificationCenter.current().notificationSettings()
-        if settings.authorizationStatus == .authorized || settings.authorizationStatus == .provisional {
-            UIApplication.shared.registerForRemoteNotifications()
+        authorizationStatus = settings.authorizationStatus
+        switch settings.authorizationStatus {
+        case .authorized, .provisional, .ephemeral:
+            if !registering { beginRegistration() }
+        case .denied: notificationStatus = "系统通知已关闭，请到系统设置中允许通知。"
+        default: notificationStatus = "尚未启用系统通知，下载请求仍可在消息列表查看。"
         }
         await reload()
     }
-    func registrationFailed() { pushRegistrationError = "暂时无法登记系统通知，请检查网络后重试。App 内请求消息仍可查看。" }
+    func openSettings() {
+        if let url = URL(string: UIApplication.openNotificationSettingsURLString) { UIApplication.shared.open(url) }
+    }
+    func registrationFailed() {
+        registrationTimeout?.cancel(); registering = false
+        notificationStatus = "系统推送登记失败。"
+        pushRegistrationError = "暂时无法登记系统通知，请检查网络后重试。App 内请求消息仍可查看。"
+    }
+    private func beginRegistration() {
+        guard !registering else { return }
+        registering = true; pushRegistrationError = ""
+        notificationStatus = "系统已允许通知，正在登记到用户中心…"
+        let expected = generation, attempt = UUID()
+        registrationAttempt = attempt
+        registrationTimeout?.cancel()
+        registrationTimeout = Task {
+            do { try await Task.sleep(for: .seconds(30)) } catch { return }
+            guard expected == generation, attempt == registrationAttempt, registering else { return }
+            registering = false
+            notificationStatus = "系统已授权，但推送登记尚未完成。"
+            pushRegistrationError = "通知登记超时，请检查网络后点击重新登记。"
+        }
+        // Reuse the last OS token when iOS does not issue a fresh callback.
+        if let deviceToken { updatePushToken(deviceToken) }
+        UIApplication.shared.registerForRemoteNotifications()
+    }
     func enable() async {
+        guard !enabling, !registering else { return }
+        enabling = true; pushRegistrationError = ""
+        defer { enabling = false }
+        let expected = generation
+        let settings = await UNUserNotificationCenter.current().notificationSettings()
+        guard expected == generation else { return }
+        authorizationStatus = settings.authorizationStatus
+        if settings.authorizationStatus == .denied {
+            notificationStatus = "系统通知已关闭，请在打开的系统设置中允许通知。"
+            openSettings()
+            return
+        }
         do {
-            guard try await UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound, .badge]) else {
-                pushRegistrationError = "系统通知未开启；请求消息仍会保留。可在系统设置中允许 Linko Moment 发送通知。"; return
+            if settings.authorizationStatus != .authorized && settings.authorizationStatus != .ephemeral {
+                notificationStatus = "正在请求系统通知权限…"
+                let allowed = try await UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound, .badge])
+                guard expected == generation else { return }
+                authorizationStatus = await UNUserNotificationCenter.current().notificationSettings().authorizationStatus
+                guard allowed else {
+                    notificationStatus = "未允许系统通知；可再次点击按钮前往系统设置开启。"
+                    return
+                }
             }
-            UIApplication.shared.registerForRemoteNotifications()
-        } catch { self.pushRegistrationError = "无法开启系统通知，请检查系统设置。" }
+            beginRegistration()
+        } catch {
+            if expected == generation {
+                notificationStatus = "无法开启系统通知。"
+                pushRegistrationError = "请检查系统设置后重试。"
+            }
+        }
     }
     func updatePushToken(_ token: String) {
         deviceToken = token
@@ -712,9 +780,16 @@ import UniformTypeIdentifiers
                 #endif
                 try await fixed.registerAppleDevice(installationID: installationID, token: token, environment: environment, channel: channel)
                 if expected != generation { try? await fixed.unregisterDevice(installationID: installationID) }
-                else { pushRegistrationError = "" }
+                else {
+                    registrationTimeout?.cancel(); registering = false; pushRegistrationError = ""
+                    notificationStatus = "系统通知已允许，用户中心推送设备登记成功。"
+                }
             } catch {
-                if expected == generation { self.pushRegistrationError = "系统推送登记未完成；请求消息仍可在此查看，请重试。" }
+                if expected == generation {
+                    registrationTimeout?.cancel(); registering = false
+                    notificationStatus = "系统已授权，但用户中心推送登记未完成。"
+                    self.pushRegistrationError = "请检查网络后点击重新登记；请求消息仍可在此查看。"
+                }
             }
         }
     }
@@ -732,6 +807,8 @@ import UniformTypeIdentifiers
     }
     func reset(token: String?) {
         let oldAuthority = authority, oldKey = applicationKey, previous = registrationTail
+        registrationTimeout?.cancel(); registrationTimeout = nil; registrationAttempt = UUID()
+        registering = false; enabling = false; notificationStatus = "请登录后启用系统通知。"
         generation = UUID(); client = nil; authority = nil; applicationKey = nil
         items = []; unreadCount = 0; showingInbox = false; selectedMessageID = nil; error = ""; pushRegistrationError = ""; inboxRequestID = UUID()
         registrationTail = Task {

@@ -1731,7 +1731,13 @@ struct MomentNotificationInbox: View {
                 if !notifications.error.isEmpty { Section { Text(notifications.error).foregroundStyle(.red) } }
                 if !notifications.pushRegistrationError.isEmpty { Section { Text(notifications.pushRegistrationError).foregroundStyle(.red) } }
                 Section {
-                    Button("开启系统消息通知") { Task { await notifications.enable() } }
+                    HStack {
+                        Button(notifications.enableButtonTitle) { Task { await notifications.enable() } }
+                            .disabled(notifications.enabling || notifications.registering)
+                        if notifications.enabling || notifications.registering { Spacer(); ProgressView() }
+                    }
+                    Text(notifications.notificationStatus).font(.footnote).foregroundStyle(.secondary)
+                    Button("系统通知设置") { notifications.openSettings() }.font(.footnote)
                     Text("下载请求会发送给共享者。原文件保存在共享设备上，传输时请保持该设备的应用打开。")
                         .font(.footnote).foregroundStyle(.secondary)
                 }
