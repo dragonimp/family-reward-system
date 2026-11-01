@@ -11,8 +11,15 @@ for project in AgentIdentity MyVnc Linko family-reward-system; do
   commit="$(git -C "$root" rev-parse HEAD)"
   remote="$(git -C "$root" ls-remote origin refs/heads/main | cut -f1)"
   [[ "$commit" == "$remote" ]] || { echo "$project source is not pushed main"; exit 1; }
-  mkdir -p "$ATLAS_BUILD_WORK/source/$project"
-  git -C "$root" archive "$commit" | tar -x -C "$ATLAS_BUILD_WORK/source/$project"
+  if [[ "$project" == AgentIdentity ]]; then
+    # The Family adapter verifies SDK ancestry through Git; keep that proof in
+    # this disposable, detached dependency checkout without duplicating objects.
+    git clone --quiet --shared --no-checkout "$root" "$ATLAS_BUILD_WORK/source/$project"
+    git -C "$ATLAS_BUILD_WORK/source/$project" checkout --quiet --detach "$commit"
+  else
+    mkdir -p "$ATLAS_BUILD_WORK/source/$project"
+    git -C "$root" archive "$commit" | tar -x -C "$ATLAS_BUILD_WORK/source/$project"
+  fi
   printf '%s %s\n' "$project" "$commit" >> "$ATLAS_BUILD_OUTPUT/source-commits.txt"
 done
 export ATLAS_ROOT="$projects/Atlas" AtlasRoot="$projects/Atlas" ATLAS_SOURCE_ROOT="$projects/Atlas"

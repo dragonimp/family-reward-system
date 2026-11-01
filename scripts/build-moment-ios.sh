@@ -4,9 +4,10 @@ set -euo pipefail
 : "${ATLAS_BUILD_OUTPUT:?run through host-build-output}"
 : "${ATLAS_BUILD_LOGS:?run through host-build-output}"
 root="$(git rev-parse --show-toplevel)"
-commit="$(git -C "$root" rev-parse HEAD)"
+commit="${MOMENT_RELEASE_COMMIT:-$(git -C "$root" rev-parse HEAD)}"
 remote="$(git -C "$root" ls-remote origin refs/heads/main | cut -f1)"
-[[ "$commit" == "$remote" ]] || { echo 'Release source must match origin/main.' >&2; exit 1; }
+git -C "$root" cat-file -e "$commit^{commit}"
+git -C "$root" merge-base --is-ancestor "$commit" "$remote" || { echo 'Release source must be included in origin/main.' >&2; exit 1; }
 git -C "$root" diff --quiet HEAD -- parent-app/ios watch-app/apple scripts/build-moment-ios.sh
 source_dir="$ATLAS_BUILD_WORK/source"
 mkdir -p "$source_dir"
