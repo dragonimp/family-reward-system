@@ -16,7 +16,9 @@ green_login_commit="f4fa8f7323a4e904d564c6c27c28fa9290aa0d18"
 git -C "$identity_root" merge-base --is-ancestor "$green_login_commit" HEAD || { echo 'AgentIdentity SDK does not include the green native login page.' >&2; exit 2; }
 git -C "$identity_root" diff --quiet HEAD -- src/AgentIdentity.Sdk || { echo 'AgentIdentity SDK has uncommitted source changes.' >&2; exit 2; }
 git -C "$identity_root" diff --quiet HEAD -- src/AgentIdentity.NativeClient || { echo 'AgentIdentity native client has uncommitted source changes.' >&2; exit 2; }
-dotnet publish "$root/FamilyReward.Api/FamilyReward.Api.csproj" -c Release -r linux-x64 --self-contained false -p:SharedProjectsRoot="$shared_projects_root" -o "$stage/api"
+dotnet_args=(-p:UseSharedCompilation=false -m:1 -nr:false)
+if [[ -n "${ATLAS_BUILD_WORK:-}" ]]; then dotnet_args+=(-p:UseArtifactsOutput=true -p:ArtifactsPath="$ATLAS_BUILD_WORK/family-publish"); fi
+dotnet publish "$root/FamilyReward.Api/FamilyReward.Api.csproj" -c Release -r linux-x64 --self-contained false "${dotnet_args[@]}" -p:SharedProjectsRoot="$shared_projects_root" -o "$stage/api"
 rsync -a --exclude=node_modules --exclude=dist "$root/frontend/" "$stage/frontend/"
 mkdir -p "$stage/shared-sdk"
 git -C "$shared_projects_root/AgentFree" archive HEAD packages/agentfree-webapp-chat | tar -x -C "$stage/shared-sdk"
