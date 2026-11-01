@@ -17,7 +17,8 @@ for project in AgentIdentity MyVnc Linko family-reward-system; do
 done
 export ATLAS_ROOT="$projects/Atlas" AtlasRoot="$projects/Atlas" ATLAS_SOURCE_ROOT="$projects/Atlas"
 export MyVncRoot="$ATLAS_BUILD_WORK/source/MyVnc"
-export AgentIdentityRoot="$ATLAS_BUILD_WORK/source/AgentIdentity" AGENTIDENTITY_ROOT="$AgentIdentityRoot"
+export AgentIdentityRoot="$ATLAS_BUILD_WORK/source/AgentIdentity"
+export AGENTIDENTITY_ROOT="$AgentIdentityRoot"
 export FAMILY_REWARD_SHARED_PROJECTS_ROOT="$ATLAS_BUILD_WORK/source"
 (cd "$ATLAS_BUILD_WORK/source/Linko" && bash scripts/check-moment-connect.sh)
 for project in Linko family-reward-system; do
