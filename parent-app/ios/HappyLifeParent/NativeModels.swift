@@ -96,6 +96,12 @@ enum ActivityListDate {
 
 // Keep dismissal directional so a page swipe, short drag or upward pan cannot close the viewer.
 enum PhotoViewerSwipe {
+    static func pageOffset(horizontal: Double, vertical: Double, predictedHorizontal: Double) -> Int {
+        guard horizontal.isFinite, vertical.isFinite, predictedHorizontal.isFinite,
+              abs(horizontal) > 24, abs(horizontal) > abs(vertical) * 1.25,
+              abs(horizontal) >= 70 || abs(predictedHorizontal) >= 160 else { return 0 }
+        return horizontal < 0 ? 1 : -1
+    }
     static func shouldDismiss(horizontal: Double, vertical: Double, predictedVertical: Double) -> Bool {
         guard horizontal.isFinite, vertical.isFinite, predictedVertical.isFinite,
               vertical > 24, vertical > abs(horizontal) * 1.25 else { return false }

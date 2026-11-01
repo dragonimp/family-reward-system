@@ -766,7 +766,7 @@ struct DearSocialView: View {
         } else {
             Button {
                 selectedPhoto = photo
-                    } label: { photoCard(photo, path: path) }
+            } label: { photoCard(photo, path: path) }
             .buttonStyle(.plain)
         }
     }
@@ -1421,7 +1421,7 @@ struct DearSocialView: View {
         let tenant = activityTenantId, activity = activityId
         let loaded = try DearRecord.list(await store.call(base + "tenants/\(tenant)/activities/\(activity)/live/photos"))
         guard !Task.isCancelled, tenant == activityTenantId, activity == activityId else { return }
-        photos = loaded
+        photos = loaded.sorted { $0.sortDate == $1.sortDate ? $0.id < $1.id : $0.sortDate > $1.sortDate }
     }
     private var canDeleteSelectedPhotos: Bool {
         guard !selectedPhotoIDs.isEmpty else { return false }
@@ -1825,7 +1825,12 @@ private struct DearPhotoGalleryView: View {
                                         canDelete: allowsDeletion && photo.flag("canDelete"),
                                         active: photo.id == selectedID,
                                         onDeleted: { removed in onDeleted(photo.id, removed); dismiss() },
-                                        onSwipeDown: { dismiss() })
+                                        onSwipeDown: { dismiss() },
+                                        onPageSwipe: { offset in
+                                            guard let index = photos.firstIndex(where: { $0.id == photo.id }), photos.indices.contains(index + offset) else { return }
+                                            let target = photos[index + offset].id
+                                            if target != selectedID { withAnimation(.easeInOut(duration: 0.2)) { selectedID = target } }
+                                        })
                         .tag(photo.id)
                 }
             }
@@ -1834,7 +1839,6 @@ private struct DearPhotoGalleryView: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) { Button { dismiss() } label: { Image(systemName: "xmark").accessibilityLabel("关闭照片查看") } }
-                ToolbarItem(placement: .bottomBar) { Text("左右切换 · 下拉照片返回列表").font(.caption).foregroundStyle(.secondary) }
             }
             .onChange(of: notifications.showingInbox) { _, showing in if showing { dismiss() } }
             .onChange(of: selectedID) { _, _ in
@@ -1854,6 +1858,7 @@ private struct DearPhotoDetailView: View {
     var active = true
     let onDeleted: (Bool) -> Void
     var onSwipeDown: (() -> Void)? = nil
+    var onPageSwipe: ((Int) -> Void)? = nil
     @State private var dismissOffset = 0.0
     @State private var downwardDrag: Bool?
     @State private var image: UIImage?
@@ -1899,7 +1904,10 @@ private struct DearPhotoDetailView: View {
                             horizontal: value.translation.width, vertical: value.translation.height,
                             predictedVertical: value.predictedEndTranslation.height)
                         downwardDrag = nil
+                        let page = PhotoViewerSwipe.pageOffset(horizontal: value.translation.width,
+                            vertical: value.translation.height, predictedHorizontal: value.predictedEndTranslation.width)
                         if close { onSwipeDown?() }
+                        else if page != 0 { dismissOffset = 0; onPageSwipe?(page) }
                         else { withAnimation(.spring(response: 0.25, dampingFraction: 0.85)) { dismissOffset = 0 } }
                     })
                 Text(photo.text("originalFileName")).font(.headline)
