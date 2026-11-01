@@ -180,7 +180,7 @@ internal static class LinkoSocialGateway
             if (s.Length == 6 && s[4] == "photos" && (s[5] == "mine" || Guid.TryParse(s[5], out _))) return method == "DELETE" || method == "GET" && s[5] == "mine";
             if (s.Length == 7 && s[4] == "photos" && Guid.TryParse(s[5], out _) && s[6] == "recognition-consent") return method == "POST";
             if (s.Length == 7 && s[4] == "live" && s[5] == "photos" && s[6] == "mine") return method == "DELETE";
-            if (s.Length == 6 && s[4] == "live" && s[5] == "ice") return method == "GET";
+            if (s.Length == 6 && s[4] == "live" && s[5] == "ice-servers") return method == "GET";
             if (s.Length == 8 && s[4] == "live" && s[5] == "photos" && Guid.TryParse(s[6], out _) && s[7] is "authorize-transfer" or "resume" or "native-source") return method == "POST";
             if (s.Length == 5 && s[4] == "native-photos") return method == "POST";
             if (s.Length == 7 && s[4] == "native-photos" && Guid.TryParse(s[5], out _) && s[6] == "comments") return method is "GET" or "POST";

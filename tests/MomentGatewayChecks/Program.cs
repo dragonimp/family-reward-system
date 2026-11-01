@@ -66,6 +66,8 @@ upload.Headers.Add("X-Photo-Revision", "sha-revision");
 var reply = await client.SendAsync(upload); reply.EnsureSuccessStatusCode();
 var echo = JsonDocument.Parse(await reply.Content.ReadAsStringAsync()).RootElement;
 Check(echo.GetProperty("revision").GetString() == "sha-revision" && echo.GetProperty("body").GetString() == "preview", "preview upload and revision preserved");
+var liveIce = await client.GetStringAsync($"/api/dear/social/tenants/{tenant}/activities/{activity}/live/ice-servers");
+Check(liveIce.Contains("ice-servers"), "web photo viewer ICE configuration route");
 var ice = await client.GetStringAsync($"/api/dear/social/photo-requests/{requestId}/connect/ice?role=receiver");
 Check(ice.Contains("role=receiver"), "ICE role preserved");
 using var socket = new ClientWebSocket();
