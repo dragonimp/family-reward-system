@@ -45,7 +45,7 @@ function DearMoments({ spaceId, activityId, refreshIndex }: { spaceId: string; a
   return <section className="rounded-2xl bg-white p-5 shadow-sm">
     <div className="flex items-center justify-between"><div><h2 className="text-xl font-bold">生活日常</h2><p className="text-sm text-slate-500">只向这场活动的成员展示。</p></div><button className="text-sm text-teal-700" onClick={() => void reload().catch(e => setError(e.message))}>刷新</button></div>
     {error && <p role="alert" className="mt-3 rounded-lg bg-red-50 p-3 text-sm text-red-700">{error}</p>}
-    <div className="mt-4 space-y-3">{items.map(item => <article key={item.id} className="rounded-xl bg-slate-50 p-4"><div className="flex justify-between gap-3 text-sm"><b>{item.authorName}</b><time className="text-slate-500">{new Date(item.createdAt).toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' })}</time></div><p className="mt-2 whitespace-pre-wrap break-words">{item.text}</p>{item.canDelete && <button disabled={busy} className="mt-2 text-xs text-red-700" onClick={() => void remove(item.id)}>删除我的记录</button>}</article>)}{items.length === 0 && <p className="text-sm text-slate-500">还没有分享的日常。</p>}</div>
+    <div className="mt-4 space-y-3">{items.map(item => <article key={item.id} className="rounded-xl bg-slate-50 p-4"><div className="flex justify-between gap-3 text-sm"><b>{item.authorName}</b><time className="text-slate-500">{new Date(item.createdAt).toLocaleString('zh-CN')}</time></div><p className="mt-2 whitespace-pre-wrap break-words">{item.text}</p>{item.canDelete && <button disabled={busy} className="mt-2 text-xs text-red-700" onClick={() => void remove(item.id)}>删除记录</button>}</article>)}{items.length === 0 && <p className="text-sm text-slate-500">还没有分享的日常。</p>}</div>
   </section>;
 }
 
