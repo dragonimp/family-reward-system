@@ -53,11 +53,11 @@ import UniformTypeIdentifiers
     private var deviceInformation: [String: Any] {
         ["deviceName": UIDevice.current.name, "deviceModel": deviceModel, "platform": "iOS " + UIDevice.current.systemVersion]
     }
-    func deviceDescription(_ photo: DearRecord) -> String {
-        let id = photo.text("sourceDeviceId")
-        let name = photo.text("sourceDeviceName")
-        let model = photo.text("sourceDeviceModel")
-        let platform = photo.text("sourceDevicePlatform")
+    func deviceDescription(_ photo: [String: Any]) -> String {
+        let id = (photo["sourceDeviceId"] as? String ?? "")
+        let name = (photo["sourceDeviceName"] as? String ?? "")
+        let model = (photo["sourceDeviceModel"] as? String ?? "")
+        let platform = (photo["sourceDevicePlatform"] as? String ?? "")
         let detail = [name, model, platform].filter { !$0.isEmpty }.joined(separator: " · ")
         let relation = id.isEmpty ? "来源设备未登记" : currentDeviceID == nil ? "来源设备" : id.caseInsensitiveCompare(currentDeviceID!) == .orderedSame ? "本机" : "其他设备"
         return relation + (detail.isEmpty ? "" : " · " + detail)

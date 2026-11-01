@@ -858,7 +858,7 @@ struct DearSocialView: View {
                 VStack(alignment: .leading, spacing: 7) {
                     Text(photo.text("sourceDisplayName").isEmpty ? "活动成员" : photo.text("sourceDisplayName")).font(.subheadline.bold()).lineLimit(1)
                     DearPhotoPlaceView(photo: photo).font(.caption2).foregroundStyle(.secondary)
-                    Text(store.photoSource.deviceDescription(photo)).font(.caption2).foregroundStyle(.secondary).lineLimit(2)
+                    Text(store.photoSource.deviceDescription(photo.data)).font(.caption2).foregroundStyle(.secondary).lineLimit(2)
                     Text(photo.dateText("createdAt")).font(.caption2).foregroundStyle(.secondary)
                     if photo.text("contentType").hasPrefix("video/") { Label("视频", systemImage: "play.circle").font(.caption2) }
                     photoActions(photo)
@@ -867,7 +867,7 @@ struct DearSocialView: View {
         } else {
             VStack(alignment: .leading, spacing: 10) {
                 photoLink(photo)
-                Text(store.photoSource.deviceDescription(photo)).font(.caption2).foregroundStyle(.secondary).lineLimit(2)
+                Text(store.photoSource.deviceDescription(photo.data)).font(.caption2).foregroundStyle(.secondary).lineLimit(2)
                     Text(photo.dateText("createdAt")).font(.caption2).foregroundStyle(.secondary)
                 photoActions(photo)
             }.padding(.vertical, 8)
@@ -1975,7 +1975,7 @@ private struct DearPhotoDetailView: View {
                     })
                 Text(photo.text("originalFileName")).font(.headline)
                 Text("分享者：\(photo.text("sourceDisplayName"))").font(.subheadline).foregroundStyle(.secondary)
-                Label(store.photoSource.deviceDescription(photo), systemImage: "iphone").font(.caption).foregroundStyle(.secondary)
+                Label(store.photoSource.deviceDescription(photo.data), systemImage: "iphone").font(.caption).foregroundStyle(.secondary)
                 Text(photo.flag("serverCached") ? "服务器已缓存，可在共享设备离线时获取" : "服务器尚未缓存，获取原件需等待共享设备上线").font(.caption).foregroundStyle(.secondary)
                 Text("分享时间：\(photo.dateText("createdAt"))").font(.subheadline).foregroundStyle(.secondary)
                 DearPhotoPlaceView(photo: photo).font(.subheadline).foregroundStyle(.secondary)
