@@ -3,6 +3,19 @@ import SwiftUI
 import AgentIdentity
 import WatchConnectivity
 
+@MainActor final class PhotoTransferPresentation: ObservableObject {
+    @Published var notice: String?
+    @Published private(set) var progress: Double?
+    private var lastUpdate = 0.0
+    func updateProgress(_ value: Double?) {
+        guard value != progress else { return }
+        let now = ProcessInfo.processInfo.systemUptime
+        if value == nil || value == 1 || progress == nil || now - lastUpdate >= 0.2 {
+            progress = value; lastUpdate = now
+        }
+    }
+}
+
 @MainActor final class FamilyStore: NSObject, ObservableObject {
     let identity = AgentIdentitySession(origin: URL(string: "https://happylife.ai.xmkurt.com")!, callback: URL(string: "linkofamily://login-complete/")!, keychainService: "net.impx.happylife.identity")
     private let base = URL(string: "https://happylife.ai.xmkurt.com")!
@@ -10,8 +23,15 @@ import WatchConnectivity
     let photoSource = DearPhotoSource()
     let notifications = MomentNotifications()
     private var photoTransferStatuses: [String: String] = [:]
-    @Published var photoRequestNotice: String?
-    @Published var photoTransferProgress: Double?
+    let photoTransfers = PhotoTransferPresentation()
+    var photoRequestNotice: String? {
+        get { photoTransfers.notice }
+        set { if photoTransfers.notice != newValue { photoTransfers.notice = newValue } }
+    }
+    var photoTransferProgress: Double? {
+        get { photoTransfers.progress }
+        set { photoTransfers.updateProgress(newValue) }
+    }
     @Published var profile: Record?
     @Published var groups: [Record] = []
     @Published var children: [Record] = []
@@ -74,7 +94,9 @@ import WatchConnectivity
             throw APIError.message("照片预览读取失败（\(response.statusCode)），请刷新相册。")
         }
         guard let image = UIImage(data: data) else { throw APIError.message("照片预览格式无效。") }
-        return image
+        let prepared = await image.byPreparingForDisplay() ?? image
+        guard current == revision, token == identity.accessToken else { throw CancellationError() }
+        return prepared
     }
     func streamChat(sessionID: String, message: String) async throws {
         guard let token = identity.accessToken else { throw APIError.message("请先登录用户中心。") }

@@ -86,7 +86,7 @@ internal static class LinkoSocialGateway
         if (s.Length == 2 && s[0] == "photo-devices" && Guid.TryParse(s[1], out _)) return method == "DELETE";
         if (s.Length == 3 && s[0] == "photo-devices" && Guid.TryParse(s[1], out _) && s[2] == "requests") return method == "GET";
         if (s.Length == 2 && s[0] == "photo-requests" && Guid.TryParse(s[1], out _)) return method == "GET";
-        if (s.Length == 3 && s[0] == "photo-requests" && Guid.TryParse(s[1], out _) && s[2] is "unavailable" or "complete" or "cancel" or "begin" or "confirm") return method == "POST";
+        if (s.Length == 3 && s[0] == "photo-requests" && Guid.TryParse(s[1], out _) && s[2] is "unavailable" or "complete" or "cancel" or "begin" or "confirm" or "approve") return method == "POST";
         if (s.Length == 1 && s[0] == "tenants") return method is "GET" or "POST";
         if (s.Length == 2 && s[0] == "spaces" && s[1] == "mine") return method == "GET";
         if (s.Length == 2 && s[0] == "activities" && s[1] == "joined") return method == "GET";

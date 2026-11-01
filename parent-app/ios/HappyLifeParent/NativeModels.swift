@@ -100,3 +100,22 @@ enum PhotoViewerSwipe {
         return vertical >= 110 || predictedVertical >= 240
     }
 }
+
+struct PhotoGeography: Sendable {
+    var name: String
+    var latitude: Double?
+    var longitude: Double?
+    var altitudeMeters: Double?
+    static func altitude(_ value: Double?, belowSeaLevel: Bool) -> Double? {
+        guard let value, value.isFinite else { return nil }
+        let signed = belowSeaLevel ? -abs(value) : value
+        return (-12000...100000).contains(signed) ? signed : nil
+    }
+    static func iso6709(_ text: String) -> (Double, Double, Double?)? {
+        guard let regex = try? NSRegularExpression(pattern: #"^([+-]\d{2}(?:\.\d+)?)([+-]\d{3}(?:\.\d+)?)([+-]\d+(?:\.\d+)?)?/$"#),
+              let match = regex.firstMatch(in: text, range: NSRange(text.startIndex..., in: text)) else { return nil }
+        func value(_ index: Int) -> Double? { Range(match.range(at: index), in: text).flatMap { Double(text[$0]) } }
+        guard let lat = value(1), let lon = value(2), abs(lat) <= 90, abs(lon) <= 180 else { return nil }
+        return (lat,lon,altitude(value(3),belowSeaLevel:false))
+    }
+}

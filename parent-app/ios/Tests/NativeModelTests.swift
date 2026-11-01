@@ -1,6 +1,13 @@
 import Foundation
 @main struct NativeModelTests {
     static func main() throws {
+        precondition(PhotoGeography.altitude(nil, belowSeaLevel: false) == nil)
+        precondition(PhotoGeography.altitude(0, belowSeaLevel: false) == 0)
+        precondition(PhotoGeography.altitude(25.5, belowSeaLevel: true) == -25.5)
+        precondition(PhotoGeography.altitude(.nan, belowSeaLevel: false) == nil)
+        precondition(PhotoGeography.iso6709("+29.92000+093.98000+3480.5/")?.2 == 3480.5)
+        precondition(PhotoGeography.iso6709("-29.92000-093.98000/")?.2 == nil)
+        precondition(PhotoGeography.iso6709("+99.00000+093.98000/") == nil)
         precondition(PhotoViewerSwipe.shouldDismiss(horizontal: 5, vertical: 130, predictedVertical: 150))
         precondition(PhotoViewerSwipe.shouldDismiss(horizontal: 5, vertical: 45, predictedVertical: 270))
         precondition(!PhotoViewerSwipe.shouldDismiss(horizontal: 180, vertical: 60, predictedVertical: 300))

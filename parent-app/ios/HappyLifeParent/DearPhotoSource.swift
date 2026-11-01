@@ -119,7 +119,7 @@ import UniformTypeIdentifiers
                         defer { try? FileManager.default.removeItem(at: copy) }
                         try await publishVideo(at: copy, spaceID: batch.tenantID, activityID: batch.activityID)
                     } else if item.mediaType == "image" {
-                        let imageData = try Data(contentsOf: url)
+                        let imageData = try await Task.detached(priority: .utility) { try Data(contentsOf: url) }.value
                         try await publish(imageData, spaceID: batch.tenantID, activityID: batch.activityID,
                                           name: item.displayName,
                                           locationName: DearPhotoLocation.label(in: imageData) ?? "")
@@ -196,7 +196,7 @@ import UniformTypeIdentifiers
         else if type.conforms(to: .webP) { format = ("image/webp", "webp") }
         else { throw APIError.message("该照片格式暂不支持共享。") }
         let temporary = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + "." + format.ext)
-        try imageData.write(to: temporary, options: .atomic)
+        try await Task.detached(priority: .utility) { try imageData.write(to: temporary, options: .atomic) }.value
         defer { try? FileManager.default.removeItem(at: temporary) }
         let fileName = name.contains(".") ? name : name + "." + format.ext
         try await publishMedia(at: temporary, contentType: format.mime, spaceID: spaceID, activityID: activityID, name: fileName, locationName: locationName)
@@ -222,7 +222,7 @@ import UniformTypeIdentifiers
         let subject = try await currentSubject()
         let root = try directory(for: subject)
         var index = try readIndex(at: root)
-        var deviceBody: [String: Any] = ["id": index.deviceID as Any? ?? NSNull(), "notificationApplicationKey": "happylife.ai", "transferProtocol": "connect-datachannel-v1"]
+        let deviceBody: [String: Any] = ["id": index.deviceID as Any? ?? NSNull(), "notificationApplicationKey": "happylife.ai", "transferProtocol": "connect-datachannel-v1"]
         let device = try await store.call("/api/dear/social/photo-devices", method: "POST",
                                           body: deviceBody) as? [String: Any]
         guard let deviceID = device?["id"] as? String, UUID(uuidString: deviceID) != nil else {
@@ -244,9 +244,10 @@ import UniformTypeIdentifiers
         let localName = UUID().uuidString + suffix
         let localURL = root.appendingPathComponent(localName)
         do {
-            do { try FileManager.default.moveItem(at: sourceURL, to: localURL) }
-            catch { try FileManager.default.copyItem(at: sourceURL, to: localURL) }
-            try FileManager.default.setAttributes([.protectionKey: FileProtectionType.completeUntilFirstUserAuthentication], ofItemAtPath: localURL.path)
+            try await Task.detached(priority: .utility) {
+                try FileManager.default.copyItem(at: sourceURL, to: localURL)
+                try FileManager.default.setAttributes([.protectionKey: FileProtectionType.completeUntilFirstUserAuthentication], ofItemAtPath: localURL.path)
+            }.value
         } catch {
             try? FileManager.default.removeItem(at: localURL)
             throw error
@@ -256,10 +257,13 @@ import UniformTypeIdentifiers
         var publishedID: String?
         do {
             let sha = try await hashFile(localURL)
-            let thumbnail = try preview(fromFile: localURL)
+            let thumbnail = try await Task.detached(priority: .utility) { try Self.preview(fromFile: localURL) }.value
+            let geography = await DearPhotoLocation.geography(at: localURL, fallbackName: locationName)
             let response = try await store.call(prefix + "/native-photos", method: "POST", body: [
                 "deviceId": deviceID, "fileName": displayName, "contentType": contentType,
-                "length": length, "sha256": sha, "locationName": String(locationName.trimmingCharacters(in: .whitespacesAndNewlines).prefix(200))]) as? [String: Any]
+                "length": length, "sha256": sha, "locationName": String(geography.name.trimmingCharacters(in: .whitespacesAndNewlines).prefix(200)),
+                "latitude": geography.latitude as Any? ?? NSNull(), "longitude": geography.longitude as Any? ?? NSNull(),
+                "altitudeMeters": geography.altitudeMeters as Any? ?? NSNull()]) as? [String: Any]
             guard let photoID = response?["id"] as? String, UUID(uuidString: photoID) != nil else {
                 throw APIError.message("照片登记回执无效。")
             }
@@ -328,10 +332,11 @@ import UniformTypeIdentifiers
         // A list response is not proof that a missing photo was revoked. Keep
         // originals until deletion is confirmed so other members can fetch them.
         for photo in index.photos where photo.spaceID == spaceID && photo.activityID == activityID {
+            guard !Task.isCancelled else { return }
             guard rows.contains(where: { ($0["id"] as? String) == photo.id && ($0["thumbnailAvailable"] as? Bool) == false }) else { continue }
             let path = root.appendingPathComponent(photo.fileName)
             guard (try? path.resourceValues(forKeys: [.fileSizeKey]).fileSize) == photo.length,
-                  let thumbnail = try? preview(fromFile: path) else { continue }
+                  let thumbnail = try? await Task.detached(priority: .utility, operation: { try Self.preview(fromFile: path) }).value else { continue }
             try? await uploadThumbnail(thumbnail, prefix: prefix, photoID: photo.id, revision: photo.sha256)
         }
     }
@@ -341,21 +346,33 @@ import UniformTypeIdentifiers
               let index = try? readIndex(at: root) else { return false }
         var changed = false
         for photo in index.photos where photo.spaceID == spaceID && photo.activityID == activityID {
+            guard !Task.isCancelled else { return changed }
             guard !checkedLocationIDs.contains(photo.id),
                   let row = rows.first(where: { ($0["id"] as? String) == photo.id }),
-                  (row["locationName"] as? String ?? "").isEmpty,
-                  photo.fileName.lowercased().hasSuffix(".jpg") || photo.fileName.lowercased().hasSuffix(".heic") || photo.fileName.lowercased().hasSuffix(".png") else { continue }
+                  (row["latitude"] as? NSNumber == nil || row["altitudeMeters"] as? NSNumber == nil ||
+                   (row["locationName"] as? String ?? "").isEmpty || DearPhotoLocation.coordinateLabel(row["locationName"] as? String ?? "") != nil) else { continue }
             checkedLocationIDs.insert(photo.id)
-            guard let local = await localOriginal(photoID: photo.id, spaceID: spaceID, activityID: activityID),
-                  let data = try? Data(contentsOf: local, options: .mappedIfSafe),
-                  let locationName = DearPhotoLocation.label(in: data) else { continue }
+            guard let local = await localOriginal(photoID: photo.id, spaceID: spaceID, activityID: activityID) else { continue }
+            let name = row["locationName"] as? String ?? ""
+            let geography = await DearPhotoLocation.geography(at: local, fallbackName: name)
+            guard geography.name != name || geography.latitude != nil && row["latitude"] as? NSNumber == nil ||
+                  geography.altitudeMeters != nil && row["altitudeMeters"] as? NSNumber == nil else { continue }
             do {
                 _ = try await store.call("/api/dear/social/tenants/\(spaceID)/activities/\(activityID)/live/photos/\(photo.id)/location",
-                                         method: "PATCH", body: ["locationName": locationName])
+                    method: "PATCH", body: ["locationName": String(geography.name.prefix(200)),
+                        "latitude": geography.latitude as Any? ?? NSNull(), "longitude": geography.longitude as Any? ?? NSNull(),
+                        "altitudeMeters": geography.altitudeMeters as Any? ?? NSNull()])
                 changed = true
             } catch { checkedLocationIDs.remove(photo.id) }
         }
         return changed
+    }
+
+    func stopRequest(_ id: UUID) async throws {
+        guard let store else { throw APIError.message("活动服务不可用。") }
+        _ = try await store.call("/api/dear/social/photo-requests/\(id.uuidString)/cancel", method: "POST", body: [:])
+        sourceTasks.removeValue(forKey: id.uuidString.lowercased())?.cancel()
+        if sourceTasks.isEmpty { store.photoRequestNotice = nil; store.photoTransferProgress = nil }
     }
 
     func localOriginal(photoID: String, spaceID: String, activityID: String) async -> URL? {
@@ -369,7 +386,7 @@ import UniformTypeIdentifiers
     }
 
     func downloadOriginal(photoID: String, spaceID: String, activityID: String,
-                          progress: ((Double) -> Void)? = nil) async throws -> URL {
+                          status: ((String) -> Void)? = nil, progress: ((Double) -> Void)? = nil) async throws -> URL {
         guard UUID(uuidString: photoID) != nil, UUID(uuidString: spaceID) != nil,
               UUID(uuidString: activityID) != nil else { throw APIError.message("照片标识无效。") }
         if let local = await localOriginal(photoID: photoID, spaceID: spaceID, activityID: activityID) { return local }
@@ -420,18 +437,44 @@ import UniformTypeIdentifiers
             }
             try? FileManager.default.removeItem(at: finalURL)
         }
-        let manifest = try connectManifest(request)
+        var current = request
         let expectedGeneration = generation
+        while current["status"] as? String == "pending_approval" {
+            status?("等待分享者打开消息同意…")
+            try Task.checkCancellation()
+            guard expectedGeneration == generation else { throw CancellationError() }
+            guard let expiry = (current["expiresAt"] as? NSNumber)?.doubleValue, Date().timeIntervalSince1970 * 1000 < expiry else {
+                throw APIError.message("等待同意已超时，请重新发起下载请求。")
+            }
+            try await Task.sleep(for: .seconds(2))
+            guard let next = try await store.call("/api/dear/social/photo-requests/\(id)") as? [String: Any] else { throw APIError.message("请求状态读取失败。") }
+            current = next
+        }
+        if let state = current["status"] as? String, ["cancelled", "expired", "revoked", "unavailable", "failed"].contains(state) {
+            throw APIError.message("本次分享已停止、已过期或不可用，请重新发起下载请求。")
+        }
+        status?("已同意，正在连接原件设备…")
+        let manifest = try connectManifest(current)
+
         let transfer = RealtimeFileTransfer(), transferID = UUID()
         transfers[transferID] = transfer
         defer { transfers.removeValue(forKey: transferID) }
         let requests = try await connectRequests(requestID: id, role: "receiver")
         guard expectedGeneration == generation else { throw CancellationError() }
-        try await withTaskCancellationHandler {
-            try await transfer.receive(partial: partialURL, manifest: manifest, requests: requests) { value in
-                await MainActor.run { progress?(value) }
+        do {
+            try await withTaskCancellationHandler {
+                try await transfer.receive(partial: partialURL, manifest: manifest, requests: requests) { value in
+                    await MainActor.run { progress?(value) }
+                }
+            } onCancel: { Task { await transfer.cancel() } }
+        } catch {
+            try Task.checkCancellation()
+            if let latest = try? await store.call("/api/dear/social/photo-requests/\(id)") as? [String: Any],
+               let state = latest["status"] as? String, ["cancelled", "expired", "revoked", "unavailable"].contains(state) {
+                throw APIError.message("本次分享已停止、已过期或不可用，请重新发起下载请求。")
             }
-        } onCancel: { Task { await transfer.cancel() } }
+            throw error
+        }
         // Connect returns only after peer acknowledgement and durable SHA validation.
         _ = try await store.call("/api/dear/social/photo-requests/\(id)/complete", method: "POST", body: [:])
         try FileManager.default.moveItem(at: partialURL, to: finalURL)
@@ -517,28 +560,29 @@ import UniformTypeIdentifiers
         return digest.finalize().map { String(format: "%02x", $0) }.joined()
     }
 
-    private func preview(fromFile fileURL: URL) throws -> Data {
-        let image: UIImage?
-        if fileURL.pathExtension.lowercased() == "mp4" || fileURL.pathExtension.lowercased() == "mov" {
+    private nonisolated static func preview(fromFile fileURL: URL) throws -> Data {
+        let image: CGImage?
+        if ["mp4", "mov"].contains(fileURL.pathExtension.lowercased()) {
             let generator = AVAssetImageGenerator(asset: AVURLAsset(url: fileURL))
             generator.appliesPreferredTrackTransform = true
-            image = (try? generator.copyCGImage(at: .zero, actualTime: nil)).map(UIImage.init(cgImage:))
-        } else { image = UIImage(contentsOfFile: fileURL.path) }
-        guard let image, image.size.width > 0, image.size.height > 0 else {
-            throw APIError.message("无法处理照片预览。")
-        }
-        let scale = min(360 / image.size.width, 360 / image.size.height, 1)
-        let size = CGSize(width: image.size.width * scale, height: image.size.height * scale)
-        let format = UIGraphicsImageRendererFormat.default()
-        format.scale = 1
-        format.opaque = true
-        let rendered = UIGraphicsImageRenderer(size: size, format: format).image { _ in
-            image.draw(in: CGRect(origin: .zero, size: size))
-        }
-        guard let jpeg = rendered.jpegData(compressionQuality: 0.65), jpeg.count <= 256 * 1024 else {
+            generator.maximumSize = CGSize(width: 360, height: 360)
+            image = try? generator.copyCGImage(at: .zero, actualTime: nil)
+        } else if let source = CGImageSourceCreateWithURL(fileURL as CFURL, nil) {
+            image = CGImageSourceCreateThumbnailAtIndex(source, 0, [
+                kCGImageSourceCreateThumbnailFromImageAlways: true,
+                kCGImageSourceCreateThumbnailWithTransform: true,
+                kCGImageSourceThumbnailMaxPixelSize: 360,
+                kCGImageSourceShouldCacheImmediately: true
+            ] as CFDictionary)
+        } else { image = nil }
+        guard let image else { throw APIError.message("无法处理照片预览。") }
+        let output = NSMutableData()
+        guard let destination = CGImageDestinationCreateWithData(output, UTType.jpeg.identifier as CFString, 1, nil) else {
             throw APIError.message("照片预览无法压缩。")
         }
-        return jpeg
+        CGImageDestinationAddImage(destination, image, [kCGImageDestinationLossyCompressionQuality: 0.65] as CFDictionary)
+        guard CGImageDestinationFinalize(destination), output.length <= 256 * 1024 else { throw APIError.message("照片预览无法压缩。") }
+        return output as Data
     }
 
     private func uploadThumbnail(_ data: Data, prefix: String, photoID: String, revision: String) async throws {

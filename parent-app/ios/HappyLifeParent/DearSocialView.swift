@@ -92,6 +92,109 @@ enum DearPhotoLocation {
     }
 }
 
+@MainActor private final class PhotoPlaceNames {
+    static let shared = PhotoPlaceNames()
+    private var cached: [String: (String?, Date)] = [:]
+    private var pending: [String: Task<String?, Never>] = [:]
+    private var tail: Task<String?, Never>?
+    func name(latitude: Double, longitude: Double) async -> String? {
+        guard latitude.isFinite, longitude.isFinite, abs(latitude) <= 90, abs(longitude) <= 180 else { return nil }
+        let key = String(format: "%.4f,%.4f", latitude, longitude)
+        if let (value, expires) = cached[key], expires > Date() { return value }
+        if let task = pending[key] { return await task.value }
+        let previous = tail
+        let task = Task { @MainActor () -> String? in
+            _ = await previous?.value
+            let geocoder = CLGeocoder()
+            let places = try? await geocoder.reverseGeocodeLocation(CLLocation(latitude: latitude, longitude: longitude))
+            let place = places?.first
+            let parts = [place?.administrativeArea, place?.locality, place?.subLocality, place?.name].compactMap { $0?.trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty }
+            var unique: [String] = []
+            for part in parts where !unique.contains(part) { unique.append(part) }
+            let result = unique.isEmpty ? nil : String(unique.joined(separator: " ").prefix(200))
+            try? await Task.sleep(for: .milliseconds(300))
+            return result
+        }
+        pending[key] = task; tail = task
+        let value = await task.value
+        pending.removeValue(forKey: key); cached[key] = (value, Date().addingTimeInterval(value == nil ? 60 : 3600))
+        return value
+    }
+}
+
+extension DearPhotoLocation {
+    static func coordinateLabel(_ text: String) -> (Double, Double)? {
+        let parts = text.components(separatedBy: "，")
+        guard parts.count == 2 else { return nil }
+        let lat = parts[0].trimmingCharacters(in: .whitespaces), lon = parts[1].trimmingCharacters(in: .whitespaces)
+        guard lat.hasPrefix("北纬") || lat.hasPrefix("南纬"), lon.hasPrefix("东经") || lon.hasPrefix("西经"),
+              let latitude = Double(lat.dropFirst(2).trimmingCharacters(in: .whitespaces)),
+              let longitude = Double(lon.dropFirst(2).trimmingCharacters(in: .whitespaces)), abs(latitude) <= 90, abs(longitude) <= 180 else { return nil }
+        return (lat.hasPrefix("南纬") ? -latitude : latitude, lon.hasPrefix("西经") ? -longitude : longitude)
+    }
+    @MainActor static func geography(at url: URL, fallbackName: String) async -> PhotoGeography {
+        var result = PhotoGeography(name: fallbackName, latitude: nil, longitude: nil, altitudeMeters: nil)
+        if ["mp4", "mov"].contains(url.pathExtension.lowercased()) {
+            let asset = AVURLAsset(url: url)
+            if let metadata = try? await asset.load(.metadata) {
+                for item in metadata where item.identifier == .quickTimeMetadataLocationISO6709 {
+                    if let text = try? await item.load(.stringValue), let (lat,lon,alt) = PhotoGeography.iso6709(text) {
+                        result.latitude = lat; result.longitude = lon; result.altitudeMeters = alt; break
+                    }
+                }
+            }
+        } else {
+            let fields = await Task.detached(priority: .utility) { () -> PhotoGeography in
+                var info = PhotoGeography(name: fallbackName, latitude: nil, longitude: nil, altitudeMeters: nil)
+                guard let source = CGImageSourceCreateWithURL(url as CFURL, [kCGImageSourceShouldCache: false] as CFDictionary),
+                      let props = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [String: Any],
+                      let gps = props[kCGImagePropertyGPSDictionary as String] as? [String: Any] else { return info }
+                if let lat = (gps[kCGImagePropertyGPSLatitude as String] as? NSNumber)?.doubleValue,
+                   let lon = (gps[kCGImagePropertyGPSLongitude as String] as? NSNumber)?.doubleValue, lat.isFinite, lon.isFinite, abs(lat) <= 90, abs(lon) <= 180 {
+                    info.latitude = (gps[kCGImagePropertyGPSLatitudeRef as String] as? String)?.uppercased() == "S" ? -lat : lat
+                    info.longitude = (gps[kCGImagePropertyGPSLongitudeRef as String] as? String)?.uppercased() == "W" ? -lon : lon
+                }
+                info.altitudeMeters = PhotoGeography.altitude((gps[kCGImagePropertyGPSAltitude as String] as? NSNumber)?.doubleValue,
+                    belowSeaLevel: (gps[kCGImagePropertyGPSAltitudeRef as String] as? NSNumber)?.intValue == 1)
+                return info
+            }.value
+            result = fields
+        }
+        if result.latitude == nil, let (lat,lon) = coordinateLabel(fallbackName) { result.latitude = lat; result.longitude = lon }
+        if result.name.isEmpty || coordinateLabel(result.name) != nil, let lat = result.latitude, let lon = result.longitude {
+            result.name = await PhotoPlaceNames.shared.name(latitude: lat, longitude: lon) ?? coordinates(latitude: lat, longitude: lon) ?? fallbackName
+        }
+        return result
+    }
+}
+
+private struct DearPhotoPlaceView: View {
+    let photo: DearRecord
+    @State private var resolvedName: String?
+    private var coordinates: (Double,Double)? {
+        if let lat = photo.data["latitude"] as? NSNumber, let lon = photo.data["longitude"] as? NSNumber { return (lat.doubleValue,lon.doubleValue) }
+        return DearPhotoLocation.coordinateLabel(photo.text("locationName"))
+    }
+    private var name: String {
+        let raw = photo.text("locationName")
+        if !raw.isEmpty && DearPhotoLocation.coordinateLabel(raw) == nil { return raw }
+        return resolvedName ?? (coordinates == nil ? "位置未记录" : "位置已记录，地点名称待解析")
+    }
+    var body: some View {
+        VStack(alignment: .leading, spacing: 3) {
+            Label(name, systemImage: "mappin").lineLimit(2)
+            if let altitude = (photo.data["altitudeMeters"] as? NSNumber)?.doubleValue, altitude.isFinite {
+                Label("海拔 \(altitude.formatted(.number.precision(.fractionLength(0...1)))) 米", systemImage: "mountain.2").lineLimit(1)
+            } else { Label("海拔未记录", systemImage: "mountain.2").lineLimit(1) }
+        }
+        .task(id: photo.text("locationName") + String(describing: coordinates)) {
+            guard let (lat,lon) = coordinates, photo.text("locationName").isEmpty || DearPhotoLocation.coordinateLabel(photo.text("locationName")) != nil else { return }
+            let value = await PhotoPlaceNames.shared.name(latitude: lat, longitude: lon)
+            if !Task.isCancelled { resolvedName = value }
+        }
+    }
+}
+
 private struct DearPickedVideo: Transferable {
     let url: URL
     static var transferRepresentation: some TransferRepresentation {
@@ -106,6 +209,11 @@ private struct DearPickedVideo: Transferable {
 
 private struct DearRecord: Identifiable {
     let data: [String: Any]
+    let sortDate: Date
+    init(data: [String: Any]) {
+        self.data = data
+        self.sortDate = ActivityListDate.parse(data["createdAt"] as? String ?? "") ?? .distantPast
+    }
     var id: String { text("id") }
     var subject: String { text("subject") }
     func text(_ key: String) -> String { data[key] as? String ?? "" }
@@ -349,10 +457,15 @@ struct DearSocialView: View {
     @State private var selectingPhotoDownloads = false
     @State private var selectedPhotoIDs = Set<String>()
     @State private var batchOriginalURLs: [URL] = []
-    @State private var batchDownloadProgress = 0.0
+    @State private var batchProgress = PhotoTransferPresentation()
+    private var batchDownloadProgress: Double {
+        get { batchProgress.progress ?? 0 }
+        nonmutating set { batchProgress.updateProgress(newValue) }
+    }
     @State private var batchDownloading = false
     @State private var batchDeleting = false
     @State private var showingBatchDelete = false
+    @State private var photoToDelete: DearRecord?
     @State private var batchDownloadError = ""
     @State private var moments: [DearRecord] = []
     @State private var checkIns: [DearRecord] = []
@@ -657,10 +770,7 @@ struct DearSocialView: View {
                 }
                 .overlay(alignment: .bottomLeading) {
                     HStack(alignment: .bottom) {
-                        if !photo.text("locationName").isEmpty {
-                            Label(photo.text("locationName"), systemImage: "mappin")
-                                .font(.caption2).lineLimit(2)
-                        }
+                        DearPhotoPlaceView(photo: photo).font(.caption2)
                         Spacer(minLength: 0)
                         if photo.text("contentType").hasPrefix("video/") { Image(systemName: "play.circle.fill").font(.title2) }
                     }
@@ -781,7 +891,7 @@ struct DearSocialView: View {
                         .disabled(!canDeleteSelectedPhotos || batchDownloading || batchDeleting)
                 }
                 Text("分享者和活动 owner 可删除分享；iPhone 相册原件保留。") .font(.caption).foregroundStyle(.secondary)
-                if batchDownloading || batchDownloadProgress > 0 && batchDownloadProgress < 1 { ProgressView(value: batchDownloadProgress) }
+                DearBatchProgress(presentation: batchProgress, active: batchDownloading)
                 if !batchOriginalURLs.isEmpty { ShareLink(items: batchOriginalURLs) { Label("保存或分享 \(batchOriginalURLs.count) 项", systemImage: "square.and.arrow.up") } }
                 if !batchDownloadError.isEmpty { Text(batchDownloadError).font(.caption).foregroundStyle(.red) }
             }
@@ -793,8 +903,8 @@ struct DearSocialView: View {
         let located = checkIns.map { DearTimelineEntry(id: "checkin:" + $0.id, kind: .checkIn, record: $0) }
         let media = photos.map { DearTimelineEntry(id: "photo:" + $0.id, kind: .photo, record: $0) }
         return (shared + located + media).sorted {
-            let left = ActivityListDate.parse($0.record.text("createdAt")) ?? .distantPast
-            let right = ActivityListDate.parse($1.record.text("createdAt")) ?? .distantPast
+            let left = $0.record.sortDate
+            let right = $1.record.sortDate
             return left == right ? $0.id < $1.id : left > right
         }
     }
@@ -813,6 +923,10 @@ struct DearSocialView: View {
                     VStack(alignment: .leading, spacing: 10) {
                         photoLink(entry.record)
                         Text(entry.record.dateText("createdAt")).font(.caption2).foregroundStyle(.secondary)
+                        if entry.record.flag("canDelete") {
+                            Button("删除分享", role: .destructive) { photoToDelete = entry.record }
+                                .buttonStyle(.borderless).disabled(busy || batchDeleting || batchDownloading)
+                        }
                         DearPhotoCommentsView(store: store, spaceID: activityTenantId, activityID: activityId, photoID: entry.record.id)
                             .id("\(activityTenantId)/\(activityId)/\(entry.record.id)")
                     }.padding(.vertical, 8)
@@ -891,6 +1005,16 @@ struct DearSocialView: View {
         }
         .listStyle(.insetGrouped)
         .readablePage()
+        .task(id: activityTenantId + activityId + photos.map(\.id).joined()) {
+            let tenant = activityTenantId, activity = activityId, rows = photos.map(\.data)
+            guard !tenant.isEmpty, !activity.isEmpty, !rows.isEmpty else { return }
+            await store.photoSource.refreshPreviews(spaceID: tenant, activityID: activity, rows: rows)
+            let changed = await store.photoSource.refreshLocations(spaceID: tenant, activityID: activity, rows: rows)
+            guard !Task.isCancelled, tenant == activityTenantId, activity == activityId else { return }
+            if changed || rows.contains(where: { ($0["thumbnailAvailable"] as? Bool) == false }) {
+                try? await loadPhotos()
+            }
+        }
         .navigationTitle(selectedActivity?.text("title") ?? "活动详情")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
@@ -917,6 +1041,19 @@ struct DearSocialView: View {
                                      })
             }
         }
+        .confirmationDialog("删除这项分享？", isPresented: Binding(get: { photoToDelete != nil }, set: { if !$0 { photoToDelete = nil } }), titleVisibility: .visible) {
+            if let photo = photoToDelete {
+                Button("删除分享", role: .destructive) {
+                    let tenant = activityTenantId, activity = activityId
+                    run {
+                        _ = try await store.photoSource.revoke(photoID: photo.id, spaceID: tenant, activityID: activity)
+                        if tenant == activityTenantId && activity == activityId { photos.removeAll { $0.id == photo.id } }
+                        photoToDelete = nil; notice = "分享已删除，设备相册原件保留。"
+                    }
+                }
+            }
+            Button("取消", role: .cancel) { photoToDelete = nil }
+        } message: { Text("分享者或活动 owner 可删除；活动成员将无法再下载，设备相册原件保留。") }
         .confirmationDialog("删除选中的 \(selectedPhotoIDs.count) 项分享？", isPresented: $showingBatchDelete, titleVisibility: .visible) {
             Button("删除选中的分享", role: .destructive) { Task { await deleteSelectedPhotos() } }
             Button("取消", role: .cancel) { }
@@ -953,7 +1090,7 @@ struct DearSocialView: View {
             error = value
         }
         .onDisappear { pendingCheckIn = false }
-        .onChange(of: activityId) { _, _ in showingActivityManagement = false; showingPhoto = false; selectedPhoto = nil; inviteLink = ""; inviteUsername = ""; momentDraft = ""; momentRequestID = UUID(); photoLocationName = ""; selectingPhotoDownloads = false; selectedPhotoIDs.removeAll(); batchOriginalURLs = [] }
+        .onChange(of: activityId) { _, _ in photoToDelete = nil; showingActivityManagement = false; showingPhoto = false; selectedPhoto = nil; inviteLink = ""; inviteUsername = ""; momentDraft = ""; momentRequestID = UUID(); photoLocationName = ""; selectingPhotoDownloads = false; selectedPhotoIDs.removeAll(); batchOriginalURLs = [] }
         .onChange(of: selectedPhotos) { _, selected in
             guard !selected.isEmpty else { return }
             let targetSpace = activityTenantId, targetActivity = activityId
@@ -1242,14 +1379,7 @@ struct DearSocialView: View {
     }
     private func loadPhotos() async throws {
         guard !activityTenantId.isEmpty, !activityId.isEmpty else { return }
-        var loaded = try DearRecord.list(await store.call(base + "tenants/\(activityTenantId)/activities/\(activityId)/live/photos"))
-        if loaded.contains(where: { !$0.flag("thumbnailAvailable") }) {
-            await store.photoSource.refreshPreviews(spaceID: activityTenantId, activityID: activityId, rows: loaded.map(\.data))
-            loaded = try DearRecord.list(await store.call(base + "tenants/\(activityTenantId)/activities/\(activityId)/live/photos"))
-        }
-        if await store.photoSource.refreshLocations(spaceID: activityTenantId, activityID: activityId, rows: loaded.map(\.data)) {
-            loaded = try DearRecord.list(await store.call(base + "tenants/\(activityTenantId)/activities/\(activityId)/live/photos"))
-        }
+        let loaded = try DearRecord.list(await store.call(base + "tenants/\(activityTenantId)/activities/\(activityId)/live/photos"))
         photos = loaded
     }
     private var canDeleteSelectedPhotos: Bool {
@@ -1506,6 +1636,16 @@ private final class DearCheckInLocator: NSObject, ObservableObject, CLLocationMa
     }
 }
 
+private struct DearBatchProgress: View {
+    @ObservedObject var presentation: PhotoTransferPresentation
+    let active: Bool
+    var body: some View {
+        if active || (presentation.progress ?? 0) > 0 && (presentation.progress ?? 0) < 1 {
+            ProgressView(value: presentation.progress ?? 0)
+        }
+    }
+}
+
 private struct DearPhotoPreview: View {
     @ObservedObject var store: FamilyStore
     let path: String
@@ -1595,7 +1735,8 @@ private struct DearPhotoCommentsView: View {
     @MainActor private func load(reset: Bool) async throws {
         let skip = reset ? 0 : nextSkip
         guard let result = try await store.call(route + "?skip=\(skip)") as? [String: Any] else { throw APIError.message("无法读取点评。") }
-        let rows = try DearRecord.list(result["items"])
+        guard let values = result["items"] else { throw APIError.message("点评返回格式无效。") }
+        let rows = try DearRecord.list(values)
         if reset { comments = rows } else { comments += rows.filter { row in !comments.contains { $0.id == row.id } } }
         nextSkip = result["nextSkip"] as? Int ?? skip + rows.count
         hasMore = result["hasMore"] as? Bool ?? false
@@ -1610,6 +1751,7 @@ private struct DearPhotoCommentsView: View {
 
 private struct DearPhotoGalleryView: View {
     @ObservedObject var store: FamilyStore
+    @ObservedObject var notifications: MomentNotifications
     let photos: [DearRecord]
     let spaceID: String
     let activityID: String
@@ -1620,7 +1762,7 @@ private struct DearPhotoGalleryView: View {
 
     init(store: FamilyStore, photos: [DearRecord], initialPhotoID: String, spaceID: String, activityID: String,
          allowsDeletion: Bool, onDeleted: @escaping (String, Bool) -> Void) {
-        self.store = store; self.spaceID = spaceID; self.activityID = activityID
+        self.store = store; self.notifications = store.notifications; self.spaceID = spaceID; self.activityID = activityID
         self.allowsDeletion = allowsDeletion; self.onDeleted = onDeleted
         self.photos = photos.sorted {
             let left = ActivityListDate.parse($0.text("createdAt")) ?? .distantPast
@@ -1648,6 +1790,7 @@ private struct DearPhotoGalleryView: View {
                 ToolbarItem(placement: .topBarLeading) { Button { dismiss() } label: { Image(systemName: "xmark").accessibilityLabel("关闭照片查看") } }
                 ToolbarItem(placement: .bottomBar) { Text("左右切换 · 下拉照片返回列表").font(.caption).foregroundStyle(.secondary) }
             }
+            .onChange(of: notifications.showingInbox) { _, showing in if showing { dismiss() } }
             .onChange(of: selectedID) { _, _ in
                 UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
             }
@@ -1673,6 +1816,7 @@ private struct DearPhotoDetailView: View {
     @State private var originalImage: UIImage?
     @State private var originalError: String?
     @State private var fetchingOriginal = false
+    @State private var downloadStatus = ""
     @State private var transferProgress = 0.0
     @State private var deleting = false
     @State private var showingDelete = false
@@ -1714,15 +1858,14 @@ private struct DearPhotoDetailView: View {
                 Text(photo.text("originalFileName")).font(.headline)
                 Text("分享者：\(photo.text("sourceDisplayName"))").font(.subheadline).foregroundStyle(.secondary)
                 Text("分享时间：\(photo.dateText("createdAt"))").font(.subheadline).foregroundStyle(.secondary)
-                Text("地点：\(photo.text("locationName").isEmpty ? "未记录" : photo.text("locationName"))")
-                    .font(.subheadline).foregroundStyle(.secondary)
+                DearPhotoPlaceView(photo: photo).font(.subheadline).foregroundStyle(.secondary)
                 if let originalURL {
                     ShareLink(item: originalURL) { Label("分享原文件", systemImage: "square.and.arrow.up") }
                 } else {
                     Button {
                         Task { await fetchOriginal() }
                     } label: {
-                        Label(fetchingOriginal ? "正在实时接收：\(Int(transferProgress * 100))%" : originalError == nil ? "获取原文件" : "继续获取原文件", systemImage: "arrow.down.circle")
+                        Label(fetchingOriginal ? (downloadStatus == "正在接收原文件" ? "正在接收原文件：\(Int(transferProgress * 100))%" : downloadStatus) : originalError == nil ? "获取原文件" : "继续获取原文件", systemImage: "arrow.down.circle")
                     }.disabled(fetchingOriginal)
                 }
                 if fetchingOriginal || transferProgress > 0 && transferProgress < 1 {
@@ -1758,21 +1901,21 @@ private struct DearPhotoDetailView: View {
         do { image = try await store.authenticatedImage(path) }
         catch {
             if let local = await store.photoSource.localOriginal(photoID: photo.id, spaceID: spaceID, activityID: activityID),
-               let localImage = UIImage(contentsOfFile: local.path) { image = localImage }
+               let localImage = UIImage(contentsOfFile: local.path) { image = await localImage.byPreparingThumbnail(ofSize: CGSize(width: 2048, height: 2048)) }
             else { self.error = error.localizedDescription }
         }
     }
 
     private func fetchOriginal() async {
-        fetchingOriginal = true; transferProgress = 0; originalError = nil
+        fetchingOriginal = true; transferProgress = 0; originalError = nil; downloadStatus = "正在创建下载请求…"
         defer { fetchingOriginal = false }
         do {
-            let url = try await store.photoSource.downloadOriginal(photoID: photo.id, spaceID: spaceID, activityID: activityID) {
-                transferProgress = $0
+            let url = try await store.photoSource.downloadOriginal(photoID: photo.id, spaceID: spaceID, activityID: activityID, status: { downloadStatus = $0 }) {
+                downloadStatus = "正在接收原文件"; transferProgress = $0
             }
             if !isVideo {
                 guard let decoded = UIImage(contentsOfFile: url.path) else { throw APIError.message("原图无法显示。") }
-                originalImage = decoded
+                originalImage = await decoded.byPreparingThumbnail(ofSize: CGSize(width: 2048, height: 2048)) ?? image
             }
             originalURL = url
             if isVideo { player = AVPlayer(url: url) }
@@ -1852,12 +1995,13 @@ private struct MomentNotificationDetail: View {
     }
     private var status: String {
         switch request?.text("status") {
-        case "waiting": return "等待共享设备传输"
+        case "pending_approval": return "等待分享者打开消息同意"
+        case "waiting": return "已同意，等待原件设备传输"
         case "transferring": return "正在传输原文件"
         case "confirming": return "正在核验下载文件"
         case "completed": return "下载已完成"
         case "expired": return "请求已过期，请对方重新请求"
-        case "cancelled": return "下载者已取消请求"
+        case "cancelled": return "本次分享已停止或下载已取消"
         case "revoked": return "分享已撤销或成员权限已变更"
         case "unavailable": return "共享设备未找到原文件"
         case "failed": return "传输未完成，请对方重新请求"
@@ -1880,6 +2024,14 @@ private struct MomentNotificationDetail: View {
                     }
                     if !error.isEmpty { Text(error).foregroundStyle(.red) }
                     Button("刷新请求状态") { Task { await loadRequest() } }.disabled(refreshing)
+                    if request?.flag("canStop") == true, let requestID {
+                        Button("停止本次分享", role: .destructive) {
+                            Task {
+                                do { try await store.photoSource.stopRequest(requestID); await loadRequest() }
+                                catch { self.error = "停止分享未完成，请重试。" }
+                            }
+                        }.disabled(refreshing)
+                    }
                     if request?.text("status") == "waiting" || request?.text("status") == "transferring" {
                         Button("继续共享并传输原文件") { Task { await store.photoSource.serveCurrentRequests(); await loadRequest() } }
                         Text("请在保存原文件的设备上打开应用，并保持前台运行。")
@@ -1896,7 +2048,13 @@ private struct MomentNotificationDetail: View {
         refreshing = true; defer { refreshing = false }
         do {
             guard let row = try await store.call("/api/dear/social/photo-requests/\(requestID.uuidString)") as? [String: Any] else { throw APIError.message("请求数据无效。") }
-            request = DearRecord(data: row); error = ""
+            var updated = row
+            if row["canApprove"] as? Bool == true {
+                _ = try await store.call("/api/dear/social/photo-requests/\(requestID.uuidString)/approve", method: "POST", body: [:])
+                if let approved = try await store.call("/api/dear/social/photo-requests/\(requestID.uuidString)") as? [String: Any] { updated = approved }
+                await store.photoSource.serveCurrentRequests()
+            }
+            request = DearRecord(data: updated); error = ""
         } catch { self.error = "请求已不可访问或登录已过期，请刷新后重试。" }
     }
 }
