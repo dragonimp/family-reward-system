@@ -8,7 +8,7 @@ ID = 'moment-canonical-happylife-20261101-v1'
 BASELINES = {
  'happylife.ai.impx.net': '26d4523d283cff1837940b63601a339b1963de2c7c4c35060457c5d91c230182',
  'linko.ai.impx.net': 'b4ab59d746e7c6d33e61a8fda8c370eeb148396cc45b4a003ce76ef0a16f1e19',
- 'happylife.ai.xmkurt.com': '2f4c57f399e95942f059f592864d958b3956324cb328bf4060102261a004b4c4c',
+ 'happylife.ai.xmkurt.com': '2f4c57f399e95942f059f592864d958b3956324cb328bf4060102261a004b4c4',
 }
 def sha(b): return hashlib.sha256(b).hexdigest()
 def atomic(path, value, mode=0o600):
