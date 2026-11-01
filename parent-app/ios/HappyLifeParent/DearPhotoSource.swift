@@ -553,7 +553,7 @@ import UniformTypeIdentifiers
 
     private func relayRequest(path: String, method: String = "GET") async throws -> URLRequest {
         guard let store else { throw CancellationError() }
-        let token = try await store.identity.validAccessToken()
+        guard let token = try await store.identity.validAccessToken() else { throw APIError.message("请重新登录用户中心。") }
         var request = URLRequest(url: URL(string: path, relativeTo: base)!.absoluteURL)
         request.httpMethod = method; request.timeoutInterval = 30 * 60
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")

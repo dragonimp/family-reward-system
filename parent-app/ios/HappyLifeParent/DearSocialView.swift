@@ -1931,6 +1931,7 @@ private struct DearPhotoDetailView: View {
     @State private var fetchingOriginal = false
     @State private var savingOriginal = false
     @State private var originalSaved = false
+    @State private var serverCacheReady: Bool?
     @State private var downloadStatus = ""
     @State private var transferProgress = 0.0
     @State private var deleting = false
@@ -1976,7 +1977,7 @@ private struct DearPhotoDetailView: View {
                 Text(photo.text("originalFileName")).font(.headline)
                 Text("分享者：\(photo.text("sourceDisplayName"))").font(.subheadline).foregroundStyle(.secondary)
                 Label(store.photoSource.deviceDescription(photo.data), systemImage: "iphone").font(.caption).foregroundStyle(.secondary)
-                Text(photo.flag("serverCached") ? "服务器已缓存，可在共享设备离线时获取" : "服务器尚未缓存，获取原件需等待共享设备上线").font(.caption).foregroundStyle(.secondary)
+                Text((serverCacheReady ?? photo.flag("serverCached")) ? "服务器已缓存，可在共享设备离线时获取" : "服务器尚未缓存，获取原件需等待共享设备上线").font(.caption).foregroundStyle(.secondary)
                 Text("分享时间：\(photo.dateText("createdAt"))").font(.subheadline).foregroundStyle(.secondary)
                 DearPhotoPlaceView(photo: photo).font(.subheadline).foregroundStyle(.secondary)
                 if let originalURL {
@@ -2017,6 +2018,18 @@ private struct DearPhotoDetailView: View {
         .task(id: path + String(active)) {
             if active { await load() }
             else { player?.pause(); player = nil; image = nil; originalImage = nil }
+        }
+        .task(id: photo.id + String(active) + "relay-status") {
+            guard active, !photo.text("sourceDeviceId").isEmpty else { return }
+            for _ in 0..<6 {
+                guard !Task.isCancelled else { return }
+                if let state = try? await store.call("/api/dear/social/tenants/\(spaceID)/activities/\(activityID)/native-photos/\(photo.id)/relay") as? [String: Any],
+                   let cached = state["cached"] as? Bool {
+                    serverCacheReady = cached
+                    if cached { return }
+                }
+                do { try await Task.sleep(for: .seconds(5)) } catch { return }
+            }
         }
         .onDisappear { player?.pause() }
     }
