@@ -29,7 +29,8 @@ export AgentIdentityRoot="$ATLAS_BUILD_WORK/source/AgentIdentity"
 export AGENTIDENTITY_ROOT="$AgentIdentityRoot"
 export FAMILY_REWARD_SHARED_PROJECTS_ROOT="$ATLAS_BUILD_WORK/source"
 (cd "$ATLAS_BUILD_WORK/source/Linko" && bash scripts/check-moment-connect.sh)
-for project in Linko family-reward-system; do
+for project in ${MOMENT_SERVICE_PROJECTS:-Linko family-reward-system}; do
+  [[ "$project" == Linko || "$project" == family-reward-system ]] || { echo "Unsupported service target"; exit 2; }
   frozen_commit="$(awk -v project="$project" '$1 == project {print $2}' "$ATLAS_BUILD_OUTPUT/source-commits.txt")"
   version="$(date +%Y%m%d-%H%M%S)-activity-${frozen_commit:0:7}"
   [[ "$version" =~ ^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$ && "$version" != latest ]] || exit 2
