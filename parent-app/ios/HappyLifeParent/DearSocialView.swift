@@ -394,6 +394,7 @@ struct DearSocialView: View {
                 }
                 if selectedSpace?.text("role") == "owner" || !joinedActivities.isEmpty {
                     Section("活动列表") {
+                        Text("日期按设备当地时区显示").font(.caption).foregroundStyle(.secondary)
                         if activityLoading { Text("正在读取已有活动…").foregroundStyle(.secondary) }
                         if !activityError.isEmpty { Text(activityError).foregroundStyle(.red) }
                         if allActivities.isEmpty && !activityLoading && activityError.isEmpty { Text("还没有活动").foregroundStyle(.secondary) }
