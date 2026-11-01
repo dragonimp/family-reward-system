@@ -49,7 +49,6 @@ import UniformTypeIdentifiers
     private var generation = UUID()
     private var importingSharedItems = false
     private var checkedLocationIDs = Set<String>()
-    private var pushToken: String?
     private let session = URLSession(configuration: .ephemeral)
     private let base = URL(string: "https://happylife.ai.xmkurt.com")!
 
@@ -70,16 +69,7 @@ import UniformTypeIdentifiers
         let active = Array(transfers.values); transfers.removeAll()
         for transfer in active { Task { await transfer.cancel() } }
     }
-    func reset() { stop(); subjectCache = nil; pushToken = nil; checkedLocationIDs.removeAll() }
-
-    func updatePushToken(_ token: String) async {
-        guard !token.isEmpty, token.allSatisfy(\.isHexDigit) else { return }
-        pushToken = token
-        guard let store, let subject = try? await currentSubject(), let root = try? directory(for: subject),
-              let deviceID = (try? readIndex(at: root))?.deviceID else { return }
-        _ = try? await store.call("/api/dear/social/photo-devices", method: "POST",
-                                  body: ["id": deviceID, "pushToken": token, "notificationApplicationKey": "happylife.ai", "transferProtocol": "connect-datachannel-v1"])
-    }
+    func reset() { stop(); subjectCache = nil; checkedLocationIDs.removeAll() }
 
     func cacheShareActivities(_ rows: [[String: Any]]) async {
         guard let subject = try? await currentSubject() else { return }
@@ -149,16 +139,10 @@ import UniformTypeIdentifiers
     }
 
     private func enableNotificationsIfNeeded() async -> Bool {
-        guard UIApplication.shared.applicationState == .active else { return false }
-        let center = UNUserNotificationCenter.current()
-        let settings = await center.notificationSettings()
-        if settings.authorizationStatus == .notDetermined {
-            _ = try? await center.requestAuthorization(options: [.alert, .sound])
-        }
-        let updated = await center.notificationSettings()
-        guard updated.authorizationStatus == .authorized || updated.authorizationStatus == .provisional else { return false }
-        UIApplication.shared.registerForRemoteNotifications()
-        return true
+        guard let store, UIApplication.shared.applicationState == .active else { return false }
+        await store.notifications.enable()
+        let settings = await UNUserNotificationCenter.current().notificationSettings()
+        return settings.authorizationStatus == .authorized || settings.authorizationStatus == .provisional
     }
 
     func logout(token: String?) {
@@ -183,7 +167,6 @@ import UniformTypeIdentifiers
         do {
             var body: [String: Any] = ["notificationApplicationKey": "happylife.ai", "transferProtocol": "connect-datachannel-v1"]
             if let deviceID = index.deviceID { body["id"] = deviceID }
-            if let pushToken { body["pushToken"] = pushToken }
             let response = try await store.call("/api/dear/social/photo-devices", method: "POST", body: body) as? [String: Any]
             guard let deviceID = response?["id"] as? String, UUID(uuidString: deviceID) != nil else { return }
             if index.deviceID == nil {
@@ -240,7 +223,6 @@ import UniformTypeIdentifiers
         let root = try directory(for: subject)
         var index = try readIndex(at: root)
         var deviceBody: [String: Any] = ["id": index.deviceID as Any? ?? NSNull(), "notificationApplicationKey": "happylife.ai", "transferProtocol": "connect-datachannel-v1"]
-        if let pushToken { deviceBody["pushToken"] = pushToken }
         let device = try await store.call("/api/dear/social/photo-devices", method: "POST",
                                           body: deviceBody) as? [String: Any]
         guard let deviceID = device?["id"] as? String, UUID(uuidString: deviceID) != nil else {

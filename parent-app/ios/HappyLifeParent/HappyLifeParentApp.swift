@@ -21,7 +21,7 @@ import UserNotifications
 
     func application(_ application: UIApplication, didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data) {
         let token = deviceToken.map { String(format: "%02x", $0) }.joined()
-        Task { await photoSource?.updatePushToken(token); notifications?.updatePushToken(token) }
+        notifications?.updatePushToken(token)
     }
 
     func application(_ application: UIApplication, didFailToRegisterForRemoteNotificationsWithError error: Error) {
