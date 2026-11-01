@@ -8,6 +8,7 @@ import WatchConnectivity
     private let base = URL(string: "https://happylife.ai.xmkurt.com")!
     private let session = URLSession(configuration: .ephemeral)
     let photoSource = DearPhotoSource()
+    let notifications = MomentNotifications()
     private var photoTransferStatuses: [String: String] = [:]
     @Published var photoRequestNotice: String?
     @Published var photoTransferProgress: Double?
@@ -29,6 +30,7 @@ import WatchConnectivity
     override init() {
         super.init()
         photoSource.store = self
+        notifications.store = self
         if WCSession.isSupported() {
             WCSession.default.delegate = self
             WCSession.default.activate()
@@ -173,13 +175,14 @@ import WatchConnectivity
     }
     func logout() {
         DearShareInbox.clearCatalog()
+        notifications.reset(token: identity.accessToken)
         photoSource.logout(token: identity.accessToken)
         photoRequestNotice = nil
         photoTransferProgress = nil
         revision = UUID(); identity.logout(); profile = nil; groups = []; children = []; rules = []; requests = []; transactions = []; growth = []; members = []; groupID = 0; loading = false
     }
 
-    func resumePhotoSharing() { if identity.isAuthenticated { photoSource.start(); Task { await photoSource.importSharedItems() } } }
+    func resumePhotoSharing() { if identity.isAuthenticated { photoSource.start(); Task { await photoSource.importSharedItems(); await notifications.resume() } } }
     func suspendPhotoSharing() { photoSource.stop() }
 }
 

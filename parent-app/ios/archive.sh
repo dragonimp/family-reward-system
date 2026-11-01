@@ -29,6 +29,11 @@ for bundle in [app,app/'Watch/Linko Moment Watch.app']:
         directory=bundle/(locale+'.lproj');directory.mkdir(exist_ok=True)
         (directory/'InfoPlist.strings').write_bytes(plistlib.dumps({'CFBundleDisplayName':name,'CFBundleName':name},fmt=plistlib.FMT_BINARY))
 LOCALIZE
+if [[ -n "${CONNECT_RTC_LIBRARY_DIR:-}" ]]; then
+  mkdir -p "$app/ConnectLicenses"
+  cp "$CONNECT_RTC_LIBRARY_DIR/NOTICE.txt" "$CONNECT_RTC_LIBRARY_DIR/libdatachannel-LICENSE" "$CONNECT_RTC_LIBRARY_DIR/MbedTLS-LICENSE" "$app/ConnectLicenses/"
+  cp "$CONNECT_RTC_LIBRARY_DIR/licenses/"* "$app/ConnectLicenses/"
+fi
 base=net.impx.happylife
 [[ "${MOMENT_IOS_RELEASE_FLAVOR:-successor}" != legacy ]] || base=net.impx.happylife.parent
 # This supplies the team's identity to the archive; export must still embed

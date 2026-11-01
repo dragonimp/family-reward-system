@@ -1,4 +1,5 @@
 import SwiftUI
+import AgentIdentity
 import CoreLocation
 import PhotosUI
 import CoreTransferable
@@ -263,6 +264,12 @@ private struct DearActivityMapView: View {
     }
 }
 
+private struct DearTimelineEntry: Identifiable {
+    let id: String
+    let checkIn: Bool
+    let record: DearRecord
+}
+
 struct DearSocialView: View {
     @ObservedObject var store: FamilyStore
     var showLogout = false
@@ -302,6 +309,11 @@ struct DearSocialView: View {
     @State private var showingActivityManagement = false
     @State private var spaceName = ""
     @State private var activityName = ""
+    @State private var showingActivityCreate = false
+    @State private var newActivityDescription = ""
+    @State private var newActivityDate = Date()
+    @State private var activityCreateError = ""
+    @State private var showingMomentCreate = false
     @State private var editedSpaceName = ""
     @State private var editedActivityName = ""
     @State private var editedActivityDescription = ""
@@ -393,7 +405,7 @@ struct DearSocialView: View {
                         .font(.caption).foregroundStyle(.secondary)
                 }
                 if selectedSpace?.text("role") == "owner" || !joinedActivities.isEmpty {
-                    Section("活动列表") {
+                    Section {
                         Text("日期按设备当地时区显示").font(.caption).foregroundStyle(.secondary)
                         if activityLoading { Text("正在读取已有活动…").foregroundStyle(.secondary) }
                         if !activityError.isEmpty { Text(activityError).foregroundStyle(.red) }
@@ -434,13 +446,18 @@ struct DearSocialView: View {
                                 }
                             }
                         }
-                        if selectedSpace?.text("role") == "owner" {
-                            HStack {
-                                TextField("例如：周末野餐", text: $activityName)
-                                Button("添加") { run { try await createActivity() } }
-                                    .disabled(busy || activityName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                    } header: {
+                        HStack {
+                            Text("活动列表")
+                            Spacer()
+                            if selectedSpace?.text("role") == "owner" {
+                                Button {
+                                    activityName = ""; newActivityDescription = ""; newActivityDate = Date(); activityCreateError = ""
+                                    showingActivityCreate = true
+                                } label: { Label("新增", systemImage: "plus.circle.fill") }
+                                .font(.subheadline.weight(.semibold)).disabled(busy)
                             }
-                        }
+                        }.textCase(nil)
                     }
                 }
                 Section("好友关系 · 跨空间") {
@@ -483,6 +500,7 @@ struct DearSocialView: View {
                     } label: { Image(systemName: "ellipsis.circle").accessibilityLabel("空间菜单") }
                     .disabled(busy)
                 }
+                ToolbarItem(placement: .topBarTrailing) { MomentNotificationButton(notifications: store.notifications) }
                 if showLogout { ToolbarItem(placement: .topBarLeading) { Button("退出") { store.logout() } } }
             }
             .refreshable { await refresh() }
@@ -490,6 +508,7 @@ struct DearSocialView: View {
             .onChange(of: spaceId) { _, _ in activityId = ""; showingActivity = false; showingPhoto = false; selectedPhoto = nil; showingActivityManagement = false; activities = []; photos = []; activityError = ""; activityLoading = true; run { try await loadActivities() } }
             .navigationDestination(isPresented: $showingActivity) { activityDetail }
             .sheet(isPresented: $showingActivityManagement) { activityManagement }
+            .sheet(isPresented: $showingActivityCreate) { activityCreateSheet }
             .sheet(isPresented: $showingSpaceMembers) {
                 NavigationStack {
                     List {
@@ -561,180 +580,231 @@ struct DearSocialView: View {
 
     private func photoCard(_ photo: DearRecord, path: String) -> some View {
         let isGrid = photoViewMode == "grid"
-        return HStack(alignment: .top, spacing: 10) {
-                DearPhotoPreview(store: store, path: path)
-                    .frame(width: isGrid ? nil : 112, height: isGrid ? 145 : 112)
-                    .frame(maxWidth: isGrid ? .infinity : nil)
-                    .overlay(alignment: .bottomLeading) {
-                        VStack(alignment: .leading, spacing: 1) {
-                            Text(photo.text("sourceDisplayName").isEmpty ? "活动成员" : photo.text("sourceDisplayName"))
-                            Text(photo.text("createdAt").isEmpty ? "正在分享" : photo.dateText("createdAt"))
-                            Text(photo.text("locationName").isEmpty ? "地点未记录" : photo.text("locationName"))
-                                .lineLimit(2).minimumScaleFactor(0.8)
-                        }
-                        .font(.system(size: 10)).foregroundStyle(.white)
-                        .padding(6).frame(maxWidth: .infinity, alignment: .leading)
-                        .background(LinearGradient(colors: [.clear, .black.opacity(0.8)], startPoint: .top, endPoint: .bottom))
-                    }
-                    .clipShape(RoundedRectangle(cornerRadius: 10))
-                if !isGrid {
-                    VStack(alignment: .leading, spacing: 5) {
-                        Text(photo.text("originalFileName")).font(.subheadline.bold()).lineLimit(2)
-                        if photo.text("contentType").hasPrefix("video/") { Label("视频", systemImage: "play.rectangle.fill").font(.caption) }
-                        if !photo.flag("thumbnailAvailable") { Text("预览尚未就绪，点开可重试").font(.caption).foregroundStyle(.secondary) }
-                    }
+        let nickname = photo.text("sourceDisplayName").isEmpty ? "活动成员" : photo.text("sourceDisplayName")
+        return HStack(alignment: .top, spacing: 12) {
+            DearPhotoPreview(store: store, path: path)
+                .frame(width: isGrid ? nil : 112, height: isGrid ? 168 : 112)
+                .frame(maxWidth: isGrid ? .infinity : nil)
+                .overlay(alignment: .topLeading) {
+                    Label(nickname, systemImage: "person.crop.circle.fill")
+                        .font(.caption.weight(.semibold)).lineLimit(1)
+                        .foregroundStyle(.white).padding(.horizontal, 8).padding(.vertical, 6)
+                        .background(.black.opacity(0.5), in: Capsule()).padding(7).padding(.trailing, selectingPhotoDownloads ? 44 : 0)
                 }
+                .overlay(alignment: .bottomLeading) {
+                    HStack(alignment: .bottom) {
+                        if !photo.text("locationName").isEmpty {
+                            Label(photo.text("locationName"), systemImage: "mappin")
+                                .font(.caption2).lineLimit(2)
+                        }
+                        Spacer(minLength: 0)
+                        if photo.text("contentType").hasPrefix("video/") { Image(systemName: "play.circle.fill").font(.title2) }
+                    }
+                    .foregroundStyle(.white).padding(8)
+                    .background(LinearGradient(colors: [.clear, .black.opacity(0.65)], startPoint: .top, endPoint: .bottom))
+                }
+                .clipShape(RoundedRectangle(cornerRadius: 12))
+            if !isGrid {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(nickname).font(.subheadline.bold()).lineLimit(1)
+                    Text(photo.text("originalFileName")).font(.caption).foregroundStyle(.secondary).lineLimit(2)
+                    Text(photo.dateText("createdAt")).font(.caption2).foregroundStyle(.secondary)
+                    if !photo.flag("thumbnailAvailable") { Text("点开查看原文件").font(.caption).foregroundStyle(.secondary) }
+                }.padding(.vertical, 4)
+            }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .accessibilityLabel("\(photo.text("originalFileName"))，\(photo.text("sourceDisplayName"))，\(photo.dateText("createdAt"))，\(photo.text("locationName").isEmpty ? "地点未记录" : photo.text("locationName"))")
+        .accessibilityLabel("\(nickname)，\(photo.text("originalFileName"))，\(photo.dateText("createdAt"))")
+    }
+
+    private var activityCreateSheet: some View {
+        NavigationStack {
+            Form {
+                if !activityCreateError.isEmpty { Text(activityCreateError).foregroundStyle(.red) }
+                Section("活动信息") {
+                    TextField("活动名称，例如周末野餐", text: $activityName)
+                    DatePicker("活动日期", selection: $newActivityDate, displayedComponents: .date)
+                    TextField("活动介绍（可选）", text: $newActivityDescription, axis: .vertical).lineLimit(3...5)
+                }
+                Section { Text("创建到\(selectedSpace?.text("name") ?? "当前空间") · 日期按当地时区保存") .font(.footnote).foregroundStyle(.secondary) }
+            }
+            .navigationTitle("新增活动")
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) { Button("取消") { showingActivityCreate = false }.disabled(busy) }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("创建") {
+                        Task {
+                            guard !busy else { return }
+                            busy = true; activityCreateError = ""; defer { busy = false }
+                            do { try await createActivity(); showingActivityCreate = false }
+                            catch { activityCreateError = error.localizedDescription }
+                        }
+                    }.disabled(busy || activityName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                }
+            }
+            .interactiveDismissDisabled(busy)
+        }
+    }
+
+    private var momentCreateSheet: some View {
+        NavigationStack {
+            Form {
+                if !error.isEmpty { Text(error).foregroundStyle(.red) }
+                TextField("分享这一刻…", text: $momentDraft, axis: .vertical).lineLimit(5...10)
+                    .onChange(of: momentDraft) { _, _ in momentRequestID = UUID() }
+            }
+            .navigationTitle("生活分享")
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) { Button("取消") { showingMomentCreate = false }.disabled(busy) }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("发布") { run { try await publishMoment(); showingMomentCreate = false } }
+                        .disabled(busy || momentDraft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                }
+            }
+        }
+    }
+
+    private var activityPhotoSection: some View {
+        Section {
+            HStack {
+                PhotosPicker(selection: $selectedPhotos, maxSelectionCount: 50, matching: .any(of: [.images, .videos]), preferredItemEncoding: .current) {
+                    Label("分享照片 / 视频", systemImage: "photo.badge.plus")
+                }.disabled(busy || batchDeleting || batchDownloading)
+                Spacer()
+                Picker("显示方式", selection: $photoViewMode) {
+                    Image(systemName: "square.grid.2x2").tag("grid").accessibilityLabel("网格")
+                    Image(systemName: "list.bullet").tag("list").accessibilityLabel("列表")
+                }.pickerStyle(.segmented).frame(width: 105)
+            }
+            DisclosureGroup("添加照片地点（可选）") {
+                TextField("照片地点", text: $photoLocationName)
+                Text("优先使用照片自带定位；未记录定位时使用此处填写的地点。")
+                    .font(.caption).foregroundStyle(.secondary)
+            }.font(.subheadline)
+            if !photos.isEmpty {
+                Button(selectingPhotoDownloads ? "完成多选" : "多选管理") {
+                    selectingPhotoDownloads.toggle(); selectedPhotoIDs.removeAll(); batchOriginalURLs = []; batchDownloadError = ""; batchDownloadProgress = 0
+                }.disabled(batchDownloading || batchDeleting)
+            }
+            if selectingPhotoDownloads {
+                Text("已选 \(selectedPhotoIDs.count) 项").font(.caption).foregroundStyle(.secondary)
+                HStack {
+                    Button(batchDownloading ? "正在获取…" : "获取原文件") { Task { await downloadSelectedPhotos() } }
+                        .disabled(selectedPhotoIDs.isEmpty || batchDownloading || batchDeleting)
+                    Spacer()
+                    Button(batchDeleting ? "正在删除…" : "删除分享", role: .destructive) { showingBatchDelete = true }
+                        .disabled(!canDeleteSelectedPhotos || batchDownloading || batchDeleting)
+                }
+                Text("只能删除自己分享的内容；iPhone 相册原件保留。") .font(.caption).foregroundStyle(.secondary)
+                if batchDownloading || batchDownloadProgress > 0 && batchDownloadProgress < 1 { ProgressView(value: batchDownloadProgress) }
+                if !batchOriginalURLs.isEmpty { ShareLink(items: batchOriginalURLs) { Label("保存或分享 \(batchOriginalURLs.count) 项", systemImage: "square.and.arrow.up") } }
+                if !batchDownloadError.isEmpty { Text(batchDownloadError).font(.caption).foregroundStyle(.red) }
+            }
+            if photos.isEmpty {
+                ContentUnavailableView("一起留下活动回忆", systemImage: "photo.on.rectangle.angled", description: Text("分享照片和视频，活动成员可请求下载原文件。"))
+            } else if photoViewMode == "grid" {
+                LazyVGrid(columns: [GridItem(.adaptive(minimum: 150), spacing: 8)], spacing: 8) {
+                    ForEach(photos) { photo in photoLink(photo) }
+                }.listRowInsets(EdgeInsets(top: 8, leading: 12, bottom: 8, trailing: 12))
+            } else { ForEach(photos) { photo in photoLink(photo) } }
+        } header: { HStack { Text("共同相册"); Spacer(); Text("\(photos.count) 项") }.textCase(nil) }
+    }
+
+    private var activityTimeline: [DearTimelineEntry] {
+        let shared = moments.map { DearTimelineEntry(id: "moment:" + $0.id, checkIn: false, record: $0) }
+        let located = checkIns.map { DearTimelineEntry(id: "checkin:" + $0.id, checkIn: true, record: $0) }
+        return (shared + located).sorted {
+            let left = ActivityListDate.parse($0.record.text("createdAt")) ?? .distantPast
+            let right = ActivityListDate.parse($1.record.text("createdAt")) ?? .distantPast
+            return left == right ? $0.id < $1.id : left > right
+        }
+    }
+
+    private var activityTimelineSection: some View {
+        Section("生活动态 · 分享与打卡") {
+            HStack {
+                Button { momentDraft = ""; momentRequestID = UUID(); error = ""; showingMomentCreate = true } label: { Label("写分享", systemImage: "square.and.pencil") }
+                Spacer()
+                Button {
+                    checkInNote = ""; checkInRequestID = UUID(); pendingCheckIn = true; checkInLocator.locate()
+                } label: { Label(pendingCheckIn ? "正在定位…" : "打卡", systemImage: "location.circle") }
+            }.disabled(busy || pendingCheckIn)
+            ForEach(activityTimeline, id: \.id) { entry in
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack {
+                        Label(entry.record.text("authorName"), systemImage: entry.checkIn ? "location.fill" : "text.bubble.fill")
+                            .font(.subheadline.weight(.semibold))
+                        Spacer()
+                        Text(entry.checkIn ? "打卡" : "分享").font(.caption).foregroundStyle(.secondary)
+                    }
+                    Text(entry.record.text(entry.checkIn ? "note" : "text")).textSelection(.enabled)
+                    if entry.checkIn {
+                        if !entry.record.text("address").isEmpty { Label(entry.record.text("address"), systemImage: "mappin.and.ellipse").font(.caption).foregroundStyle(.secondary) }
+                        HStack {
+                            Label(String(format: "海拔 %.1f 米", entry.record.number("altitudeMeters")), systemImage: "mountain.2").font(.caption)
+                            Spacer()
+                            Button(entry.record.flag("canEdit") ? "查看 / 编辑" : "查看打卡") {
+                                pendingCheckIn = false; selectedCheckIn = entry.record; checkInNote = entry.record.text("note")
+                                error = ""; checkInLocator.clear(); showingCheckIn = true
+                            }.font(.caption).disabled(busy || pendingCheckIn)
+                        }
+                    } else if entry.record.flag("canDelete") {
+                        Button("删除我的分享", role: .destructive) { run { try await deleteMoment(entry.record) } }.font(.caption)
+                    }
+                    Text(entry.record.dateText("createdAt")).font(.caption2).foregroundStyle(.secondary)
+                }.padding(.vertical, 6)
+            }
+            if activityTimeline.isEmpty { Text("还没有动态，写下分享或打卡，留下活动的第一刻。") .foregroundStyle(.secondary).font(.subheadline) }
+        }
     }
 
     private var activityDetail: some View {
         List {
             if !error.isEmpty { Section { Text(error).foregroundStyle(.red) } }
             if !notice.isEmpty { Section { Text(notice).foregroundStyle(.teal) } }
-            if selectedActivity != nil {
-                Section("生活分享") {
-                    ForEach(moments) { moment in
-                        VStack(alignment: .leading, spacing: 6) {
-                            Text(moment.text("authorName")).font(.subheadline.bold())
-                            Text(moment.text("text")).textSelection(.enabled)
-                            if moment.flag("canDelete") {
-                                Button("删除我的记录", role: .destructive) { run { try await deleteMoment(moment) } }.font(.caption)
-                            }
-                        }.padding(.vertical, 4)
-                    }
-                    if moments.isEmpty { Text("还没有分享的日常。").foregroundStyle(.secondary) }
-                    Button("刷新日常") { run { try await loadMoments() } }.disabled(busy)
-                }
-            }
-            Section {
-                let points = DearActivityMapPoint.points(checkIns: checkIns, photos: photos)
-                NavigationLink {
-                    DearActivityMapView(store: store, title: selectedActivity?.text("title") ?? "活动",
-                                        spaceID: activityTenantId, activityID: activityId,
-                                        points: points, photos: photos)
-                } label: {
-                    Label("活动地图", systemImage: "map")
-                }
-                .disabled(points.isEmpty && photos.isEmpty)
-                if points.isEmpty && photos.isEmpty {
-                    Text("暂无打卡或共享照片。")
-                        .font(.caption).foregroundStyle(.secondary)
-                } else {
-                    Text("\(points.filter { $0.photo == nil }.count) 个打卡点 · \(points.filter { $0.photo != nil }.count) 项定位照片或视频；其他照片也可在地图页查看。")
-                        .font(.caption).foregroundStyle(.secondary)
-                }
-            }
-                if let selectedActivity {
-                    Section("照片与视频 · \(selectedActivity.text("title"))") {
-                        PhotosPicker("多选共享 iPhone 照片或视频", selection: $selectedPhotos, maxSelectionCount: 50,
-                                     matching: .any(of: [.images, .videos]), preferredItemEncoding: .current)
-                            .disabled(busy)
-                        TextField("照片地点（可选，供活动成员查看）", text: $photoLocationName)
-                            .textInputAutocapitalization(.sentences)
-                        Text("优先显示照片自带的定位；无定位时使用填写地点。")
+            if let selectedActivity {
+                Section {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text(selectedActivity.text("title")).font(.title2.bold())
+                        HStack { Label(activityDate(selectedActivity), systemImage: "calendar"); Spacer(); Label("\(activityMembers.count) 位成员", systemImage: "person.2") }
                             .font(.caption).foregroundStyle(.secondary)
-                        Picker("显示方式", selection: $photoViewMode) {
-                            Text("网格").tag("grid")
-                            Text("列表").tag("list")
-                        }.pickerStyle(.segmented)
-                        Button(selectingPhotoDownloads ? "完成多选" : "多选管理照片与视频") {
-                            selectingPhotoDownloads.toggle()
-                            selectedPhotoIDs.removeAll(); batchOriginalURLs = []; batchDownloadError = ""; batchDownloadProgress = 0
-                        }.disabled(batchDownloading || batchDeleting)
-                        if selectingPhotoDownloads {
-                            Text("已选 \(selectedPhotoIDs.count) 项") .font(.caption).foregroundStyle(.secondary)
-                            Button(batchDownloading ? "正在获取原文件…" : "获取选中原文件") {
-                                Task { await downloadSelectedPhotos() }
-                            }.disabled(selectedPhotoIDs.isEmpty || batchDownloading || batchDeleting)
-                            Button(batchDeleting ? "正在删除…" : "删除选中的分享", role: .destructive) {
-                                showingBatchDelete = true
-                            }.disabled(selectedPhotoIDs.isEmpty || batchDownloading || batchDeleting || !canDeleteSelectedPhotos)
-                            Text("只能删除自己分享的照片与视频。")
-                                .font(.caption).foregroundStyle(.secondary)
-                            if batchDownloading || batchDownloadProgress > 0 && batchDownloadProgress < 1 {
-                                ProgressView(value: batchDownloadProgress).accessibilityLabel("多选原文件接收进度")
-                            }
-                            if !batchOriginalURLs.isEmpty {
-                                ShareLink(items: batchOriginalURLs) {
-                                    Label("保存或分享已获取的 \(batchOriginalURLs.count) 项", systemImage: "square.and.arrow.up")
-                                }
-                            }
-                            if !batchDownloadError.isEmpty { Text(batchDownloadError).font(.caption).foregroundStyle(.red) }
-                        }
-                        Text("原图留在此 iPhone；对方获取原图时，请保持 Linko Moment 打开。")
-                            .font(.caption).foregroundStyle(.secondary)
-                        if photos.isEmpty { Text("还没有分享的照片或视频").foregroundStyle(.secondary) }
-                        if photoViewMode == "grid" {
-                            LazyVGrid(columns: [GridItem(.flexible(), spacing: 8), GridItem(.flexible(), spacing: 8)], spacing: 8) {
-                                ForEach(photos) { photo in photoLink(photo) }
-                            }.listRowInsets(EdgeInsets(top: 8, leading: 12, bottom: 8, trailing: 12))
-                        } else {
-                            ForEach(photos) { photo in photoLink(photo) }
-                        }
-                        Button("刷新相册") { run { try await loadPhotos() } }.disabled(busy)
-                    }
-                    Section("活动打卡") {
+                        if !selectedActivity.text("description").isEmpty { Text(selectedActivity.text("description")).font(.subheadline).foregroundStyle(.secondary) }
                         Button {
-                            checkInNote = ""; checkInRequestID = UUID(); pendingCheckIn = true
-                            checkInLocator.locate()
-                        } label: {
-                            Label(pendingCheckIn ? "正在定位并打卡…" : "在当前位置打卡", systemImage: "location.circle")
-                        }.disabled(busy || pendingCheckIn)
-                        if let latest = checkIns.first {
-                            Label(String(format: "最近打卡海拔 %.1f 米", latest.number("altitudeMeters")), systemImage: "mountain.2.fill")
-                                .font(.subheadline.weight(.semibold))
-                        }
-                        ForEach(checkIns) { checkIn in
-                            Button {
-                                pendingCheckIn = false
-                                selectedCheckIn = checkIn
-                                checkInNote = checkIn.text("note")
-                                error = ""
-                                checkInLocator.clear()
-                                showingCheckIn = true
-                            } label: { VStack(alignment: .leading, spacing: 4) {
-                                HStack {
-                                    Text(checkIn.text("authorName")).font(.subheadline.bold())
-                                    Spacer()
-                                    Text(checkIn.dateText("createdAt")).font(.caption).foregroundStyle(.secondary)
-                                }
-                                Text(checkIn.text("note"))
-                                Label(String(format: "海拔 %.1f 米", checkIn.number("altitudeMeters")), systemImage: "mountain.2")
-                                    .font(.subheadline)
-                                Text(checkIn.text("address")).font(.caption).foregroundStyle(.secondary)
-                                if let latitude = checkIn.data["latitude"] as? Double,
-                                   let longitude = checkIn.data["longitude"] as? Double {
-                                    Text(String(format: "%.6f, %.6f", latitude, longitude))
-                                        .font(.caption2).foregroundStyle(.secondary)
-                                }
-                            }}.buttonStyle(.plain).padding(.vertical, 4).disabled(busy || pendingCheckIn)
-                        }
-                        if checkIns.isEmpty { Text("还没有打卡记录。") .foregroundStyle(.secondary) }
-                    }
-                    Section("活动成员") {
-                        Text("同一活动不会自动建立好友关系，需要对方确认。")
-                            .font(.caption).foregroundStyle(.secondary)
-                        ForEach(activityMembers.filter { !$0.flag("isSelf") }, id: \.subject) { member in
+                            editedActivityName = selectedActivity.text("title"); editedActivityDescription = selectedActivity.text("description")
+                            editedActivityDate = activityDateValue(selectedActivity); showingActivityManagement = true
+                        } label: { Label("管理与邀请", systemImage: "person.badge.plus") }.font(.subheadline)
+                    }.padding(.vertical, 4)
+                }
+                activityPhotoSection
+                activityTimelineSection
+                Section("活动地图") {
+                    let points = DearActivityMapPoint.points(checkIns: checkIns, photos: photos)
+                    NavigationLink {
+                        DearActivityMapView(store: store, title: selectedActivity.text("title"), spaceID: activityTenantId, activityID: activityId, points: points, photos: photos)
+                    } label: {
+                        Label("查看地图 · \(checkIns.count) 次打卡 · \(photos.count) 项照片与视频", systemImage: "map.fill").font(.subheadline)
+                    }.disabled(points.isEmpty && photos.isEmpty)
+                }
+                Section {
+                    DisclosureGroup("活动成员与好友关系") {
+                        ForEach(activityMembers, id: \.subject) { member in
                             HStack {
-                                Text(member.text("displayName"))
-                                Spacer()
-                                if let relation = relationships.first(where: { $0.text("peerSubject") == member.subject }) {
-                                    Text(relation.text("status") == "accepted" ? "已是朋友" : "待确认")
-                                        .font(.caption).foregroundStyle(.secondary)
-                                } else { Text("尚未成为好友").font(.caption).foregroundStyle(.secondary) }
-                            }
+                                Text(member.text("displayName")); Spacer()
+                                if member.flag("isSelf") { Text("我").foregroundStyle(.secondary) }
+                                else if let relation = relationships.first(where: { $0.text("peerSubject") == member.subject }) {
+                                    Text(relation.text("status") == "accepted" ? "朋友" : "待确认").foregroundStyle(.secondary)
+                                }
+                            }.font(.subheadline)
                         }
-                        if activityMembers.filter({ !$0.flag("isSelf") }).isEmpty {
-                            Text("邀请其他人参加活动后，可以互相申请好友。") .foregroundStyle(.secondary)
-                        }
+                        Text("好友关系需要双方确认，可在活动管理中发起申请。") .font(.caption).foregroundStyle(.secondary)
                     }
                 }
+            }
         }
         .listStyle(.insetGrouped)
         .readablePage()
         .navigationTitle(selectedActivity?.text("title") ?? "活动详情")
+        .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 if let url = URL(string: "https://happylife.ai.xmkurt.com/dear/spaces/\(activityTenantId)/activities/\(activityId)") {
@@ -765,6 +835,7 @@ struct DearSocialView: View {
             Button("取消", role: .cancel) { }
         } message: { Text("活动成员将无法再获取这些文件；iPhone 相册中的原文件不会删除。") }
         .sheet(isPresented: $showingCheckIn) { checkInSheet }
+        .sheet(isPresented: $showingMomentCreate) { momentCreateSheet }
         .onChange(of: checkInLocator.location?.timestamp) { _, value in
             guard pendingCheckIn, value != nil else { return }
             pendingCheckIn = false
@@ -1160,9 +1231,11 @@ struct DearSocialView: View {
         try await load(); notice = "空间已删除。"
     }
     private func createActivity() async throws {
+        let name = activityName.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !name.isEmpty, name.count <= 200, newActivityDescription.count <= 2000 else { throw APIError.message("活动名称须为 1 至 200 字，介绍不超过 2000 字。") }
         let value = try await store.call(base + "tenants/\(spaceId)/activities", method: "POST", body: [
-            "title": activityName.trimmingCharacters(in: .whitespacesAndNewlines), "description": "",
-            "startsAt": ISO8601DateFormatter().string(from: Date())
+            "title": activityName.trimmingCharacters(in: .whitespacesAndNewlines), "description": newActivityDescription,
+            "startsAt": ISO8601DateFormatter().string(from: Calendar.current.startOfDay(for: newActivityDate))
         ])
         let item = DearRecord(data: value as? [String: Any] ?? [:])
         activityName = ""; try await loadActivities(); activityId = item.id; showingActivity = true; notice = "活动已创建。"
@@ -1392,5 +1465,118 @@ private struct DearPhotoDetailView: View {
             let localCopyRemoved = try await store.photoSource.revoke(photoID: photo.id, spaceID: spaceID, activityID: activityID)
             onDeleted(localCopyRemoved)
         } catch { originalError = error.localizedDescription }
+    }
+}
+
+
+struct MomentNotificationInbox: View {
+    @ObservedObject var store: FamilyStore
+    @ObservedObject var notifications: MomentNotifications
+    @Environment(\.dismiss) private var dismiss
+    var body: some View {
+        NavigationStack {
+            List {
+                if !notifications.error.isEmpty { Section { Text(notifications.error).foregroundStyle(.red) } }
+                if !notifications.pushRegistrationError.isEmpty { Section { Text(notifications.pushRegistrationError).foregroundStyle(.red) } }
+                Section {
+                    Button("开启系统消息通知") { Task { await notifications.enable() } }
+                    Text("下载请求会发送给共享者。原文件保存在共享设备上，传输时请保持该设备的应用打开。")
+                        .font(.footnote).foregroundStyle(.secondary)
+                }
+                Section("请求与消息 · 未读 \(notifications.unreadCount)") {
+                    ForEach(notifications.items) { item in
+                        NavigationLink {
+                            MomentNotificationDetail(store: store, notifications: notifications, item: item)
+                        } label: {
+                            VStack(alignment: .leading, spacing: 5) {
+                                HStack { if item.readAt == nil { Circle().fill(.teal).frame(width: 7, height: 7) }; Text(item.title).font(.headline) }
+                                Text(item.content).lineLimit(2).font(.subheadline).foregroundStyle(.secondary)
+                                Text(DearRecord(data: ["createdAt": item.createdAt]).dateText("createdAt"))
+                                    .font(.caption).foregroundStyle(.secondary)
+                            }
+                        }
+                    }
+                    if notifications.items.isEmpty { Text("暂无消息。下载请求会在此保留。") }
+                }
+            }
+            .navigationTitle("消息通知")
+            .toolbar { ToolbarItem(placement: .topBarTrailing) { Button("完成") { dismiss() } } }
+            .refreshable { await notifications.reload() }
+            .task { await notifications.reload() }
+            .navigationDestination(isPresented: Binding(get: { notifications.selectedMessageID != nil && !notifications.items.isEmpty }, set: { if !$0 { notifications.selectedMessageID = nil } })) {
+                if let item = notifications.items.first(where: { $0.id == notifications.selectedMessageID }) {
+                    MomentNotificationDetail(store: store, notifications: notifications, item: item)
+                } else { ContentUnavailableView("此消息不属于当前账号或已不可访问", systemImage: "bell.slash") }
+            }
+        }
+    }
+}
+
+private struct MomentNotificationDetail: View {
+    @ObservedObject var store: FamilyStore
+    @ObservedObject var notifications: MomentNotifications
+    let item: ApplicationNotification
+    @State private var request: DearRecord?
+    @State private var error = ""
+    @State private var refreshing = false
+    private var requestID: UUID? {
+        guard let source = item.sourceRecordId, source.hasPrefix("photo-request:") else { return nil }
+        return UUID(uuidString: String(source.dropFirst("photo-request:".count)))
+    }
+    private var status: String {
+        switch request?.text("status") {
+        case "waiting": return "等待共享设备传输"
+        case "transferring": return "正在传输原文件"
+        case "confirming": return "正在核验下载文件"
+        case "completed": return "下载已完成"
+        case "expired": return "请求已过期，请对方重新请求"
+        case "cancelled": return "下载者已取消请求"
+        case "revoked": return "分享已撤销或成员权限已变更"
+        case "unavailable": return "共享设备未找到原文件"
+        case "failed": return "传输未完成，请对方重新请求"
+        default: return "正在读取请求状态"
+        }
+    }
+    var body: some View {
+        List {
+            Section {
+                Text(item.title).font(.headline)
+                Text(item.content).textSelection(.enabled)
+                Text(DearRecord(data: ["createdAt": item.createdAt]).dateText("createdAt"))
+                    .font(.caption).foregroundStyle(.secondary)
+            }
+            if requestID != nil {
+                Section("原文件下载请求") {
+                    if let request { Text(request.text("fileName")); Text(status) }
+                    if !error.isEmpty { Text(error).foregroundStyle(.red) }
+                    Button("刷新请求状态") { Task { await loadRequest() } }.disabled(refreshing)
+                    if request?.text("status") == "waiting" || request?.text("status") == "transferring" {
+                        Button("继续共享并传输原文件") { Task { await store.photoSource.serveCurrentRequests(); await loadRequest() } }
+                        Text("请在保存原文件的设备上打开应用，并保持前台运行。")
+                            .font(.footnote).foregroundStyle(.secondary)
+                    }
+                }
+            }
+        }
+        .navigationTitle("消息详情")
+        .task { await notifications.markRead(item); await loadRequest() }
+    }
+    private func loadRequest() async {
+        guard let requestID else { return }
+        refreshing = true; defer { refreshing = false }
+        do {
+            guard let row = try await store.call("/api/dear/social/photo-requests/\(requestID.uuidString)") as? [String: Any] else { throw APIError.message("请求数据无效。") }
+            request = DearRecord(data: row); error = ""
+        } catch { self.error = "请求已不可访问或登录已过期，请刷新后重试。" }
+    }
+}
+
+
+private struct MomentNotificationButton: View {
+    @ObservedObject var notifications: MomentNotifications
+    var body: some View {
+        Button { notifications.open() } label: {
+            Label("消息通知", systemImage: notifications.unreadCount > 0 ? "bell.badge" : "bell")
+        }.accessibilityLabel("消息通知，\(notifications.unreadCount) 条未读")
     }
 }

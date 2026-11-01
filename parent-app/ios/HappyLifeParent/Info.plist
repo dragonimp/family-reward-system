@@ -65,5 +65,7 @@
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>通过 Linko Connect 与活动成员的设备连接，传输您共享的照片和视频原文件。</string>
 </dict>
 </plist>

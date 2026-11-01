@@ -13,6 +13,26 @@ mkdir -p "$source_dir"
 git -C "$root" archive "$commit" | tar -x -C "$source_dir"
 common="$(git -C "$root" rev-parse --path-format=absolute --git-common-dir)"
 ln -s "$(dirname "$(dirname "$common")")/AgentIdentity" "$ATLAS_BUILD_WORK/AgentIdentity"
+connect_root="$(dirname "$(dirname "$common")")/MyVnc"
+identity_root="$(dirname "$(dirname "$common")")/AgentIdentity"
+ln -s "$connect_root" "$ATLAS_BUILD_WORK/MyVnc"
+: "${CONNECT_RTC_LIBRARY_DIR:?Provide the matching committed ios-arm64 Connect native output}"
+python3 - "$connect_root" "$identity_root" "$CONNECT_RTC_LIBRARY_DIR" "$ATLAS_BUILD_OUTPUT" <<'SDK'
+import hashlib,json,subprocess,sys
+from pathlib import Path
+connect,identity,native,output=map(Path,sys.argv[1:])
+receipts={}
+for key,path,scope in [('connect',connect,['sdk/MyVnc.Realtime.Apple','native/rtc']),('identity',identity,['packages/AgentIdentity-iOS'])]:
+    commit=subprocess.check_output(['git','-C',str(path),'rev-parse','HEAD'],text=True).strip()
+    remote=subprocess.check_output(['git','-C',str(path),'ls-remote','origin','refs/heads/main'],text=True).split()[0]
+    assert commit==remote, key+' source is not pushed main'
+    subprocess.run(['git','-C',str(path),'diff','--quiet','HEAD','--',*scope],check=True)
+    receipts[key]=commit
+assert (native/'source-commit.txt').read_text().strip()==receipts['connect']
+assert (native/'native-version.txt').read_text().splitlines()[0]=='ios-arm64'
+receipts['nativeLibrarySha256']=hashlib.sha256((native/'libmyvnc-rtc.a').read_bytes()).hexdigest()
+(output/'sdk-dependencies.json').write_text(json.dumps(receipts,indent=2)+'\n')
+SDK
 export MOMENT_IOS_RELEASE_FLAVOR="${MOMENT_IOS_RELEASE_FLAVOR:-successor}"
 export DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer
 export HAPPYLIFE_PARENT_BUILD_ROOT="$ATLAS_BUILD_WORK/ios"

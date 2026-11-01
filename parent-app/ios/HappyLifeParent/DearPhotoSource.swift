@@ -1,4 +1,7 @@
 import CryptoKit
+import MyVncRealtime
+import AgentIdentity
+import SwiftUI
 import Foundation
 import UIKit
 import UserNotifications
@@ -39,6 +42,11 @@ import UniformTypeIdentifiers
     private var subjectCache: String?
     private var enabledForSession = false
     private var publishing = false
+    private var polling = false
+    private var transfers: [UUID: RealtimeFileTransfer] = [:]
+    private var downloads = Set<String>()
+    private var sourceTasks: [String: Task<Void, Never>] = [:]
+    private var generation = UUID()
     private var importingSharedItems = false
     private var checkedLocationIDs = Set<String>()
     private var pushToken: String?
@@ -56,7 +64,12 @@ import UniformTypeIdentifiers
         }
     }
 
-    func stop() { pump?.cancel(); pump = nil; enabledForSession = false }
+    func stop() {
+        generation = UUID(); pump?.cancel(); pump = nil; enabledForSession = false
+        for task in sourceTasks.values { task.cancel() }; sourceTasks.removeAll()
+        let active = Array(transfers.values); transfers.removeAll()
+        for transfer in active { Task { await transfer.cancel() } }
+    }
     func reset() { stop(); subjectCache = nil; pushToken = nil; checkedLocationIDs.removeAll() }
 
     func updatePushToken(_ token: String) async {
@@ -65,7 +78,7 @@ import UniformTypeIdentifiers
         guard let store, let subject = try? await currentSubject(), let root = try? directory(for: subject),
               let deviceID = (try? readIndex(at: root))?.deviceID else { return }
         _ = try? await store.call("/api/dear/social/photo-devices", method: "POST",
-                                  body: ["id": deviceID, "pushToken": token])
+                                  body: ["id": deviceID, "pushToken": token, "notificationApplicationKey": "happylife.ai", "transferProtocol": "connect-datachannel-v1"])
     }
 
     func cacheShareActivities(_ rows: [[String: Any]]) async {
@@ -168,7 +181,7 @@ import UniformTypeIdentifiers
               let index = try? readIndex(at: root) else { return }
         if !index.pendingRemoval.isEmpty { _ = try? cleanPendingRemoval(at: root) }
         do {
-            var body: [String: Any] = [:]
+            var body: [String: Any] = ["notificationApplicationKey": "happylife.ai", "transferProtocol": "connect-datachannel-v1"]
             if let deviceID = index.deviceID { body["id"] = deviceID }
             if let pushToken { body["pushToken"] = pushToken }
             let response = try await store.call("/api/dear/social/photo-devices", method: "POST", body: body) as? [String: Any]
@@ -226,7 +239,7 @@ import UniformTypeIdentifiers
         let subject = try await currentSubject()
         let root = try directory(for: subject)
         var index = try readIndex(at: root)
-        var deviceBody: [String: Any] = ["id": index.deviceID as Any? ?? NSNull()]
+        var deviceBody: [String: Any] = ["id": index.deviceID as Any? ?? NSNull(), "notificationApplicationKey": "happylife.ai", "transferProtocol": "connect-datachannel-v1"]
         if let pushToken { deviceBody["pushToken"] = pushToken }
         let device = try await store.call("/api/dear/social/photo-devices", method: "POST",
                                           body: deviceBody) as? [String: Any]
@@ -378,11 +391,14 @@ import UniformTypeIdentifiers
         guard UUID(uuidString: photoID) != nil, UUID(uuidString: spaceID) != nil,
               UUID(uuidString: activityID) != nil else { throw APIError.message("照片标识无效。") }
         if let local = await localOriginal(photoID: photoID, spaceID: spaceID, activityID: activityID) { return local }
-        guard let store, let token = store.identity.accessToken else { throw APIError.message("请先登录用户中心。") }
+        guard let store, store.identity.isAuthenticated else { throw APIError.message("请先登录用户中心。") }
+        guard !downloads.contains(photoID) else { throw APIError.message("该原文件正在接收，请稍候。") }
+        downloads.insert(photoID)
+        defer { downloads.remove(photoID) }
         let value = try await store.call("/api/dear/social/tenants/\(spaceID)/activities/\(activityID)/photo-requests",
-                                         method: "POST", body: ["photoId": photoID, "operationId": UUID().uuidString])
+                                         method: "POST", body: ["photoId": photoID, "operationId": UUID().uuidString, "transport": "connect-datachannel-v1"])
         guard let request = value as? [String: Any], let id = request["id"] as? String,
-              UUID(uuidString: id) != nil, let length = (request["length"] as? NSNumber)?.intValue,
+              UUID(uuidString: id) != nil, request["transport"] as? String == "connect-datachannel-v1", let length = (request["length"] as? NSNumber)?.intValue,
               let contentType = request["contentType"] as? String,
               length > 0, length <= (contentType.hasPrefix("video/") ? 500 : 50) * 1024 * 1024,
               let sha = request["sha256"] as? String,
@@ -422,108 +438,52 @@ import UniformTypeIdentifiers
             }
             try? FileManager.default.removeItem(at: finalURL)
         }
-        if FileManager.default.fileExists(atPath: partialURL.path) {
-            let size = try partialURL.resourceValues(forKeys: [.fileSizeKey]).fileSize ?? 0
-            if size >= length {
-                if size == length, (try? await hashFile(partialURL))?.caseInsensitiveCompare(sha) == .orderedSame {
-                    try FileManager.default.moveItem(at: partialURL, to: finalURL)
-                    _ = try? await store.call("/api/dear/social/photo-requests/\(id)/cancel", method: "POST", body: [:])
-                    progress?(1)
-                    return finalURL
-                }
-                try FileManager.default.removeItem(at: partialURL)
+        let manifest = try connectManifest(request)
+        let expectedGeneration = generation
+        let transfer = RealtimeFileTransfer(), transferID = UUID()
+        transfers[transferID] = transfer
+        defer { transfers.removeValue(forKey: transferID) }
+        let requests = try await connectRequests(requestID: id, role: "receiver")
+        guard expectedGeneration == generation else { throw CancellationError() }
+        try await withTaskCancellationHandler {
+            try await transfer.receive(partial: partialURL, manifest: manifest, requests: requests) { value in
+                await MainActor.run { progress?(value) }
             }
-        }
-        if !FileManager.default.fileExists(atPath: partialURL.path) &&
-            !FileManager.default.createFile(atPath: partialURL.path, contents: nil,
-                    attributes: [.protectionKey: FileProtectionType.completeUntilFirstUserAuthentication]) {
-            throw APIError.message("无法保存接收的原文件。")
-        }
-        let offset = try partialURL.resourceValues(forKeys: [.fileSizeKey]).fileSize ?? 0
-        var digest = SHA256()
-        if offset > 0 {
-            let existing = try FileHandle(forReadingFrom: partialURL)
-            defer { try? existing.close() }
-            while let chunk = try existing.read(upToCount: 1024 * 1024), !chunk.isEmpty {
-                digest.update(data: chunk)
-                await Task.yield()
+        } onCancel: { Task { await transfer.cancel() } }
+        // Connect returns only after peer acknowledgement and durable SHA validation.
+        _ = try await store.call("/api/dear/social/photo-requests/\(id)/complete", method: "POST", body: [:])
+        try FileManager.default.moveItem(at: partialURL, to: finalURL)
+        progress?(1)
+        return finalURL
+    }
+
+    private func connectManifest(_ row: [String: Any]) throws -> RealtimeFileManifest {
+        guard row["transport"] as? String == "connect-datachannel-v1",
+              let length = (row["length"] as? NSNumber)?.intValue, let sha = row["sha256"] as? String,
+              let expiry = (row["expiresAt"] as? NSNumber)?.doubleValue else { throw APIError.message("Connect 传输回执无效。") }
+        return try RealtimeFileManifest(length: length, sha256: sha, expiresAt: Date(timeIntervalSince1970: expiry / 1000))
+    }
+
+    private func connectRequests(requestID: String, role: String) async throws -> RealtimeFileTransfer.Requests {
+        guard let store, let config = try await store.call("/api/dear/social/connect-configuration") as? [String: Any],
+              config["transport"] as? String == "connect-datachannel-v1", let text = config["origin"] as? String,
+              let origin = URL(string: text), origin.scheme == "https", origin.host != nil,
+              origin.user == nil, origin.password == nil, origin.query == nil, origin.fragment == nil,
+              origin.path.isEmpty || origin.path == "/" else { throw APIError.message("Connect 服务尚未配置。") }
+        return { [weak store] in
+            try await MainActor.run { guard store?.identity.isAuthenticated == true else { throw CancellationError() } }
+            guard let token = try await store?.identity.serviceToken(for: origin) else { throw CancellationError() }
+            func request(_ action: String) -> URLRequest {
+                var components = URLComponents(url: origin, resolvingAgainstBaseURL: false)!
+                components.path = "/api/photo-requests/\(requestID)/connect/\(action)"
+                components.queryItems = [URLQueryItem(name: "role", value: role)]
+                var request = URLRequest(url: components.url!)
+                request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+                request.setValue(text, forHTTPHeaderField: "Origin")
+                request.timeoutInterval = 30
+                return request
             }
-        }
-        var prefixDigest = digest
-        let prefix = offset == 0 ? "" : prefixDigest.finalize().map { String(format: "%02x", $0) }.joined()
-        progress?(Double(offset) / Double(length))
-        var completed = false
-        var badPartial = false
-        do {
-            let output = try FileHandle(forWritingTo: partialURL)
-            defer { try? output.close() }
-            try output.seek(toOffset: UInt64(offset))
-            var received = offset
-            var components = URLComponents(url: base, resolvingAgainstBaseURL: false)!
-            components.scheme = "wss"
-            components.path = "/api/dear/social/photo-requests/\(id)/transfer"
-            components.queryItems = [URLQueryItem(name: "role", value: "receiver"),
-                                     URLQueryItem(name: "offset", value: String(offset))]
-            if offset > 0 { components.queryItems?.append(URLQueryItem(name: "prefixSha256", value: prefix)) }
-            var socketRequest = URLRequest(url: components.url!)
-            socketRequest.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-            socketRequest.timeoutInterval = contentType.hasPrefix("video/") ? 1805 : 305
-            let socket = session.webSocketTask(with: socketRequest)
-            socket.resume()
-            defer { socket.cancel(with: .normalClosure, reason: nil) }
-            var started = false
-            while true {
-                try Task.checkCancellation()
-                let message = try await socket.receive()
-                switch message {
-                case .string(let text):
-                    guard let bytes = text.data(using: .utf8),
-                          let marker = try? JSONSerialization.jsonObject(with: bytes) as? [String: Any],
-                          let kind = marker["kind"] as? String else { throw APIError.message("原图传输消息无效。") }
-                    if kind == "start" && !started {
-                        guard (marker["length"] as? NSNumber)?.intValue == length,
-                              (marker["offset"] as? NSNumber)?.intValue == offset,
-                              (marker["sha256"] as? String)?.caseInsensitiveCompare(sha) == .orderedSame else {
-                            badPartial = true
-                            throw APIError.message("原图续传信息不匹配。")
-                        }
-                        started = true
-                    } else if kind == "end" && started {
-                        try output.synchronize()
-                        guard received == length,
-                              digest.finalize().map({ String(format: "%02x", $0) }).joined().caseInsensitiveCompare(sha) == .orderedSame,
-                              (contentType.hasPrefix("video/") || UIImage(contentsOfFile: partialURL.path) != nil) else {
-                            badPartial = true
-                            throw APIError.message("原文件完整性校验失败。")
-                        }
-                        _ = try await store.call("/api/dear/social/photo-requests/\(id)/complete", method: "POST", body: [:])
-                        try output.close()
-                        try FileManager.default.moveItem(at: partialURL, to: finalURL)
-                        progress?(1)
-                        completed = true
-                        return finalURL
-                    } else if kind == "reset" {
-                        badPartial = true
-                        throw APIError.message("本地部分文件与分享源不一致，再次获取将从头开始。")
-                    } else { throw APIError.message("原图传输顺序无效。") }
-                case .data(let chunk):
-                    guard started, received + chunk.count <= length else {
-                        badPartial = true
-                        throw APIError.message("原图大小不匹配。")
-                    }
-                    try output.write(contentsOf: chunk)
-                    digest.update(data: chunk)
-                    received += chunk.count
-                    if received == length || received % (1024 * 1024) < chunk.count {
-                        progress?(Double(received) / Double(length))
-                    }
-                @unknown default: throw APIError.message("原图传输格式无效。")
-                }
-            }
-        } catch {
-            if badPartial { try? FileManager.default.removeItem(at: partialURL) }
-            if !completed { _ = try? await store.call("/api/dear/social/photo-requests/\(id)/cancel", method: "POST", body: [:]) }
-            throw error
+            return (request("ice"), request("signal"))
         }
     }
 
@@ -610,21 +570,31 @@ import UniformTypeIdentifiers
         guard (response as? HTTPURLResponse)?.statusCode == 200 else { throw APIError.message("预览上传失败。") }
     }
 
+    func serveCurrentRequests() async {
+        start()
+        if !enabledForSession { await enableExistingDevice() }
+        await poll()
+    }
+
     private func poll() async {
         guard !Task.isCancelled, let store, store.identity.isAuthenticated,
               let subject = try? await currentSubject(), let root = try? directory(for: subject),
               let index = try? readIndex(at: root), let deviceID = index.deviceID else { return }
+        guard !polling else { return }
+        polling = true
+        defer { polling = false }
         if !index.pendingRemoval.isEmpty { _ = try? cleanPendingRemoval(at: root) }
         do {
             let rows = try await store.call("/api/dear/social/photo-devices/\(deviceID)/requests") as? [[String: Any]] ?? []
-            if rows.isEmpty { store.photoRequestNotice = nil; store.photoTransferProgress = nil; return }
+            if rows.isEmpty && sourceTasks.isEmpty { store.photoRequestNotice = nil; store.photoTransferProgress = nil; return }
             store.photoRequestNotice = "有活动成员正在请求原图，请保持 App 打开直到传输完成。"
             store.photoTransferProgress = nil
-            defer { store.photoRequestNotice = nil; store.photoTransferProgress = nil }
+
             for request in rows {
                 guard !Task.isCancelled else { return }
                 let requestID = request["id"] as? String ?? ""
-                guard UUID(uuidString: requestID) != nil else { continue }
+                guard UUID(uuidString: requestID) != nil, request["transport"] as? String == "connect-datachannel-v1",
+                      sourceTasks[requestID] == nil, sourceTasks.count < 2 else { continue }
                 let photoID = request["photoId"] as? String ?? ""
                 guard let photo = index.photos.first(where: { $0.id == photoID }),
                       photo.spaceID == request["tenantId"] as? String,
@@ -640,62 +610,153 @@ import UniformTypeIdentifiers
                     _ = try? await store.call("/api/dear/social/photo-requests/\(requestID)/unavailable", method: "POST", body: [:])
                     continue
                 }
-                try await sendOriginal(at: path, length: photo.length, requestID: requestID)
+                let expectedGeneration = generation
+                sourceTasks[requestID] = Task { [weak self] in
+                    guard let self else { return }
+                    do { try await self.sendOriginal(at: path, request: request, requestID: requestID) }
+                    catch { /* Next authorized poll can resume the same request. */ }
+                    guard expectedGeneration == self.generation else { return }
+                    self.sourceTasks.removeValue(forKey: requestID)
+                    if self.sourceTasks.isEmpty { store.photoRequestNotice = nil; store.photoTransferProgress = nil }
+                }
             }
         } catch { }
     }
 
-    private func sendOriginal(at url: URL, length: Int, requestID: String) async throws {
-        guard let store, let token = store.identity.accessToken else { throw APIError.message("登录已过期。") }
-        let input = try FileHandle(forReadingFrom: url)
-        defer { try? input.close() }
-        var components = URLComponents(url: base, resolvingAgainstBaseURL: false)!
-        components.scheme = "wss"
-        components.path = "/api/dear/social/photo-requests/\(requestID)/transfer"
-        components.queryItems = [URLQueryItem(name: "role", value: "source"), URLQueryItem(name: "protocol", value: "2")]
-        var request = URLRequest(url: components.url!)
-        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-        let task = session.webSocketTask(with: request)
-        task.resume()
-        defer { task.cancel(with: .normalClosure, reason: nil) }
-        guard case .string(let controlText) = try await task.receive(),
-              let controlData = controlText.data(using: .utf8),
-              let control = try JSONSerialization.jsonObject(with: controlData) as? [String: Any],
-              control["kind"] as? String == "resume",
-              let offset = (control["offset"] as? NSNumber)?.intValue,
-              offset >= 0, offset < length,
-              let prefix = control["prefixSha256"] as? String else {
-            throw APIError.message("续传请求无效。")
+    private func sendOriginal(at url: URL, request: [String: Any], requestID: String) async throws {
+        guard let store, store.identity.isAuthenticated else { throw APIError.message("登录已过期。") }
+        let expectedGeneration = generation
+        let manifest = try connectManifest(request)
+        let requests = try await connectRequests(requestID: requestID, role: "source")
+        guard expectedGeneration == generation else { throw CancellationError() }
+        let transfer = RealtimeFileTransfer(), id = UUID()
+        transfers[id] = transfer
+        defer { transfers.removeValue(forKey: id) }
+        try await withTaskCancellationHandler {
+            try await transfer.send(file: url, manifest: manifest, requests: requests, started: {
+                _ = try await store.call("/api/dear/social/photo-requests/\(requestID)/begin", method: "POST", body: [:])
+            }, commit: {
+                _ = try await store.call("/api/dear/social/photo-requests/\(requestID)/confirm", method: "POST", body: [:])
+            }, progress: { value in
+                await MainActor.run { store.photoTransferProgress = value }
+            })
+        } onCancel: { Task { await transfer.cancel() } }
+    }
+
+}
+
+
+@MainActor final class MomentNotifications: ObservableObject {
+    weak var store: FamilyStore?
+    @Published var items: [ApplicationNotification] = []
+    @Published var unreadCount = 0
+    @Published var error = ""
+    @Published var pushRegistrationError = ""
+    @Published var showingInbox = false
+    @Published var selectedMessageID: Int64?
+    private var generation = UUID()
+    private var inboxRequestID = UUID()
+    private var client: NotificationClient?
+    private var authority: URL?
+    private var applicationKey: String?
+    private var registrationTail: Task<Void, Never>?
+    private var deviceToken: String?
+    private let installationID: String = {
+        let key = "moment.notifications.installation"
+        if let value = UserDefaults.standard.string(forKey: key) { return value }
+        let value = UUID().uuidString.replacingOccurrences(of: "-", with: "").lowercased()
+        UserDefaults.standard.set(value, forKey: key)
+        return value
+    }()
+    private var channel: String { Bundle.main.bundleIdentifier == "net.impx.happylife.parent" ? "app-store-legacy" : "app-store-successor" }
+    private func configuredClient() async throws -> NotificationClient {
+        if let client { return client }
+        guard let store else { throw APIError.message("消息服务不可用。") }
+        let expected = generation
+        guard let config = try await store.call("/auth/native/configuration") as? [String: Any],
+              let text = config["authority"] as? String, let url = URL(string: text), url.scheme == "https",
+              url.host != nil, url.user == nil, url.password == nil, url.path.isEmpty, url.query == nil, url.fragment == nil,
+              let key = config["clientId"] as? String, key == "happylife.ai", expected == generation else {
+            throw APIError.message("通知应用配置无效。")
         }
-        let localPrefix = offset == 0 ? "" : try await Task.detached(priority: .utility) {
-            try Self.fileSHA256(url, limit: offset)
-        }.value
-        guard localPrefix.caseInsensitiveCompare(prefix) == .orderedSame else {
-            try? await task.send(.string("{\"kind\":\"reset\"}"))
-            throw APIError.message("已接收部分与本机原文件不匹配，请重新获取。")
+        let result = NotificationClient(authority: url, applicationKey: key) { [weak self] in
+            guard let self, self.generation == expected, let token = try await self.store?.identity.validAccessToken(), !token.isEmpty else { throw CancellationError() }
+            return token
         }
-        try input.seek(toOffset: UInt64(offset))
-        try await task.send(.string("{\"kind\":\"ready\"}"))
-        var sent = offset
-        store.photoTransferProgress = Double(sent) / Double(length)
-        var reportedPercent = -1
-        while let chunk = try input.read(upToCount: 16 * 1024), !chunk.isEmpty {
-            try Task.checkCancellation()
-            guard sent + chunk.count <= length else { throw APIError.message("原文件已发生变化。") }
-            try await task.send(.data(chunk))
-            sent += chunk.count
-            let percent = Int(Double(sent) / Double(length) * 100)
-            if percent / 5 != reportedPercent / 5 {
-                store.photoRequestNotice = "正在实时传输原文件：\(percent)%；请保持 App 打开。"
-                store.photoTransferProgress = Double(sent) / Double(length)
-                reportedPercent = percent
+        authority = url; applicationKey = key; client = result
+        return result
+    }
+    func reload() async {
+        let expected = generation, requestID = UUID()
+        inboxRequestID = requestID
+        do {
+            let inbox = try await configuredClient().list()
+            guard expected == generation, requestID == inboxRequestID else { return }
+            items = inbox.items; unreadCount = inbox.unreadCount; error = ""
+        } catch is CancellationError { } catch {
+            if expected == generation, requestID == inboxRequestID { self.error = "消息通知暂时无法读取，请重试。" }
+        }
+    }
+    func resume() async {
+        let settings = await UNUserNotificationCenter.current().notificationSettings()
+        if settings.authorizationStatus == .authorized || settings.authorizationStatus == .provisional {
+            UIApplication.shared.registerForRemoteNotifications()
+        }
+        await reload()
+    }
+    func registrationFailed() { pushRegistrationError = "暂时无法登记系统通知，请检查网络后重试。App 内请求消息仍可查看。" }
+    func enable() async {
+        do {
+            guard try await UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound, .badge]) else {
+                pushRegistrationError = "系统通知未开启；请求消息仍会保留。可在系统设置中允许 Linko Moment 发送通知。"; return
+            }
+            UIApplication.shared.registerForRemoteNotifications()
+        } catch { self.pushRegistrationError = "无法开启系统通知，请检查系统设置。" }
+    }
+    func updatePushToken(_ token: String) {
+        deviceToken = token
+        let expected = generation, previous = registrationTail
+        registrationTail = Task {
+            await previous?.value
+            do {
+                guard expected == generation, let store, store.identity.isAuthenticated else { return }
+                _ = try await configuredClient()
+                guard let authority, let applicationKey, let access = try await store.identity.validAccessToken(), expected == generation else { return }
+                let fixed = NotificationClient(authority: authority, applicationKey: applicationKey, accessToken: { access })
+                #if DEBUG
+                let environment = "sandbox"
+                #else
+                let environment = "production"
+                #endif
+                try await fixed.registerAppleDevice(installationID: installationID, token: token, environment: environment, channel: channel)
+                if expected != generation { try? await fixed.unregisterDevice(installationID: installationID) }
+                else { pushRegistrationError = "" }
+            } catch {
+                if expected == generation { self.pushRegistrationError = "系统推送登记未完成；请求消息仍可在此查看，请重试。" }
             }
         }
-        guard sent == length else { throw APIError.message("原文件已发生变化。") }
-        // Linko confirms receipt only after the other device has consumed all bytes.
-        do { _ = try await task.receive() }
-        catch {
-            guard task.closeCode == .normalClosure else { throw error }
+    }
+    func markRead(_ item: ApplicationNotification) async {
+        let expected = generation
+        do {
+            try await configuredClient().markRead(item.id)
+            if expected == generation { await reload() }
+        } catch { if expected == generation { self.error = "标记已读失败，请重试。" } }
+    }
+    func open(messageID: Int64? = nil) {
+        selectedMessageID = messageID; showingInbox = true
+        guard store?.identity.isAuthenticated == true else { return }
+        Task { await reload(); await store?.photoSource.serveCurrentRequests() }
+    }
+    func reset(token: String?) {
+        let oldAuthority = authority, oldKey = applicationKey, previous = registrationTail
+        generation = UUID(); client = nil; authority = nil; applicationKey = nil
+        items = []; unreadCount = 0; showingInbox = false; selectedMessageID = nil; error = ""; pushRegistrationError = ""; inboxRequestID = UUID()
+        registrationTail = Task {
+            await previous?.value
+            if let token, let oldAuthority, let oldKey {
+                try? await NotificationClient(authority: oldAuthority, applicationKey: oldKey, accessToken: { token }).unregisterDevice(installationID: installationID)
+            }
         }
     }
 }

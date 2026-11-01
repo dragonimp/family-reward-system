@@ -6,6 +6,13 @@ import UserNotifications
 
 @MainActor final class PhotoPushDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDelegate {
     weak var photoSource: DearPhotoSource?
+    weak var notifications: MomentNotifications?
+    private var pendingMessageID: Int64?
+
+    func connect(store: FamilyStore) {
+        photoSource = store.photoSource; notifications = store.notifications
+        if let pendingMessageID { store.notifications.open(messageID: pendingMessageID); self.pendingMessageID = nil }
+    }
 
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil) -> Bool {
         UNUserNotificationCenter.current().delegate = self
@@ -14,11 +21,16 @@ import UserNotifications
 
     func application(_ application: UIApplication, didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data) {
         let token = deviceToken.map { String(format: "%02x", $0) }.joined()
-        Task { await photoSource?.updatePushToken(token) }
+        Task { await photoSource?.updatePushToken(token); notifications?.updatePushToken(token) }
+    }
+
+    func application(_ application: UIApplication, didFailToRegisterForRemoteNotificationsWithError error: Error) {
+        notifications?.registrationFailed()
     }
 
     nonisolated func userNotificationCenter(_ center: UNUserNotificationCenter, willPresent notification: UNNotification,
                                 withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void) {
+        Task { @MainActor [weak self] in await self?.notifications?.reload() }
         completionHandler([.banner, .sound])
     }
 
@@ -26,6 +38,12 @@ import UserNotifications
                                 withCompletionHandler completionHandler: @escaping () -> Void) {
         Task { @MainActor [weak self] in
             self?.photoSource?.start()
+            let info = response.notification.request.content.userInfo
+            if info["applicationKey"] as? String == "happylife.ai",
+               let raw = info["messageId"] as? String, let id = Int64(raw), id > 0 {
+                if let notifications = self?.notifications { notifications.open(messageID: id) }
+                else { self?.pendingMessageID = id }
+            }
             completionHandler()
         }
     }
@@ -52,8 +70,8 @@ extension View {
     @UIApplicationDelegateAdaptor(PhotoPushDelegate.self) private var photoPushDelegate
     @StateObject private var store = FamilyStore()
     @Environment(\.scenePhase) private var scenePhase
-    var body: some Scene { WindowGroup { FamilyRoot(store: store, identity: store.identity).tint(.teal).onAppear {
-        photoPushDelegate.photoSource = store.photoSource
+    var body: some Scene { WindowGroup { FamilyRoot(store: store, identity: store.identity, notifications: store.notifications).tint(.teal).onAppear {
+        photoPushDelegate.connect(store: store)
     }.onChange(of: scenePhase) { _, phase in
         if phase == .active { store.resumePhotoSharing(); Task { await store.refreshIfStale() } }
         else { store.suspendPhotoSharing() }
@@ -63,6 +81,7 @@ extension View {
 struct FamilyRoot: View {
     @ObservedObject var store: FamilyStore
     @ObservedObject var identity: AgentIdentitySession
+    @ObservedObject var notifications: MomentNotifications
     var body: some View {
         Group {
             if !identity.isAuthenticated { login }
@@ -96,6 +115,9 @@ struct FamilyRoot: View {
         }
         .task(id: identity.isAuthenticated) {
             if identity.isAuthenticated { await store.load(); store.resumePhotoSharing() }
+        }
+        .sheet(isPresented: Binding(get: { identity.isAuthenticated && notifications.showingInbox }, set: { notifications.showingInbox = $0 })) {
+            MomentNotificationInbox(store: store, notifications: notifications)
         }
         .alert("操作提示", isPresented: Binding(get: { store.error != nil }, set: { if !$0 { store.error = nil } })) { Button("知道了", role: .cancel) { store.error = nil } } message: { Text(store.error ?? "") }
     }
@@ -134,7 +156,7 @@ struct FamilyRoot: View {
             DearSocialView(store: store).tabItem { Label("活动", systemImage: "photo.on.rectangle.angled") }
             ExerciseView(userID: store.profile?.text("unifiedUserId") ?? "").id(store.profile?.text("unifiedUserId") ?? "").tabItem { Label("运动", systemImage: "figure.walk") }
             FamilyChatView(store: store).tabItem { Label("AI 对话", systemImage: "bubble.left.and.bubble.right.fill") }
-            AccountView(store: store).tabItem { Label("我的", systemImage: "person.crop.circle") }
+            AccountView(store: store).tabItem { Label("我的", systemImage: "person.crop.circle") }.badge(notifications.unreadCount)
         }
     }
 }
@@ -497,6 +519,9 @@ struct AccountView: View {
                     }
                 }
                 Section("应用与设置") {
+                    Button { store.notifications.open() } label: {
+                        Label("消息通知与下载请求", systemImage: "bell.badge")
+                    }
                     NavigationLink { GenealogyView(store: store) } label: { Label("家族族谱", systemImage: "person.3.sequence.fill") }
                     NavigationLink { MembersView(store: store) } label: { Label("家庭成员", systemImage: "person.3.fill") }
                     NavigationLink { FamilyInvitationHub(store: store) } label: { Label("邀请家人", systemImage: "envelope.open.fill") }

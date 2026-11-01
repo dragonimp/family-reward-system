@@ -1,6 +1,5 @@
 using System.Net;
 using System.Net.Http.Headers;
-using System.Net.WebSockets;
 using AgentIdentity.NativeClient;
 
 internal static class LinkoSocialGateway
@@ -9,42 +8,11 @@ internal static class LinkoSocialGateway
 
     public static void MapLinkoSocialGateway(this WebApplication app)
     {
-        app.MapGet("/api/dear/social/photo-requests/{requestId:guid}/transfer", async (
-            HttpContext context, Guid requestId, IHttpClientFactory clients, IConfiguration configuration, CancellationToken ct) =>
-        {
-            var role = context.Request.Query["role"].ToString();
-            if (!context.WebSockets.IsWebSocketRequest || role is not ("source" or "receiver"))
-                return Results.BadRequest();
-            var originText = configuration["LinkoSocial:Origin"];
-            var loginText = configuration["LinkoSocial:LoginOrigin"];
-            if (!Uri.TryCreate(originText, UriKind.Absolute, out var origin) || origin.Scheme != "https" ||
-                !Uri.TryCreate(loginText, UriKind.Absolute, out var loginOrigin) || loginOrigin.Scheme != "https")
-                return Results.Problem("Linko Social 服务地址未配置。", statusCode: 503);
-            var token = AccessToken(context, configuration);
-            if (string.IsNullOrWhiteSpace(token)) return Results.Unauthorized();
-            try
-            {
-                var serviceToken = await new NativeSsoClient(clients.CreateClient("dear-social-sso"))
-                    .ExchangeAsync(loginOrigin, origin, token, ct);
-                using var upstream = new ClientWebSocket();
-                upstream.Options.SetRequestHeader("Authorization", "Bearer " + serviceToken);
-                var destination = new UriBuilder(origin) { Scheme = "wss", Path = $"/api/photo-requests/{requestId}/transfer", Query = "role=" + role }.Uri;
-                await upstream.ConnectAsync(destination, ct);
-                using var downstream = await context.WebSockets.AcceptWebSocketAsync();
-                using var linked = CancellationTokenSource.CreateLinkedTokenSource(ct);
-                linked.CancelAfter(TimeSpan.FromSeconds(305));
-                var send = RelayWebSocket(downstream, upstream, linked.Token);
-                var receive = RelayWebSocket(upstream, downstream, linked.Token);
-                await Task.WhenAny(send, receive);
-                linked.Cancel();
-                try { await Task.WhenAll(send, receive); } catch (OperationCanceledException) { }
-                return Results.Empty;
-            }
-            catch (HttpRequestException exception) when (exception.StatusCode == HttpStatusCode.Unauthorized)
-            {
-                return Results.Unauthorized();
-            }
-            catch (OperationCanceledException) when (ct.IsCancellationRequested) { return Results.Empty; }
+        app.MapGet("/api/dear/social/connect-configuration", (IConfiguration configuration) => {
+            if (!Uri.TryCreate(configuration["LinkoSocial:Origin"], UriKind.Absolute, out var origin) ||
+                origin.Scheme != "https" || origin.UserInfo.Length != 0 || origin.AbsolutePath != "/" ||
+                origin.Query.Length != 0 || origin.Fragment.Length != 0) return Results.StatusCode(503);
+            return Results.Ok(new { origin = origin.GetLeftPart(UriPartial.Authority), transport = "connect-datachannel-v1" });
         }).RequireAuthorization();
         app.MapMethods("/api/dear/social/{**path}", Methods, async (HttpContext context, string? path,
             IHttpClientFactory clients, IConfiguration configuration, CancellationToken ct) =>
@@ -109,22 +77,6 @@ internal static class LinkoSocialGateway
                 ?? Environment.GetEnvironmentVariable("AGENTIDENTITY_COOKIE_NAME") ?? "happylife_access_token"]);
     }
 
-    private static async Task RelayWebSocket(WebSocket source, WebSocket destination, CancellationToken ct)
-    {
-        var buffer = new byte[16 * 1024];
-        while (!ct.IsCancellationRequested)
-        {
-            var result = await source.ReceiveAsync(buffer, ct);
-            if (result.MessageType == WebSocketMessageType.Close)
-            {
-                if (destination.State == WebSocketState.Open)
-                    await destination.CloseOutputAsync(WebSocketCloseStatus.NormalClosure, "complete", CancellationToken.None);
-                return;
-            }
-            await destination.SendAsync(buffer.AsMemory(0, result.Count), result.MessageType, result.EndOfMessage, ct);
-        }
-    }
-
     private static bool Allowed(string method, string? path)
     {
         if (string.IsNullOrWhiteSpace(path)) return false;
@@ -134,7 +86,7 @@ internal static class LinkoSocialGateway
         if (s.Length == 2 && s[0] == "photo-devices" && Guid.TryParse(s[1], out _)) return method == "DELETE";
         if (s.Length == 3 && s[0] == "photo-devices" && Guid.TryParse(s[1], out _) && s[2] == "requests") return method == "GET";
         if (s.Length == 2 && s[0] == "photo-requests" && Guid.TryParse(s[1], out _)) return method == "GET";
-        if (s.Length == 3 && s[0] == "photo-requests" && Guid.TryParse(s[1], out _) && s[2] is "unavailable" or "complete" or "cancel") return method == "POST";
+        if (s.Length == 3 && s[0] == "photo-requests" && Guid.TryParse(s[1], out _) && s[2] is "unavailable" or "complete" or "cancel" or "begin" or "confirm") return method == "POST";
         if (s.Length == 1 && s[0] == "tenants") return method is "GET" or "POST";
         if (s.Length == 2 && s[0] == "spaces" && s[1] == "mine") return method == "GET";
         if (s.Length == 2 && s[0] == "activities" && s[1] == "joined") return method == "GET";
