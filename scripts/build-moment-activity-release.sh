@@ -6,7 +6,7 @@ set -euo pipefail
 export MSBUILDDISABLENODEREUSE=1 DOTNET_CLI_DO_NOT_USE_MSBUILD_SERVER=1
 projects=/Users/wengzhishan/Projects
 mkdir -p "$ATLAS_BUILD_WORK/source"
-for project in AgentIdentity MyVnc AgentFree Linko family-reward-system; do
+for project in AgentIdentity MyVnc AgentFree Agent-Pay Atlas Linko family-reward-system; do
   root="$projects/$project"
   commit="$(git -C "$root" rev-parse HEAD)"
   remote="$(git -C "$root" ls-remote origin refs/heads/main | cut -f1)"
@@ -22,7 +22,8 @@ for project in AgentIdentity MyVnc AgentFree Linko family-reward-system; do
   fi
   printf '%s %s\n' "$project" "$commit" >> "$ATLAS_BUILD_OUTPUT/source-commits.txt"
 done
-export ATLAS_ROOT="$projects/Atlas" AtlasRoot="$projects/Atlas" ATLAS_SOURCE_ROOT="$projects/Atlas"
+export ATLAS_ROOT="$projects/Atlas" ATLAS_SOURCE_ROOT="$projects/Atlas"
+export AtlasRoot="$ATLAS_BUILD_WORK/source/Atlas"
 export MyVncRoot="$ATLAS_BUILD_WORK/source/MyVnc"
 export AgentIdentityRoot="$ATLAS_BUILD_WORK/source/AgentIdentity"
 export AGENTIDENTITY_ROOT="$AgentIdentityRoot"
