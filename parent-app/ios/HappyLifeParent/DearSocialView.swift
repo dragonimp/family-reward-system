@@ -1917,6 +1917,7 @@ private struct DearPhotoDetailView: View {
     let path: String
     let canDelete: Bool
     var active = true
+    var downloadRequestID: UUID? = nil
     let onDeleted: (Bool) -> Void
     var onSwipeDown: (() -> Void)? = nil
     var onPageSwipe: ((Int) -> Void)? = nil
@@ -1975,6 +1976,9 @@ private struct DearPhotoDetailView: View {
                         else { withAnimation(.spring(response: 0.25, dampingFraction: 0.85)) { dismissOffset = 0 } }
                     })
                 Text(photo.text("originalFileName")).font(.headline)
+                if let downloadRequestID {
+                    MomentPhotoRequestProgress(store: store, requestID: downloadRequestID)
+                }
                 Text("分享者：\(photo.text("sourceDisplayName"))").font(.subheadline).foregroundStyle(.secondary)
                 Label(store.photoSource.deviceDescription(photo.data), systemImage: "iphone").font(.caption).foregroundStyle(.secondary)
                 Text((serverCacheReady ?? photo.flag("serverCached")) ? "服务器已缓存，可在共享设备离线时获取" : "服务器尚未缓存，获取原件需等待共享设备上线").font(.caption).foregroundStyle(.secondary)
@@ -2060,7 +2064,7 @@ private struct DearPhotoDetailView: View {
         defer { fetchingOriginal = false }
         do {
             let url = try await store.photoSource.downloadOriginal(photoID: photo.id, spaceID: spaceID, activityID: activityID, status: { downloadStatus = $0 }) {
-                downloadStatus = "正在接收原文件"; transferProgress = $0
+                downloadStatus = "正在接收原文件"; transferProgress = max(transferProgress, $0)
             }
             if !isVideo {
                 originalImage = try await PhotoDisplayImage.load(url)
@@ -2155,6 +2159,7 @@ private struct MomentNotificationDetail: View {
     @ObservedObject var notifications: MomentNotifications
     let item: ApplicationNotification
     @State private var request: DearRecord?
+    @State private var thumbnail: UIImage?
     @State private var error = ""
     @State private var refreshing = false
     private var requestID: UUID? {
@@ -2187,6 +2192,30 @@ private struct MomentNotificationDetail: View {
             if requestID != nil {
                 Section("原文件下载请求") {
                     if let request {
+                        if let photo = request.data["photo"] as? [String: Any], let requestID {
+                            NavigationLink {
+                                DearPhotoDetailView(store: store, photo: DearRecord(data: photo),
+                                    spaceID: request.text("tenantId"), activityID: request.text("activityId"),
+                                    path: thumbnailPath(request), canDelete: false, downloadRequestID: requestID,
+                                    onDeleted: { _ in })
+                                    .navigationTitle("照片详情")
+                                    .navigationBarTitleDisplayMode(.inline)
+                            } label: {
+                                HStack(spacing: 12) {
+                                    Group {
+                                        if let thumbnail { Image(uiImage: thumbnail).resizable().scaledToFill() }
+                                        else { Image(systemName: request.text("contentType").hasPrefix("video/") ? "video" : "photo").foregroundStyle(.secondary) }
+                                    }
+                                    .frame(width: 88, height: 88).clipped().clipShape(RoundedRectangle(cornerRadius: 10))
+                                    VStack(alignment: .leading, spacing: 5) {
+                                        Text(request.text("fileName")).font(.headline).lineLimit(2)
+                                        Text(ByteCountFormatter.string(fromByteCount: Int64(request.number("length")), countStyle: .file))
+                                            .font(.caption).foregroundStyle(.secondary)
+                                        Text("查看照片详情与下载进度").font(.caption)
+                                    }
+                                }
+                            }
+                        } else { Text("照片已撤销或暂不可访问").foregroundStyle(.secondary) }
                         Text("请求人：\(request.text("requesterDisplayName").isEmpty ? "成员 " + request.text("requester") : request.text("requesterDisplayName"))")
                         Text(request.text("fileName")); Text(status)
                     }
@@ -2211,6 +2240,9 @@ private struct MomentNotificationDetail: View {
         .navigationTitle("消息详情")
         .task { await notifications.markRead(item); await loadRequest() }
     }
+    private func thumbnailPath(_ request: DearRecord) -> String {
+        "/api/dear/social/tenants/\(request.text("tenantId"))/activities/\(request.text("activityId"))/native-photos/\(request.text("photoId"))/thumbnail"
+    }
     private func loadRequest() async {
         guard let requestID else { return }
         refreshing = true; defer { refreshing = false }
@@ -2222,11 +2254,73 @@ private struct MomentNotificationDetail: View {
                 if let approved = try await store.call("/api/dear/social/photo-requests/\(requestID.uuidString)") as? [String: Any] { updated = approved }
                 await store.photoSource.serveCurrentRequests()
             }
-            request = DearRecord(data: updated); error = ""
+            let record = DearRecord(data: updated)
+            request = record; error = ""
+            if thumbnail == nil, updated["photo"] is [String: Any] {
+                thumbnail = try? await store.authenticatedImage(thumbnailPath(record))
+            }
         } catch { self.error = "请求已不可访问或登录已过期，请刷新后重试。" }
     }
 }
 
+
+private struct MomentPhotoRequestProgress: View {
+    @ObservedObject var store: FamilyStore
+    let requestID: UUID
+    @State private var request: DearRecord?
+    @State private var failed = false
+    private var phase: String {
+        switch request?.text("status") {
+        case "pending_approval": return "等待分享者同意"
+        case "waiting": return "已同意，等待原文件传输"
+        case "transferring": return "正在传输原文件"
+        case "confirming": return "正在接收或校验原文件"
+        case "completed": return "下载已完成"
+        case "cancelled": return "下载已取消或已停止分享"
+        case "expired": return "下载请求已过期"
+        case "revoked": return "分享已撤销或成员权限已变更"
+        case "unavailable": return "原文件暂不可用"
+        case "failed": return "下载未完成，请重新请求"
+        default: return "正在读取下载状态"
+        }
+    }
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("这次下载请求").font(.headline)
+            if let request {
+                Text("请求人：\(request.text("requesterDisplayName").isEmpty ? request.text("requester") : request.text("requesterDisplayName"))")
+                    .font(.subheadline)
+                Text(phase).font(.subheadline)
+                if request.text("status") == "completed" {
+                    ProgressView(value: 1).accessibilityLabel("下载已完成")
+                } else if let bytes = request.data["relayBytesSent"] as? NSNumber, request.number("length") > 0 {
+                    let value = min(0.99, bytes.doubleValue / request.number("length"))
+                    ProgressView(value: value).accessibilityLabel("服务器发送进度")
+                    Text("服务器已发送 \(Int(value * 100))%，接收端校验后完成")
+                        .font(.caption).foregroundStyle(.secondary)
+                } else if ["transferring", "confirming"].contains(request.text("status")) {
+                    ProgressView().accessibilityLabel(phase)
+                }
+            } else { ProgressView() }
+            if failed { Text("状态更新暂时失败，正在重试。 ").font(.caption).foregroundStyle(.secondary) }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding().background(.quaternary, in: RoundedRectangle(cornerRadius: 12))
+        .task(id: requestID) {
+            while !Task.isCancelled {
+                do {
+                    if let row = try await store.call("/api/dear/social/photo-requests/\(requestID.uuidString)") as? [String: Any] {
+                        guard !Task.isCancelled else { return }
+                        request = DearRecord(data: row); failed = false
+                        if ["completed", "cancelled", "expired", "revoked", "unavailable", "failed"].contains(request?.text("status") ?? "") { return }
+                    }
+                } catch is CancellationError { return }
+                catch { failed = true }
+                do { try await Task.sleep(for: .seconds(2)) } catch { return }
+            }
+        }
+    }
+}
 
 private struct MomentNotificationButton: View {
     @ObservedObject var notifications: MomentNotifications

@@ -482,7 +482,7 @@ import UniformTypeIdentifiers
         if current["serverCached"] as? Bool == true {
             status?("正在从服务器缓存接收原文件…")
             let relayRequest = try await relayRequest(path: "/api/dear/social/photo-requests/\(id)/relay")
-            try await RealtimeFileRelay.receive(to: partialURL, manifest: manifest, request: relayRequest)
+            try await RealtimeFileRelay.receive(to: partialURL, manifest: manifest, request: relayRequest) { value in await MainActor.run { progress?(value) } }
             guard expectedGeneration == generation else { try? FileManager.default.removeItem(at: partialURL); throw CancellationError() }
             _ = try await store.call("/api/dear/social/photo-requests/\(id)/complete", method: "POST", body: [:])
             try FileManager.default.moveItem(at: partialURL, to: finalURL); progress?(1); return finalURL
@@ -510,7 +510,7 @@ import UniformTypeIdentifiers
             if latest?["serverCached"] as? Bool == true {
                 status?("设备直传中断，正在从服务器缓存接收…")
                 let cached = try await relayRequest(path: "/api/dear/social/photo-requests/\(id)/relay")
-                try await RealtimeFileRelay.receive(to: partialURL, manifest: manifest, request: cached)
+                try await RealtimeFileRelay.receive(to: partialURL, manifest: manifest, request: cached) { value in await MainActor.run { progress?(value) } }
             } else { throw error }
         }
         // Connect returns only after peer acknowledgement and durable SHA validation.
