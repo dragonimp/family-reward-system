@@ -225,9 +225,18 @@ private struct DearPickedVideo: Transferable {
 private struct DearRecord: Identifiable {
     let data: [String: Any]
     let sortDate: Date
+    private let startsAtInstant: Date?
     init(data: [String: Any]) {
         self.data = data
         self.sortDate = ActivityListDate.parse(data["createdAt"] as? String ?? "") ?? .distantPast
+        let raw = data["startsAt"] as? String ?? ""
+        // Calendar-only dates stay tied to the current device time zone.
+        self.startsAtInstant = raw.count == 10 ? nil : ActivityListDate.parse(raw)
+    }
+    var activitySortDate: Date {
+        let raw = text("startsAt")
+        if raw.count == 10 { return ActivityListDate.parse(raw) ?? sortDate }
+        return startsAtInstant ?? sortDate
     }
     var id: String { text("id") }
     var subject: String { text("subject") }
@@ -528,12 +537,12 @@ struct DearSocialView: View {
     private var allActivities: [DearRecord] {
         let combined = activities + joinedActivities.filter { joined in !activities.contains { $0.id == joined.id } }
         return combined.sorted { left, right in
-            let leftDate = ActivityListDate.value(startsAt: left.text("startsAt"), createdAt: left.text("createdAt")) ?? .distantPast
-            let rightDate = ActivityListDate.value(startsAt: right.text("startsAt"), createdAt: right.text("createdAt")) ?? .distantPast
+            let leftDate = left.activitySortDate
+            let rightDate = right.activitySortDate
             return leftDate == rightDate ? left.id < right.id : leftDate > rightDate
         }
     }
-    private var selectedActivity: DearRecord? { allActivities.first { $0.id == activityId } }
+    private var selectedActivity: DearRecord? { activities.first { $0.id == activityId } ?? joinedActivities.first { $0.id == activityId } }
     private var visibleSpaces: [DearRecord] { spaces.filter { $0.text("role") == "owner" || $0.text("role") == "member" } }
     private var activityTenantId: String { selectedActivity?.text("sourceTenantId") ?? spaceId }
     private var isActivityCreator: Bool {
