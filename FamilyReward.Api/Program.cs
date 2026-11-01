@@ -104,7 +104,8 @@ builder.Services.AddCors(options =>
 });
 builder.Services.AddHttpClient();
 builder.Services.AddHttpClient("dear-social-sso", client => client.Timeout = TimeSpan.FromSeconds(15));
-builder.Services.AddHttpClient("dear-social-api", client => client.Timeout = TimeSpan.FromSeconds(45));
+builder.Services.AddHttpClient("dear-social-api", client => client.Timeout = TimeSpan.FromSeconds(45))
+    .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler { AllowAutoRedirect = false });
 builder.Services.AddHttpClient("agent-pay");
 builder.Services.AddSingleton<XiaotiancaiDeviceTestEmailService>();
 builder.Services.AddAgentIdentityJwtCookieAuthentication(new AgentIdentityOptions
@@ -139,8 +140,8 @@ app.UseWebSockets();
 app.UseAgentIdentity();
 app.UseAtlasReleaseDrain(context => HttpMethods.IsGet(context.Request.Method) && context.Request.Path == "/health");
 app.MapAgentIdentityAuthEndpoints();
-app.MapAgentIdentityNativeLogin(new Uri("https://happylife.ai.xmkurt.com"), new Uri("linkofamily://login-complete"), "Linko-Family",
-    additionalPublicOrigins: [new Uri("https://happylife.ai.impx.net")]);
+app.MapAgentIdentityNativeLogin(new Uri("https://happylife.ai.impx.net"), new Uri("linkofamily://login-complete"), "Linko-Family",
+    additionalPublicOrigins: [new Uri("https://happylife.ai.xmkurt.com")]);
 app.MapLinkoSocialGateway();
 app.MapAtlasReleaseVersion();
 if (!string.IsNullOrWhiteSpace(releaseControlApplicationId))

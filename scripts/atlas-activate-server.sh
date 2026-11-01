@@ -73,7 +73,7 @@ PY
 done
 [[ "$state" == completed ]] || { echo 'Atlas API upgrade did not finish within 15 minutes.' >&2; exit 1; }
 
-bash "$stage/install-social-photo-proxy.sh" "$stage/happylife.ai.xmkurt.com.nginx.conf" "$stage"
+# Edge cutover runs only after the complete web artifact is active.
 
 site=/var/www/happylife/frontend/static
 releases_link=/var/www/happylife/frontend/releases
@@ -122,6 +122,7 @@ PY
 /usr/bin/dotnet "$updater" upgrade-static-site "$static_profile" > "$stage/web-status.json"
 
 [[ "$(readlink "$site")" == "$candidate" ]]
+python3 /opt/Atlas/downloads/family-points-api-credit/current/deploy/moment-domain/activate-moment-domain.py edge
 curl -fsS https://happylife.ai.impx.net/version.json | python3 -c 'import json,sys; assert json.load(sys.stdin)["version"]==sys.argv[1]' "$version"
 curl -fsS https://happylife.ai.impx.net/health >/dev/null
 printf '{"summary":"家庭应用 API 和网页已通过 Atlas 发布并验证","evidence":"release=%s source_commit=%s api_operation=%s web_journal=%s"}\n' "$version" "$source_commit" "$operation" "$journal"

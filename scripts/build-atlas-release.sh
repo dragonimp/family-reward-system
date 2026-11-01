@@ -37,7 +37,17 @@ NODE
   cd "$stage/frontend"
   npm install --package-lock-only --ignore-scripts
   npm ci
+  npm run lint
   npm run build -- --outDir "$stage/web"
+)
+# Ship the maintained Linko feature UI under the same Moment site, without copying sources.
+linko_root="$shared_projects_root/Linko"
+[[ -f "$linko_root/apps/web/package-lock.json" ]] || { echo 'Committed Linko web package required.' >&2; exit 2; }
+(
+  cd "$linko_root/apps/web"
+  npm ci
+  node --test src/requestPhoto.test.mjs src/photoLocation.test.mjs
+  VITE_MOMENT_INTEGRATED=true npm run build -- --base /moment/ --outDir "$stage/web/moment"
 )
 node - "$stage/web/version.json" "$app_code" "$version" <<'NODE'
 const fs = require('fs');
@@ -47,5 +57,9 @@ NODE
 mkdir -p "$stage/api/migrations"
 cp "$root/scripts/migrations/"*.sql "$stage/api/migrations/"
 cp "$root/scripts/run-db-migrations.sh" "$stage/api/migrations/run-db-migrations.sh"
+mkdir -p "$stage/api/deploy/moment-domain"
+cp "$root/deploy/activate-moment-domain.py" "$root/deploy/happylife.ai.impx.net.nginx.conf" "$root/deploy/happylife.ai.xmkurt.com.nginx.conf" "$stage/api/deploy/moment-domain/"
+cp "$linko_root/deploy/nginx-linko-ai-impx.conf" "$stage/api/deploy/moment-domain/linko.ai.impx.net.nginx.conf"
+cp "$linko_root/deploy/configure-turn.sh" "$stage/api/deploy/moment-domain/"
 # Atlas owns package validation, release identity, checksums and combined API/Web layout.
 bash "$atlas_root/scripts/atlas-package-server.sh" "$stage/api" "$stage/web" "$2" "$app_code" "$version"

@@ -676,7 +676,7 @@ struct DearSocialView: View {
                     }
                 }
                 if showLogout {
-                    Section { Link("隐私政策与支持", destination: URL(string: "https://happylife.ai.xmkurt.com/legal/linko-family-privacy.html")!) }
+                    Section { Link("隐私政策与支持", destination: URL(string: "https://happylife.ai.impx.net/legal/linko-family-privacy.html")!) }
                 }
             }
             .listStyle(.insetGrouped)
@@ -1040,7 +1040,7 @@ struct DearSocialView: View {
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 Menu {
-                    if let url = URL(string: "https://happylife.ai.xmkurt.com/dear/spaces/\(activityTenantId)/activities/\(activityId)") {
+                    if let url = URL(string: "https://happylife.ai.impx.net/dear/spaces/\(activityTenantId)/activities/\(activityId)") {
                         ShareLink(item: url, subject: Text(selectedActivity?.text("title") ?? "活动")) { Label("分享活动链接", systemImage: "square.and.arrow.up") }
                     }
                     Button {
@@ -1609,7 +1609,7 @@ struct DearSocialView: View {
         let value = try await store.call(base + "tenants/\(activityTenantId)/activities/\(activityId)/invites/link", method: "POST", body: [:])
         guard let token = (value as? [String: Any])?["token"] as? String,
               let safe = token.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) else { throw APIError.message("邀请链接无效。") }
-        inviteLink = "https://happylife.ai.xmkurt.com/dear?invite=\(safe)"
+        inviteLink = "https://happylife.ai.impx.net/dear?invite=\(safe)"
     }
     private func accept(_ invitation: DearRecord) async throws {
         let me = try await store.call(base + "me") as? [String: Any] ?? [:]

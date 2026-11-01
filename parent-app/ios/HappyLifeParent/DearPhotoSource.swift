@@ -50,7 +50,7 @@ import UniformTypeIdentifiers
     private var importingSharedItems = false
     private var checkedLocationIDs = Set<String>()
     private let session = URLSession(configuration: .ephemeral)
-    private let base = URL(string: "https://happylife.ai.xmkurt.com")!
+    private let base = URL(string: "https://happylife.ai.impx.net")!
 
     func start() {
         guard pump == nil else { return }
@@ -494,13 +494,14 @@ import UniformTypeIdentifiers
               config["transport"] as? String == "connect-datachannel-v1", let text = config["origin"] as? String,
               let origin = URL(string: text), origin.scheme == "https", origin.host != nil,
               origin.user == nil, origin.password == nil, origin.query == nil, origin.fragment == nil,
-              origin.path.isEmpty || origin.path == "/" else { throw APIError.message("Connect 服务尚未配置。") }
+              origin.path.isEmpty || origin.path == "/",
+              config["apiPathPrefix"] as? String == "/api/dear/social" else { throw APIError.message("Connect 服务尚未配置。") }
         return { [weak store] in
             try await MainActor.run { guard store?.identity.isAuthenticated == true else { throw CancellationError() } }
-            guard let token = try await store?.identity.serviceToken(for: origin) else { throw CancellationError() }
+            guard let token = try await store?.identity.validAccessToken() else { throw CancellationError() }
             func request(_ action: String) -> URLRequest {
                 var components = URLComponents(url: origin, resolvingAgainstBaseURL: false)!
-                components.path = "/api/photo-requests/\(requestID)/connect/\(action)"
+                components.path = "/api/dear/social/photo-requests/\(requestID)/connect/\(action)"
                 components.queryItems = [URLQueryItem(name: "role", value: role)]
                 var request = URLRequest(url: components.url!)
                 request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")

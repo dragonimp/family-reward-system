@@ -1,5 +1,7 @@
 using System.Net;
 using System.Net.Http.Headers;
+using System.Net.WebSockets;
+using AgentIdentity.Sdk;
 using AgentIdentity.NativeClient;
 
 internal static class LinkoSocialGateway
@@ -12,16 +14,20 @@ internal static class LinkoSocialGateway
             if (!Uri.TryCreate(configuration["LinkoSocial:Origin"], UriKind.Absolute, out var origin) ||
                 origin.Scheme != "https" || origin.UserInfo.Length != 0 || origin.AbsolutePath != "/" ||
                 origin.Query.Length != 0 || origin.Fragment.Length != 0) return Results.StatusCode(503);
-            return Results.Ok(new { origin = origin.GetLeftPart(UriPartial.Authority), transport = "connect-datachannel-v1" });
+            return Results.Ok(new { origin = origin.GetLeftPart(UriPartial.Authority), apiPathPrefix = "/api/dear/social", transport = "connect-datachannel-v1" });
         }).RequireAuthorization();
         app.MapMethods("/api/dear/social/{**path}", Methods, async (HttpContext context, string? path,
-            IHttpClientFactory clients, IConfiguration configuration, CancellationToken ct) =>
+            IHttpClientFactory clients, IConfiguration configuration, AgentIdentityOptions identity, CancellationToken ct) =>
         {
             if (!Allowed(context.Request.Method, path)) return Results.NotFound();
             var originText = configuration["LinkoSocial:Origin"];
-            var loginText = configuration["LinkoSocial:LoginOrigin"];
+            var backendText = configuration["LinkoSocial:BackendOrigin"];
+            var applicationKey = configuration["LinkoSocial:ApplicationKey"];
             if (!Uri.TryCreate(originText, UriKind.Absolute, out var origin) || origin.Scheme != "https" ||
-                !Uri.TryCreate(loginText, UriKind.Absolute, out var loginOrigin) || loginOrigin.Scheme != "https")
+                !Uri.TryCreate(backendText, UriKind.Absolute, out var backend) ||
+                !(backend.Scheme == "https" || backend.Scheme == "http" && backend.IsLoopback) ||
+                backend.UserInfo.Length != 0 || backend.AbsolutePath != "/" || backend.Query.Length != 0 || backend.Fragment.Length != 0 ||
+                string.IsNullOrWhiteSpace(applicationKey))
                 return Results.Problem("Linko Social 服务地址未配置。", statusCode: 503);
 
             var token = AccessToken(context, configuration);
@@ -30,10 +36,16 @@ internal static class LinkoSocialGateway
             try
             {
                 var serviceToken = await new NativeSsoClient(clients.CreateClient("dear-social-sso"))
-                    .ExchangeAsync(loginOrigin, origin, token, ct);
-                var destination = new Uri(origin, "/api/" + path + context.Request.QueryString);
+                    .ExchangeApplicationAsync(new Uri(identity.Authority), identity.ClientId, applicationKey, token, ct);
+                var destination = new Uri(backend, "/api/" + path + context.Request.QueryString);
+                if (context.WebSockets.IsWebSocketRequest)
+                {
+                    await RelayWebSocket(context, destination, serviceToken, origin, ct);
+                    return Results.Empty;
+                }
                 using var outgoing = new HttpRequestMessage(new HttpMethod(context.Request.Method), destination);
                 outgoing.Headers.Authorization = new AuthenticationHeaderValue("Bearer", serviceToken);
+                outgoing.Headers.TryAddWithoutValidation("Origin", origin.GetLeftPart(UriPartial.Authority));
                 if (context.Request.ContentLength is > 0 || context.Request.Headers.ContainsKey("Transfer-Encoding"))
                 {
                     outgoing.Content = new StreamContent(context.Request.Body);
@@ -49,6 +61,11 @@ internal static class LinkoSocialGateway
                 context.Response.Headers.XContentTypeOptions = "nosniff";
                 if (response.Content.Headers.ContentType is { } type)
                     context.Response.ContentType = type.ToString();
+                if (response.Content.Headers.ContentDisposition is { } disposition)
+                    context.Response.Headers.ContentDisposition = disposition.ToString();
+                if (response.Headers.Location is { } location && location.IsAbsoluteUri && location.Scheme == "https" &&
+                    location.GetLeftPart(UriPartial.Authority) == identity.Authority.TrimEnd('/'))
+                    context.Response.Headers.Location = location.AbsoluteUri;
                 await response.Content.CopyToAsync(context.Response.Body, ct);
                 return Results.Empty;
             }
@@ -67,6 +84,41 @@ internal static class LinkoSocialGateway
         }).RequireAuthorization();
     }
 
+    private static async Task RelayWebSocket(HttpContext context, Uri destination, string token, Uri publicOrigin, CancellationToken ct)
+    {
+        using var upstream = new ClientWebSocket();
+        upstream.Options.SetRequestHeader("Authorization", "Bearer " + token);
+        upstream.Options.SetRequestHeader("Origin", publicOrigin.GetLeftPart(UriPartial.Authority));
+        upstream.Options.KeepAliveInterval = TimeSpan.FromSeconds(20);
+        var uri = new UriBuilder(destination) { Scheme = destination.Scheme == "https" ? "wss" : "ws" };
+        await upstream.ConnectAsync(uri.Uri, ct);
+        using var downstream = await context.WebSockets.AcceptWebSocketAsync();
+        using var lifetime = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        var upload = Pump(downstream, upstream, lifetime.Token);
+        var download = Pump(upstream, downstream, lifetime.Token);
+        await Task.WhenAny(upload, download);
+        await lifetime.CancelAsync();
+        try { await Task.WhenAll(upload, download); }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (WebSocketException) when (lifetime.IsCancellationRequested) { }
+    }
+
+    private static async Task Pump(WebSocket source, WebSocket target, CancellationToken ct)
+    {
+        var buffer = new byte[32 * 1024];
+        while (!ct.IsCancellationRequested)
+        {
+            var result = await source.ReceiveAsync(buffer.AsMemory(), ct);
+            if (result.MessageType == WebSocketMessageType.Close)
+            {
+                if (target.State == WebSocketState.Open)
+                    await target.CloseOutputAsync(source.CloseStatus ?? WebSocketCloseStatus.NormalClosure, source.CloseStatusDescription, ct);
+                return;
+            }
+            await target.SendAsync(buffer.AsMemory(0, result.Count), result.MessageType, result.EndOfMessage, ct);
+        }
+    }
+
     private static string? AccessToken(HttpContext context, IConfiguration configuration)
     {
         var authorization = context.Request.Headers.Authorization.ToString();
@@ -81,6 +133,10 @@ internal static class LinkoSocialGateway
     {
         if (string.IsNullOrWhiteSpace(path)) return false;
         var s = path.Split('/', StringSplitOptions.RemoveEmptyEntries);
+        if (s.Length == 2 && s[0] == "storage" && s[1] == "platform-logins") return method == "GET";
+        if (s.Length == 3 && s[0] == "storage" && s[1] == "platform-logins" && s[2] == "manage") return method == "GET";
+        if (s.Length == 3 && s[0] == "photos" && Guid.TryParse(s[1], out _) && s[2] == "download") return method == "GET";
+        if (s.Length == 4 && s[0] == "photo-requests" && Guid.TryParse(s[1], out _) && s[2] == "connect" && s[3] is "ice" or "signal") return method == "GET";
         if (s.Length == 1 && s[0] == "me") return method == "GET";
         if (s.Length == 1 && s[0] == "photo-devices") return method == "POST";
         if (s.Length == 2 && s[0] == "photo-devices" && Guid.TryParse(s[1], out _)) return method == "DELETE";
@@ -119,6 +175,13 @@ internal static class LinkoSocialGateway
             if (s.Length == 6 && s[4] == "live" && s[5] == "photos") return method == "GET";
             if (s.Length == 7 && s[4] == "live" && s[5] == "photos" && Guid.TryParse(s[6], out _)) return method == "DELETE";
             if (s.Length == 8 && s[4] == "live" && s[5] == "photos" && Guid.TryParse(s[6], out _) && s[7] == "location") return method == "PATCH";
+            if (s.Length == 5 && s[4] == "live") return method == "GET";
+            if (s.Length == 5 && s[4] == "photos") return method == "POST";
+            if (s.Length == 6 && s[4] == "photos" && (s[5] == "mine" || Guid.TryParse(s[5], out _))) return method == "DELETE" || method == "GET" && s[5] == "mine";
+            if (s.Length == 7 && s[4] == "photos" && Guid.TryParse(s[5], out _) && s[6] == "recognition-consent") return method == "POST";
+            if (s.Length == 7 && s[4] == "live" && s[5] == "photos" && s[6] == "mine") return method == "DELETE";
+            if (s.Length == 6 && s[4] == "live" && s[5] == "ice") return method == "GET";
+            if (s.Length == 8 && s[4] == "live" && s[5] == "photos" && Guid.TryParse(s[6], out _) && s[7] is "authorize-transfer" or "resume" or "native-source") return method == "POST";
             if (s.Length == 5 && s[4] == "native-photos") return method == "POST";
             if (s.Length == 7 && s[4] == "native-photos" && Guid.TryParse(s[5], out _) && s[6] == "comments") return method is "GET" or "POST";
             if (s.Length == 8 && s[4] == "native-photos" && Guid.TryParse(s[5], out _) && s[6] == "comments" && Guid.TryParse(s[7], out _)) return method == "DELETE";
