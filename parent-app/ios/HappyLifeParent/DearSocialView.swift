@@ -758,9 +758,9 @@ struct DearSocialView: View {
             } label: {
                 photoCard(photo, path: path)
                     .overlay(alignment: .topTrailing) {
-                        Image(systemName: selectedPhotoIDs.contains(photo.id) ? "checkmark.circle.fill" : "circle")
+                        if photoViewMode != "list" { Image(systemName: selectedPhotoIDs.contains(photo.id) ? "checkmark.circle.fill" : "circle")
                             .font(.title2).foregroundStyle(selectedPhotoIDs.contains(photo.id) ? .teal : .white)
-                            .padding(7)
+                            .padding(7) }
                     }
             }.buttonStyle(.plain).disabled(batchDownloading || batchDeleting)
         } else {
@@ -772,19 +772,21 @@ struct DearSocialView: View {
     }
 
     private func photoCard(_ photo: DearRecord, path: String) -> some View {
-        let isGrid = photoViewMode == "grid"
+        let expanded = photoViewMode != "list"
         let nickname = photo.text("sourceDisplayName").isEmpty ? "活动成员" : photo.text("sourceDisplayName")
-        return HStack(alignment: .top, spacing: 12) {
-            DearPhotoPreview(store: store, path: path)
-                .frame(width: isGrid ? nil : 112, height: isGrid ? 240 : 112)
-                .frame(maxWidth: isGrid ? .infinity : nil)
-                .overlay(alignment: .topLeading) {
+        return DearPhotoPreview(store: store, path: path)
+            .frame(height: expanded ? 240 : 112)
+            .frame(maxWidth: expanded ? .infinity : 112)
+            .overlay(alignment: .topLeading) {
+                if expanded {
                     Label(nickname, systemImage: "person.crop.circle.fill")
                         .font(.caption.weight(.semibold)).lineLimit(1)
                         .foregroundStyle(.white).padding(.horizontal, 8).padding(.vertical, 6)
                         .background(.black.opacity(0.5), in: Capsule()).padding(7).padding(.trailing, selectingPhotoDownloads ? 44 : 0)
                 }
-                .overlay(alignment: .bottomLeading) {
+            }
+            .overlay(alignment: .bottomLeading) {
+                if expanded {
                     HStack(alignment: .bottom) {
                         DearPhotoPlaceView(photo: photo).font(.caption2)
                         Spacer(minLength: 0)
@@ -793,18 +795,46 @@ struct DearSocialView: View {
                     .foregroundStyle(.white).padding(8)
                     .background(LinearGradient(colors: [.clear, .black.opacity(0.65)], startPoint: .top, endPoint: .bottom))
                 }
-                .clipShape(RoundedRectangle(cornerRadius: 12))
-            if !isGrid {
-                VStack(alignment: .leading, spacing: 6) {
-                    Text(nickname).font(.subheadline.bold()).lineLimit(1)
-                    Text(photo.text("originalFileName")).font(.caption).foregroundStyle(.secondary).lineLimit(2)
-                    Text(photo.dateText("createdAt")).font(.caption2).foregroundStyle(.secondary)
-                    if !photo.flag("thumbnailAvailable") { Text("点开查看原文件").font(.caption).foregroundStyle(.secondary) }
-                }.padding(.vertical, 4)
             }
+            .clipShape(RoundedRectangle(cornerRadius: 12))
+            .accessibilityLabel("\(nickname)，\(photo.text("originalFileName"))，\(photo.dateText("createdAt"))")
+    }
+
+    private func photoActions(_ photo: DearRecord) -> some View {
+        HStack(spacing: 16) {
+            if photo.flag("canDelete") {
+                Button("删除分享", role: .destructive) { photoToDelete = photo }
+                    .disabled(busy || batchDeleting || batchDownloading)
+            }
+            Button { selectedPhoto = photo } label: {
+                Label("\(Int(photo.number("commentCount")))", systemImage: "text.bubble")
+            }.accessibilityLabel("照片点评 \(Int(photo.number("commentCount"))) 条")
+            Spacer(minLength: 0)
+            if selectingPhotoDownloads && photoViewMode == "list" {
+                Image(systemName: selectedPhotoIDs.contains(photo.id) ? "checkmark.circle.fill" : "circle").foregroundStyle(.teal)
+            }
+        }.font(.caption).buttonStyle(.borderless)
+    }
+
+    @ViewBuilder private func photoTimelineRow(_ photo: DearRecord) -> some View {
+        if photoViewMode == "list" {
+            HStack(alignment: .top, spacing: 12) {
+                photoLink(photo).frame(width: 112, height: 112)
+                VStack(alignment: .leading, spacing: 7) {
+                    Text(photo.text("sourceDisplayName").isEmpty ? "活动成员" : photo.text("sourceDisplayName")).font(.subheadline.bold()).lineLimit(1)
+                    DearPhotoPlaceView(photo: photo).font(.caption2).foregroundStyle(.secondary)
+                    Text(photo.dateText("createdAt")).font(.caption2).foregroundStyle(.secondary)
+                    if photo.text("contentType").hasPrefix("video/") { Label("视频", systemImage: "play.circle").font(.caption2) }
+                    photoActions(photo)
+                }.frame(maxWidth: .infinity, alignment: .leading)
+            }.padding(.vertical, 8)
+        } else {
+            VStack(alignment: .leading, spacing: 10) {
+                photoLink(photo)
+                Text(photo.dateText("createdAt")).font(.caption2).foregroundStyle(.secondary)
+                photoActions(photo)
+            }.padding(.vertical, 8)
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .accessibilityLabel("\(nickname)，\(photo.text("originalFileName"))，\(photo.dateText("createdAt"))")
     }
 
     private var photoGridRows: [[DearRecord]] {
@@ -965,16 +995,7 @@ struct DearSocialView: View {
             }
             ForEach(activityTimeline.filter { photoViewMode != "tiles" || $0.kind != .photo }, id: \.id) { entry in
                 if entry.kind == .photo {
-                    VStack(alignment: .leading, spacing: 10) {
-                        photoLink(entry.record)
-                        Text(entry.record.dateText("createdAt")).font(.caption2).foregroundStyle(.secondary)
-                        if entry.record.flag("canDelete") {
-                            Button("删除分享", role: .destructive) { photoToDelete = entry.record }
-                                .buttonStyle(.borderless).disabled(busy || batchDeleting || batchDownloading)
-                        }
-                        DearPhotoCommentsView(store: store, spaceID: activityTenantId, activityID: activityId, photoID: entry.record.id, allowsComposition: false)
-                            .id("\(activityTenantId)/\(activityId)/\(entry.record.id)")
-                    }.padding(.vertical, 8)
+                    photoTimelineRow(entry.record)
                 } else {
                 VStack(alignment: .leading, spacing: 8) {
                     HStack {
@@ -1693,6 +1714,7 @@ private struct DearPhotoPreview: View {
     @State private var image: UIImage?
     @State private var failed = false
     var body: some View {
+        GeometryReader { geometry in
         Group {
             if let image { Image(uiImage: image).resizable().scaledToFill() }
             else if failed {
@@ -1702,6 +1724,8 @@ private struct DearPhotoPreview: View {
                 }.foregroundStyle(.secondary)
             }
             else { ProgressView() }
+        }
+        .frame(width: geometry.size.width, height: geometry.size.height).clipped()
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity).clipped().background(.quaternary)
         .clipShape(RoundedRectangle(cornerRadius: 10))
