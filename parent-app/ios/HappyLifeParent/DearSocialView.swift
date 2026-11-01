@@ -263,7 +263,8 @@ private struct DearRecord: Identifiable {
 
 private struct DearActivityMapPoint: Identifiable {
     let id: String
-    let title: String
+    let nickname: String
+    let placeName: String
     let subtitle: String
     let coordinate: CLLocationCoordinate2D
     let systemImage: String
@@ -273,15 +274,16 @@ private struct DearActivityMapPoint: Identifiable {
         let visits = checkIns.compactMap { item -> Self? in
             guard let coordinate = coordinate(latitude: item.data["latitude"], longitude: item.data["longitude"]) else { return nil }
             let address = item.text("address")
-            let subtitle = "\(address.isEmpty ? item.dateText("createdAt") : address) · 海拔 \(String(format: "%.1f", item.number("altitudeMeters"))) 米"
-            return Self(id: "checkin-\(item.id)", title: item.text("authorName").isEmpty ? "活动打卡" : "\(item.text("authorName"))的打卡",
+            let subtitle = "\(item.dateText("createdAt")) · 海拔 \(String(format: "%.1f", item.number("altitudeMeters"))) 米"
+            return Self(id: "checkin-\(item.id)", nickname: item.text("authorName"), placeName: address,
                         subtitle: subtitle, coordinate: coordinate, systemImage: "mappin.circle.fill", photo: nil)
         }
         let pictures = photos.compactMap { item -> Self? in
             guard let coordinate = coordinate(latitude: item.data["latitude"], longitude: item.data["longitude"]) ?? photoCoordinate(item.text("locationName")) else { return nil }
-            let title = item.text("originalFileName").isEmpty ? "活动照片" : item.text("originalFileName")
-            return Self(id: "photo-\(item.id)", title: title,
-                        subtitle: "\(item.text("sourceDisplayName")) · \(item.dateText("createdAt"))",
+            let rawPlace = item.text("locationName")
+            let place = DearPhotoLocation.coordinateLabel(rawPlace) == nil ? rawPlace : ""
+            return Self(id: "photo-\(item.id)", nickname: item.text("sourceDisplayName"), placeName: place,
+                        subtitle: item.dateText("createdAt"),
                         coordinate: coordinate, systemImage: item.text("contentType").hasPrefix("video/") ? "video.fill" : "photo.fill",
                         photo: item)
         }
@@ -320,6 +322,7 @@ private struct DearActivityMapView: View {
     let photos: [DearRecord]
     @State private var cameraPosition: MapCameraPosition = .automatic
     @State private var selectedPointID: String?
+    @State private var resolvedPlaces: [String: String] = [:]
     @State private var selectedPhoto: DearRecord?
 
     private var selectedPoint: DearActivityMapPoint? { points.first { $0.id == selectedPointID } }
@@ -330,6 +333,15 @@ private struct DearActivityMapView: View {
     private func openPhoto(_ photo: DearRecord) {
         selectedPhoto = photo
     }
+    private func mapTitle(_ point: DearActivityMapPoint) -> String {
+        ActivityMapLabel.title(nickname: point.nickname, placeName: resolvedPlaces[point.id] ?? point.placeName)
+    }
+    private func photoTitle(_ photo: DearRecord) -> String {
+        let raw = photo.text("locationName")
+        return ActivityMapLabel.title(nickname: photo.text("sourceDisplayName"),
+            placeName: resolvedPlaces["photo-" + photo.id] ?? (DearPhotoLocation.coordinateLabel(raw) == nil ? raw : ""))
+    }
+
 
     var body: some View {
         VStack(spacing: 0) {
@@ -340,8 +352,9 @@ private struct DearActivityMapView: View {
             } else {
                 Map(position: $cameraPosition) {
                     ForEach(points) { point in
-                        Annotation(point.title, coordinate: point.coordinate) {
+                        Annotation("", coordinate: point.coordinate) {
                             Button { selectedPointID = point.id } label: {
+                                VStack(spacing: 4) {
                                 if let photo = point.photo {
                                     DearPhotoPreview(store: store, path: thumbnailPath(photo))
                                         .frame(width: 66, height: 66)
@@ -362,13 +375,27 @@ private struct DearActivityMapView: View {
                                         .padding(9)
                                         .background(point.id == selectedPointID ? Color.orange : Color.teal, in: Circle())
                                 }
-                            }
-                            .accessibilityLabel("\(point.title)，\(point.subtitle)")
+                                Text(mapTitle(point)).font(.caption2.weight(.semibold))
+                                    .foregroundStyle(.primary).multilineTextAlignment(.center).lineLimit(2)
+                                    .frame(maxWidth: 156).fixedSize(horizontal: false, vertical: true)
+                                    .padding(.horizontal, 7).padding(.vertical, 4)
+                                    .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 7))
+                                }
+                            }.buttonStyle(.plain)
+                            .accessibilityLabel("\(mapTitle(point))，\(point.subtitle)")
                         }
                     }
                 }
                 .mapControls { MapCompass(); MapScaleView() }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .task(id: points.map { "\($0.id):\($0.coordinate.latitude):\($0.coordinate.longitude)" }.joined(separator: "|")) {
+                    for point in points where point.placeName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                        if Task.isCancelled { return }
+                        if let name = await PhotoPlaceNames.shared.name(latitude: point.coordinate.latitude, longitude: point.coordinate.longitude), !Task.isCancelled {
+                            resolvedPlaces[point.id] = name
+                        }
+                    }
+                }
             }
             if let selectedPoint {
                 HStack(spacing: 10) {
@@ -377,7 +404,7 @@ private struct DearActivityMapView: View {
                             .frame(width: 54, height: 54)
                     } else { Image(systemName: selectedPoint.systemImage).font(.title2) }
                     VStack(alignment: .leading, spacing: 3) {
-                        Text(selectedPoint.title).font(.headline).lineLimit(1)
+                        Text(mapTitle(selectedPoint)).font(.headline).lineLimit(1)
                         Text(selectedPoint.subtitle).font(.caption).foregroundStyle(.secondary).lineLimit(2)
                     }
                     Spacer(minLength: 0)
@@ -402,7 +429,7 @@ private struct DearActivityMapView: View {
                                 VStack(alignment: .leading, spacing: 4) {
                                     DearPhotoPreview(store: store, path: thumbnailPath(photo))
                                         .frame(width: 82, height: 82)
-                                    Text(photo.text("originalFileName").isEmpty ? "照片" : photo.text("originalFileName"))
+                                    Text(photoTitle(photo))
                                         .font(.caption2).lineLimit(1).frame(width: 82, alignment: .leading)
                                 }
                             }.buttonStyle(.plain)

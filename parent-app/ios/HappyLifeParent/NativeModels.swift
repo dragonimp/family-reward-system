@@ -127,3 +127,12 @@ struct PhotoGeography: Sendable {
         return (lat,lon,altitude(value(3),belowSeaLevel:false))
     }
 }
+
+// Map labels identify the person and place; filenames are confined to photo details.
+enum ActivityMapLabel {
+    static func title(nickname: String, placeName: String) -> String {
+        let person = nickname.trimmingCharacters(in: .whitespacesAndNewlines)
+        let place = placeName.trimmingCharacters(in: .whitespacesAndNewlines)
+        return "\(person.isEmpty ? "活动成员" : person) · \(place.isEmpty ? "地点未命名" : place)"
+    }
+}

@@ -42,6 +42,9 @@ import Foundation
         for invalid in ["ABCD1234", "123", "https://evil.test/children?watchCode=ABCD2345", "https://happylife.ai.impx.net/children?watchCode=ABCD2345&watchCode=EFGH2345", "https://happylife.ai.impx.net/other?watchCode=ABCD2345", "https://user@happylife.ai.impx.net/children?watchCode=ABCD2345"] {
             precondition(WatchPairingCode.parse(invalid) == nil)
         }
+        precondition(ActivityMapLabel.title(nickname: " 山翁 ", placeName: " 巴松措 ") == "山翁 · 巴松措")
+        precondition(ActivityMapLabel.title(nickname: "", placeName: "错高乡") == "活动成员 · 错高乡")
+        precondition(ActivityMapLabel.title(nickname: "山翁", placeName: " ") == "山翁 · 地点未命名")
         let utc = TimeZone(secondsFromGMT: 0)!
         let losAngeles = TimeZone(identifier: "America/Los_Angeles")!
         let tokyo = TimeZone(identifier: "Asia/Tokyo")!
