@@ -11,10 +11,12 @@ BASELINES = {
  'happylife.ai.xmkurt.com': '2f4c57f399e95942f059f592864d958b3956324cb328bf4060102261a004b4c4',
 }
 def sha(b): return hashlib.sha256(b).hexdigest()
-def atomic(path, value, mode=0o600):
+def atomic(path, value, mode=0o600, uid=None, gid=None):
  temp = path.with_name(path.name+'.moment-pending')
  with temp.open('xb') as f:
-  os.fchmod(f.fileno(),mode); f.write(value); f.flush(); os.fsync(f.fileno())
+  os.fchmod(f.fileno(),mode);
+  if uid is not None: os.fchown(f.fileno(),uid,gid)
+  f.write(value); f.flush(); os.fsync(f.fileno())
  os.replace(temp,path)
 def run(*args): subprocess.run(args,check=True,stdout=subprocess.DEVNULL)
 def main(action):
@@ -52,20 +54,20 @@ def main(action):
    before=path.read_bytes();backup=journal_root/(ID+'-'+action+'-'+str(i)+'.before')
    if backup.exists(): raise ValueError('Existing rollback copy requires review')
    atomic(backup,before)
-   files.append({'path':str(path),'before':sha(before),'backup':str(backup),'mode':path.stat().st_mode & 0o777})
+   files.append({'path':str(path),'before':sha(before),'backup':str(backup),'mode':path.stat().st_mode & 0o777,'uid':path.stat().st_uid,'gid':path.stat().st_gid})
   record={'id':ID,'action':action,'checksum':checksum,'status':'prepared','files':files}
   atomic(journal,(json.dumps(record,indent=2)+'\n').encode())
   try:
    for item in files:
     path=Path(item['path'])
     if sha(path.read_bytes())!=item['before']: raise ValueError('Concurrent configuration change')
-    if path in updates: atomic(path,updates[path],item['mode'])
+    if path in updates: atomic(path,updates[path],item['mode'],item['uid'],item['gid'])
    if action=='edge':run('nginx','-t');run('systemctl','reload','nginx')
    else:run('bash',str(ROOT/'configure-turn.sh'))
    for item in files:item['after']=sha(Path(item['path']).read_bytes())
    record['status']='completed';atomic(journal,(json.dumps(record,indent=2)+'\n').encode())
   except Exception:
-   for item in files:atomic(Path(item['path']),Path(item['backup']).read_bytes(),item['mode'])
+   for item in files:atomic(Path(item['path']),Path(item['backup']).read_bytes(),item['mode'],item['uid'],item['gid'])
    if action=='edge':run('nginx','-t');run('systemctl','reload','nginx')
    else:run('systemctl','daemon-reload');run('systemctl','restart','coturn')
    record['status']='rolled-back';atomic(journal,(json.dumps(record,indent=2)+'\n').encode());raise
