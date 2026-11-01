@@ -270,7 +270,7 @@ private struct DearActivityMapPoint: Identifiable {
                         subtitle: subtitle, coordinate: coordinate, systemImage: "mappin.circle.fill", photo: nil)
         }
         let pictures = photos.compactMap { item -> Self? in
-            guard let coordinate = photoCoordinate(item.text("locationName")) else { return nil }
+            guard let coordinate = coordinate(latitude: item.data["latitude"], longitude: item.data["longitude"]) ?? photoCoordinate(item.text("locationName")) else { return nil }
             let title = item.text("originalFileName").isEmpty ? "活动照片" : item.text("originalFileName")
             return Self(id: "photo-\(item.id)", title: title,
                         subtitle: "\(item.text("sourceDisplayName")) · \(item.dateText("createdAt"))",
