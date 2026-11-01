@@ -324,14 +324,14 @@ import UniformTypeIdentifiers
         _ = try await store.call(prefix + "/live/photos/\(photoID)", method: "DELETE")
         guard let subject = try? await currentSubject(), let root = try? directory(for: subject) else { return true }
         var index = try readIndex(at: root)
-        let removed = index.photos.filter { $0.id == photoID && $0.spaceID == spaceID && $0.activityID == activityID }
-        index.photos.removeAll { $0.id == photoID && $0.spaceID == spaceID && $0.activityID == activityID }
+        let removed = index.photos.filter { UUID(uuidString: $0.id) == UUID(uuidString: photoID) && UUID(uuidString: $0.spaceID) == UUID(uuidString: spaceID) && UUID(uuidString: $0.activityID) == UUID(uuidString: activityID) }
+        index.photos.removeAll { UUID(uuidString: $0.id) == UUID(uuidString: photoID) && UUID(uuidString: $0.spaceID) == UUID(uuidString: spaceID) && UUID(uuidString: $0.activityID) == UUID(uuidString: activityID) }
         index.pendingRemoval.append(contentsOf: removed)
         try writeIndex(index, at: root)
         _ = try cleanPendingRemoval(at: root)
         let remaining = try readIndex(at: root).pendingRemoval
         return !remaining.contains {
-            $0.id == photoID && $0.spaceID == spaceID && $0.activityID == activityID
+            UUID(uuidString: $0.id) == UUID(uuidString: photoID) && UUID(uuidString: $0.spaceID) == UUID(uuidString: spaceID) && UUID(uuidString: $0.activityID) == UUID(uuidString: activityID)
         }
     }
 
@@ -403,11 +403,59 @@ import UniformTypeIdentifiers
     func localOriginal(photoID: String, spaceID: String, activityID: String) async -> URL? {
         guard let subject = try? await currentSubject(), let root = try? directory(for: subject),
               let index = try? readIndex(at: root),
-              let photo = index.photos.first(where: { $0.id == photoID && $0.spaceID == spaceID && $0.activityID == activityID }) else { return nil }
+              let photo = index.photos.first(where: { UUID(uuidString: $0.id) == UUID(uuidString: photoID) && UUID(uuidString: $0.spaceID) == UUID(uuidString: spaceID) && UUID(uuidString: $0.activityID) == UUID(uuidString: activityID) }) else { return nil }
         let path = root.appendingPathComponent(photo.fileName)
         guard (try? path.resourceValues(forKeys: [.fileSizeKey]).fileSize) == photo.length,
               (try? await hashFile(path)) == photo.sha256 else { return nil }
         return path
+    }
+
+    // Recover only this account's verified bytes, never infer physical ownership
+    // from the username or claim an unrelated item from the system photo library.
+    func restoreOriginal(for request: [String: Any], selectedFile: URL? = nil) async throws -> Bool {
+        guard request["canStop"] as? Bool == true, request["status"] as? String == "waiting",
+              request["serverCached"] as? Bool != true else { return false }
+        guard store != nil, let photoID = request["photoId"] as? String, UUID(uuidString: photoID) != nil,
+              let spaceID = request["tenantId"] as? String, UUID(uuidString: spaceID) != nil,
+              let activityID = request["activityId"] as? String, UUID(uuidString: activityID) != nil,
+              let length = (request["length"] as? NSNumber)?.intValue, length > 0,
+              let sha = request["sha256"] as? String, sha.count == 64 else { throw APIError.message("原文件请求数据无效。") }
+        let expected = generation
+        let subject = try await currentSubject(), root = try directory(for: subject)
+        if !enabledForSession { await enableExistingDevice() }
+        guard let deviceID = currentDeviceID else { throw APIError.message("本机共享设备登记失败，请稍后重试。") }
+        let candidates = selectedFile.map { [$0] } ?? ((try? FileManager.default.contentsOfDirectory(at: root, includingPropertiesForKeys: [.fileSizeKey])) ?? [])
+        var original: URL?
+        for candidate in candidates {
+            try Task.checkCancellation()
+            guard (try? candidate.resourceValues(forKeys: [.fileSizeKey]).fileSize) == length else { continue }
+            if (try? await hashFile(candidate))?.caseInsensitiveCompare(sha) == .orderedSame { original = candidate; break }
+        }
+        guard let original else {
+            if selectedFile != nil { throw APIError.message("选择的文件与这张共享照片的原文件不一致，请选择未编辑、未转换的原文件。") }
+            return false
+        }
+        guard expected == generation else { throw CancellationError() }
+        let prefix = "/api/dear/social/tenants/\(spaceID)/activities/\(activityID)/native-photos/\(photoID)/relay"
+        var upload = try await relayRequest(path: prefix, method: "PUT")
+        upload.setValue(deviceID, forHTTPHeaderField: "X-Source-Device")
+        upload.setValue(sha, forHTTPHeaderField: "X-Photo-Revision")
+        upload.setValue("application/octet-stream", forHTTPHeaderField: "Content-Type")
+        upload.setValue(String(length), forHTTPHeaderField: "Content-Length")
+        try await RealtimeFileRelay.upload(file: original, request: upload)
+        guard expected == generation else { throw CancellationError() }
+        var index = try readIndex(at: root)
+        let local: URL
+        if original.deletingLastPathComponent() == root { local = original }
+        else {
+            local = root.appendingPathComponent(UUID().uuidString + "." + original.pathExtension)
+            try FileManager.default.copyItem(at: original, to: local)
+        }
+        index.photos.removeAll { UUID(uuidString: $0.id) == UUID(uuidString: photoID) }
+        index.photos.append(SharedPhoto(id: photoID, spaceID: spaceID, activityID: activityID, fileName: local.lastPathComponent, length: length, sha256: sha))
+        try writeIndex(index, at: root)
+        cachedShares.insert(photoID + sha)
+        return true
     }
 
     func downloadOriginal(photoID: String, spaceID: String, activityID: String,
@@ -494,6 +542,18 @@ import UniformTypeIdentifiers
         defer { transfers.removeValue(forKey: transferID) }
         let requests = try await connectRequests(requestID: id, role: "receiver")
         guard expectedGeneration == generation else { throw CancellationError() }
+        // A source may finish caching while Connect is still waiting for a peer.
+        // Stop that wait promptly so the existing fallback can fetch verified bytes.
+        let cacheWatch = Task {
+            while !Task.isCancelled, expectedGeneration == generation {
+                do { try await Task.sleep(for: .seconds(2)) } catch { return }
+                if let latest = try? await store.call("/api/dear/social/photo-requests/\(id)") as? [String: Any],
+                   latest["serverCached"] as? Bool == true {
+                    await transfer.cancel(); return
+                }
+            }
+        }
+        defer { cacheWatch.cancel() }
         do {
             try await withTaskCancellationHandler {
                 try await transfer.receive(partial: partialURL, manifest: manifest, requests: requests) { value in
@@ -699,9 +759,9 @@ import UniformTypeIdentifiers
                 guard UUID(uuidString: requestID) != nil, request["transport"] as? String == "connect-datachannel-v1",
                       sourceTasks[requestID] == nil, sourceTasks.count < 2 else { continue }
                 let photoID = request["photoId"] as? String ?? ""
-                guard let photo = index.photos.first(where: { $0.id == photoID }),
-                      photo.spaceID == request["tenantId"] as? String,
-                      photo.activityID == request["activityId"] as? String,
+                guard let photo = index.photos.first(where: { UUID(uuidString: $0.id) == UUID(uuidString: photoID) }),
+                      UUID(uuidString: photo.spaceID) == UUID(uuidString: request["tenantId"] as? String ?? ""),
+                      UUID(uuidString: photo.activityID) == UUID(uuidString: request["activityId"] as? String ?? ""),
                       photo.length == (request["length"] as? Int),
                       photo.sha256.caseInsensitiveCompare(request["sha256"] as? String ?? "") == .orderedSame else {
                     _ = try? await store.call("/api/dear/social/photo-requests/\(requestID)/unavailable", method: "POST", body: [:])

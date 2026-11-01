@@ -230,6 +230,19 @@ private struct DearPickedVideo: Transferable {
     }
 }
 
+private struct DearPickedOriginal: Transferable {
+    let url: URL
+    private static func copy(_ received: ReceivedTransferredFile) throws -> Self {
+        let path = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + "." + received.file.pathExtension)
+        try FileManager.default.copyItem(at: received.file, to: path)
+        return Self(url: path)
+    }
+    static var transferRepresentation: some TransferRepresentation {
+        FileRepresentation(importedContentType: .image) { try copy($0) }
+        FileRepresentation(importedContentType: .movie) { try copy($0) }
+    }
+}
+
 private struct DearRecord: Identifiable {
     let data: [String: Any]
     let sortDate: Date
@@ -2162,6 +2175,8 @@ private struct MomentNotificationDetail: View {
     @State private var thumbnail: UIImage?
     @State private var error = ""
     @State private var refreshing = false
+    @State private var recovering = false
+    @State private var selectedOriginal: PhotosPickerItem?
     private var requestID: UUID? {
         guard let source = item.sourceRecordId, source.hasPrefix("photo-request:") else { return nil }
         return UUID(uuidString: String(source.dropFirst("photo-request:".count)))
@@ -2169,7 +2184,7 @@ private struct MomentNotificationDetail: View {
     private var status: String {
         switch request?.text("status") {
         case "pending_approval": return "等待分享者打开消息同意"
-        case "waiting": return "已同意，等待原件设备传输"
+        case "waiting": return request?.flag("serverCached") == true ? "原文件已就绪，等待请求人打开 App 接收" : "已同意，正在等待原文件；可在本机恢复共享"
         case "transferring": return "正在传输原文件"
         case "confirming": return "正在核验下载文件"
         case "completed": return "下载已完成"
@@ -2229,16 +2244,48 @@ private struct MomentNotificationDetail: View {
                             }
                         }.disabled(refreshing)
                     }
-                    if request?.text("status") == "waiting" || request?.text("status") == "transferring" {
-                        Button("继续共享并传输原文件") { Task { await store.photoSource.serveCurrentRequests(); await loadRequest() } }
-                        Text("请在保存原文件的设备上打开应用，并保持前台运行。")
+                    if request?.flag("canStop") == true, request?.text("status") == "waiting", request?.flag("serverCached") != true {
+                        Button("从本机恢复并继续分享") { Task { await restoreOriginal() } }.disabled(recovering || refreshing)
+                        PhotosPicker(selection: $selectedOriginal, matching: .any(of: [.images, .videos]), preferredItemEncoding: .current) {
+                            Label("选择本机原文件继续分享", systemImage: "photo.on.rectangle")
+                        }.disabled(recovering || refreshing)
+                        if recovering { ProgressView("正在核验并上传本机原文件…") }
+                        Text("自动核对本机保存的原文件；若照片只在系统相册中，请选择原文件。核验一致后继续原下载请求。")
                             .font(.footnote).foregroundStyle(.secondary)
                     }
                 }
             }
         }
         .navigationTitle("消息详情")
-        .task { await notifications.markRead(item); await loadRequest() }
+        .task {
+            await notifications.markRead(item); await loadRequest()
+            await restoreOriginal(silent: true)
+            while !Task.isCancelled {
+                do { try await Task.sleep(for: .seconds(3)) } catch { return }
+                await loadRequest()
+            }
+        }
+        .onChange(of: selectedOriginal) { _, item in
+            guard let item else { return }
+            Task {
+                recovering = true; defer { recovering = false; selectedOriginal = nil }
+                do {
+                    guard let file = try await item.loadTransferable(type: DearPickedOriginal.self), let request else { throw APIError.message("无法读取所选原文件。") }
+                    defer { try? FileManager.default.removeItem(at: file.url) }
+                    _ = try await store.photoSource.restoreOriginal(for: request.data, selectedFile: file.url)
+                    await loadRequest()
+                } catch { self.error = error.localizedDescription }
+            }
+        }
+    }
+    private func restoreOriginal(silent: Bool = false) async {
+        guard let request, request.flag("canStop"), request.text("status") == "waiting", !request.flag("serverCached"), !recovering else { return }
+        recovering = true; defer { recovering = false }
+        do {
+            let restored = try await store.photoSource.restoreOriginal(for: request.data)
+            if restored { await loadRequest() }
+            else if !silent { error = "本机共享目录未找到一致的原文件，请从系统相册选择原文件继续。" }
+        } catch { self.error = error.localizedDescription }
     }
     private func thumbnailPath(_ request: DearRecord) -> String {
         "/api/dear/social/tenants/\(request.text("tenantId"))/activities/\(request.text("activityId"))/native-photos/\(request.text("photoId"))/thumbnail"
@@ -2255,7 +2302,7 @@ private struct MomentNotificationDetail: View {
                 await store.photoSource.serveCurrentRequests()
             }
             let record = DearRecord(data: updated)
-            request = record; error = ""
+            request = record
             if thumbnail == nil, updated["photo"] is [String: Any] {
                 thumbnail = try? await store.authenticatedImage(thumbnailPath(record))
             }
@@ -2272,7 +2319,7 @@ private struct MomentPhotoRequestProgress: View {
     private var phase: String {
         switch request?.text("status") {
         case "pending_approval": return "等待分享者同意"
-        case "waiting": return "已同意，等待原文件传输"
+        case "waiting": return request?.flag("serverCached") == true ? "原文件已缓存，等待接收端继续下载" : "已同意，等待原文件设备上线或恢复共享"
         case "transferring": return "正在传输原文件"
         case "confirming": return "正在接收或校验原文件"
         case "completed": return "下载已完成"
