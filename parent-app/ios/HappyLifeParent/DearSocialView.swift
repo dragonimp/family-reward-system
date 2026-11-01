@@ -9,6 +9,61 @@ import ImageIO
 import Photos
 import MapKit
 
+private struct DearCamera: UIViewControllerRepresentable {
+    enum Mode: String, Identifiable {
+        case photo, video
+        var id: String { rawValue }
+    }
+    let mode: Mode
+    let completion: (Result<(URL, Bool)?, Error>) -> Void
+
+    func makeCoordinator() -> Coordinator { Coordinator(completion: completion) }
+    func makeUIViewController(context: Context) -> UIImagePickerController {
+        let picker = UIImagePickerController()
+        picker.sourceType = .camera
+        picker.mediaTypes = [mode == .video ? UTType.movie.identifier : UTType.image.identifier]
+        picker.cameraCaptureMode = mode == .video ? .video : .photo
+        picker.videoQuality = .typeHigh
+        picker.videoMaximumDuration = 180
+        picker.delegate = context.coordinator
+        return picker
+    }
+    func updateUIViewController(_ controller: UIImagePickerController, context: Context) { }
+
+    final class Coordinator: NSObject, UIImagePickerControllerDelegate, UINavigationControllerDelegate {
+        let completion: (Result<(URL, Bool)?, Error>) -> Void
+        init(completion: @escaping (Result<(URL, Bool)?, Error>) -> Void) { self.completion = completion }
+        func imagePickerControllerDidCancel(_ picker: UIImagePickerController) { completion(.success(nil)) }
+        func imagePickerController(_ picker: UIImagePickerController, didFinishPickingMediaWithInfo info: [UIImagePickerController.InfoKey: Any]) {
+            do {
+                let video = info[.mediaType] as? String == UTType.movie.identifier
+                let url = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + (video ? ".mov" : ".jpg"))
+                if video, let source = info[.mediaURL] as? URL {
+                    // The camera's temporary URL is only valid during this callback.
+                    try FileManager.default.copyItem(at: source, to: url)
+                } else if let image = info[.originalImage] as? UIImage, let data = image.jpegData(compressionQuality: 0.95) {
+                    try data.write(to: url, options: .atomic)
+                } else { throw APIError.message("无法读取拍摄内容，请重试。") }
+                completion(.success((url, video)))
+            } catch { completion(.failure(error)) }
+        }
+    }
+}
+
+private struct DearCaptureTarget {
+    let spaceID: String
+    let activityID: String
+    let locationName: String
+    let sessionToken: String
+}
+
+private struct DearCapturedMedia {
+    let url: URL
+    let video: Bool
+    let target: DearCaptureTarget
+    var savedToLibrary = false
+}
+
 enum DearPhotoLocation {
     static func label(for item: PhotosPickerItem, data: Data) -> String? {
         if let embedded = label(in: data) { return embedded }
@@ -280,6 +335,12 @@ struct DearSocialView: View {
     @State private var selectedPhoto: DearRecord?
     @State private var showingPhoto = false
     @State private var selectedPhotos: [PhotosPickerItem] = []
+    @State private var cameraMode: DearCamera.Mode?
+    @State private var cameraTarget: DearCaptureTarget?
+    @State private var capturedMedia: DearCapturedMedia?
+    @State private var requestingCamera = false
+    @State private var cameraError = ""
+    @State private var showingCameraError = false
     @AppStorage("dearPhotoViewMode") private var photoViewMode = "grid"
     @State private var photoLocationName = ""
     @State private var selectingPhotoDownloads = false
@@ -667,6 +728,27 @@ struct DearSocialView: View {
     private var activityPhotoSection: some View {
         Section {
             HStack {
+                Button { Task { await openCamera(.photo) } } label: { Label("拍照", systemImage: "camera") }
+                Spacer()
+                Button { Task { await openCamera(.video) } } label: { Label("录制视频", systemImage: "video") }
+            }.buttonStyle(.borderless)
+                .disabled(busy || requestingCamera || capturedMedia != nil || batchDeleting || batchDownloading)
+            Text("拍摄确认后自动保存到系统相册并共享到当前活动；视频最长 3 分钟。")
+                .font(.caption).foregroundStyle(.secondary)
+            if let capturedMedia {
+                Text(capturedMedia.savedToLibrary ? "已保存到系统相册，尚未共享到活动。" : "拍摄内容尚未保存并共享，请重试。")
+                    .font(.caption).foregroundStyle(.secondary)
+                HStack {
+                    Button("重试保存并共享") { shareCapturedMedia() }
+                    Spacer()
+                    ShareLink(item: capturedMedia.url) { Label("另存或分享", systemImage: "square.and.arrow.up") }
+                    Button("移除", role: .destructive) {
+                        try? FileManager.default.removeItem(at: capturedMedia.url)
+                        self.capturedMedia = nil
+                    }
+                }.buttonStyle(.borderless).disabled(busy)
+            }
+            HStack {
                 PhotosPicker(selection: $selectedPhotos, maxSelectionCount: 50, matching: .any(of: [.images, .videos]), preferredItemEncoding: .current) {
                     Label("分享照片 / 视频", systemImage: "photo.badge.plus")
                 }.disabled(busy || batchDeleting || batchDownloading)
@@ -836,6 +918,25 @@ struct DearSocialView: View {
         } message: { Text("活动成员将无法再获取这些文件；iPhone 相册中的原文件不会删除。") }
         .sheet(isPresented: $showingCheckIn) { checkInSheet }
         .sheet(isPresented: $showingMomentCreate) { momentCreateSheet }
+        .fullScreenCover(item: $cameraMode, onDismiss: { shareCapturedMedia() }) { mode in
+            DearCamera(mode: mode) { result in
+                switch result {
+                case .success(let media):
+                    if let (url, video) = media, let target = cameraTarget {
+                        capturedMedia = DearCapturedMedia(url: url, video: video, target: target)
+                    }
+                case .failure(let failure):
+                    cameraError = failure.localizedDescription; showingCameraError = true
+                }
+                cameraMode = nil
+            }.ignoresSafeArea()
+        }
+        .alert("拍摄提示", isPresented: $showingCameraError) {
+            Button("好", role: .cancel) { }
+            Button("打开设置") {
+                if let url = URL(string: UIApplication.openSettingsURLString) { UIApplication.shared.open(url) }
+            }
+        } message: { Text(cameraError) }
         .onChange(of: checkInLocator.location?.timestamp) { _, value in
             guard pendingCheckIn, value != nil else { return }
             pendingCheckIn = false
@@ -884,6 +985,74 @@ struct DearSocialView: View {
         .refreshable {
             do { try await loadDetails(); try await loadRelationships() }
             catch { self.error = error.localizedDescription }
+        }
+    }
+
+    @MainActor private func openCamera(_ mode: DearCamera.Mode) async {
+        guard !busy, !requestingCamera, capturedMedia == nil,
+              let token = store.identity.accessToken, !activityId.isEmpty else { return }
+        requestingCamera = true
+        defer { requestingCamera = false }
+        let target = DearCaptureTarget(spaceID: activityTenantId, activityID: activityId,
+                                       locationName: photoLocationName, sessionToken: token)
+        do {
+            guard UIImagePickerController.isSourceTypeAvailable(.camera),
+                  UIImagePickerController.availableMediaTypes(for: .camera)?.contains(mode == .video ? UTType.movie.identifier : UTType.image.identifier) == true else {
+                throw APIError.message("此设备不支持所选拍摄方式，请从相册选择照片或视频。")
+            }
+            let cameraAllowed = await AVCaptureDevice.requestAccess(for: .video)
+            guard cameraAllowed else { throw APIError.message("请在设置中允许使用相机，以拍摄照片或视频。") }
+            if mode == .video {
+                let microphoneAllowed = await AVCaptureDevice.requestAccess(for: .audio)
+                guard microphoneAllowed else { throw APIError.message("请在设置中允许使用麦克风，以录制有声音的视频。") }
+            }
+            let library = await PHPhotoLibrary.requestAuthorization(for: .addOnly)
+            guard library == .authorized || library == .limited else {
+                throw APIError.message("请在设置中允许添加照片，以保存拍摄的照片和视频。")
+            }
+            guard token == store.identity.accessToken, target.activityID == activityId, showingActivity else { return }
+            cameraTarget = target
+            cameraMode = mode
+        } catch { cameraError = error.localizedDescription; showingCameraError = true }
+    }
+
+    private func shareCapturedMedia() {
+        guard let capture = capturedMedia, !busy else { return }
+        busy = true; error = ""; notice = ""
+        Task {
+            defer { busy = false }
+            do {
+                guard capture.target.sessionToken == store.identity.accessToken else {
+                    throw APIError.message("登录状态已变化，拍摄内容未共享。请另存到相册，再使用当前账号选择共享。")
+                }
+                if !capture.savedToLibrary {
+                    try await PHPhotoLibrary.shared().performChanges {
+                        if capture.video {
+                            PHAssetChangeRequest.creationRequestForAssetFromVideo(atFileURL: capture.url)
+                        } else {
+                            PHAssetChangeRequest.creationRequestForAssetFromImage(atFileURL: capture.url)
+                        }
+                    }
+                    capturedMedia?.savedToLibrary = true
+                }
+                guard capture.target.sessionToken == store.identity.accessToken else { throw CancellationError() }
+                do {
+                    if capture.video {
+                        try await store.photoSource.publishVideo(at: capture.url, spaceID: capture.target.spaceID,
+                                                                activityID: capture.target.activityID, locationName: capture.target.locationName)
+                    } else {
+                        let data = try Data(contentsOf: capture.url, options: .mappedIfSafe)
+                        try await store.photoSource.publish(data, spaceID: capture.target.spaceID, activityID: capture.target.activityID,
+                                                            name: "拍摄照片.jpg", locationName: capture.target.locationName)
+                    }
+                } catch {
+                    throw APIError.message("已保存到系统相册，共享未完成：\(error.localizedDescription)。可点击重试保存并共享。")
+                }
+                capturedMedia = nil
+                try? FileManager.default.removeItem(at: capture.url)
+                notice = "已保存到系统相册并共享到活动；请保持此 iPhone 可以响应原文件请求。"
+                if activityId == capture.target.activityID { try await loadPhotos() }
+            } catch { self.error = error.localizedDescription }
         }
     }
 
