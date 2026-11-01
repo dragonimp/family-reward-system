@@ -447,7 +447,7 @@ private struct DearActivityMapView: View {
                 } label: {
                     Label {
                         VStack(alignment: .leading, spacing: 3) {
-                            Text(point.title).lineLimit(1)
+                            Text(mapTitle(point)).lineLimit(1)
                             Text(point.subtitle).font(.caption).foregroundStyle(.secondary).lineLimit(2)
                         }
                     } icon: { Image(systemName: point.systemImage) }
