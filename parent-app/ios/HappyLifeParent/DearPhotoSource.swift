@@ -963,6 +963,7 @@ import UniformTypeIdentifiers
         }
         let result = NotificationClient(authority: url, applicationKey: key) { [weak self] in
             guard let self, self.generation == expected, let token = try await self.store?.identity.validAccessToken(), !token.isEmpty else { throw CancellationError() }
+            guard self.generation == expected else { throw CancellationError() }
             return token
         }
         authority = url; applicationKey = key; client = result
