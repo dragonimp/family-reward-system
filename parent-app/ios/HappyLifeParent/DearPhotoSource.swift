@@ -876,13 +876,13 @@ import UniformTypeIdentifiers
                       UUID(uuidString: photo.activityID) == UUID(uuidString: request["activityId"] as? String ?? ""),
                       photo.length == (request["length"] as? Int),
                       photo.sha256.caseInsensitiveCompare(request["sha256"] as? String ?? "") == .orderedSame else {
-                    store.photoRequestNotice = "尚未匹配本机原件，请打开请求消息自动匹配系统相册。"
+                    store.photoRequestNotice = "本机原件暂不可用，请打开请求消息恢复原件。"
                     continue
                 }
                 let path = root.appendingPathComponent(photo.fileName)
                 guard (try? path.resourceValues(forKeys: [.fileSizeKey]).fileSize) == photo.length,
                       (try? await hashFile(path)) == photo.sha256 else {
-                    store.photoRequestNotice = "尚未匹配本机原件，请打开请求消息自动匹配系统相册。"
+                    store.photoRequestNotice = "本机原件暂不可用，请打开请求消息恢复原件。"
                     continue
                 }
                 let expectedGeneration = generation
@@ -1186,6 +1186,8 @@ private enum MomentLibraryOriginals {
         return value
     }
     static func locate(assetIdentifier: String, length: Int, sha: String, contentType: String) async throws -> URL? {
+        let permission = PHPhotoLibrary.authorizationStatus(for: .readWrite)
+        guard permission == .authorized || permission == .limited else { return nil }
         guard let expectedType = UTType(mimeType: contentType),
               let asset = PHAsset.fetchAssets(withLocalIdentifiers: [assetIdentifier], options: nil).firstObject else { return nil }
         for resource in PHAssetResource.assetResources(for: asset) where resource.type != .adjustmentData && UTType(resource.uniformTypeIdentifier)?.conforms(to: expectedType) == true {
