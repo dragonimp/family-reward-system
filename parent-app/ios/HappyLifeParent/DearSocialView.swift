@@ -1112,35 +1112,7 @@ struct DearSocialView: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
-                Menu {
-                    if let url = URL(string: "https://happylife.ai.impx.net/api/dear/public/activities/\(activityTenantId)/\(activityId)") {
-                        ShareLink(item: url, subject: Text(selectedActivity?.text("title") ?? "活动"), message: Text(selectedActivity?.text("title") ?? "活动"), preview: SharePreview(selectedActivity?.text("title") ?? "活动")) { Label("分享活动链接", systemImage: "square.and.arrow.up") }
-                    }
-                    Button {
-                        editedActivityName = selectedActivity?.text("title") ?? ""; editedActivityDescription = selectedActivity?.text("description") ?? ""
-                        editedActivityDate = selectedActivity.map(activityDateValue) ?? Date(); showingActivityManagement = true
-                    } label: { Label("活动管理与邀请", systemImage: "person.badge.plus") }
-                    Button {
-                        selectingPhotoDownloads.toggle(); selectedPhotoIDs.removeAll(); batchOriginalURLs = []; batchDownloadError = ""; batchDownloadProgress = 0
-                    } label: { Label(selectingPhotoDownloads ? "完成多选" : "批量下载或删除", systemImage: "checkmark.circle") }
-                        .disabled(photos.isEmpty || batchDownloading || batchDeleting)
-                    Button {
-                        Task { matchingOriginals = true; defer { matchingOriginals = false }
-                            do { matchingStatus = try await store.photoSource.recoverAllMyOriginals { matchingStatus = $0 }; notice = matchingStatus; try await loadPhotos() }
-                            catch { error = error.localizedDescription }
-                        }
-                    } label: { Label(matchingOriginals ? matchingStatus : "匹配我分享的全部活动原图", systemImage: "photo.badge.checkmark") }
-                        .disabled(matchingOriginals || busy || batchDownloading || batchDeleting)
-                    Button { showingPhotoLocation = true } label: { Label("照片默认地点", systemImage: "mappin") }
-                    Divider()
-                    Button { momentDraft = ""; momentRequestID = UUID(); error = ""; showingMomentCreate = true } label: { Label("写日常", systemImage: "square.and.pencil") }
-                    Button { checkInNote = ""; checkInRequestID = UUID(); pendingCheckIn = true; checkInLocator.locate() } label: { Label("打卡", systemImage: "location.circle") }
-                        .disabled(busy || pendingCheckIn)
-                    let points = DearActivityMapPoint.points(checkIns: checkIns, photos: photos)
-                    NavigationLink {
-                        DearActivityMapView(store: store, title: selectedActivity?.text("title") ?? "活动地图", spaceID: activityTenantId, activityID: activityId, points: points, photos: photos)
-                    } label: { Label("活动地图", systemImage: "map") }.disabled(points.isEmpty && photos.isEmpty)
-                } label: { Image(systemName: "ellipsis").accessibilityLabel("更多活动操作") }
+                activityActions
             }
         }
         .fullScreenCover(item: $selectedPhoto) { selectedPhoto in
@@ -1247,6 +1219,38 @@ struct DearSocialView: View {
             do { try await loadDetails(); try await loadRelationships() }
             catch { self.error = error.localizedDescription }
         }
+    }
+
+    private var activityActions: some View {
+                Menu {
+                    if let url = URL(string: "https://happylife.ai.impx.net/api/dear/public/activities/\(activityTenantId)/\(activityId)") {
+                        DearActivityShareLink(url: url, title: selectedActivity?.text("title") ?? "活动", label: "分享活动链接")
+                    }
+                    Button {
+                        editedActivityName = selectedActivity?.text("title") ?? ""; editedActivityDescription = selectedActivity?.text("description") ?? ""
+                        editedActivityDate = selectedActivity.map(activityDateValue) ?? Date(); showingActivityManagement = true
+                    } label: { Label("活动管理与邀请", systemImage: "person.badge.plus") }
+                    Button {
+                        selectingPhotoDownloads.toggle(); selectedPhotoIDs.removeAll(); batchOriginalURLs = []; batchDownloadError = ""; batchDownloadProgress = 0
+                    } label: { Label(selectingPhotoDownloads ? "完成多选" : "批量下载或删除", systemImage: "checkmark.circle") }
+                        .disabled(photos.isEmpty || batchDownloading || batchDeleting)
+                    Button {
+                        Task { matchingOriginals = true; defer { matchingOriginals = false }
+                            do { matchingStatus = try await store.photoSource.recoverAllMyOriginals { matchingStatus = $0 }; notice = matchingStatus; try await loadPhotos() }
+                            catch { error = error.localizedDescription }
+                        }
+                    } label: { Label(matchingOriginals ? matchingStatus : "匹配我分享的全部活动原图", systemImage: "photo.badge.checkmark") }
+                        .disabled(matchingOriginals || busy || batchDownloading || batchDeleting)
+                    Button { showingPhotoLocation = true } label: { Label("照片默认地点", systemImage: "mappin") }
+                    Divider()
+                    Button { momentDraft = ""; momentRequestID = UUID(); error = ""; showingMomentCreate = true } label: { Label("写日常", systemImage: "square.and.pencil") }
+                    Button { checkInNote = ""; checkInRequestID = UUID(); pendingCheckIn = true; checkInLocator.locate() } label: { Label("打卡", systemImage: "location.circle") }
+                        .disabled(busy || pendingCheckIn)
+                    let points = DearActivityMapPoint.points(checkIns: checkIns, photos: photos)
+                    NavigationLink {
+                        DearActivityMapView(store: store, title: selectedActivity?.text("title") ?? "活动地图", spaceID: activityTenantId, activityID: activityId, points: points, photos: photos)
+                    } label: { Label("活动地图", systemImage: "map") }.disabled(points.isEmpty && photos.isEmpty)
+                } label: { Image(systemName: "ellipsis").accessibilityLabel("更多活动操作") }
     }
 
     @MainActor private func openCamera(_ mode: DearCamera.Mode) async {
@@ -1383,7 +1387,7 @@ struct DearSocialView: View {
                         }
                         Button("生成七天有效的邀请链接") { run { try await createInviteLink() } }.disabled(busy)
                         if let url = URL(string: inviteLink), url.scheme == "https" {
-                            ShareLink(item: url, subject: Text(selectedActivity?.text("title") ?? "活动"), message: Text(selectedActivity?.text("title") ?? "活动"), preview: SharePreview(selectedActivity?.text("title") ?? "活动")) { Label("分享邀请链接", systemImage: "square.and.arrow.up") }
+                            DearActivityShareLink(url: url, title: selectedActivity?.text("title") ?? "活动", label: "分享邀请链接")
                         }
                         Text("对方确认加入后才能查看这场活动的分享。")
                             .font(.caption).foregroundStyle(.secondary)
@@ -2412,5 +2416,16 @@ private struct MomentNotificationButton: View {
         Button { notifications.open() } label: {
             Label("消息通知", systemImage: notifications.unreadCount > 0 ? "bell.badge" : "bell")
         }.accessibilityLabel("消息通知，\(notifications.unreadCount) 条未读")
+    }
+}
+
+private struct DearActivityShareLink: View {
+    let url: URL
+    let title: String
+    let label: String
+    var body: some View {
+        ShareLink(item: url, subject: Text(title), message: Text(title), preview: SharePreview(title)) {
+            Label(label, systemImage: "square.and.arrow.up")
+        }
     }
 }
