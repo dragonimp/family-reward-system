@@ -2440,7 +2440,7 @@ private struct DearActivityShareLink: View {
     let title: String
     let label: String
     var body: some View {
-        ShareLink(item: url, subject: Text(title), message: Text(title), preview: SharePreview(title)) {
+        ShareLink(item: "\(title)\n\(url.absoluteString)") {
             Label(label, systemImage: "square.and.arrow.up")
         }
     }
