@@ -1221,6 +1221,19 @@ struct DearSocialView: View {
         }
     }
 
+    private func matchSharedOriginals() async {
+        matchingOriginals = true
+        defer { matchingOriginals = false }
+        do {
+            matchingStatus = try await store.photoSource.recoverAllMyOriginals { value in
+                matchingStatus = value; notice = value
+            }
+            notice = matchingStatus
+            try await loadPhotos()
+        } catch is CancellationError { }
+        catch { self.error = error.localizedDescription }
+    }
+
     private var activityActions: some View {
                 Menu {
                     if let url = URL(string: "https://happylife.ai.impx.net/api/dear/public/activities/\(activityTenantId)/\(activityId)") {
@@ -1235,10 +1248,7 @@ struct DearSocialView: View {
                     } label: { Label(selectingPhotoDownloads ? "完成多选" : "批量下载或删除", systemImage: "checkmark.circle") }
                         .disabled(photos.isEmpty || batchDownloading || batchDeleting)
                     Button {
-                        Task { matchingOriginals = true; defer { matchingOriginals = false }
-                            do { matchingStatus = try await store.photoSource.recoverAllMyOriginals { matchingStatus = $0 }; notice = matchingStatus; try await loadPhotos() }
-                            catch { error = error.localizedDescription }
-                        }
+                        Task { await matchSharedOriginals() }
                     } label: { Label(matchingOriginals ? matchingStatus : "匹配我分享的全部活动原图", systemImage: "photo.badge.checkmark") }
                         .disabled(matchingOriginals || busy || batchDownloading || batchDeleting)
                     Button { showingPhotoLocation = true } label: { Label("照片默认地点", systemImage: "mappin") }
