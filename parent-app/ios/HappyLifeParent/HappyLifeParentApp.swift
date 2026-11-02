@@ -78,20 +78,6 @@ extension View {
     } } }
 }
 
-private struct PhotoTransferBanner: View {
-    @ObservedObject var presentation: PhotoTransferPresentation
-    var body: some View {
-        if let notice = presentation.notice {
-            VStack(spacing: 5) {
-                Label(notice, systemImage: "photo.badge.arrow.down").font(.footnote.weight(.semibold)).frame(maxWidth: .infinity)
-                if let progress = presentation.progress {
-                    ProgressView(value: progress).tint(.orange).accessibilityLabel("原文件发送进度")
-                }
-            }.padding(10).background(.orange.opacity(0.18))
-        }
-    }
-}
-
 struct FamilyRoot: View {
     @ObservedObject var store: FamilyStore
     @ObservedObject var identity: AgentIdentitySession
@@ -115,7 +101,6 @@ struct FamilyRoot: View {
                 }
             }
         }
-        .safeAreaInset(edge: .top) { PhotoTransferBanner(presentation: store.photoTransfers) }
         .task(id: identity.isAuthenticated) {
             if identity.isAuthenticated { await store.load(); store.resumePhotoSharing() }
         }
