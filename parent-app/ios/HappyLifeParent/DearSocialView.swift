@@ -243,7 +243,7 @@ private struct DearPickedOriginal: Transferable {
     }
 }
 
-private struct DearRecord: Identifiable {
+struct DearRecord: Identifiable {
     let data: [String: Any]
     let sortDate: Date
     private let startsAtInstant: Date?

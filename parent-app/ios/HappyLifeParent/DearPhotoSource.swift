@@ -461,7 +461,7 @@ import UniformTypeIdentifiers
                 request["serverCached"] = false
                 request["sha256"] = photo.text("thumbnailRevision"); request["canStop"] = true; request["status"] = "waiting"
                 do {
-                    if try await recoverOriginal(request: request, status: status) { matched += 1 } else { missing += 1 }
+                    if try await restoreOriginal(for: request, status: status) { matched += 1 } else { missing += 1 }
                 } catch is CancellationError { throw CancellationError() }
                 catch { failed += 1 }
             }
