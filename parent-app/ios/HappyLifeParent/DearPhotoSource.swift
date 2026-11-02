@@ -463,13 +463,18 @@ import UniformTypeIdentifiers
         status?("已匹配原件，正在继续分享…")
         try await RealtimeFileRelay.upload(file: original, request: upload)
         guard expected == generation else { throw CancellationError() }
-        var index = try readIndex(at: root)
         let local: URL
         if original.deletingLastPathComponent() == root { local = original }
         else {
             local = root.appendingPathComponent(UUID().uuidString + "." + original.pathExtension)
-            try FileManager.default.copyItem(at: original, to: local)
+            do {
+                try await Task.detached(priority: .utility) { try FileManager.default.copyItem(at: original, to: local) }.value
+                try Task.checkCancellation()
+                guard expected == generation else { throw CancellationError() }
+            } catch { try? FileManager.default.removeItem(at: local); throw error }
         }
+        // Reload after asynchronous work so a concurrent share cannot lose its index.
+        var index = try readIndex(at: root)
         index.photos.removeAll { UUID(uuidString: $0.id) == UUID(uuidString: photoID) }
         index.photos.append(SharedPhoto(id: photoID, spaceID: spaceID, activityID: activityID, fileName: local.lastPathComponent, length: length, sha256: sha))
         try writeIndex(index, at: root)
