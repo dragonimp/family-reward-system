@@ -2177,6 +2177,8 @@ private struct MomentNotificationDetail: View {
     @State private var refreshing = false
     @State private var recovering = false
     @State private var selectedOriginal: PhotosPickerItem?
+    @State private var recoveryStatus = "正在核验本机原件…"
+    @State private var libraryRecoveryTask: Task<Void, Never>?
     private var requestID: UUID? {
         guard let source = item.sourceRecordId, source.hasPrefix("photo-request:") else { return nil }
         return UUID(uuidString: String(source.dropFirst("photo-request:".count)))
@@ -2245,12 +2247,21 @@ private struct MomentNotificationDetail: View {
                         }.disabled(refreshing)
                     }
                     if request?.flag("canStop") == true, request?.text("status") == "waiting", request?.flag("serverCached") != true {
-                        Button("从本机恢复并继续分享") { Task { await restoreOriginal() } }.disabled(recovering || refreshing)
+                        Button("自动匹配本机与系统相册原件") {
+                            libraryRecoveryTask = Task {
+                                let permission = await PHPhotoLibrary.requestAuthorization(for: .readWrite)
+                                if permission == .authorized || permission == .limited { await restoreOriginal() }
+                                else { error = "相册访问未获允许。可在系统设置中允许访问，或使用下面的手动选择。" }
+                            }
+                        }.disabled(recovering || refreshing)
+                        if [.denied, .limited].contains(PHPhotoLibrary.authorizationStatus(for: .readWrite)) {
+                            Button("调整相册访问范围") { if let url = URL(string: UIApplication.openSettingsURLString) { UIApplication.shared.open(url) } }
+                        }
                         PhotosPicker(selection: $selectedOriginal, matching: .any(of: [.images, .videos]), preferredItemEncoding: .current) {
                             Label("选择本机原文件继续分享", systemImage: "photo.on.rectangle")
                         }.disabled(recovering || refreshing)
-                        if recovering { ProgressView("正在核验并上传本机原文件…") }
-                        Text("自动核对本机保存的原文件；若照片只在系统相册中，请选择原文件。核验一致后继续原下载请求。")
+                        if recovering { ProgressView(recoveryStatus) }
+                        Text("先匹配 App 内原件，再自动匹配已授权的本机相册。只核验并共享完全一致的原件，不下载整库云端照片；仅允许部分照片时，只匹配已允许的范围。")
                             .font(.footnote).foregroundStyle(.secondary)
                     }
                 }
@@ -2265,6 +2276,7 @@ private struct MomentNotificationDetail: View {
                 await loadRequest()
             }
         }
+        .onDisappear { libraryRecoveryTask?.cancel() }
         .onChange(of: selectedOriginal) { _, item in
             guard let item else { return }
             Task {
@@ -2282,10 +2294,12 @@ private struct MomentNotificationDetail: View {
         guard let request, request.flag("canStop"), request.text("status") == "waiting", !request.flag("serverCached"), !recovering else { return }
         recovering = true; defer { recovering = false }
         do {
-            let restored = try await store.photoSource.restoreOriginal(for: request.data)
+            error = ""; recoveryStatus = "正在核验本机原件…"
+            let restored = try await store.photoSource.restoreOriginal(for: request.data) { recoveryStatus = $0 }
             if restored { await loadRequest() }
-            else if !silent { error = "本机共享目录未找到一致的原文件，请从系统相册选择原文件继续。" }
-        } catch { self.error = error.localizedDescription }
+            else if !silent { error = "在 App 和已授权的本机相册中未匹配到一致原件。云端原件需先下载到本机；也可手动选择原文件。" }
+        } catch is CancellationError { }
+        catch { self.error = error.localizedDescription }
     }
     private func thumbnailPath(_ request: DearRecord) -> String {
         "/api/dear/social/tenants/\(request.text("tenantId"))/activities/\(request.text("activityId"))/native-photos/\(request.text("photoId"))/thumbnail"

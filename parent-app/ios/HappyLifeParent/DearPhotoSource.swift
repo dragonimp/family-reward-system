@@ -7,6 +7,7 @@ import UIKit
 import UserNotifications
 import AVFoundation
 import ImageIO
+import Photos
 import UniformTypeIdentifiers
 
 // Linko Social keeps original media bytes on the source device. This adapter
@@ -40,6 +41,7 @@ import UniformTypeIdentifiers
     weak var store: FamilyStore?
     private var pump: Task<Void, Never>?
     private var cacheTask: Task<Void, Never>?
+    private var librarySearch: Task<URL?, Error>?
     private var cachedShares = Set<String>()
     private var cacheRetries: [String: Date] = [:]
     private(set) var currentDeviceID: String?
@@ -88,7 +90,7 @@ import UniformTypeIdentifiers
     }
 
     func stop() {
-        generation = UUID(); cacheTask?.cancel(); cacheTask = nil; cachedShares.removeAll(); cacheRetries.removeAll(); currentDeviceID = nil; pump?.cancel(); pump = nil; enabledForSession = false
+        generation = UUID(); librarySearch?.cancel(); librarySearch = nil; cacheTask?.cancel(); cacheTask = nil; cachedShares.removeAll(); cacheRetries.removeAll(); currentDeviceID = nil; pump?.cancel(); pump = nil; enabledForSession = false
         for task in sourceTasks.values { task.cancel() }; sourceTasks.removeAll()
         let active = Array(transfers.values); transfers.removeAll()
         for transfer in active { Task { await transfer.cancel() } }
@@ -412,7 +414,7 @@ import UniformTypeIdentifiers
 
     // Recover only this account's verified bytes, never infer physical ownership
     // from the username or claim an unrelated item from the system photo library.
-    func restoreOriginal(for request: [String: Any], selectedFile: URL? = nil) async throws -> Bool {
+    func restoreOriginal(for request: [String: Any], selectedFile: URL? = nil, status: ((String) -> Void)? = nil) async throws -> Bool {
         guard request["canStop"] as? Bool == true, request["status"] as? String == "waiting",
               request["serverCached"] as? Bool != true else { return false }
         guard store != nil, let photoID = request["photoId"] as? String, UUID(uuidString: photoID) != nil,
@@ -431,6 +433,22 @@ import UniformTypeIdentifiers
             guard (try? candidate.resourceValues(forKeys: [.fileSizeKey]).fileSize) == length else { continue }
             if (try? await hashFile(candidate))?.caseInsensitiveCompare(sha) == .orderedSame { original = candidate; break }
         }
+        var libraryOriginal: URL?
+        defer { if let libraryOriginal { try? FileManager.default.removeItem(at: libraryOriginal) } }
+        let authorization = PHPhotoLibrary.authorizationStatus(for: .readWrite)
+        if original == nil, selectedFile == nil, authorization == .authorized || authorization == .limited {
+            guard librarySearch == nil else { throw APIError.message("正在自动匹配其他原件，请稍后重试。") }
+            let type = request["contentType"] as? String ?? ""
+            let search = Task.detached(priority: .utility) {
+                try await MomentLibraryOriginals.find(length: length, sha: sha, contentType: type, indexRoot: root) { checked, total in
+                    await MainActor.run { status?("正在自动匹配相册原件 \(checked)/\(total)…") }
+                }
+            }
+            librarySearch = search
+            defer { if expected == generation { librarySearch = nil } }
+            libraryOriginal = try await withTaskCancellationHandler { try await search.value } onCancel: { search.cancel() }
+            original = libraryOriginal
+        }
         guard let original else {
             if selectedFile != nil { throw APIError.message("选择的文件与这张共享照片的原文件不一致，请选择未编辑、未转换的原文件。") }
             return false
@@ -442,6 +460,7 @@ import UniformTypeIdentifiers
         upload.setValue(sha, forHTTPHeaderField: "X-Photo-Revision")
         upload.setValue("application/octet-stream", forHTTPHeaderField: "Content-Type")
         upload.setValue(String(length), forHTTPHeaderField: "Content-Length")
+        status?("已匹配原件，正在继续分享…")
         try await RealtimeFileRelay.upload(file: original, request: upload)
         guard expected == generation else { throw CancellationError() }
         var index = try readIndex(at: root)
@@ -764,13 +783,13 @@ import UniformTypeIdentifiers
                       UUID(uuidString: photo.activityID) == UUID(uuidString: request["activityId"] as? String ?? ""),
                       photo.length == (request["length"] as? Int),
                       photo.sha256.caseInsensitiveCompare(request["sha256"] as? String ?? "") == .orderedSame else {
-                    _ = try? await store.call("/api/dear/social/photo-requests/\(requestID)/unavailable", method: "POST", body: [:])
+                    store.photoRequestNotice = "尚未匹配本机原件，请打开请求消息自动匹配系统相册。"
                     continue
                 }
                 let path = root.appendingPathComponent(photo.fileName)
                 guard (try? path.resourceValues(forKeys: [.fileSizeKey]).fileSize) == photo.length,
                       (try? await hashFile(path)) == photo.sha256 else {
-                    _ = try? await store.call("/api/dear/social/photo-requests/\(requestID)/unavailable", method: "POST", body: [:])
+                    store.photoRequestNotice = "尚未匹配本机原件，请打开请求消息自动匹配系统相册。"
                     continue
                 }
                 let expectedGeneration = generation
@@ -998,5 +1017,112 @@ import UniformTypeIdentifiers
                 try? await NotificationClient(authority: oldAuthority, applicationKey: oldKey, accessToken: { token }).unregisterDevice(installationID: installationID)
             }
         }
+    }
+}
+
+// PhotoKit work stays on the utility executor. Only exact matches leave the
+// authorized library; scanning never downloads iCloud originals or edits assets.
+private enum MomentLibraryOriginals {
+    private final class Read: @unchecked Sendable {
+        private let lock = NSLock()
+        private var requestID: PHAssetResourceDataRequestID?
+        private var cancelled = false
+        private var fingerprint: OriginalResourceFingerprint
+        private var output: FileHandle?
+        init(limit: Int, outputURL: URL?) throws {
+            fingerprint = OriginalResourceFingerprint(limit: limit)
+            if let outputURL {
+                guard FileManager.default.createFile(atPath: outputURL.path, contents: nil, attributes: [.posixPermissions: 0o600]) else { throw APIError.message("无法暂存匹配原件。") }
+                output = try FileHandle(forWritingTo: outputURL)
+            }
+        }
+        func install(_ id: PHAssetResourceDataRequestID) {
+            lock.lock(); requestID = id; let stop = cancelled; lock.unlock()
+            if stop { PHAssetResourceManager.default().cancelDataRequest(id) }
+        }
+        func cancel() {
+            lock.lock(); cancelled = true; let id = requestID; lock.unlock()
+            if let id { PHAssetResourceManager.default().cancelDataRequest(id) }
+        }
+        func consume(_ data: Data) {
+            lock.lock(); let stop = cancelled; lock.unlock()
+            guard !stop else { return }
+            // PhotoKit delivers data and completion on the same serial queue.
+            guard fingerprint.append(data) else { cancel(); return }
+            do { try output?.write(contentsOf: data) } catch { cancel() }
+        }
+        func finish(_ error: Error?) -> OriginalResourceDigest? {
+            lock.lock(); let stop = cancelled; lock.unlock()
+            defer { try? output?.close(); output = nil }
+            guard error == nil, !stop else { return nil }
+            do { try output?.synchronize() } catch { return nil }
+            return fingerprint.finish()
+        }
+    }
+    private static func read(_ resource: PHAssetResource, limit: Int, outputURL: URL? = nil) async throws -> OriginalResourceDigest? {
+        try Task.checkCancellation()
+        let read = try Read(limit: limit, outputURL: outputURL)
+        let value: OriginalResourceDigest? = await withTaskCancellationHandler {
+            await withCheckedContinuation { continuation in
+                let options = PHAssetResourceRequestOptions(); options.isNetworkAccessAllowed = false
+                let id = PHAssetResourceManager.default().requestData(for: resource, options: options, dataReceivedHandler: { data in
+                    read.consume(data)
+                }, completionHandler: { error in continuation.resume(returning: read.finish(error)) })
+                read.install(id)
+            }
+        } onCancel: { read.cancel() }
+        try Task.checkCancellation()
+        return value
+    }
+    static func find(length: Int, sha: String, contentType: String, indexRoot: URL,
+                     progress: @escaping (Int, Int) async -> Void) async throws -> URL? {
+        let permission = PHPhotoLibrary.authorizationStatus(for: .readWrite)
+        guard permission == .authorized || permission == .limited, let expectedType = UTType(mimeType: contentType) else { return nil }
+        let options = PHFetchOptions()
+        options.predicate = NSPredicate(format: "mediaType = %d", contentType.hasPrefix("video/") ? PHAssetMediaType.video.rawValue : PHAssetMediaType.image.rawValue)
+        options.sortDescriptors = [NSSortDescriptor(key: "creationDate", ascending: false)]
+        let assets = PHAsset.fetchAssets(with: options)
+        let indexURL = indexRoot.appendingPathComponent("library-fingerprints.json")
+        var fingerprints = (try? JSONDecoder().decode([String: OriginalResourceDigest].self, from: Data(contentsOf: indexURL))) ?? [:]
+        if fingerprints.count > 20000 { fingerprints.removeAll() }
+        var changed = false
+        func saveIndex() {
+            if changed, let bytes = try? JSONEncoder().encode(fingerprints) {
+                try? bytes.write(to: indexURL, options: [.atomic, .completeFileProtectionUntilFirstUserAuthentication])
+            }
+        }
+        defer { saveIndex() }
+        await progress(0, assets.count)
+        for position in 0..<assets.count {
+            try Task.checkCancellation()
+            let asset = assets.object(at: position)
+            // A limited grant only enumerates the assets the user allowed.
+            let resources = PHAssetResource.assetResources(for: asset).filter { resource in
+                resource.type != .adjustmentData && UTType(resource.uniformTypeIdentifier)?.conforms(to: expectedType) == true
+            }
+            for resource in resources {
+                try Task.checkCancellation()
+                let key = asset.localIdentifier + "|" + String(asset.modificationDate?.timeIntervalSince1970 ?? 0) + "|" + String(resource.type.rawValue) + "|" + resource.originalFilename
+                let digest: OriginalResourceDigest?
+                if let saved = fingerprints[key] { digest = saved }
+                else {
+                    digest = try await read(resource, limit: length)
+                    if let digest, fingerprints.count < 20000 { fingerprints[key] = digest; changed = true }
+                }
+                guard digest?.matches(length: length, sha256: sha) == true else { continue }
+                let ext = expectedType.preferredFilenameExtension ?? (contentType.hasPrefix("video/") ? "mov" : "jpg")
+                let copy = FileManager.default.temporaryDirectory.appendingPathComponent("MomentLibraryMatch-" + UUID().uuidString + "." + ext)
+                do {
+                    guard let verified = try await read(resource, limit: length, outputURL: copy), verified.matches(length: length, sha256: sha) else {
+                        try? FileManager.default.removeItem(at: copy); fingerprints.removeValue(forKey: key); changed = true; continue
+                    }
+                    try Task.checkCancellation()
+                    return copy
+                } catch { try? FileManager.default.removeItem(at: copy); throw error }
+            }
+            if position % 25 == 0 || position + 1 == assets.count { await progress(position + 1, assets.count) }
+            if position % 100 == 0 { saveIndex() }
+        }
+        return nil
     }
 }

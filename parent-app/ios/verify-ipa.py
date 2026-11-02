@@ -29,6 +29,8 @@ with tempfile.TemporaryDirectory(prefix="happylife-parent-ipa-") as directory:
     fields = dict(line.split("=", 1) for line in signature.stderr.splitlines() if "=" in line)
     assert info["CFBundleIdentifier"] == expected
     assert info["CFBundleDisplayName"] == english_name
+    assert info.get("NSPhotoLibraryUsageDescription")
+    assert info.get("PHPhotoLibraryPreventAutomaticLimitedAccessAlert") is True
     for locale,name in [('en',english_name),('zh-Hans',chinese_name)]:
         assert plistlib.loads((app/(locale+'.lproj')/'InfoPlist.strings').read_bytes())['CFBundleDisplayName'] == name
     assert any("linkofamily" in item.get("CFBundleURLSchemes", []) for item in info.get("CFBundleURLTypes", []))

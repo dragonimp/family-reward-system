@@ -1,6 +1,19 @@
 import Foundation
 @main struct NativeModelTests {
     static func main() throws {
+        var fingerprint = OriginalResourceFingerprint(limit: 3)
+        precondition(fingerprint.append(Data([97])))
+        precondition(fingerprint.append(Data([98,99])))
+        let abc = "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
+        precondition(fingerprint.finish()?.matches(length: 3, sha256: abc.uppercased()) == true)
+        precondition(fingerprint.finish()?.matches(length: 2, sha256: abc) == false)
+        precondition(fingerprint.finish()?.matches(length: 3, sha256: String(repeating: "0", count: 64)) == false)
+        precondition(!fingerprint.append(Data([100])))
+        precondition(fingerprint.finish() == nil)
+        var truncated = OriginalResourceFingerprint(limit: 3)
+        precondition(truncated.append(Data([97,98])))
+        precondition(truncated.finish()?.matches(length: 3, sha256: abc) == false)
+        print("PASS: streaming originals match exact bytes across chunks; reject wrong SHA, truncated and oversized data")
         precondition(PhotoGeography.altitude(nil, belowSeaLevel: false) == nil)
         precondition(PhotoGeography.altitude(0, belowSeaLevel: false) == 0)
         precondition(PhotoGeography.altitude(25.5, belowSeaLevel: true) == -25.5)

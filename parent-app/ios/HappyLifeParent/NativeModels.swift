@@ -1,4 +1,5 @@
 import Foundation
+import CryptoKit
 
 struct Record: Identifiable {
     let fields: [String: Any]
@@ -134,5 +135,29 @@ enum ActivityMapLabel {
         let person = nickname.trimmingCharacters(in: .whitespacesAndNewlines)
         let place = placeName.trimmingCharacters(in: .whitespacesAndNewlines)
         return "\(person.isEmpty ? "活动成员" : person) · \(place.isEmpty ? "地点未命名" : place)"
+    }
+}
+
+// Streaming original verification: names and thumbnails never establish identity.
+struct OriginalResourceDigest: Codable, Equatable {
+    let length: Int
+    let sha256: String
+    func matches(length expectedLength: Int, sha256 expectedSHA: String) -> Bool {
+        length == expectedLength && sha256.caseInsensitiveCompare(expectedSHA) == .orderedSame
+    }
+}
+struct OriginalResourceFingerprint {
+    private var hash = SHA256()
+    private var length = 0
+    private var exceeded = false
+    let limit: Int
+    mutating func append(_ bytes: Data) -> Bool {
+        guard !exceeded, bytes.count <= limit - length else { exceeded = true; return false }
+        hash.update(data: bytes); length += bytes.count
+        return true
+    }
+    func finish() -> OriginalResourceDigest? {
+        guard !exceeded else { return nil }
+        return OriginalResourceDigest(length: length, sha256: hash.finalize().map { String(format: "%02x", $0) }.joined())
     }
 }
