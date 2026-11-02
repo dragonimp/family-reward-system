@@ -1,3 +1,7 @@
+## 1.2.86（95）：AI 对话入口调整
+
+AI 对话移至“我的 → 应用与设置”，底部保留成长、活动、运动、我的四个入口。对话页复用“我的”的导航栈，支持返回；会话管理弹窗保留独立导航。安装显示名统一为旧入口 Linko MomentX、新入口 Linko Moment（中文与英文相同）。
+
 # Linko Moment 原生 iOS
 
 SwiftUI 原生界面，iPhone、iPad / iOS 17+。当前工程版本 1.2.35（44），Bundle ID `net.impx.happylife`。业务页面不包含 WebView。

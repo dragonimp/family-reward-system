@@ -22,8 +22,8 @@ with tempfile.TemporaryDirectory(prefix="happylife-parent-ipa-") as directory:
     flavor = os.environ.get('MOMENT_IOS_RELEASE_FLAVOR', 'successor')
     assert flavor in ('legacy', 'successor')
     expected = 'net.impx.happylife.parent' if flavor == 'legacy' else 'net.impx.happylife'
-    english_name = 'LinkoXMoment' if flavor == 'legacy' else 'Linko Moment'
-    chinese_name = 'LinkoXMoment' if flavor == 'legacy' else '灵可时刻'
+    english_name = 'Linko MomentX' if flavor == 'legacy' else 'Linko Moment'
+    chinese_name = 'Linko MomentX' if flavor == 'legacy' else 'Linko Moment'
     group = 'group.' + expected
     signature = subprocess.run(["codesign", "-dv", str(app)], capture_output=True, text=True, check=True)
     fields = dict(line.split("=", 1) for line in signature.stderr.splitlines() if "=" in line)

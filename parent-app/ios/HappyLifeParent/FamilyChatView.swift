@@ -21,85 +21,83 @@ struct FamilyChatView: View {
     private var selectedAgent: Record? { agents.first { $0.id == selectedAgentID } }
 
     var body: some View {
-        NavigationStack {
-            VStack(spacing: 0) {
-                if !agents.isEmpty {
-                    HStack {
-                        Menu {
-                            ForEach(agents) { agent in
-                                Button(agent.text("name")) { selectAgent(agent.id) }
+        VStack(spacing: 0) {
+            if !agents.isEmpty {
+                HStack {
+                    Menu {
+                        ForEach(agents) { agent in
+                            Button(agent.text("name")) { selectAgent(agent.id) }
+                        }
+                    } label: {
+                        Label(selectedAgent?.text("name") ?? "选择智能体", systemImage: "person.crop.circle")
+                            .lineLimit(1)
+                    }
+                    Spacer()
+                    Button("会话管理", systemImage: "tray.full") {
+                        composerFocused = false
+                        showingSessions = true
+                    }
+                }
+                .padding(.horizontal)
+                .padding(.vertical, 10)
+                .background(.bar)
+            }
+            if let error {
+                Text(error).foregroundStyle(.red).padding()
+                    .frame(maxWidth: .infinity)
+                    .contentShape(Rectangle())
+                    .onTapGesture { composerFocused = false }
+            }
+            if agents.isEmpty && !busy {
+                ContentUnavailableView("暂无可用智能体", systemImage: "bubble.left.and.bubble.right", description: Text("请在 Linko Moment 中授权智能体后刷新。"))
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .contentShape(Rectangle())
+                    .onTapGesture { composerFocused = false }
+            } else {
+                ScrollViewReader { proxy in
+                    ScrollView {
+                        LazyVStack(alignment: .leading, spacing: 14) {
+                            ForEach(Array(messages.enumerated()), id: \.offset) { index, message in
+                                let mine = message["role"] as? String == "user"
+                                VStack(alignment: mine ? .trailing : .leading, spacing: 4) {
+                                    Text(mine ? "我" : "AI 助手").font(.caption).foregroundStyle(.secondary)
+                                    Text(message["content"] as? String ?? "").textSelection(.enabled)
+                                        .padding(12).background(mine ? Color.teal.opacity(0.16) : Color(uiColor: .secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 14))
+                                }.frame(maxWidth: .infinity, alignment: mine ? .trailing : .leading).id(index)
                             }
-                        } label: {
-                            Label(selectedAgent?.text("name") ?? "选择智能体", systemImage: "person.crop.circle")
-                                .lineLimit(1)
-                        }
-                        Spacer()
-                        Button("会话管理", systemImage: "tray.full") {
-                            composerFocused = false
-                            showingSessions = true
-                        }
+                            if busy { ProgressView("正在等待回复…").frame(maxWidth: .infinity, alignment: .leading) }
+                        }.padding()
                     }
-                    .padding(.horizontal)
-                    .padding(.vertical, 10)
-                    .background(.bar)
+                    .scrollDismissesKeyboard(.interactively)
+                    .contentShape(Rectangle())
+                    .simultaneousGesture(TapGesture().onEnded { composerFocused = false })
+                    .onChange(of: messages.count) { _, count in if count > 0 { proxy.scrollTo(count - 1, anchor: .bottom) } }
                 }
-                if let error {
-                    Text(error).foregroundStyle(.red).padding()
-                        .frame(maxWidth: .infinity)
-                        .contentShape(Rectangle())
-                        .onTapGesture { composerFocused = false }
-                }
-                if agents.isEmpty && !busy {
-                    ContentUnavailableView("暂无可用智能体", systemImage: "bubble.left.and.bubble.right", description: Text("请在 Linko Moment 中授权智能体后刷新。"))
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                        .contentShape(Rectangle())
-                        .onTapGesture { composerFocused = false }
-                } else {
-                    ScrollViewReader { proxy in
-                        ScrollView {
-                            LazyVStack(alignment: .leading, spacing: 14) {
-                                ForEach(Array(messages.enumerated()), id: \.offset) { index, message in
-                                    let mine = message["role"] as? String == "user"
-                                    VStack(alignment: mine ? .trailing : .leading, spacing: 4) {
-                                        Text(mine ? "我" : "AI 助手").font(.caption).foregroundStyle(.secondary)
-                                        Text(message["content"] as? String ?? "").textSelection(.enabled)
-                                            .padding(12).background(mine ? Color.teal.opacity(0.16) : Color(uiColor: .secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 14))
-                                    }.frame(maxWidth: .infinity, alignment: mine ? .trailing : .leading).id(index)
-                                }
-                                if busy { ProgressView("正在等待回复…").frame(maxWidth: .infinity, alignment: .leading) }
-                            }.padding()
-                        }
-                        .scrollDismissesKeyboard(.interactively)
-                        .contentShape(Rectangle())
-                        .simultaneousGesture(TapGesture().onEnded { composerFocused = false })
-                        .onChange(of: messages.count) { _, count in if count > 0 { proxy.scrollTo(count - 1, anchor: .bottom) } }
-                    }
-                }
-                HStack(alignment: .bottom) {
-                    TextField("输入消息", text: $draft, axis: .vertical).lineLimit(1...5).textFieldStyle(.roundedBorder)
-                        .focused($composerFocused)
-                    Button("发送", systemImage: "arrow.up.circle.fill") { Task { await send() } }
-                        .labelStyle(.iconOnly).font(.title2)
-                        .disabled(busy || selectedAgent == nil || draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-                }.padding().background(.bar)
             }
-            .navigationTitle("智能体对话")
-            .toolbar {
-                Button("新建对话", systemImage: "plus") { newConversation() }
-                    .disabled(selectedAgent == nil || busy)
-            }
-            .sheet(isPresented: $showingSessions) { sessionManager }
-            .alert("修改会话名称", isPresented: Binding(
-                get: { renamingSessionID != nil },
-                set: { if !$0 { renamingSessionID = nil } }
-            )) {
-                TextField("会话名称", text: $sessionName)
-                Button("取消", role: .cancel) { renamingSessionID = nil }
-                Button("保存") { Task { await renameSession() } }
-            }
-            .task { await load() }
-            .refreshable { await load() }
+            HStack(alignment: .bottom) {
+                TextField("输入消息", text: $draft, axis: .vertical).lineLimit(1...5).textFieldStyle(.roundedBorder)
+                    .focused($composerFocused)
+                Button("发送", systemImage: "arrow.up.circle.fill") { Task { await send() } }
+                    .labelStyle(.iconOnly).font(.title2)
+                    .disabled(busy || selectedAgent == nil || draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+            }.padding().background(.bar)
         }
+        .navigationTitle("智能体对话")
+        .toolbar {
+            Button("新建对话", systemImage: "plus") { newConversation() }
+                .disabled(selectedAgent == nil || busy)
+        }
+        .sheet(isPresented: $showingSessions) { sessionManager }
+        .alert("修改会话名称", isPresented: Binding(
+            get: { renamingSessionID != nil },
+            set: { if !$0 { renamingSessionID = nil } }
+        )) {
+            TextField("会话名称", text: $sessionName)
+            Button("取消", role: .cancel) { renamingSessionID = nil }
+            Button("保存") { Task { await renameSession() } }
+        }
+        .task { await load() }
+        .refreshable { await load() }
     }
 
     private var sessionManager: some View {
