@@ -42,3 +42,7 @@
 此验证证明已缓存请求不要求重选文件，不等同于在真实系统相册完成首次自动扫描、匹配和上传；相册匹配部分的当前证据是正式签名编译、流式哈希检查和实际匹配器的确定性回调测试。wzs 所用 iPhone18,1 的真实相册原件匹配仍未直接验收。
 
 另独立复核 1.2.83/1.2.84 双入口的 16 项历史正式制品在 Atlas 存储中的 SHA-256 和字节数，回收本地历史 IPA/符号包 60,498,571 字节，仅保留必要元数据、发布回执以及当前 1.2.85 正式输出。原生 RTC 共享库仍保留为构建依赖。
+
+## Apple 处理与限流记录
+
+successor 于 08:49 遇到 App Store Connect `apps` 查询 HTTP 429 / RATE_LIMIT_EXCEEDED，Atlas 将该次状态核对记为 failed；Apple 上传 ID `7e1e8328-22eb-4e13-a7e2-837134233f58` 已存在。核对 Atlas 正式恢复契约并等待冷却后，使用同一 attempt 的 refresh 读取原上传任务，恢复为 apple_processing，错误已清空；没有新建 attempt、重传 IPA 或绕过限流。08:52:43 的后续正式读回仍为 UPLOAD_PROCESSING，worker 继续处理，尚未将 successor 宣称为 TestFlight 可见。legacy 已 VALID/testflight_visible 并在测试机安装确认；已就绪入口可独立使用。
