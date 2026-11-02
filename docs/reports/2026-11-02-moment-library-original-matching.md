@@ -46,3 +46,5 @@
 ## Apple 处理与限流记录
 
 successor 于 08:49 遇到 App Store Connect `apps` 查询 HTTP 429 / RATE_LIMIT_EXCEEDED，Atlas 将该次状态核对记为 failed；Apple 上传 ID `7e1e8328-22eb-4e13-a7e2-837134233f58` 已存在。核对 Atlas 正式恢复契约并等待冷却后，使用同一 attempt 的 refresh 读取原上传任务，恢复为 apple_processing，错误已清空；没有新建 attempt、重传 IPA 或绕过限流。08:52:43 的后续正式读回仍为 UPLOAD_PROCESSING，worker 继续处理，尚未将 successor 宣称为 TestFlight 可见。legacy 已 VALID/testflight_visible 并在测试机安装确认；已就绪入口可独立使用。
+
+08:53:53 后续核对再次收到相同 `apps` HTTP 429，successor attempt 当前为 failed（状态查询受限，不能据此判断 Apple 原上传制品失败），尚无 apple_build_id，未确认测试组可见。保留同一 attempt/upload ID 及正式制品，不再高频重复恢复或上传；限流解除后需以同一 attempt 的正式 refresh 恢复核对。此次交付边界为：自动匹配功能实现与检查完成，legacy TestFlight 可见且已安装；successor 分发尚未完成。本任务未改动 Atlas 服务或其他应用的发布任务。
