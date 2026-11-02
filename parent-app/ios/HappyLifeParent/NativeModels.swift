@@ -151,6 +151,7 @@ struct OriginalResourceFingerprint {
     private var length = 0
     private var exceeded = false
     let limit: Int
+    init(limit: Int) { self.limit = limit }
     mutating func append(_ bytes: Data) -> Bool {
         guard !exceeded, bytes.count <= limit - length else { exceeded = true; return false }
         hash.update(data: bytes); length += bytes.count

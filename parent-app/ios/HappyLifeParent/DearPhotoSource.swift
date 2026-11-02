@@ -45,6 +45,9 @@ import UniformTypeIdentifiers
     private var pump: Task<Void, Never>?
     private var cacheTask: Task<Void, Never>?
     private var librarySearch: Task<URL?, Error>?
+    private var localReads: [String: Task<URL?, Never>] = [:]
+    private var legacyLibraryAttempts = Set<String>()
+    private var legacyRead: Task<URL?, Error>?
     private var cachedShares = Set<String>()
     private var cacheRetries: [String: Date] = [:]
     private(set) var currentDeviceID: String?
@@ -93,6 +96,7 @@ import UniformTypeIdentifiers
     }
 
     func stop() {
+        for task in localReads.values { task.cancel() }; localReads.removeAll(); legacyLibraryAttempts.removeAll(); legacyRead?.cancel(); legacyRead = nil
         generation = UUID(); originalsRevision = UUID(); librarySearch?.cancel(); librarySearch = nil; cacheTask?.cancel(); cacheTask = nil; cachedShares.removeAll(); cacheRetries.removeAll(); currentDeviceID = nil; pump?.cancel(); pump = nil; enabledForSession = false
         for task in sourceTasks.values { task.cancel() }; sourceTasks.removeAll()
         let active = Array(transfers.values); transfers.removeAll()
@@ -417,25 +421,94 @@ import UniformTypeIdentifiers
         if sourceTasks.isEmpty { store.photoRequestNotice = nil; store.photoTransferProgress = nil }
     }
 
-    func localOriginal(photoID: String, spaceID: String, activityID: String) async -> URL? {
-        guard let subject = try? await currentSubject(), let root = try? directory(for: subject),
-              let index = try? readIndex(at: root),
-              let photo = index.photos.first(where: { UUID(uuidString: $0.id) == UUID(uuidString: photoID) && UUID(uuidString: $0.spaceID) == UUID(uuidString: spaceID) && UUID(uuidString: $0.activityID) == UUID(uuidString: activityID) }) else { return nil }
+    func isSourceDevice(_ photo: DearRecord) -> Bool {
+        var deviceID = currentDeviceID
+        if deviceID == nil, let subjectCache, let root = try? directory(for: subjectCache) {
+            deviceID = (try? readIndex(at: root))?.deviceID
+        }
+        guard let source = UUID(uuidString: photo.text("sourceDeviceId")),
+              let deviceID, let current = UUID(uuidString: deviceID) else { return false }
+        return source == current
+    }
+
+    // A PhotoKit resource must be materialized to a file for AVPlayer/export. This
+    // reads local bytes only, never creates a download request or relay upload.
+    func localOriginal(photoID: String, spaceID: String, activityID: String, record: DearRecord? = nil) async -> URL? {
+        let expected = generation
+        guard let id = UUID(uuidString: photoID), let tenant = UUID(uuidString: spaceID),
+              let activity = UUID(uuidString: activityID),
+              let subject = try? await currentSubject(), expected == generation,
+              let root = try? directory(for: subject), let index = try? readIndex(at: root) else { return nil }
+        var entry = index.photos.first { UUID(uuidString: $0.id) == id && UUID(uuidString: $0.spaceID) == tenant && UUID(uuidString: $0.activityID) == activity }
+        if entry == nil, let record, record.text("sourceSubject") == subject, isSourceDevice(record),
+           let length = (record.data["length"] as? NSNumber)?.intValue, length > 0 {
+            let sha = record.text("thumbnailRevision")
+            if sha.count == 64, sha.allSatisfy({ $0.isHexDigit }) {
+                entry = SharedPhoto(id: photoID, spaceID: spaceID, activityID: activityID,
+                    fileName: UUID().uuidString + ".original", length: length, sha256: sha,
+                    originalFileName: record.text("originalFileName"))
+            }
+        }
+        guard let photo = entry else { return nil }
         let path = root.appendingPathComponent(photo.fileName)
-        guard (try? path.resourceValues(forKeys: [.fileSizeKey]).fileSize) == photo.length,
-              (try? await hashFile(path)) == photo.sha256 else { return nil }
-        return path
+        if (try? path.resourceValues(forKeys: [.fileSizeKey]).fileSize) == photo.length,
+           (try? await hashFile(path))?.caseInsensitiveCompare(photo.sha256) == .orderedSame,
+           expected == generation { return path }
+        var permission = PHPhotoLibrary.authorizationStatus(for: .readWrite)
+        if permission == .notDetermined { permission = await PHPhotoLibrary.requestAuthorization(for: .readWrite) }
+        guard permission == .authorized || permission == .limited, expected == generation else { return nil }
+        let key = id.uuidString + photo.sha256
+        if let task = localReads[key] { let value = await task.value; return expected == generation ? value : nil }
+        let type = record?.text("contentType") ?? UTType(filenameExtension: photo.originalFileName.map { ($0 as NSString).pathExtension } ?? path.pathExtension)?.preferredMIMEType ?? "image/jpeg"
+        let assetID = photo.assetIdentifier
+        // Older shares did not save a Photos ID. Rebuild that local index once
+        // automatically; subsequent reads go straight to the saved asset ID.
+        let attempt = key + String(describing: permission)
+        guard assetID != nil || legacyLibraryAttempts.insert(attempt).inserted else { return nil }
+        let task = Task<URL?, Never> {
+            let previous = self.legacyRead
+            let search = Task.detached(priority: .utility) {
+                if assetID == nil { _ = try? await previous?.value; try Task.checkCancellation() }
+                if let assetID {
+                    return try await MomentLibraryOriginals.locate(assetIdentifier: assetID, length: photo.length, sha: photo.sha256, contentType: type)
+                }
+                return try await MomentLibraryOriginals.find(length: photo.length, sha: photo.sha256, contentType: type, indexRoot: root) { _, _ in }
+            }
+            if assetID == nil { self.legacyRead = search }
+            do {
+                guard let temporary = try await withTaskCancellationHandler(operation: { try await search.value }, onCancel: { search.cancel() }) else { return nil }
+                defer { try? FileManager.default.removeItem(at: temporary) }
+                try Task.checkCancellation()
+                guard expected == self.generation else { return nil }
+                let local = root.appendingPathComponent(UUID().uuidString + "." + temporary.pathExtension)
+                try FileManager.default.copyItem(at: temporary, to: local)
+                var refreshed = try self.readIndex(at: root)
+                refreshed.photos.removeAll { UUID(uuidString: $0.id) == id && UUID(uuidString: $0.spaceID) == tenant && UUID(uuidString: $0.activityID) == activity }
+                let restoredID = assetID ?? MomentLibraryOriginals.indexedAssetIdentifier(length: photo.length, sha: photo.sha256, indexRoot: root)
+                refreshed.photos.append(SharedPhoto(id: photoID, spaceID: spaceID, activityID: activityID,
+                    fileName: local.lastPathComponent, length: photo.length, sha256: photo.sha256,
+                    assetIdentifier: restoredID, originalFileName: photo.originalFileName))
+                do { try self.writeIndex(refreshed, at: root) }
+                catch { try? FileManager.default.removeItem(at: local); throw error }
+                return local
+            } catch { return nil }
+        }
+        localReads[key] = task
+        let result = await task.value
+        if expected == generation { localReads.removeValue(forKey: key) }
+        return expected == generation ? result : nil
     }
 
     func availableOriginal(photo: DearRecord, spaceID: String, activityID: String) async -> URL? {
-        guard let subject = try? await currentSubject(),
+        let expected = generation
+        guard let subject = try? await currentSubject(), expected == generation,
               UUID(uuidString: photo.id) != nil, UUID(uuidString: spaceID) != nil, UUID(uuidString: activityID) != nil,
               let length = (photo.data["length"] as? NSNumber)?.intValue, length > 0 else { return nil }
         let sha = photo.text("thumbnailRevision")
         guard sha.count == 64, sha.allSatisfy({ $0.isHexDigit }) else { return nil }
-        if let local = await localOriginal(photoID: photo.id, spaceID: spaceID, activityID: activityID),
+        if let local = await localOriginal(photoID: photo.id, spaceID: spaceID, activityID: activityID, record: photo),
            (try? local.resourceValues(forKeys: [.fileSizeKey]).fileSize) == length,
-           (try? await hashFile(local))?.caseInsensitiveCompare(sha) == .orderedSame { return local }
+           (try? await hashFile(local))?.caseInsensitiveCompare(sha) == .orderedSame, expected == generation { return local }
         let subjectKey = SHA256.hash(data: Data(subject.utf8)).map { String(format: "%02x", $0) }.joined()
         let root = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)[0]
             .appendingPathComponent("DearReceivedPhotos").appendingPathComponent(subjectKey)
@@ -443,7 +516,7 @@ import UniformTypeIdentifiers
         for file in (try? FileManager.default.contentsOfDirectory(at: root, includingPropertiesForKeys: [.fileSizeKey])) ?? [] {
             guard file.lastPathComponent.hasPrefix(prefix), file.pathExtension != "part",
                   (try? file.resourceValues(forKeys: [.fileSizeKey]).fileSize) == length,
-                  (try? await hashFile(file))?.caseInsensitiveCompare(sha) == .orderedSame else { continue }
+                  (try? await hashFile(file))?.caseInsensitiveCompare(sha) == .orderedSame, expected == generation else { continue }
             return file
         }
         return nil
@@ -511,6 +584,12 @@ import UniformTypeIdentifiers
             guard (try? candidate.resourceValues(forKeys: [.fileSizeKey]).fileSize) == length else { continue }
             if (try? await hashFile(candidate))?.caseInsensitiveCompare(sha) == .orderedSame { original = candidate; break }
         }
+        if original == nil, selectedFile == nil {
+            var metadata = request
+            metadata["id"] = photoID; metadata["sourceSubject"] = subject
+            metadata["sourceDeviceId"] = deviceID; metadata["thumbnailRevision"] = sha
+            original = await localOriginal(photoID: photoID, spaceID: spaceID, activityID: activityID, record: DearRecord(data: metadata))
+        }
         var libraryOriginal: URL?
         defer { if let libraryOriginal { try? FileManager.default.removeItem(at: libraryOriginal) } }
         let authorization = PHPhotoLibrary.authorizationStatus(for: .readWrite)
@@ -561,18 +640,23 @@ import UniformTypeIdentifiers
         }
         // Reload after asynchronous work so a concurrent share cannot lose its index.
         var index = try readIndex(at: root)
+        let restoredAssetID = index.photos.first { UUID(uuidString: $0.id) == UUID(uuidString: photoID) }?.assetIdentifier
         index.photos.removeAll { UUID(uuidString: $0.id) == UUID(uuidString: photoID) }
-        index.photos.append(SharedPhoto(id: photoID, spaceID: spaceID, activityID: activityID, fileName: local.lastPathComponent, length: length, sha256: sha, assetIdentifier: assetID, originalFileName: recorded?.originalFileName ?? request["fileName"] as? String))
+        index.photos.append(SharedPhoto(id: photoID, spaceID: spaceID, activityID: activityID, fileName: local.lastPathComponent, length: length, sha256: sha, assetIdentifier: assetID ?? restoredAssetID, originalFileName: recorded?.originalFileName ?? request["fileName"] as? String))
         try writeIndex(index, at: root)
         cachedShares.insert(photoID + sha)
         return true
     }
 
-    func downloadOriginal(photoID: String, spaceID: String, activityID: String,
+    func downloadOriginal(photoID: String, spaceID: String, activityID: String, record: DearRecord? = nil,
                           status: ((String) -> Void)? = nil, progress: ((Double) -> Void)? = nil) async throws -> URL {
         guard UUID(uuidString: photoID) != nil, UUID(uuidString: spaceID) != nil,
               UUID(uuidString: activityID) != nil else { throw APIError.message("照片标识无效。") }
-        if let local = await localOriginal(photoID: photoID, spaceID: spaceID, activityID: activityID) { return local }
+        if let record, let local = await availableOriginal(photo: record, spaceID: spaceID, activityID: activityID) { progress?(1); return local }
+        if record == nil, let local = await localOriginal(photoID: photoID, spaceID: spaceID, activityID: activityID) { progress?(1); return local }
+        if let record, isSourceDevice(record) {
+            throw APIError.message("这是本机分享的文件。请允许访问对应相册原件；若原件仅在 iCloud，请先在系统照片中打开使其保留在本机。无需向自己请求下载或手动匹配。")
+        }
         guard let store, store.identity.isAuthenticated else { throw APIError.message("请先登录用户中心。") }
         guard !downloads.contains(photoID) else { throw APIError.message("该原文件正在接收，请稍候。") }
         downloads.insert(photoID)
@@ -760,12 +844,14 @@ import UniformTypeIdentifiers
     }
 
     private func currentSubject() async throws -> String {
+        let expected = generation
         if let subjectCache, store?.identity.isAuthenticated == true { return subjectCache }
         guard let store, store.identity.isAuthenticated,
               let me = try await store.call("/api/dear/social/me") as? [String: Any],
               let subject = me["subject"] as? String, !subject.isEmpty else {
             throw APIError.message("请先在 iPhone 上登录 Linko Moment。")
         }
+        guard expected == generation else { throw CancellationError() }
         subjectCache = subject
         return subject
     }
@@ -871,18 +957,14 @@ import UniformTypeIdentifiers
                 guard UUID(uuidString: requestID) != nil, request["transport"] as? String == "connect-datachannel-v1",
                       sourceTasks[requestID] == nil, sourceTasks.count < 2 else { continue }
                 let photoID = request["photoId"] as? String ?? ""
-                guard let photo = index.photos.first(where: { UUID(uuidString: $0.id) == UUID(uuidString: photoID) }),
-                      UUID(uuidString: photo.spaceID) == UUID(uuidString: request["tenantId"] as? String ?? ""),
-                      UUID(uuidString: photo.activityID) == UUID(uuidString: request["activityId"] as? String ?? ""),
-                      photo.length == (request["length"] as? Int),
-                      photo.sha256.caseInsensitiveCompare(request["sha256"] as? String ?? "") == .orderedSame else {
-                    store.photoRequestNotice = "本机原件暂不可用，请打开请求消息恢复原件。"
-                    continue
-                }
-                let path = root.appendingPathComponent(photo.fileName)
-                guard (try? path.resourceValues(forKeys: [.fileSizeKey]).fileSize) == photo.length,
-                      (try? await hashFile(path)) == photo.sha256 else {
-                    store.photoRequestNotice = "本机原件暂不可用，请打开请求消息恢复原件。"
+                guard request["sourceSubject"] as? String == subject,
+                      UUID(uuidString: request["deviceId"] as? String ?? "") == UUID(uuidString: deviceID) else { continue }
+                var metadata = request
+                metadata["id"] = photoID; metadata["sourceDeviceId"] = deviceID
+                metadata["thumbnailRevision"] = request["sha256"]
+                guard let tenant = request["tenantId"] as? String, let activity = request["activityId"] as? String,
+                      let path = await availableOriginal(photo: DearRecord(data: metadata), spaceID: tenant, activityID: activity) else {
+                    store.photoRequestNotice = "暂时无法读取本机原件，请检查相册访问权限及原件是否保留在本机。"
                     continue
                 }
                 let expectedGeneration = generation
@@ -1200,6 +1282,13 @@ private enum MomentLibraryOriginals {
             } catch { try? FileManager.default.removeItem(at: copy); throw error }
         }
         return nil
+    }
+
+    static func indexedAssetIdentifier(length: Int, sha: String, indexRoot: URL) -> String? {
+        let path = indexRoot.appendingPathComponent("library-fingerprints.json")
+        guard let data = try? Data(contentsOf: path),
+              let fingerprints = try? JSONDecoder().decode([String: OriginalResourceDigest].self, from: data) else { return nil }
+        return fingerprints.first { $0.value.matches(length: length, sha256: sha) }?.key.components(separatedBy: "|").first
     }
 
     static func find(length: Int, sha: String, contentType: String, indexRoot: URL,

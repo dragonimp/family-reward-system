@@ -169,6 +169,14 @@ extension DearPhotoLocation {
 }
 
 private enum PhotoDisplayImage {
+    static func preview(_ url: URL, isVideo: Bool) async throws -> UIImage {
+        if !isVideo { return try await load(url) }
+        let generator = AVAssetImageGenerator(asset: AVURLAsset(url: url))
+        generator.appliesPreferredTrackTransform = true
+        generator.maximumSize = CGSize(width: 2048, height: 2048)
+        let result = try await generator.image(at: .zero)
+        return UIImage(cgImage: result.image)
+    }
     static func load(_ url: URL) async throws -> UIImage {
         try await Task.detached(priority: .utility) {
             guard let source = CGImageSourceCreateWithURL(url as CFURL, [kCGImageSourceShouldCache: false] as CFDictionary),
@@ -528,8 +536,6 @@ struct DearSocialView: View {
         nonmutating set { batchProgress.updateProgress(newValue) }
     }
     @State private var batchDownloading = false
-    @State private var matchingOriginals = false
-    @State private var matchingStatus = ""
     @State private var batchDeleting = false
     @State private var showingBatchDelete = false
     @State private var photoToDelete: DearRecord?
@@ -1220,19 +1226,6 @@ struct DearSocialView: View {
         }
     }
 
-    private func matchSharedOriginals() async {
-        matchingOriginals = true
-        defer { matchingOriginals = false }
-        do {
-            matchingStatus = try await store.photoSource.recoverAllMyOriginals { value in
-                matchingStatus = value; notice = value
-            }
-            notice = matchingStatus
-            try await loadPhotos()
-        } catch is CancellationError { }
-        catch { self.error = error.localizedDescription }
-    }
-
     private var activityActions: some View {
                 Menu {
                     if let url = URL(string: "https://happylife.ai.impx.net/api/dear/public/activities/\(activityTenantId)/\(activityId)") {
@@ -1246,10 +1239,6 @@ struct DearSocialView: View {
                         selectingPhotoDownloads.toggle(); selectedPhotoIDs.removeAll(); batchOriginalURLs = []; batchDownloadError = ""; batchDownloadProgress = 0
                     } label: { Label(selectingPhotoDownloads ? "完成多选" : "批量下载或删除", systemImage: "checkmark.circle") }
                         .disabled(photos.isEmpty || batchDownloading || batchDeleting)
-                    Button {
-                        Task { await matchSharedOriginals() }
-                    } label: { Label(matchingOriginals ? matchingStatus : "匹配我分享的全部活动原图", systemImage: "photo.badge.checkmark") }
-                        .disabled(matchingOriginals || busy || batchDownloading || batchDeleting)
                     Button { showingPhotoLocation = true } label: { Label("照片默认地点", systemImage: "mappin") }
                     Divider()
                     Button { momentDraft = ""; momentRequestID = UUID(); error = ""; showingMomentCreate = true } label: { Label("写日常", systemImage: "square.and.pencil") }
@@ -1558,7 +1547,7 @@ struct DearSocialView: View {
         for (index, photo) in selected.enumerated() {
             do {
                 let url = try await store.photoSource.downloadOriginal(photoID: photo.id,
-                    spaceID: targetSpace, activityID: targetActivity) { fraction in
+                    spaceID: targetSpace, activityID: targetActivity, record: photo) { fraction in
                     batchDownloadProgress = (Double(index) + fraction) / Double(selected.count)
                 }
                 batchOriginalURLs.append(url)
@@ -1809,9 +1798,9 @@ private struct DearPhotoPreview: View {
         .task(id: path + photo.text("thumbnailRevision") + source.originalsRevision.uuidString) {
             do {
                 let parts = path.split(separator: "/").map(String.init)
-                if parts.count == 10, !photo.text("contentType").hasPrefix("video/"),
+                if parts.count == 10,
                    let local = await source.availableOriginal(photo: photo, spaceID: parts[4], activityID: parts[6]),
-                   let original = try? await PhotoDisplayImage.load(local) {
+                   let original = try? await PhotoDisplayImage.preview(local, isVideo: photo.text("contentType").hasPrefix("video/")) {
                     try Task.checkCancellation(); image = original; failed = false; return
                 }
                 let preview = try await store.authenticatedImage(path)
@@ -2030,7 +2019,10 @@ private struct DearPhotoDetailView: View {
                 }
                 Text("分享者：\(photo.text("sourceDisplayName"))").font(.subheadline).foregroundStyle(.secondary)
                 Label(store.photoSource.deviceDescription(photo.data), systemImage: "iphone").font(.caption).foregroundStyle(.secondary)
-                Text((serverCacheReady ?? photo.flag("serverCached")) ? "服务器已缓存，可在共享设备离线时获取" : "服务器尚未缓存，获取原件需等待共享设备上线").font(.caption).foregroundStyle(.secondary)
+                if store.photoSource.isSourceDevice(photo) {
+                    Text(originalURL != nil ? "正在使用本机原件" : "正在读取本机相册原件")
+                        .font(.caption).foregroundStyle(.secondary)
+                } else { Text((serverCacheReady ?? photo.flag("serverCached")) ? "服务器已缓存，可在共享设备离线时获取" : "服务器尚未缓存，获取原件需等待共享设备上线").font(.caption).foregroundStyle(.secondary) }
                 Text("分享时间：\(photo.dateText("createdAt"))").font(.subheadline).foregroundStyle(.secondary)
                 DearPhotoPlaceView(photo: photo).font(.subheadline).foregroundStyle(.secondary)
                 if let originalURL {
@@ -2042,6 +2034,9 @@ private struct DearPhotoDetailView: View {
                             Label("分享原文件", systemImage: "square.and.arrow.up")
                         }
                     }
+                } else if store.photoSource.isSourceDevice(photo) {
+                    if fetchingOriginal { ProgressView("正在读取本机原件") }
+                    else { Button("重新读取相册原件") { Task { await fetchOriginal() } } }
                 } else {
                     Button {
                         Task { await fetchOriginal() }
@@ -2058,8 +2053,10 @@ private struct DearPhotoDetailView: View {
                 if canDelete {
                     Button("删除分享", role: .destructive) { showingDelete = true }.disabled(deleting)
                 }
-                Text("原文件可从共享设备或服务器缓存获取。服务器最多缓存 1 GB，较久未使用的文件可能被淘汰；未缓存时需等待共享设备上线。")
-                    .font(.footnote).foregroundStyle(.secondary)
+                if !store.photoSource.isSourceDevice(photo) {
+                    Text("原文件可从共享设备或服务器缓存获取。服务器最多缓存 1 GB，较久未使用的文件可能被淘汰；未缓存时需等待共享设备上线。")
+                        .font(.footnote).foregroundStyle(.secondary)
+                }
             }
             .frame(maxWidth: .infinity)
             .padding()
@@ -2094,25 +2091,26 @@ private struct DearPhotoDetailView: View {
             else if let loaded = try? await PhotoDisplayImage.load(originalURL), !Task.isCancelled { originalImage = loaded }
             return
         }
-        if isVideo, let local = await store.photoSource.localOriginal(photoID: photo.id, spaceID: spaceID, activityID: activityID) {
+        if let local = await store.photoSource.availableOriginal(photo: photo, spaceID: spaceID, activityID: activityID), !Task.isCancelled {
             originalURL = local
-            player = AVPlayer(url: local)
+            if isVideo { player = AVPlayer(url: local) }
+            else { originalImage = try? await PhotoDisplayImage.load(local) }
             return
+        }
+        if Task.isCancelled { return }
+        if store.photoSource.isSourceDevice(photo) {
+            originalError = "无法读取本机原件。请允许访问对应相册；若原件只在 iCloud，请先在系统照片中打开。无需向自己下载或手动匹配。"
         }
         do { let loaded = try await store.authenticatedImage(path); if !Task.isCancelled { image = loaded } }
         catch is CancellationError { }
-        catch {
-            if let local = await store.photoSource.localOriginal(photoID: photo.id, spaceID: spaceID, activityID: activityID),
-               let localImage = try? await PhotoDisplayImage.load(local) { if !Task.isCancelled { image = localImage } }
-            else if !Task.isCancelled { self.error = error.localizedDescription }
-        }
+        catch { if !Task.isCancelled { self.error = error.localizedDescription } }
     }
 
     private func fetchOriginal() async {
-        fetchingOriginal = true; transferProgress = 0; originalError = nil; downloadStatus = "正在创建下载请求…"
+        fetchingOriginal = true; transferProgress = 0; originalError = nil; downloadStatus = store.photoSource.isSourceDevice(photo) ? "正在读取本机原件…" : "正在创建下载请求…"
         defer { fetchingOriginal = false }
         do {
-            let url = try await store.photoSource.downloadOriginal(photoID: photo.id, spaceID: spaceID, activityID: activityID, status: { downloadStatus = $0 }) {
+            let url = try await store.photoSource.downloadOriginal(photoID: photo.id, spaceID: spaceID, activityID: activityID, record: photo, status: { downloadStatus = $0 }) {
                 downloadStatus = "正在接收原文件"; transferProgress = max(transferProgress, $0)
             }
             if !isVideo {
