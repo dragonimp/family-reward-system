@@ -232,10 +232,11 @@ private struct DearPickedVideo: Transferable {
 
 private struct DearPickedOriginal: Transferable {
     let url: URL
+    let originalFileName: String
     private static func copy(_ received: ReceivedTransferredFile) throws -> Self {
         let path = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + "." + received.file.pathExtension)
         try FileManager.default.copyItem(at: received.file, to: path)
-        return Self(url: path)
+        return Self(url: path, originalFileName: received.file.lastPathComponent)
     }
     static var transferRepresentation: some TransferRepresentation {
         FileRepresentation(importedContentType: .image) { try copy($0) }
@@ -1191,19 +1192,17 @@ struct DearSocialView: View {
                 var failures: [String] = []
                 for (index, item) in selected.enumerated() {
                     do {
+                        guard let file = try await item.loadTransferable(type: DearPickedOriginal.self) else { throw APIError.message("无法读取所选原文件。") }
+                        defer { try? FileManager.default.removeItem(at: file.url) }
+                        let name = DearPhotoSource.originalFileName(assetIdentifier: item.itemIdentifier, fallback: file.originalFileName)
                         if item.supportedContentTypes.contains(where: { $0.conforms(to: .movie) }) {
-                            guard let video = try await item.loadTransferable(type: DearPickedVideo.self) else {
-                                throw APIError.message("无法读取所选视频。")
-                            }
-                            defer { try? FileManager.default.removeItem(at: video.url) }
-                            try await store.photoSource.publishVideo(at: video.url, spaceID: targetSpace, activityID: targetActivity, locationName: photoLocationName)
+                            try await store.photoSource.publishVideo(at: file.url, spaceID: targetSpace, activityID: targetActivity,
+                                locationName: photoLocationName, name: name, assetIdentifier: item.itemIdentifier)
                         } else {
-                            guard let data = try await item.loadTransferable(type: Data.self) else {
-                                throw APIError.message("无法读取所选照片。")
-                            }
+                            let data = try await Task.detached(priority: .utility) { try Data(contentsOf: file.url) }.value
                             let embedded = DearPhotoLocation.label(for: item, data: data)
                             try await store.photoSource.publish(data, spaceID: targetSpace, activityID: targetActivity,
-                                                                name: "iPhone照片", locationName: embedded ?? photoLocationName)
+                                name: name, locationName: embedded ?? photoLocationName, assetIdentifier: item.itemIdentifier)
                         }
                         completed += 1
                     } catch {
@@ -2159,22 +2158,12 @@ struct MomentNotificationInbox: View {
     @ObservedObject var store: FamilyStore
     @ObservedObject var notifications: MomentNotifications
     @Environment(\.dismiss) private var dismiss
+    @State private var confirmDeleteAll = false
     var body: some View {
         NavigationStack {
             List {
                 if !notifications.error.isEmpty { Section { Text(notifications.error).foregroundStyle(.red) } }
                 if !notifications.pushRegistrationError.isEmpty { Section { Text(notifications.pushRegistrationError).foregroundStyle(.red) } }
-                Section {
-                    HStack {
-                        Button(notifications.enableButtonTitle) { Task { await notifications.enable() } }
-                            .disabled(notifications.enabling || notifications.registering)
-                        if notifications.enabling || notifications.registering { Spacer(); ProgressView() }
-                    }
-                    Text(notifications.notificationStatus).font(.footnote).foregroundStyle(.secondary)
-                    Button("系统通知设置") { notifications.openSettings() }.font(.footnote)
-                    Text("下载请求会发送给共享者。原文件保存在共享设备上，传输时请保持该设备的应用打开。")
-                        .font(.footnote).foregroundStyle(.secondary)
-                }
                 Section("请求与消息 · 未读 \(notifications.unreadCount)") {
                     ForEach(notifications.items) { item in
                         NavigationLink {
@@ -2192,7 +2181,25 @@ struct MomentNotificationInbox: View {
                 }
             }
             .navigationTitle("消息通知")
-            .toolbar { ToolbarItem(placement: .topBarTrailing) { Button("完成") { dismiss() } } }
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItemGroup(placement: .topBarLeading) {
+                    Button("全部已读", systemImage: "checkmark.circle") { Task { await notifications.markAllRead() } }
+                        .labelStyle(.iconOnly).disabled(notifications.unreadCount == 0 || notifications.editingInbox)
+                    Button("全部删除", systemImage: "trash", role: .destructive) { confirmDeleteAll = true }
+                        .labelStyle(.iconOnly).disabled(notifications.items.isEmpty || notifications.editingInbox)
+                    Menu {
+                        Button(notifications.enableButtonTitle) { Task { await notifications.enable() } }
+                            .disabled(notifications.enabling || notifications.registering)
+                        Button("系统通知设置", systemImage: "gearshape") { notifications.openSettings() }
+                    } label: { Image(systemName: "ellipsis.circle").accessibilityLabel("消息操作与设置") }
+                }
+                ToolbarItem(placement: .topBarTrailing) { Button("完成") { dismiss() } }
+            }
+            .confirmationDialog("删除当前账号的全部应用消息？", isPresented: $confirmDeleteAll, titleVisibility: .visible) {
+                Button("全部删除", role: .destructive) { Task { await notifications.deleteAll() } }
+                Button("取消", role: .cancel) { }
+            } message: { Text("仅删除消息，原图下载请求和活动照片保留。") }
             .refreshable { await notifications.reload() }
             .task { await notifications.reload() }
             .navigationDestination(isPresented: Binding(get: { notifications.selectedMessageID != nil && !notifications.items.isEmpty }, set: { if !$0 { notifications.selectedMessageID = nil } })) {
@@ -2245,6 +2252,7 @@ private struct MomentNotificationDetail: View {
             }
             if requestID != nil {
                 Section("原文件下载请求") {
+                    if let request, !request.text("activityTitle").isEmpty { Label(request.text("activityTitle"), systemImage: "calendar") }
                     if let request {
                         if let photo = request.data["photo"] as? [String: Any], let requestID {
                             NavigationLink {
@@ -2298,7 +2306,7 @@ private struct MomentNotificationDetail: View {
                             Label("选择本机原文件继续分享", systemImage: "photo.on.rectangle")
                         }.disabled(recovering || refreshing)
                         if recovering { ProgressView(recoveryStatus) }
-                        Text("先匹配 App 内原件，再自动匹配已授权的本机相册。只核验并共享完全一致的原件，不下载整库云端照片；仅允许部分照片时，只匹配已允许的范围。")
+                        Text("请求时按已保存的副本或相册标识直接定位。只有主动恢复时才扫描已授权范围；原件始终按文件大小和 SHA-256 校验。")
                             .font(.footnote).foregroundStyle(.secondary)
                     }
                 }
@@ -2321,7 +2329,7 @@ private struct MomentNotificationDetail: View {
                 do {
                     guard let file = try await item.loadTransferable(type: DearPickedOriginal.self), let request else { throw APIError.message("无法读取所选原文件。") }
                     defer { try? FileManager.default.removeItem(at: file.url) }
-                    _ = try await store.photoSource.restoreOriginal(for: request.data, selectedFile: file.url)
+                    _ = try await store.photoSource.restoreOriginal(for: request.data, selectedFile: file.url, selectedAssetIdentifier: item.itemIdentifier)
                     await loadRequest()
                 } catch { self.error = error.localizedDescription }
             }
@@ -2332,7 +2340,7 @@ private struct MomentNotificationDetail: View {
         recovering = true; defer { recovering = false }
         do {
             error = ""; recoveryStatus = "正在核验本机原件…"
-            let restored = try await store.photoSource.restoreOriginal(for: request.data) { recoveryStatus = $0 }
+            let restored = try await store.photoSource.restoreOriginal(for: request.data, allowLibraryScan: !silent) { recoveryStatus = $0 }
             if restored { await loadRequest() }
             else if !silent { error = "在 App 和已授权的本机相册中未匹配到一致原件。云端原件需先下载到本机；也可手动选择原文件。" }
         } catch is CancellationError { }

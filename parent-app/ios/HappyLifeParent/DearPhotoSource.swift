@@ -21,6 +21,8 @@ import UniformTypeIdentifiers
         let fileName: String
         let length: Int
         let sha256: String
+        var assetIdentifier: String? = nil
+        var originalFileName: String? = nil
     }
     private struct Index: Codable {
         var deviceID: String?
@@ -211,7 +213,19 @@ import UniformTypeIdentifiers
         } catch { }
     }
 
-    func publish(_ imageData: Data, spaceID: String, activityID: String, name: String, locationName: String = "") async throws {
+    static func originalFileName(assetIdentifier: String?, fallback: String) -> String {
+        if let assetIdentifier, let asset = PHAsset.fetchAssets(withLocalIdentifiers: [assetIdentifier], options: nil).firstObject,
+           let resource = PHAssetResource.assetResources(for: asset).first(where: { $0.type == .photo || $0.type == .video }),
+           !resource.originalFilename.isEmpty { return String(resource.originalFilename.prefix(200)) }
+        let file = URL(fileURLWithPath: fallback).lastPathComponent
+        let stem = URL(fileURLWithPath: file).deletingPathExtension().lastPathComponent
+        if !stem.isEmpty && UUID(uuidString: stem) == nil && !["照片", "视频", "iPhone照片", "iPhone视频", "相机照片", "image", "photo"].contains(stem) { return String(file.prefix(200)) }
+        let formatter = DateFormatter(); formatter.dateFormat = "yyyyMMdd-HHmmss"
+        let suffix = URL(fileURLWithPath: file).pathExtension
+        return "\(["mov", "mp4"].contains(suffix.lowercased()) ? "视频" : "照片")-\(formatter.string(from: Date()))-\(UUID().uuidString.prefix(6))" + (suffix.isEmpty ? "" : "." + suffix)
+    }
+
+    func publish(_ imageData: Data, spaceID: String, activityID: String, name: String, locationName: String = "", assetIdentifier: String? = nil) async throws {
         guard imageData.count > 0, imageData.count <= 50 * 1024 * 1024,
               UIImage(data: imageData) != nil else { throw APIError.message("照片文件无效或超过 50 MB。") }
         guard let source = CGImageSourceCreateWithData(imageData as CFData, nil),
@@ -227,18 +241,18 @@ import UniformTypeIdentifiers
         try await Task.detached(priority: .utility) { try imageData.write(to: temporary, options: .atomic) }.value
         defer { try? FileManager.default.removeItem(at: temporary) }
         let fileName = name.contains(".") ? name : name + "." + format.ext
-        try await publishMedia(at: temporary, contentType: format.mime, spaceID: spaceID, activityID: activityID, name: fileName, locationName: locationName)
+        try await publishMedia(at: temporary, contentType: format.mime, spaceID: spaceID, activityID: activityID, name: fileName, locationName: locationName, assetIdentifier: assetIdentifier)
     }
 
-    func publishVideo(at url: URL, spaceID: String, activityID: String, locationName: String = "") async throws {
+    func publishVideo(at url: URL, spaceID: String, activityID: String, locationName: String = "", name: String? = nil, assetIdentifier: String? = nil) async throws {
         let length = try url.resourceValues(forKeys: [.fileSizeKey]).fileSize ?? 0
         guard (1...500 * 1024 * 1024).contains(length) else { throw APIError.message("视频必须在 500 MB 以内。") }
         let type = url.pathExtension.lowercased() == "mp4" ? "video/mp4" : "video/quicktime"
-        let name = type == "video/mp4" ? "iPhone视频.mp4" : "iPhone视频.mov"
-        try await publishMedia(at: url, contentType: type, spaceID: spaceID, activityID: activityID, name: name, locationName: locationName)
+        let fileName = name ?? Self.originalFileName(assetIdentifier: assetIdentifier, fallback: "视频." + (type == "video/mp4" ? "mp4" : "mov"))
+        try await publishMedia(at: url, contentType: type, spaceID: spaceID, activityID: activityID, name: fileName, locationName: locationName, assetIdentifier: assetIdentifier)
     }
 
-    private func publishMedia(at sourceURL: URL, contentType: String, spaceID: String, activityID: String, name: String, locationName: String) async throws {
+    private func publishMedia(at sourceURL: URL, contentType: String, spaceID: String, activityID: String, name: String, locationName: String, assetIdentifier: String? = nil) async throws {
         guard !publishing else { throw APIError.message("另一张照片正在共享，请稍后重试。") }
         publishing = true
         defer { publishing = false }
@@ -297,7 +311,7 @@ import UniformTypeIdentifiers
             }
             publishedID = photoID
             index.photos.append(SharedPhoto(id: photoID, spaceID: spaceID, activityID: activityID,
-                                            fileName: localName, length: length, sha256: sha))
+                                            fileName: localName, length: length, sha256: sha, assetIdentifier: assetIdentifier, originalFileName: displayName))
             try writeIndex(index, at: root)
             do {
                 try await uploadThumbnail(thumbnail, prefix: prefix, photoID: photoID, revision: sha)
@@ -461,7 +475,7 @@ import UniformTypeIdentifiers
                 request["serverCached"] = false
                 request["sha256"] = photo.text("thumbnailRevision"); request["canStop"] = true; request["status"] = "waiting"
                 do {
-                    if try await restoreOriginal(for: request, status: status) { matched += 1 } else { missing += 1 }
+                    if try await restoreOriginal(for: request, allowLibraryScan: true, status: status) { matched += 1 } else { missing += 1 }
                 } catch is CancellationError { throw CancellationError() }
                 catch { failed += 1 }
             }
@@ -471,7 +485,7 @@ import UniformTypeIdentifiers
 
     // Recover only this account's verified bytes, never infer physical ownership
     // from the username or claim an unrelated item from the system photo library.
-    func restoreOriginal(for request: [String: Any], selectedFile: URL? = nil, status: ((String) -> Void)? = nil) async throws -> Bool {
+    func restoreOriginal(for request: [String: Any], selectedFile: URL? = nil, selectedAssetIdentifier: String? = nil, allowLibraryScan: Bool = false, status: ((String) -> Void)? = nil) async throws -> Bool {
         guard request["canStop"] as? Bool == true, request["status"] as? String == "waiting",
               request["serverCached"] as? Bool != true else { return false }
         guard store != nil, let photoID = request["photoId"] as? String, UUID(uuidString: photoID) != nil,
@@ -483,7 +497,14 @@ import UniformTypeIdentifiers
         let subject = try await currentSubject(), root = try directory(for: subject)
         if !enabledForSession { await enableExistingDevice() }
         guard let deviceID = currentDeviceID else { throw APIError.message("本机共享设备登记失败，请稍后重试。") }
-        let candidates = selectedFile.map { [$0] } ?? ((try? FileManager.default.contentsOfDirectory(at: root, includingPropertiesForKeys: [.fileSizeKey])) ?? [])
+        let recorded = try readIndex(at: root).photos.first {
+            UUID(uuidString: $0.id) == UUID(uuidString: photoID) && UUID(uuidString: $0.spaceID) == UUID(uuidString: spaceID) && UUID(uuidString: $0.activityID) == UUID(uuidString: activityID)
+        }
+        let recordedURL = recorded.map { root.appendingPathComponent($0.fileName) }
+        var candidates = selectedFile.map { [$0] } ?? recordedURL.map { [$0] } ?? []
+        if allowLibraryScan && selectedFile == nil {
+            candidates += (try? FileManager.default.contentsOfDirectory(at: root, includingPropertiesForKeys: [.fileSizeKey])) ?? []
+        }
         var original: URL?
         for candidate in candidates {
             try Task.checkCancellation()
@@ -493,7 +514,15 @@ import UniformTypeIdentifiers
         var libraryOriginal: URL?
         defer { if let libraryOriginal { try? FileManager.default.removeItem(at: libraryOriginal) } }
         let authorization = PHPhotoLibrary.authorizationStatus(for: .readWrite)
-        if original == nil, selectedFile == nil, authorization == .authorized || authorization == .limited {
+        let assetID = selectedAssetIdentifier ?? recorded?.assetIdentifier
+        if original == nil, let assetID, authorization == .authorized || authorization == .limited {
+            let type = request["contentType"] as? String ?? ""
+            libraryOriginal = try await Task.detached(priority: .utility) {
+                try await MomentLibraryOriginals.locate(assetIdentifier: assetID, length: length, sha: sha, contentType: type)
+            }.value
+            original = libraryOriginal
+        }
+        if allowLibraryScan, original == nil, selectedFile == nil, authorization == .authorized || authorization == .limited {
             guard librarySearch == nil else { throw APIError.message("正在自动匹配其他原件，请稍后重试。") }
             let type = request["contentType"] as? String ?? ""
             let search = Task.detached(priority: .utility) {
@@ -533,7 +562,7 @@ import UniformTypeIdentifiers
         // Reload after asynchronous work so a concurrent share cannot lose its index.
         var index = try readIndex(at: root)
         index.photos.removeAll { UUID(uuidString: $0.id) == UUID(uuidString: photoID) }
-        index.photos.append(SharedPhoto(id: photoID, spaceID: spaceID, activityID: activityID, fileName: local.lastPathComponent, length: length, sha256: sha))
+        index.photos.append(SharedPhoto(id: photoID, spaceID: spaceID, activityID: activityID, fileName: local.lastPathComponent, length: length, sha256: sha, assetIdentifier: assetID, originalFileName: recorded?.originalFileName ?? request["fileName"] as? String))
         try writeIndex(index, at: root)
         cachedShares.insert(photoID + sha)
         return true
@@ -902,6 +931,7 @@ import UniformTypeIdentifiers
     @Published var authorizationStatus: UNAuthorizationStatus = .notDetermined
     @Published var enabling = false
     @Published var registering = false
+    @Published var editingInbox = false
     @Published var showingInbox = false
     @Published var selectedMessageID: Int64?
     private var generation = UUID()
@@ -1064,6 +1094,22 @@ import UniformTypeIdentifiers
             if expected == generation { await reload() }
         } catch { if expected == generation { self.error = "标记已读失败，请重试。" } }
     }
+    func markAllRead() async {
+        guard !editingInbox else { return }
+        let expected = generation; editingInbox = true
+        defer { if expected == generation { editingInbox = false } }
+        do { try await configuredClient().markAllRead(); if expected == generation { await reload() } }
+        catch { if expected == generation { self.error = "全部已读未完成，请重试。" } }
+    }
+    func deleteAll() async {
+        guard !editingInbox else { return }
+        let expected = generation; editingInbox = true
+        defer { if expected == generation { editingInbox = false } }
+        do {
+            try await configuredClient().deleteAll()
+            if expected == generation { selectedMessageID = nil; await reload() }
+        } catch { if expected == generation { self.error = "全部删除未完成，请重试。" } }
+    }
     func open(messageID: Int64? = nil) {
         selectedMessageID = messageID; showingInbox = true
         guard store?.identity.isAuthenticated == true else { return }
@@ -1074,7 +1120,7 @@ import UniformTypeIdentifiers
         registrationTimeout?.cancel(); registrationTimeout = nil; registrationAttempt = UUID()
         registering = false; enabling = false; notificationStatus = "请登录后启用系统通知。"
         generation = UUID(); client = nil; authority = nil; applicationKey = nil
-        items = []; unreadCount = 0; showingInbox = false; selectedMessageID = nil; error = ""; pushRegistrationError = ""; inboxRequestID = UUID()
+        items = []; unreadCount = 0; editingInbox = false; showingInbox = false; selectedMessageID = nil; error = ""; pushRegistrationError = ""; inboxRequestID = UUID()
         registrationTail = Task {
             await previous?.value
             if let token, let oldAuthority, let oldKey {
@@ -1138,6 +1184,21 @@ private enum MomentLibraryOriginals {
         try Task.checkCancellation()
         return value
     }
+    static func locate(assetIdentifier: String, length: Int, sha: String, contentType: String) async throws -> URL? {
+        guard let expectedType = UTType(mimeType: contentType),
+              let asset = PHAsset.fetchAssets(withLocalIdentifiers: [assetIdentifier], options: nil).firstObject else { return nil }
+        for resource in PHAssetResource.assetResources(for: asset) where resource.type != .adjustmentData && UTType(resource.uniformTypeIdentifier)?.conforms(to: expectedType) == true {
+            try Task.checkCancellation()
+            let ext = expectedType.preferredFilenameExtension ?? "data"
+            let copy = FileManager.default.temporaryDirectory.appendingPathComponent("MomentLibraryMatch-" + UUID().uuidString + "." + ext)
+            do {
+                if let digest = try await read(resource, limit: length, outputURL: copy), digest.matches(length: length, sha256: sha) { return copy }
+                try? FileManager.default.removeItem(at: copy)
+            } catch { try? FileManager.default.removeItem(at: copy); throw error }
+        }
+        return nil
+    }
+
     static func find(length: Int, sha: String, contentType: String, indexRoot: URL,
                      progress: @escaping (Int, Int) async -> Void) async throws -> URL? {
         let permission = PHPhotoLibrary.authorizationStatus(for: .readWrite)

@@ -483,12 +483,14 @@ struct AccountView: View {
                 Section("用户与权益") {
                     HStack {
                         Link(destination: URL(string: "https://auth.ai.xmkurt.com/personal/info")!) {
-                            VStack(alignment: .leading, spacing: 2) {
-                                Label(userInfo?.username ?? store.profile?.text("username") ?? "账号", systemImage: "person.crop.circle.fill")
-                                if let name = userInfo?.displayName, name != userInfo?.username {
-                                    Text(name).font(.caption).foregroundStyle(.secondary)
+                            Label {
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(userInfo?.username ?? store.profile?.text("username") ?? "账号")
+                                    if let name = userInfo?.displayName, name != userInfo?.username {
+                                        Text(name).font(.caption).foregroundStyle(.secondary)
+                                    }
                                 }
-                            }
+                            } icon: { Image(systemName: "person.crop.circle") }
                         }.buttonStyle(.plain)
                         Spacer()
                         Button { logout = true } label: {

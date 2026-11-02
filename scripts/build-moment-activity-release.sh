@@ -28,9 +28,13 @@ export MyVncRoot="$ATLAS_BUILD_WORK/source/MyVnc"
 export AgentIdentityRoot="$ATLAS_BUILD_WORK/source/AgentIdentity"
 export AGENTIDENTITY_ROOT="$AgentIdentityRoot"
 export FAMILY_REWARD_SHARED_PROJECTS_ROOT="$ATLAS_BUILD_WORK/source"
+export AGENTIDENTITY_API_ONLY=1
+dotnet test "$ATLAS_BUILD_WORK/source/AgentIdentity/tests/AgentIdentity.Tests/AgentIdentity.Tests.csproj" --filter FullyQualifiedName~ApplicationNotificationTests \
+  --artifacts-path "$ATLAS_BUILD_WORK/auth-tests" -p:UseSharedCompilation=false -nr:false -m:1 \
+  > "$ATLAS_BUILD_LOGS/auth-tests.log" 2>&1 || { tail -35 "$ATLAS_BUILD_LOGS/auth-tests.log"; exit 1; }
 (cd "$ATLAS_BUILD_WORK/source/Linko" && bash scripts/check-moment-connect.sh)
-for project in ${MOMENT_SERVICE_PROJECTS:-Linko family-reward-system}; do
-  [[ "$project" == Linko || "$project" == family-reward-system ]] || { echo "Unsupported service target"; exit 2; }
+for project in ${MOMENT_SERVICE_PROJECTS:-AgentIdentity Linko family-reward-system}; do
+  [[ "$project" == AgentIdentity || "$project" == Linko || "$project" == family-reward-system ]] || { echo "Unsupported service target"; exit 2; }
   frozen_commit="$(awk -v project="$project" '$1 == project {print $2}' "$ATLAS_BUILD_OUTPUT/source-commits.txt")"
   version="$(date +%Y%m%d-%H%M%S)-activity-${frozen_commit:0:7}"
   [[ "$version" =~ ^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$ && "$version" != latest ]] || exit 2

@@ -32,15 +32,18 @@ final class PHFetchOptions { var predicate: NSPredicate?; var sortDescriptors: [
 final class Assets {
  let rows: [PHAsset]; init(_ rows: [PHAsset]) { self.rows=rows }
  var count: Int { rows.count }
+ var firstObject: PHAsset? { rows.first }
  func object(at index: Int) -> PHAsset { rows[index] }
 }
 final class PHAsset {
  static var visible: [PHAsset] = []
+ static var fullFetches = 0
  let localIdentifier: String
  let modificationDate: Date? = Date(timeIntervalSince1970: 123)
  let resource: PHAssetResource
  init(_ id: String, _ resource: PHAssetResource) { localIdentifier=id; self.resource=resource }
- static func fetchAssets(with options: PHFetchOptions) -> Assets { Assets(visible) }
+ static func fetchAssets(with options: PHFetchOptions) -> Assets { fullFetches += 1; return Assets(visible) }
+ static func fetchAssets(withLocalIdentifiers ids: [String], options: PHFetchOptions?) -> Assets { Assets(visible.filter { ids.contains($0.localIdentifier) }) }
  static func assetResources(for asset: PHAsset) -> [PHAssetResource] { [asset.resource] }
 }
 typealias PHAssetResourceDataRequestID = Int32
@@ -84,6 +87,13 @@ driver=r'''
   let tooLarge=PHAssetResource("oversized.jpg",Data(repeating:1,count:10000))
   let original=PHAssetResource("different-name.jpg",Data("abc".utf8))
   PHAsset.visible=[PHAsset("cloud",cloud),PHAsset("wrong",wrong),PHAsset("large",tooLarge),PHAsset("right",original)]
+  PHPhotoLibrary.permission = .limited
+  let direct=try await MomentLibraryOriginals.locate(assetIdentifier:"right",length:3,sha:abc,contentType:"image/jpeg")
+  precondition(direct != nil && PHAsset.fullFetches == 0)
+  let directBytes=try Data(contentsOf:direct!);precondition(directBytes==Data("abc".utf8));try FileManager.default.removeItem(at:direct!)
+  let absent=try await MomentLibraryOriginals.locate(assetIdentifier:"missing",length:3,sha:abc,contentType:"image/jpeg")
+  precondition(absent == nil && PHAsset.fullFetches == 0)
+  PHAssetResourceManager.shared.reads.removeAll()
   PHPhotoLibrary.permission = .denied
   let denied=try await MomentLibraryOriginals.find(length:3,sha:abc,contentType:"image/jpeg",indexRoot:root) {_,_ in}
   precondition(denied == nil && PHAssetResourceManager.shared.reads.isEmpty)
