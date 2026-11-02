@@ -144,6 +144,7 @@ app.MapAgentIdentityAuthEndpoints();
 app.MapAgentIdentityNativeLogin(new Uri("https://happylife.ai.impx.net"), new Uri("linkofamily://login-complete"), "Linko-Family",
     additionalPublicOrigins: [new Uri("https://happylife.ai.xmkurt.com")]);
 app.MapLinkoSocialGateway();
+app.MapPublicActivityIntroduction();
 app.MapAtlasReleaseVersion();
 if (!string.IsNullOrWhiteSpace(releaseControlApplicationId))
     app.MapAtlasReleaseDrain(ReleaseDrainExtensions.UpgradeControlPolicy);

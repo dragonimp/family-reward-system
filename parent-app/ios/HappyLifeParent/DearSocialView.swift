@@ -369,7 +369,7 @@ private struct DearActivityMapView: View {
                             Button { selectedPointID = point.id } label: {
                                 VStack(spacing: 4) {
                                 if let photo = point.photo {
-                                    DearPhotoPreview(store: store, path: thumbnailPath(photo))
+                                    DearPhotoPreview(store: store, path: thumbnailPath(photo), photo: photo)
                                         .frame(width: 66, height: 66)
                                         .overlay(alignment: .bottomTrailing) {
                                             if point.systemImage == "video.fill" {
@@ -413,7 +413,7 @@ private struct DearActivityMapView: View {
             if let selectedPoint {
                 HStack(spacing: 10) {
                     if let photo = selectedPoint.photo {
-                        DearPhotoPreview(store: store, path: thumbnailPath(photo))
+                        DearPhotoPreview(store: store, path: thumbnailPath(photo), photo: photo)
                             .frame(width: 54, height: 54)
                     } else { Image(systemName: selectedPoint.systemImage).font(.title2) }
                     VStack(alignment: .leading, spacing: 3) {
@@ -440,7 +440,7 @@ private struct DearActivityMapView: View {
                         ForEach(photos) { photo in
                             Button { openPhoto(photo) } label: {
                                 VStack(alignment: .leading, spacing: 4) {
-                                    DearPhotoPreview(store: store, path: thumbnailPath(photo))
+                                    DearPhotoPreview(store: store, path: thumbnailPath(photo), photo: photo)
                                         .frame(width: 82, height: 82)
                                     Text(photoTitle(photo))
                                         .font(.caption2).lineLimit(1).frame(width: 82, alignment: .leading)
@@ -527,6 +527,8 @@ struct DearSocialView: View {
         nonmutating set { batchProgress.updateProgress(newValue) }
     }
     @State private var batchDownloading = false
+    @State private var matchingOriginals = false
+    @State private var matchingStatus = ""
     @State private var batchDeleting = false
     @State private var showingBatchDelete = false
     @State private var photoToDelete: DearRecord?
@@ -822,7 +824,7 @@ struct DearSocialView: View {
     private func photoCard(_ photo: DearRecord, path: String) -> some View {
         let expanded = photoViewMode != "list"
         let nickname = photo.text("sourceDisplayName").isEmpty ? "活动成员" : photo.text("sourceDisplayName")
-        return DearPhotoPreview(store: store, path: path)
+        return DearPhotoPreview(store: store, path: path, photo: photo)
             .frame(height: expanded ? 240 : 112)
             .frame(maxWidth: expanded ? .infinity : 112)
             .overlay(alignment: .topLeading) {
@@ -902,7 +904,7 @@ struct DearSocialView: View {
         } label: {
             VStack(spacing: 3) {
                 GeometryReader { proxy in
-                    DearPhotoPreview(store: store, path: path)
+                    DearPhotoPreview(store: store, path: path, photo: photo)
                         .frame(width: proxy.size.width, height: proxy.size.height)
                         .overlay(alignment: .topLeading) {
                             Text(nickname).font(.system(size: 9, weight: .semibold)).lineLimit(1)
@@ -1111,8 +1113,8 @@ struct DearSocialView: View {
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 Menu {
-                    if let url = URL(string: "https://happylife.ai.impx.net/dear/spaces/\(activityTenantId)/activities/\(activityId)") {
-                        ShareLink(item: url, subject: Text(selectedActivity?.text("title") ?? "活动")) { Label("分享活动链接", systemImage: "square.and.arrow.up") }
+                    if let url = URL(string: "https://happylife.ai.impx.net/api/dear/public/activities/\(activityTenantId)/\(activityId)") {
+                        ShareLink(item: url, subject: Text(selectedActivity?.text("title") ?? "活动"), message: Text(selectedActivity?.text("title") ?? "活动"), preview: SharePreview(selectedActivity?.text("title") ?? "活动")) { Label("分享活动链接", systemImage: "square.and.arrow.up") }
                     }
                     Button {
                         editedActivityName = selectedActivity?.text("title") ?? ""; editedActivityDescription = selectedActivity?.text("description") ?? ""
@@ -1122,6 +1124,13 @@ struct DearSocialView: View {
                         selectingPhotoDownloads.toggle(); selectedPhotoIDs.removeAll(); batchOriginalURLs = []; batchDownloadError = ""; batchDownloadProgress = 0
                     } label: { Label(selectingPhotoDownloads ? "完成多选" : "批量下载或删除", systemImage: "checkmark.circle") }
                         .disabled(photos.isEmpty || batchDownloading || batchDeleting)
+                    Button {
+                        Task { matchingOriginals = true; defer { matchingOriginals = false }
+                            do { matchingStatus = try await store.photoSource.recoverAllMyOriginals { matchingStatus = $0 }; notice = matchingStatus; try await loadPhotos() }
+                            catch { error = error.localizedDescription }
+                        }
+                    } label: { Label(matchingOriginals ? matchingStatus : "匹配我分享的全部活动原图", systemImage: "photo.badge.checkmark") }
+                        .disabled(matchingOriginals || busy || batchDownloading || batchDeleting)
                     Button { showingPhotoLocation = true } label: { Label("照片默认地点", systemImage: "mappin") }
                     Divider()
                     Button { momentDraft = ""; momentRequestID = UUID(); error = ""; showingMomentCreate = true } label: { Label("写日常", systemImage: "square.and.pencil") }
@@ -1374,7 +1383,7 @@ struct DearSocialView: View {
                         }
                         Button("生成七天有效的邀请链接") { run { try await createInviteLink() } }.disabled(busy)
                         if let url = URL(string: inviteLink), url.scheme == "https" {
-                            ShareLink(item: url) { Label("分享邀请链接", systemImage: "square.and.arrow.up") }
+                            ShareLink(item: url, subject: Text(selectedActivity?.text("title") ?? "活动"), message: Text(selectedActivity?.text("title") ?? "活动"), preview: SharePreview(selectedActivity?.text("title") ?? "活动")) { Label("分享邀请链接", systemImage: "square.and.arrow.up") }
                         }
                         Text("对方确认加入后才能查看这场活动的分享。")
                             .font(.caption).foregroundStyle(.secondary)
@@ -1680,7 +1689,7 @@ struct DearSocialView: View {
         let value = try await store.call(base + "tenants/\(activityTenantId)/activities/\(activityId)/invites/link", method: "POST", body: [:])
         guard let token = (value as? [String: Any])?["token"] as? String,
               let safe = token.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) else { throw APIError.message("邀请链接无效。") }
-        inviteLink = "https://happylife.ai.impx.net/dear?invite=\(safe)"
+        inviteLink = "https://happylife.ai.impx.net/api/dear/public/activities/\(activityTenantId)/\(activityId)?invite=\(safe)"
     }
     private func accept(_ invitation: DearRecord) async throws {
         let me = try await store.call(base + "me") as? [String: Any] ?? [:]
@@ -1761,8 +1770,13 @@ private struct DearBatchProgress: View {
 private struct DearPhotoPreview: View {
     @ObservedObject var store: FamilyStore
     let path: String
+    let photo: DearRecord
+    @ObservedObject private var source: DearPhotoSource
     @State private var image: UIImage?
     @State private var failed = false
+    init(store: FamilyStore, path: String, photo: DearRecord) {
+        self.store = store; self.path = path; self.photo = photo; self.source = store.photoSource
+    }
     var body: some View {
         GeometryReader { geometry in
         Group {
@@ -1779,8 +1793,17 @@ private struct DearPhotoPreview: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity).clipped().background(.quaternary)
         .clipShape(RoundedRectangle(cornerRadius: 10))
-        .task(id: path) {
-            do { image = try await store.authenticatedImage(path); failed = false }
+        .task(id: path + photo.text("thumbnailRevision") + source.originalsRevision.uuidString) {
+            do {
+                let parts = path.split(separator: "/").map(String.init)
+                if parts.count == 10, !photo.text("contentType").hasPrefix("video/"),
+                   let local = await source.availableOriginal(photo: photo, spaceID: parts[4], activityID: parts[6]),
+                   let original = try? await PhotoDisplayImage.load(local) {
+                    try Task.checkCancellation(); image = original; failed = false; return
+                }
+                let preview = try await store.authenticatedImage(path)
+                try Task.checkCancellation(); image = preview; failed = false
+            }
             catch is CancellationError { }
             catch { image = nil; failed = true }
         }

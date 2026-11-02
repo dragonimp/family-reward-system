@@ -12,7 +12,8 @@ import UniformTypeIdentifiers
 
 // Linko Social keeps original media bytes on the source device. This adapter
 // stores selected photos and videos on the iPhone and serves verified requests.
-@MainActor final class DearPhotoSource {
+@MainActor final class DearPhotoSource: ObservableObject {
+    @Published private(set) var originalsRevision = UUID()
     private struct SharedPhoto: Codable {
         let id: String
         let spaceID: String
@@ -90,7 +91,7 @@ import UniformTypeIdentifiers
     }
 
     func stop() {
-        generation = UUID(); librarySearch?.cancel(); librarySearch = nil; cacheTask?.cancel(); cacheTask = nil; cachedShares.removeAll(); cacheRetries.removeAll(); currentDeviceID = nil; pump?.cancel(); pump = nil; enabledForSession = false
+        generation = UUID(); originalsRevision = UUID(); librarySearch?.cancel(); librarySearch = nil; cacheTask?.cancel(); cacheTask = nil; cachedShares.removeAll(); cacheRetries.removeAll(); currentDeviceID = nil; pump?.cancel(); pump = nil; enabledForSession = false
         for task in sourceTasks.values { task.cancel() }; sourceTasks.removeAll()
         let active = Array(transfers.values); transfers.removeAll()
         for transfer in active { Task { await transfer.cancel() } }
@@ -412,6 +413,62 @@ import UniformTypeIdentifiers
         return path
     }
 
+    func availableOriginal(photo: DearRecord, spaceID: String, activityID: String) async -> URL? {
+        guard let subject = try? await currentSubject(),
+              UUID(uuidString: photo.id) != nil, UUID(uuidString: spaceID) != nil, UUID(uuidString: activityID) != nil,
+              let length = (photo.data["length"] as? NSNumber)?.intValue, length > 0 else { return nil }
+        let sha = photo.text("thumbnailRevision")
+        guard sha.count == 64, sha.allSatisfy({ $0.isHexDigit }) else { return nil }
+        if let local = await localOriginal(photoID: photo.id, spaceID: spaceID, activityID: activityID),
+           (try? local.resourceValues(forKeys: [.fileSizeKey]).fileSize) == length,
+           (try? await hashFile(local))?.caseInsensitiveCompare(sha) == .orderedSame { return local }
+        let subjectKey = SHA256.hash(data: Data(subject.utf8)).map { String(format: "%02x", $0) }.joined()
+        let root = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent("DearReceivedPhotos").appendingPathComponent(subjectKey)
+        let prefix = photo.id.lowercased() + "-" + sha.lowercased() + "."
+        for file in (try? FileManager.default.contentsOfDirectory(at: root, includingPropertiesForKeys: [.fileSizeKey])) ?? [] {
+            guard file.lastPathComponent.hasPrefix(prefix), file.pathExtension != "part",
+                  (try? file.resourceValues(forKeys: [.fileSizeKey]).fileSize) == length,
+                  (try? await hashFile(file))?.caseInsensitiveCompare(sha) == .orderedSame else { continue }
+            return file
+        }
+        return nil
+    }
+
+    func recoverAllMyOriginals(status: @escaping (String) -> Void) async throws -> String {
+        guard let store else { throw CancellationError() }
+        let subject = try await currentSubject(), expected = generation
+        let authorization = await PHPhotoLibrary.requestAuthorization(for: .readWrite)
+        guard authorization == .authorized || authorization == .limited else {
+            throw APIError.message("需要允许访问保存原件的相册后才能批量匹配。")
+        }
+        let activities = try DearRecord.list(await store.call("/api/dear/social/activities/joined"))
+        var seen = Set<UUID>(), matched = 0, missing = 0, failed = 0, cached = 0
+        for activity in activities {
+            try Task.checkCancellation()
+            guard expected == generation else { throw CancellationError() }
+            let tenant = activity.text("sourceTenantId").isEmpty ? activity.text("tenantId") : activity.text("sourceTenantId")
+            guard UUID(uuidString: tenant) != nil, UUID(uuidString: activity.id) != nil else { continue }
+            let photos = try DearRecord.list(await store.call("/api/dear/social/tenants/\(tenant)/activities/\(activity.id)/live/photos"))
+            for photo in photos where photo.text("sourceSubject") == subject {
+                guard let id = UUID(uuidString: photo.id), seen.insert(id).inserted else { continue }
+                try Task.checkCancellation()
+                guard expected == generation else { throw CancellationError() }
+                status("已检查 \(seen.count) 张：已匹配 \(matched)，缓存就绪 \(cached)，未找到 \(missing)，失败 \(failed)")
+                if photo.flag("serverCached"), await availableOriginal(photo: photo, spaceID: tenant, activityID: activity.id) != nil { cached += 1; continue }
+                var request = photo.data
+                request["photoId"] = photo.id; request["tenantId"] = tenant; request["activityId"] = activity.id
+                request["serverCached"] = false
+                request["sha256"] = photo.text("thumbnailRevision"); request["canStop"] = true; request["status"] = "waiting"
+                do {
+                    if try await recoverOriginal(request: request, status: status) { matched += 1 } else { missing += 1 }
+                } catch is CancellationError { throw CancellationError() }
+                catch { failed += 1 }
+            }
+        }
+        return "检查 \(seen.count) 张：匹配并恢复 \(matched)，缓存已就绪 \(cached)，本机未找到 \(missing)，失败待重试 \(failed)。"
+    }
+
     // Recover only this account's verified bytes, never infer physical ownership
     // from the username or claim an unrelated item from the system photo library.
     func restoreOriginal(for request: [String: Any], selectedFile: URL? = nil, status: ((String) -> Void)? = nil) async throws -> Bool {
@@ -600,6 +657,7 @@ import UniformTypeIdentifiers
         // Connect returns only after peer acknowledgement and durable SHA validation.
         _ = try await store.call("/api/dear/social/photo-requests/\(id)/complete", method: "POST", body: [:])
         try FileManager.default.moveItem(at: partialURL, to: finalURL)
+        originalsRevision = UUID()
         progress?(1)
         return finalURL
     }
@@ -701,6 +759,7 @@ import UniformTypeIdentifiers
     private func writeIndex(_ index: Index, at root: URL) throws {
         try JSONEncoder().encode(index).write(to: root.appendingPathComponent("index.json"),
                                               options: [.atomic, .completeFileProtectionUntilFirstUserAuthentication])
+        originalsRevision = UUID()
     }
 
     private func hashFile(_ url: URL) async throws -> String {
