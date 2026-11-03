@@ -24,12 +24,13 @@ try
         Check(html.Contains("linkofamily://activity?tenantId=" + tenant.ToString()) && html.Contains("activityId=" + activity.ToString()) && html.Contains("&amp;invite=a%26b%3Cc"), "app link retains typed activity and encoded invitation");
         Check(html.Contains("apple-itunes-app") && html.Contains("app-id=6828813434") && html.Contains("linkomoment://activity"), "system banner targets successor app");
         Check(html.Contains("https://home.ai.impx.net/invite/TvXoL3UTV60fnciLC1bjISYx") && html.Contains("linkomomentx://activity"), "managed installation invitation and deterministic legacy opening");
+        Check(html.Contains("id=\"wechat-guide\"") && html.Contains("微信右上角") && html.Contains("MicroMessenger") && html.Contains("event.preventDefault()"), "WeChat offers system browser guidance before app and install navigation");
         Check(html.Contains("datetime=\"2026-11-01T01:00:00.0000000+00:00\"") && html.Contains("toLocaleString"), "dates converted by browser timezone");
         Check(response.Headers.CacheControl?.NoStore == true && response.Headers.Contains("Content-Security-Policy"), "no-store and document protection");
     }
     Check((await client.GetAsync($"/api/dear/public/activities/{Guid.Empty}/{activity}")).StatusCode == HttpStatusCode.NotFound, "missing activity remains 404");
     Check((await client.GetAsync("/api/dear/public/activities/invalid/invalid")).StatusCode == HttpStatusCode.NotFound, "invalid UUID rejected");
-    Console.WriteLine("PASS: 20 public activity introduction checks");
+    Console.WriteLine("PASS: 22 public activity introduction checks");
 }
 finally { await app.StopAsync(); await app.DisposeAsync(); }
 
