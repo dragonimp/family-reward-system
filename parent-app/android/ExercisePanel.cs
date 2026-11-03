@@ -181,8 +181,8 @@ public sealed class ExercisePanel : ContentView
         {
             var row = new VerticalStackLayout { Spacing = 6 };
             row.Add(new Label { Text = $"{item.Kind} · {item.DistanceText} · {item.StartedAt.ToLocalTime():yyyy-MM-dd HH:mm}\n{TimeSpan.FromSeconds(item.Seconds):hh\\:mm\\:ss} · {(item.HasSteps ? $"{item.Steps} 步" : "步数未完整获取")}" });
-            var delete = Action("删除记录", () => _ = DeleteRecord(item));
-            delete.TextColor = Colors.Red;
+            var delete = new Button { Text = "删除记录", TextColor = Colors.Red, BackgroundColor = Colors.Transparent };
+            delete.Clicked += (_, _) => _ = DeleteRecord(item);
             row.Add(delete);
             body.Add(row);
         }
