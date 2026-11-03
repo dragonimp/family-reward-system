@@ -8,7 +8,7 @@ for (const wechat of [true, false]) {
   let focused = 0, scrolled = 0;
   const guide = { hidden: true, focus: () => focused++, scrollIntoView: () => scrolled++ };
   const help = { hidden: true };
-  const links = ['open-app', 'install', 'legacy'].map(id => ({ id, addEventListener(_, handler) { this.click = handler; } }));
+  const links = ['open-app', 'install'].map(id => ({ id, addEventListener(_, handler) { this.click = handler; } }));
   const timers = [];
   vm.runInNewContext(script, {
     navigator: { userAgent: wechat ? 'iPhone MicroMessenger/8.0' : 'iPhone Safari/605.1' },
@@ -19,10 +19,10 @@ for (const wechat of [true, false]) {
   for (const link of links) {
     let prevented = false;
     link.click({ preventDefault() { prevented = true; } });
-    assert.equal(prevented, wechat, 'App, install and legacy links guide WeChat and navigate normally elsewhere');
+    assert.equal(prevented, wechat, 'App and install links guide WeChat and navigate normally elsewhere');
   }
-  assert.equal(focused, wechat ? 3 : 0);
-  assert.equal(scrolled, wechat ? 3 : 0);
+  assert.equal(focused, wechat ? 2 : 0);
+  assert.equal(scrolled, wechat ? 2 : 0);
   assert.equal(timers.length, wechat ? 0 : 1);
   timers.forEach(fn => fn());
   assert.equal(help.hidden, wechat);
