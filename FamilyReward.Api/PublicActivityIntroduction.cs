@@ -46,7 +46,7 @@ internal static class PublicActivityIntroduction
                 <style>body{font-family:system-ui,sans-serif;background:#f4f7f5;color:#183a31;margin:0;padding:24px}main{max-width:680px;margin:8vh auto;background:white;border-radius:20px;padding:32px}h1{overflow-wrap:anywhere}p{white-space:pre-wrap;line-height:1.8}a{display:inline-block;padding:12px 20px;background:#126b51;color:white;border-radius:10px;text-decoration:none}.actions{display:flex;gap:12px;flex-wrap:wrap}.secondary{background:#e6f2ed;color:#126b51}.install{background:#fff;color:#126b51;border:1px solid #b7cec3}details{margin-top:20px}small{display:block;margin-top:20px;color:#687b73}</style></head>
                 <body><main><span>Linko Moment · 活动介绍</span><h1>{{title}}</h1><p>{{description}}</p><p><time datetime="{{date}}"></time></p>
                 <div class="actions"><a id="open-app" href="{{appLink}}">在 App 中打开</a><a class="secondary" href="{{enter}}">继续网页版 · 进入活动</a>
-                <a class="install" href="https://testflight.apple.com/join/dAHHKXM7" rel="noreferrer">安装测试版（Linko MomentX）</a></div>
+                <a class="install" href="https://home.ai.impx.net/invite/TvXoL3UTV60fnciLC1bjISYx" rel="noreferrer">安装测试版</a></div>
                 <p id="app-help" hidden>如果没有打开 App，可先安装 TestFlight 并接受测试邀请。安装后返回本页，再点“在 App 中打开”。微信内无法唤起时，可从右上角菜单选择在浏览器中打开；也可继续网页版。</p>
                 <details><summary>使用旧版 Linko MomentX？</summary><p><a href="{{legacyLink}}">在 Linko MomentX 中打开</a></p></details>
                 <small>活动介绍公开可见。进入活动查看照片、动态和成员时，需要登录并验证访问权限。</small></main>
