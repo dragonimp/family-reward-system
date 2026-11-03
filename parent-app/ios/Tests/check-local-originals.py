@@ -35,6 +35,9 @@ struct DearRecord {
  func directory(for subject: String) throws -> URL { root }
  func readIndex(at root: URL) throws -> Index { index }
  func writeIndex(_ value: Index, at root: URL) throws { index=value }
+ func verifiedOriginal(_ url: URL, length: Int, sha: String, subject: String) async -> Bool {
+  await OriginalFileVerifier(directory: root).verify(url, length:length, sha256:sha)
+ }
  func hashFile(_ url: URL) async throws -> String { SHA256.hash(data:try Data(contentsOf:url)).map {String(format:"%02x",$0)}.joined() }
 '''+methods+download+r'''
         networkRequests += 1

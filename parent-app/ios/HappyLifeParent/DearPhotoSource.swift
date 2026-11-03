@@ -45,6 +45,7 @@ import UniformTypeIdentifiers
     private var pump: Task<Void, Never>?
     private var cacheTask: Task<Void, Never>?
     private var librarySearch: Task<URL?, Error>?
+    private var fileVerifiers: [String: OriginalFileVerifier] = [:]
     private var localReads: [String: Task<URL?, Never>] = [:]
     private var legacyLibraryAttempts = Set<String>()
     private var legacyRead: Task<URL?, Error>?
@@ -96,7 +97,7 @@ import UniformTypeIdentifiers
     }
 
     func stop() {
-        for task in localReads.values { task.cancel() }; localReads.removeAll(); legacyLibraryAttempts.removeAll(); legacyRead?.cancel(); legacyRead = nil
+        for task in localReads.values { task.cancel() }; localReads.removeAll(); fileVerifiers.removeAll(); legacyLibraryAttempts.removeAll(); legacyRead?.cancel(); legacyRead = nil
         generation = UUID(); originalsRevision = UUID(); librarySearch?.cancel(); librarySearch = nil; cacheTask?.cancel(); cacheTask = nil; cachedShares.removeAll(); cacheRetries.removeAll(); currentDeviceID = nil; pump?.cancel(); pump = nil; enabledForSession = false
         for task in sourceTasks.values { task.cancel() }; sourceTasks.removeAll()
         let active = Array(transfers.values); transfers.removeAll()
@@ -452,7 +453,7 @@ import UniformTypeIdentifiers
         guard let photo = entry else { return nil }
         let path = root.appendingPathComponent(photo.fileName)
         if (try? path.resourceValues(forKeys: [.fileSizeKey]).fileSize) == photo.length,
-           (try? await hashFile(path))?.caseInsensitiveCompare(photo.sha256) == .orderedSame,
+           await verifiedOriginal(path, length: photo.length, sha: photo.sha256, subject: subject),
            expected == generation { return path }
         var permission = PHPhotoLibrary.authorizationStatus(for: .readWrite)
         if permission == .notDetermined { permission = await PHPhotoLibrary.requestAuthorization(for: .readWrite) }
@@ -508,7 +509,7 @@ import UniformTypeIdentifiers
         guard sha.count == 64, sha.allSatisfy({ $0.isHexDigit }) else { return nil }
         if let local = await localOriginal(photoID: photo.id, spaceID: spaceID, activityID: activityID, record: photo),
            (try? local.resourceValues(forKeys: [.fileSizeKey]).fileSize) == length,
-           (try? await hashFile(local))?.caseInsensitiveCompare(sha) == .orderedSame, expected == generation { return local }
+           await verifiedOriginal(local, length: length, sha: sha, subject: subject), expected == generation { return local }
         let subjectKey = SHA256.hash(data: Data(subject.utf8)).map { String(format: "%02x", $0) }.joined()
         let root = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)[0]
             .appendingPathComponent("DearReceivedPhotos").appendingPathComponent(subjectKey)
@@ -516,7 +517,7 @@ import UniformTypeIdentifiers
         for file in (try? FileManager.default.contentsOfDirectory(at: root, includingPropertiesForKeys: [.fileSizeKey])) ?? [] {
             guard file.lastPathComponent.hasPrefix(prefix), file.pathExtension != "part",
                   (try? file.resourceValues(forKeys: [.fileSizeKey]).fileSize) == length,
-                  (try? await hashFile(file))?.caseInsensitiveCompare(sha) == .orderedSame, expected == generation else { continue }
+                  await verifiedOriginal(file, length: length, sha: sha, subject: subject), expected == generation else { continue }
             return file
         }
         return nil
@@ -875,6 +876,14 @@ import UniformTypeIdentifiers
         try JSONEncoder().encode(index).write(to: root.appendingPathComponent("index.json"),
                                               options: [.atomic, .completeFileProtectionUntilFirstUserAuthentication])
         originalsRevision = UUID()
+    }
+
+    private func verifiedOriginal(_ url: URL, length: Int, sha: String, subject: String) async -> Bool {
+        guard let root = try? directory(for: subject) else { return false }
+        let verifier: OriginalFileVerifier
+        if let saved = fileVerifiers[subject] { verifier = saved }
+        else { verifier = OriginalFileVerifier(directory: root); fileVerifiers[subject] = verifier }
+        return await verifier.verify(url, length: length, sha256: sha)
     }
 
     private func hashFile(_ url: URL) async throws -> String {

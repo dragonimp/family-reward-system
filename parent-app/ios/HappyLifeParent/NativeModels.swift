@@ -162,3 +162,85 @@ struct OriginalResourceFingerprint {
         return OriginalResourceDigest(length: length, sha256: hash.finalize().map { String(format: "%02x", $0) }.joined())
     }
 }
+
+// A receipt is valid only for the exact private file identity and filesystem
+// change stamp. ctime also catches same-size edits with restored mtime.
+struct OriginalFileStamp: Codable, Hashable {
+    let device: Int64
+    let inode: UInt64
+    let length: Int64
+    let modifiedSeconds: Int64
+    let modifiedNanoseconds: Int64
+    let changedSeconds: Int64
+    let changedNanoseconds: Int64
+
+    static func read(_ url: URL) -> Self? {
+        var value = stat()
+        guard url.isFileURL,
+              url.withUnsafeFileSystemRepresentation({ path in
+                  guard let path else { return false }
+                  return lstat(path, &value) == 0
+              }), value.st_mode & S_IFMT == S_IFREG else { return nil }
+        return Self(device: Int64(value.st_dev), inode: UInt64(value.st_ino), length: Int64(value.st_size),
+                    modifiedSeconds: Int64(value.st_mtimespec.tv_sec), modifiedNanoseconds: Int64(value.st_mtimespec.tv_nsec),
+                    changedSeconds: Int64(value.st_ctimespec.tv_sec), changedNanoseconds: Int64(value.st_ctimespec.tv_nsec))
+    }
+}
+
+actor OriginalFileVerifier {
+    private struct Receipt: Codable {
+        let stamp: OriginalFileStamp
+        let sha256: String
+    }
+    private struct Check: Hashable {
+        let path: String
+        let stamp: OriginalFileStamp
+        let sha256: String
+    }
+    private let ledger: URL
+    private var receipts: [String: Receipt]?
+    private var checks: [Check: Task<Bool, Never>] = [:]
+
+    init(directory: URL) { ledger = directory.appendingPathComponent("verified-original-files.json") }
+
+    func verify(_ url: URL, length: Int, sha256: String,
+                hash: @escaping @Sendable (URL) async throws -> String = { try await OriginalFileVerifier.digest($0) }) async -> Bool {
+        guard length > 0, sha256.count == 64, sha256.allSatisfy({ $0.isHexDigit }),
+              let stamp = OriginalFileStamp.read(url), stamp.length == length else { return false }
+        if receipts == nil {
+            receipts = (try? JSONDecoder().decode([String: Receipt].self, from: Data(contentsOf: ledger))) ?? [:]
+        }
+        let path = url.standardizedFileURL.path
+        if let saved = receipts?[path], saved.stamp == stamp,
+           saved.sha256.caseInsensitiveCompare(sha256) == .orderedSame { return true }
+        let check = Check(path: path, stamp: stamp, sha256: sha256.lowercased())
+        if let task = checks[check] { return await task.value && OriginalFileStamp.read(url) == stamp }
+        let task = Task<Bool, Never> {
+            guard let digest = try? await hash(url), !Task.isCancelled else { return false }
+            return digest.caseInsensitiveCompare(sha256) == .orderedSame && OriginalFileStamp.read(url) == stamp
+        }
+        checks[check] = task
+        let valid = await task.value && OriginalFileStamp.read(url) == stamp
+        checks.removeValue(forKey: check)
+        guard valid else { receipts?.removeValue(forKey: path); return false }
+        if (receipts?.count ?? 0) >= 4096 { receipts = [:] }
+        receipts?[path] = Receipt(stamp: stamp, sha256: sha256.lowercased())
+        if let data = try? JSONEncoder().encode(receipts) {
+            try? data.write(to: ledger, options: [.atomic, .completeFileProtectionUntilFirstUserAuthentication])
+        }
+        return true
+    }
+
+    static func digest(_ url: URL) async throws -> String {
+        try await Task.detached(priority: .utility) {
+            let file = try FileHandle(forReadingFrom: url)
+            defer { try? file.close() }
+            var value = SHA256()
+            while let bytes = try file.read(upToCount: 1024 * 1024), !bytes.isEmpty {
+                try Task.checkCancellation()
+                value.update(data: bytes)
+            }
+            return value.finalize().map { String(format: "%02x", $0) }.joined()
+        }.value
+    }
+}
