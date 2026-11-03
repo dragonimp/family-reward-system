@@ -1,5 +1,24 @@
 import Foundation
 
+struct ExerciseArchive: Codable {
+    var active: ExerciseSession?
+    var history: [ExerciseSession] = []
+
+    func write(to file: URL) throws {
+        try FileManager.default.createDirectory(at: file.deletingLastPathComponent(), withIntermediateDirectories: true)
+        let encoder = JSONEncoder(); encoder.dateEncodingStrategy = .iso8601
+        try encoder.encode(self).write(to: file, options: [.atomic, .completeFileProtectionUntilFirstUserAuthentication])
+    }
+
+    mutating func deleteHistoryRecord(id: UUID, file: URL) throws {
+        guard history.contains(where: { $0.id == id }) else { return }
+        var updated = self
+        updated.history.removeAll { $0.id == id }
+        try updated.write(to: file)
+        self = updated
+    }
+}
+
 struct ExerciseInterval: Codable {
     var start: Date
     var end: Date?

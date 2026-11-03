@@ -39,6 +39,28 @@ import Foundation
         precondition(local.string(from: restored.startedAt) == "2026-10-30 08:59:50")
         precondition(ExerciseSession.clock(3661) == "01:01:01")
         precondition(ExerciseSession.clock(-1) == "00:00:00")
+        let folder = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let file = folder.appendingPathComponent("exercise.json")
+        var archive = ExerciseArchive(active: restored, history: [restored, session])
+        archive.history[1].id = UUID() // Same visible data, distinct records.
+        let retainedID = archive.history[1].id
+        try archive.write(to: file)
+        try archive.deleteHistoryRecord(id: restored.id, file: file)
+        let afterDeletion = try decoder.decode(ExerciseArchive.self, from: Data(contentsOf: file))
+        precondition(afterDeletion.history.map(\.id) == [retainedID])
+        precondition(afterDeletion.active?.id == restored.id)
+        // A failed filesystem write must not remove the in-memory record.
+        do {
+            try archive.deleteHistoryRecord(id: retainedID, file: file.appendingPathComponent("blocked.json"))
+            preconditionFailure("Expected a write failure beneath a regular file")
+        } catch { precondition(archive.history.map(\.id) == [retainedID]) }
+        try archive.deleteHistoryRecord(id: UUID(), file: file)
+        precondition(archive.history.count == 1)
+        try archive.deleteHistoryRecord(id: retainedID, file: file)
+        let emptyArchive = try decoder.decode(ExerciseArchive.self, from: Data(contentsOf: file))
+        precondition(emptyArchive.history.isEmpty)
+        print("PASS: targeted history deletion persists, active record retained, failed writes retain records, final record deletion")
         var distanceSession = ExerciseSession(kind: "慢跑", startedAt: start,
             intervals: [ExerciseInterval(start: start, steps: 100, distanceMeters: 1234)])
         precondition(distanceSession.distanceMeters == 1234 && distanceSession.distanceText == "1.23 公里")

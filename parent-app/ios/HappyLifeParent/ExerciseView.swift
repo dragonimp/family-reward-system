@@ -3,11 +3,7 @@ import CoreMotion
 import CryptoKit
 
 @MainActor final class ExerciseStore: ObservableObject {
-    private struct Archive: Codable {
-        var active: ExerciseSession?
-        var history: [ExerciseSession] = []
-    }
-    @Published private var archive = Archive()
+    @Published private var archive = ExerciseArchive()
     @Published var message: String?
     @Published var busy = false
     private let pedometer = CMPedometer()
@@ -24,7 +20,7 @@ import CryptoKit
         file = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
             .appendingPathComponent("Exercise/\(key).json")
         let decoder = JSONDecoder(); decoder.dateDecodingStrategy = .iso8601
-        do { archive = try decoder.decode(Archive.self, from: Data(contentsOf: file)) }
+        do { archive = try decoder.decode(ExerciseArchive.self, from: Data(contentsOf: file)) }
         catch let error as NSError where error.domain == NSCocoaErrorDomain && error.code == NSFileReadNoSuchFileError { }
         catch { readable = false; message = "运动记录暂时无法读取，请重新打开页面后重试。原记录已保留。" }
     }
@@ -32,12 +28,18 @@ import CryptoKit
     private func save() {
         guard readable else { return }
         do {
-            try FileManager.default.createDirectory(at: file.deletingLastPathComponent(), withIntermediateDirectories: true)
-            let encoder = JSONEncoder(); encoder.dateEncodingStrategy = .iso8601
-            try encoder.encode(archive).write(to: file, options: [.atomic, .completeFileProtectionUntilFirstUserAuthentication])
+            try archive.write(to: file)
         } catch { message = "运动记录尚未保存：\(error.localizedDescription)。请保留页面并重试保存。" }
     }
     func retrySave() { guard readable else { return }; message = nil; save() }
+
+    func deleteRecord(id: UUID) {
+        guard readable, !busy, archive.history.contains(where: { $0.id == id }) else { return }
+        do { try archive.deleteHistoryRecord(id: id, file: file) }
+        catch {
+            message = "删除失败，运动记录已保留，请稍后重试。"
+        }
+    }
 
     func start(kind: String) {
         guard readable, active == nil, !busy else { return }
@@ -131,6 +133,7 @@ struct ExerciseView: View {
     @Environment(\.scenePhase) private var phase
     @State private var kind = "散步"
     @State private var confirmFinish = false
+    @State private var pendingDeletion: ExerciseSession?
     init(userID: String) { _exercise = StateObject(wrappedValue: ExerciseStore(userID: userID)) }
 
     var body: some View {
@@ -188,7 +191,14 @@ struct ExerciseView: View {
                     }
                     ForEach(exercise.history) { item in
                         VStack(alignment: .leading, spacing: 6) {
-                            HStack { Text(item.kind).bold(); Spacer(); Text(ExerciseSession.clock(item.duration(at: item.endedAt ?? .now))).monospacedDigit() }
+                            HStack {
+                                Text(item.kind).bold()
+                                Spacer()
+                                Text(ExerciseSession.clock(item.duration(at: item.endedAt ?? .now))).monospacedDigit()
+                                Button(role: .destructive) { pendingDeletion = item } label: {
+                                    Label("删除", systemImage: "trash")
+                                }.buttonStyle(.borderless).disabled(exercise.busy)
+                            }
                             Text(item.distanceText).font(.headline).monospacedDigit()
                             HStack {
                                 Text(item.startedAt, format: .dateTime.year().month().day().hour().minute())
@@ -196,11 +206,27 @@ struct ExerciseView: View {
                                 Text(item.steps.map { "\($0) 步" } ?? "步数未获取")
                             }.font(.caption).foregroundStyle(.secondary)
                         }.padding(.vertical, 4)
+                            .swipeActions(allowsFullSwipe: false) {
+                                Button("删除", role: .destructive) { pendingDeletion = item }
+                                    .disabled(exercise.busy)
+                            }
                     }
                 } header: { Text("运动记录 · 当地时间") } footer: { Text("记录按当前账号保存在此手机，暂不跨设备同步。") }
             }.navigationTitle("运动").readablePage()
                 .confirmationDialog("结束本次运动并保存记录？", isPresented: $confirmFinish, titleVisibility: .visible) {
                     Button("结束并保存") { Task { await exercise.finish() } }
+                }
+                .alert("删除这条运动记录？", isPresented: Binding(
+                    get: { pendingDeletion != nil },
+                    set: { if !$0 { pendingDeletion = nil } }
+                ), presenting: pendingDeletion) { item in
+                    Button("取消", role: .cancel) { pendingDeletion = nil }
+                    Button("删除", role: .destructive) {
+                        exercise.deleteRecord(id: item.id)
+                        pendingDeletion = nil
+                    }
+                } message: { item in
+                    Text("将删除这条\(item.kind)记录，删除后无法恢复。")
                 }
                 .task { await exercise.refresh() }
                 .onChange(of: phase) { _, value in

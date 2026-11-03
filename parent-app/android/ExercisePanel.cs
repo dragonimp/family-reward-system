@@ -72,16 +72,18 @@ public sealed class ExercisePanel : ContentView
     }
     public void Suspend() { lifecycle++; Pause(); timer.Stop(); }
     public void Show() { timer.Start(); Update(); }
-    private void Save()
+    private bool Save()
     {
-        if (!readable) return;
+        if (!readable) return false;
         try
         {
             if (archive.Active is { } active) active.LastSeen = DateTimeOffset.UtcNow;
             File.WriteAllText(file + ".tmp", JsonSerializer.Serialize(archive));
             File.Move(file + ".tmp", file, true);
+            return true;
         }
         catch (Exception error) { notice.Text = $"记录尚未保存：{error.Message}。请重试保存。"; }
+        return false;
     }
     private static Button Action(string text, Action action)
     {
@@ -129,6 +131,20 @@ public sealed class ExercisePanel : ContentView
         if (archive.Active is { } completed) archive.History.Insert(0, completed);
         archive.Active = null; Save(); Render();
     }
+    private async Task DeleteRecord(Workout item)
+    {
+        if (!readable || Window?.Page is not { } page || !archive.History.Contains(item)) return;
+        if (!await page.DisplayAlertAsync("删除运动记录", $"删除这条{item.Kind}记录？删除后无法恢复。", "删除", "取消")) return;
+        var index = archive.History.IndexOf(item);
+        if (index < 0) return;
+        archive.History.RemoveAt(index);
+        if (!Save())
+        {
+            archive.History.Insert(index, item);
+            notice.Text = "删除失败，运动记录已保留，请稍后重试。";
+        }
+        Render();
+    }
     private void Update()
     {
         clock.Text = TimeSpan.FromSeconds(archive.Active?.Duration ?? 0).ToString(@"hh\:mm\:ss");
@@ -157,12 +173,19 @@ public sealed class ExercisePanel : ContentView
             foreach (var kind in new[] { "散步", "慢跑", "自由运动" }) body.Add(Action($"开始{kind}", () => _ = Start(kind)));
         }
         body.Add(new Label { Text = "请保持应用在前台。锁屏或切到后台时自动暂停，回到应用后可继续；暂停期间不计时、不计步、不累计距离。公里数按步数乘本次步长估算，默认 70 厘米/步，可在开始前调整；非 GPS 测距。计步可能稍有延迟。", FontSize = 13 });
-        body.Add(Action("重试保存记录", Save));
+        body.Add(Action("重试保存记录", () => Save()));
         body.Add(Action("运动权限设置", AppInfo.ShowSettingsUI));
         body.Add(new Label { Text = "运动记录 · 当地时间", FontSize = 20, FontAttributes = FontAttributes.Bold });
         if (archive.History.Count == 0) body.Add(new Label { Text = "完成一次运动后，时长、步数和估算公里数会保存在这里。" });
         foreach (var item in archive.History)
-            body.Add(new Label { Text = $"{item.Kind} · {item.DistanceText} · {item.StartedAt.ToLocalTime():yyyy-MM-dd HH:mm}\n{TimeSpan.FromSeconds(item.Seconds):hh\\:mm\\:ss} · {(item.HasSteps ? $"{item.Steps} 步" : "步数未完整获取")}" });
+        {
+            var row = new VerticalStackLayout { Spacing = 6 };
+            row.Add(new Label { Text = $"{item.Kind} · {item.DistanceText} · {item.StartedAt.ToLocalTime():yyyy-MM-dd HH:mm}\n{TimeSpan.FromSeconds(item.Seconds):hh\\:mm\\:ss} · {(item.HasSteps ? $"{item.Steps} 步" : "步数未完整获取")}" });
+            var delete = Action("删除记录", () => _ = DeleteRecord(item));
+            delete.TextColor = Colors.Red;
+            row.Add(delete);
+            body.Add(row);
+        }
         body.Add(new Label { Text = "记录按当前账号保存在此手机，暂不跨设备同步。", FontSize = 13 });
         Update();
     }
