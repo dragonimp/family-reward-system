@@ -73,7 +73,10 @@ extension View {
     var body: some Scene { WindowGroup { FamilyRoot(store: store, identity: store.identity, notifications: store.notifications).tint(.teal).onAppear {
         photoPushDelegate.connect(store: store)
     }.onOpenURL { url in
-        if let link = MomentActivityLink(url: url) { store.pendingActivityLink = link }
+        if let link = MomentActivityLink(url: url) {
+            store.notifications.showingInbox = false
+            store.pendingActivityLink = link
+        }
     }.onChange(of: scenePhase) { _, phase in
         if phase == .active { store.resumePhotoSharing(); Task { await store.refreshIfStale() } }
         else { store.suspendPhotoSharing() }

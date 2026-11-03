@@ -1459,7 +1459,7 @@ struct DearSocialView: View {
         do {
             try openLinkedActivity(tenant: link.tenantID, activity: link.activityID)
             store.pendingActivityLink = nil
-        } catch { self.error = error.localizedDescription; store.pendingActivityLink = nil }
+        } catch { store.error = error.localizedDescription; store.pendingActivityLink = nil }
     }
 
     private func openLinkedActivity(tenant: UUID, activity: UUID) throws {
