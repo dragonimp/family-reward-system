@@ -80,6 +80,7 @@ private actor PhotoPreviewLoader {
         get { photoTransfers.progress }
         set { photoTransfers.updateProgress(newValue) }
     }
+    @Published var pendingActivityLink: MomentActivityLink?
     @Published var profile: Record?
     @Published var groups: [Record] = []
     @Published var children: [Record] = []

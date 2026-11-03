@@ -244,3 +244,25 @@ actor OriginalFileVerifier {
         }.value
     }
 }
+
+struct MomentActivityLink: Identifiable, Equatable {
+    let id = UUID()
+    let tenantID: UUID
+    let activityID: UUID
+    let invitation: String?
+
+    init?(url: URL) {
+        guard let parts = URLComponents(url: url, resolvingAgainstBaseURL: false),
+              ["linkofamily", "linkomoment", "linkomomentx"].contains(parts.scheme?.lowercased() ?? ""), parts.host?.lowercased() == "activity",
+              parts.user == nil, parts.password == nil, parts.port == nil,
+              parts.path.isEmpty || parts.path == "/", parts.fragment == nil else { return nil }
+        let items = parts.queryItems ?? []
+        guard items.allSatisfy({ ["tenantId", "activityId", "invite"].contains($0.name) }),
+              Set(items.map(\.name)).count == items.count,
+              let tenant = items.first(where: { $0.name == "tenantId" })?.value.flatMap(UUID.init(uuidString:)),
+              let activity = items.first(where: { $0.name == "activityId" })?.value.flatMap(UUID.init(uuidString:)) else { return nil }
+        let token = items.first { $0.name == "invite" }?.value
+        guard token == nil || (!(token?.isEmpty ?? true) && (token?.count ?? 0) <= 512) else { return nil }
+        tenantID = tenant; activityID = activity; invitation = token
+    }
+}

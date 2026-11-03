@@ -72,6 +72,8 @@ extension View {
     @Environment(\.scenePhase) private var scenePhase
     var body: some Scene { WindowGroup { FamilyRoot(store: store, identity: store.identity, notifications: store.notifications).tint(.teal).onAppear {
         photoPushDelegate.connect(store: store)
+    }.onOpenURL { url in
+        if let link = MomentActivityLink(url: url) { store.pendingActivityLink = link }
     }.onChange(of: scenePhase) { _, phase in
         if phase == .active { store.resumePhotoSharing(); Task { await store.refreshIfStale() } }
         else { store.suspendPhotoSharing() }
@@ -82,6 +84,7 @@ struct FamilyRoot: View {
     @ObservedObject var store: FamilyStore
     @ObservedObject var identity: AgentIdentitySession
     @ObservedObject var notifications: MomentNotifications
+    @State private var selectedTab = 0
     var body: some View {
         Group {
             if !identity.isAuthenticated { login }
@@ -138,13 +141,15 @@ struct FamilyRoot: View {
         } }
     }
     private var main: some View {
-        TabView {
+        TabView(selection: $selectedTab) {
             FamilyHome(store: store).tabItem { Label("成长", systemImage: "person.3.fill") }
-                .badge(store.requests.filter { $0.text("status") == "pending" }.count)
-            DearSocialView(store: store).tabItem { Label("活动", systemImage: "photo.on.rectangle.angled") }
-            ExerciseView(userID: store.profile?.text("unifiedUserId") ?? "").id(store.profile?.text("unifiedUserId") ?? "").tabItem { Label("运动", systemImage: "figure.walk") }
-            AccountView(store: store).tabItem { Label("我的", systemImage: "person.crop.circle") }.badge(notifications.unreadCount)
+                .badge(store.requests.filter { $0.text("status") == "pending" }.count).tag(0)
+            DearSocialView(store: store).tabItem { Label("活动", systemImage: "photo.on.rectangle.angled") }.tag(1)
+            ExerciseView(userID: store.profile?.text("unifiedUserId") ?? "").id(store.profile?.text("unifiedUserId") ?? "").tabItem { Label("运动", systemImage: "figure.walk") }.tag(2)
+            AccountView(store: store).tabItem { Label("我的", systemImage: "person.crop.circle") }.badge(notifications.unreadCount).tag(3)
         }
+        .onAppear { if store.pendingActivityLink != nil { selectedTab = 1 } }
+        .onChange(of: store.pendingActivityLink?.id) { _, id in if id != nil { selectedTab = 1 } }
     }
 }
 

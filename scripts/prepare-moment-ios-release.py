@@ -28,6 +28,9 @@ if flavor == 'legacy':
 for relative in ['parent-app/ios/HappyLifeParent/Info.plist', 'parent-app/ios/WatchInfo.plist']:
     path = source / relative
     info = plistlib.loads(path.read_bytes())
+    if relative.endswith('HappyLifeParent/Info.plist') and flavor == 'legacy':
+        for entry in info.get('CFBundleURLTypes', []):
+            entry['CFBundleURLSchemes'] = ['linkomomentx' if scheme == 'linkomoment' else scheme for scheme in entry.get('CFBundleURLSchemes', [])]
     info['CFBundleDisplayName'] = english_name
     info['CFBundleLocalizations'] = ['en', 'zh-Hans']
     path.write_bytes(plistlib.dumps(info))

@@ -513,6 +513,7 @@ private struct DearTimelineEntry: Identifiable {
 struct DearSocialView: View {
     @ObservedObject var store: FamilyStore
     var showLogout = false
+    @State private var invitationToOpen: MomentActivityLink?
     @State private var spaces: [DearRecord] = []
     @State private var joinedActivities: [DearRecord] = []
     @State private var activities: [DearRecord] = []
@@ -755,8 +756,14 @@ struct DearSocialView: View {
                 if showLogout { ToolbarItem(placement: .topBarLeading) { Button("退出") { store.logout() } } }
             }
             .refreshable { await refresh() }
-            .task { await refresh() }
-            .onChange(of: spaceId) { _, _ in activityId = ""; showingActivity = false; selectedPhoto = nil; showingActivityManagement = false; activities = []; photos = []; activityError = ""; activityLoading = true; run { try await loadActivities() } }
+            .task(id: store.pendingActivityLink?.id) { await refresh(); await openPendingActivityLink() }
+            .alert("加入邀请中的活动？", isPresented: Binding(get: { invitationToOpen != nil }, set: { if !$0 { invitationToOpen = nil } })) {
+                Button("确认加入") {
+                    if let link = invitationToOpen { invitationToOpen = nil; run { try await acceptActivityLink(link) } }
+                }
+                Button("取消", role: .cancel) { invitationToOpen = nil }
+            } message: { Text("确认后使用当前登录账号接受活动邀请，并查看活动内容。") }
+            .onChange(of: spaceId) { _, _ in if !showingActivity { activityId = ""; selectedPhoto = nil; showingActivityManagement = false; photos = [] }; activities = []; activityError = ""; activityLoading = true; run { try await loadActivities() } }
             .navigationDestination(isPresented: $showingActivity) { activityDetail }
             .sheet(isPresented: $showingActivityManagement) { activityManagement }
             .sheet(isPresented: $showingActivityCreate) { activityCreateSheet }
@@ -1446,6 +1453,34 @@ struct DearSocialView: View {
         do { try await load() }
         catch is CancellationError {} catch { self.error = error.localizedDescription }
     }
+    private func openPendingActivityLink() async {
+        guard !Task.isCancelled, let link = store.pendingActivityLink else { return }
+        if link.invitation != nil { invitationToOpen = link; store.pendingActivityLink = nil; return }
+        do {
+            try openLinkedActivity(tenant: link.tenantID, activity: link.activityID)
+            store.pendingActivityLink = nil
+        } catch { self.error = error.localizedDescription; store.pendingActivityLink = nil }
+    }
+
+    private func openLinkedActivity(tenant: UUID, activity: UUID) throws {
+        guard let item = joinedActivities.first(where: {
+            UUID(uuidString: $0.id) == activity && UUID(uuidString: $0.text("sourceTenantId")) == tenant
+        }) else { throw APIError.message("当前账号尚未加入这场活动，请使用活动邀请链接或联系发起人。") }
+        activityId = item.id; showingActivity = true
+    }
+
+    private func acceptActivityLink(_ link: MomentActivityLink) async throws {
+        guard let invitation = link.invitation,
+              let token = invitation.addingPercentEncoding(withAllowedCharacters: .alphanumerics),
+              let response = try await store.call(base + "invites/link/\(token)/accept", method: "POST", body: [:]) as? [String: Any],
+              let tenant = (response["tenantId"] as? String).flatMap(UUID.init(uuidString:)),
+              let activity = (response["activityId"] as? String).flatMap(UUID.init(uuidString:)) else {
+            throw APIError.message("邀请无效或已过期，请联系发起人重新分享。")
+        }
+        try await load()
+        try openLinkedActivity(tenant: tenant, activity: activity)
+    }
+
     private func load() async throws {
         error = ""
         let loaded = try DearRecord.list(await store.call(base + "tenants"))

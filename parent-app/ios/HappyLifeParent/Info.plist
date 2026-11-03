@@ -40,6 +40,7 @@
 			<key>CFBundleURLSchemes</key>
 			<array>
 				<string>linkofamily</string>
+				<string>linkomoment</string>
 			</array>
 		</dict>
 	</array>

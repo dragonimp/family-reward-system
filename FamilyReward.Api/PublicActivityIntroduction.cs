@@ -29,6 +29,11 @@ internal static class PublicActivityIntroduction
                 ? $"/dear/spaces/{tenantId:D}/activities/{activityId:D}"
                 : "/moment/?invite=" + Uri.EscapeDataString(invite);
             enter = WebUtility.HtmlEncode(enter);
+            var appQuery = $"tenantId={tenantId:D}&activityId={activityId:D}" +
+                (string.IsNullOrEmpty(invite) ? "" : "&invite=" + Uri.EscapeDataString(invite));
+            var appLink = WebUtility.HtmlEncode("linkofamily://activity?" + appQuery);
+            var smartLink = WebUtility.HtmlEncode("linkomoment://activity?" + appQuery);
+            var legacyLink = WebUtility.HtmlEncode("linkomomentx://activity?" + appQuery);
             var nonce = Guid.NewGuid().ToString("N");
             context.Response.Headers.CacheControl = "no-store";
             context.Response.Headers.XContentTypeOptions = "nosniff";
@@ -36,13 +41,16 @@ internal static class PublicActivityIntroduction
             context.Response.Headers.ContentSecurityPolicy = $"default-src 'none'; style-src 'unsafe-inline'; script-src 'nonce-{nonce}'; base-uri 'none'; frame-ancestors 'none'";
             return Results.Content($$"""
                 <!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-                <title>{{title}} · Linko Moment</title><meta property="og:title" content="{{title}}"><meta property="og:type" content="website">
+                <meta name="apple-itunes-app" content="app-id=6828813434, app-argument={{smartLink}}"><title>{{title}} · Linko Moment</title><meta property="og:title" content="{{title}}"><meta property="og:type" content="website">
                 <meta property="og:description" content="{{description}}"><meta name="description" content="{{description}}">
-                <style>body{font-family:system-ui,sans-serif;background:#f4f7f5;color:#183a31;margin:0;padding:24px}main{max-width:680px;margin:8vh auto;background:white;border-radius:20px;padding:32px}h1{overflow-wrap:anywhere}p{white-space:pre-wrap;line-height:1.8}a{display:inline-block;padding:12px 20px;background:#126b51;color:white;border-radius:10px;text-decoration:none}small{display:block;margin-top:20px;color:#687b73}</style></head>
+                <style>body{font-family:system-ui,sans-serif;background:#f4f7f5;color:#183a31;margin:0;padding:24px}main{max-width:680px;margin:8vh auto;background:white;border-radius:20px;padding:32px}h1{overflow-wrap:anywhere}p{white-space:pre-wrap;line-height:1.8}a{display:inline-block;padding:12px 20px;background:#126b51;color:white;border-radius:10px;text-decoration:none}.actions{display:flex;gap:12px;flex-wrap:wrap}.secondary{background:#e6f2ed;color:#126b51}.install{background:#fff;color:#126b51;border:1px solid #b7cec3}details{margin-top:20px}small{display:block;margin-top:20px;color:#687b73}</style></head>
                 <body><main><span>Linko Moment · 活动介绍</span><h1>{{title}}</h1><p>{{description}}</p><p><time datetime="{{date}}"></time></p>
-                <a href="{{enter}}">进入活动</a>
+                <div class="actions"><a id="open-app" href="{{appLink}}">在 App 中打开</a><a class="secondary" href="{{enter}}">继续网页版 · 进入活动</a>
+                <a class="install" href="https://testflight.apple.com/join/dAHHKXM7" rel="noreferrer">安装测试版（Linko MomentX）</a></div>
+                <p id="app-help" hidden>如果没有打开 App，可先安装 TestFlight 并接受测试邀请。安装后返回本页，再点“在 App 中打开”。微信内无法唤起时，可从右上角菜单选择在浏览器中打开；也可继续网页版。</p>
+                <details><summary>使用旧版 Linko MomentX？</summary><p><a href="{{legacyLink}}">在 Linko MomentX 中打开</a></p></details>
                 <small>活动介绍公开可见。进入活动查看照片、动态和成员时，需要登录并验证访问权限。</small></main>
-                <script nonce="{{nonce}}">const t=document.querySelector('time');if(t.dateTime)t.textContent=new Date(t.dateTime).toLocaleString()+'（当地时间）';</script></body></html>
+                <script nonce="{{nonce}}">const t=document.querySelector('time');if(t.dateTime)t.textContent=new Date(t.dateTime).toLocaleString()+'（当地时间）';document.querySelector('#open-app').addEventListener('click',()=>{setTimeout(()=>{if(!document.hidden)document.querySelector('#app-help').hidden=false;},1500);});</script></body></html>
                 """, "text/html; charset=utf-8");
         }).AllowAnonymous();
     }
