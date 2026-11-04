@@ -9,8 +9,8 @@
     <Nullable>enable</Nullable>
     <ApplicationTitle>Linko Moment</ApplicationTitle>
     <ApplicationId>net.impx.happylife</ApplicationId>
-    <ApplicationDisplayVersion>1.0.3</ApplicationDisplayVersion>
-    <ApplicationVersion>12</ApplicationVersion>
+    <ApplicationDisplayVersion>1.0.4</ApplicationDisplayVersion>
+    <ApplicationVersion>13</ApplicationVersion>
     <SupportedOSPlatformVersion>26</SupportedOSPlatformVersion>
     <AgentIdentityNativeClientProject Condition="'$(AgentIdentityNativeClientProject)' == ''">$(MSBuildThisFileDirectory)../../../AgentIdentity/src/AgentIdentity.NativeClient/AgentIdentity.NativeClient.csproj</AgentIdentityNativeClientProject>
   </PropertyGroup>
