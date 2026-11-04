@@ -207,15 +207,12 @@ public sealed class FamilyPage : ContentPage
     {
         content.Add(Heading("我的", 21));
         content.Add(Heading("用户与权益", 17));
-        var accountRow = new Grid { ColumnDefinitions = new ColumnDefinitionCollection { new(GridLength.Star), new(GridLength.Auto) }, ColumnSpacing = 8 };
-        var userLabel = new Label { Text = "👤 " + (store.Profile?.Text("username") ?? "家长"), FontSize = 18, VerticalTextAlignment = TextAlignment.Center };
-        var profileTap = new TapGestureRecognizer();
-        profileTap.Tapped += async (_, _) => await Browser.Default.OpenAsync(new Uri("https://auth.ai.xmkurt.com/personal/info"), BrowserLaunchMode.SystemPreferred);
-        userLabel.GestureRecognizers.Add(profileTap);
-        SemanticProperties.SetDescription(userLabel, "打开用户中心个人信息");
-        accountRow.Add(userLabel, 0, 0);
-        accountRow.Add(Button("↪ 退出登录", () => _ = Logout()), 1, 0);
-        content.Add(accountRow);
+        content.Add(new AgentIdentity.Maui.UserCenterAccountRow {
+            Username = store.AccountProfile?.Username ?? store.Profile?.Text("username") ?? "",
+            DisplayName = store.AccountProfile?.DisplayName, IconEmoji = store.AccountProfile?.IconEmoji,
+            ProfileCommand = new Command(async () => await Browser.Default.OpenAsync(new Uri("https://auth.ai.xmkurt.com/personal/info"), BrowserLaunchMode.SystemPreferred)),
+            LogoutCommand = new Command(async () => await Logout()) });
+        if (store.AccountProfileError is { } profileError) content.Add(new Label { Text = profileError, FontSize = 12 });
         content.Add(Button("🔑 修改密码", () => _ = Browser.Default.OpenAsync(new Uri("https://auth.ai.xmkurt.com/personal/info?section=password"), BrowserLaunchMode.SystemPreferred)));
         content.Add(Button("🚫 账号注销", () => _ = DeleteAccount()));
         content.Add(Button("✦ 套餐权益", () => _ = Navigation.PushAsync(new SubscriptionBenefitsPage(store))));

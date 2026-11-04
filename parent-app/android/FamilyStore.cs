@@ -35,6 +35,8 @@ public sealed class FamilyStore
     public bool ParentReady => Profile is { } profile && profile.Text("role") == "parent" && !profile.Bool("needsRole");
     public string? DisplayCode { get; private set; }
     public FamilyRecord? Profile { get; private set; }
+    public UserCenterProfile? AccountProfile { get; private set; }
+    public string? AccountProfileError { get; private set; }
     public List<FamilyRecord> Groups { get; private set; } = [];
     public List<FamilyRecord> Children { get; private set; } = [];
     public List<FamilyRecord> Rules { get; private set; } = [];
@@ -95,7 +97,7 @@ public sealed class FamilyStore
         session.Clear();
         SecureStorage.Default.Remove(SessionKey);
         Authenticated = false;
-        Profile = null;
+        Profile = null; AccountProfile = null; AccountProfileError = null;
         GroupId = 0;
         Groups = []; Children = []; Rules = []; Requests = []; Transactions = [];
     }
@@ -131,6 +133,18 @@ public sealed class FamilyStore
         var profile = new FamilyRecord(await CallAsync("/api/user/profile?channel=pc"));
         if (current != generation) return;
         Profile = profile;
+        try {
+            var identityToken = await session.GetTokenAsync();
+            if (identityToken is not null) {
+                using var identityHttp = new HttpClient { Timeout = TimeSpan.FromSeconds(10) };
+                var accountProfile = await new UserCenterProfileClient(identityHttp, new Uri("https://auth.ai.xmkurt.com")).GetAsync(identityToken);
+                if (current != generation) return;
+                AccountProfile = accountProfile; AccountProfileError = null;
+            }
+        } catch (Exception) {
+            if (current != generation) return;
+            AccountProfile = null; AccountProfileError = "用户中心资料暂不可用";
+        }
         if (!ParentReady) return;
         var groups = FamilyRecord.Array(await CallAsync("/api/family-groups"));
         if (current != generation) return;
