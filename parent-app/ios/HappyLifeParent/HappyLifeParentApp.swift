@@ -498,22 +498,12 @@ struct AccountView: View {
         NavigationStack {
             List {
                 Section("用户与权益") {
-                    HStack {
-                        Link(destination: URL(string: "https://auth.ai.xmkurt.com/personal/info")!) {
-                            Label {
-                                VStack(alignment: .leading, spacing: 2) {
-                                    Text(userInfo?.username ?? store.profile?.text("username") ?? "账号")
-                                    if let name = userInfo?.displayName, name != userInfo?.username {
-                                        Text(name).font(.caption).foregroundStyle(.secondary)
-                                    }
-                                }
-                            } icon: { Image(systemName: "person.crop.circle") }
-                        }.buttonStyle(.plain)
-                        Spacer()
-                        Button { logout = true } label: {
-                            Label("退出登录", systemImage: "rectangle.portrait.and.arrow.right")
-                        }.font(.subheadline)
-                    }
+                    AgentIdentityAccountRow(iconEmoji: userInfo?.iconEmoji,
+                                            username: userInfo?.username ?? store.profile?.text("username") ?? "账号",
+                                            displayName: userInfo?.displayName,
+                                            logoutTitle: "退出登录") { label in
+                        Link(destination: URL(string: "https://auth.ai.xmkurt.com/personal/info")!) { label }
+                    } onLogout: { logout = true }
                     Link(destination: URL(string: "https://auth.ai.xmkurt.com/personal/info?section=password")!) {
                         Label("修改密码", systemImage: "key")
                     }
