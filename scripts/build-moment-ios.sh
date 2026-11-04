@@ -14,25 +14,27 @@ source_dir="$ATLAS_BUILD_WORK/source"
 mkdir -p "$source_dir"
 git -C "$root" archive "$commit" | tar -x -C "$source_dir"
 common="$(git -C "$root" rev-parse --path-format=absolute --git-common-dir)"
-mkdir -p "$ATLAS_BUILD_WORK/AgentIdentity" "$ATLAS_BUILD_WORK/MyVnc"
+mkdir -p "$ATLAS_BUILD_WORK/AgentIdentity" "$ATLAS_BUILD_WORK/MyVnc" "$ATLAS_BUILD_WORK/Atlas"
 connect_root="$(dirname "$(dirname "$common")")/MyVnc"
 identity_root="$(dirname "$(dirname "$common")")/AgentIdentity"
+atlas_root="$(dirname "$(dirname "$common")")/Atlas"
 
 : "${CONNECT_RTC_LIBRARY_DIR:?Provide the matching committed ios-arm64 Connect native output}"
-python3 - "$connect_root" "$identity_root" "$CONNECT_RTC_LIBRARY_DIR" "$ATLAS_BUILD_OUTPUT" <<'SDK'
+python3 - "$connect_root" "$identity_root" "$CONNECT_RTC_LIBRARY_DIR" "$ATLAS_BUILD_OUTPUT" "$atlas_root" <<'SDK'
 import hashlib,json,subprocess,sys
 from pathlib import Path
-connect,identity,native,output=map(Path,sys.argv[1:])
+connect,identity,native,output,atlas=map(Path,sys.argv[1:])
 receipts={}
-for key,path,scope in [('connect',connect,['sdk/MyVnc.Realtime.Apple','native/rtc']),('identity',identity,['packages/AgentIdentity-iOS'])]:
+packages={'connect':('MyVnc','sdk/MyVnc.Realtime.Apple'),'identity':('AgentIdentity','packages/AgentIdentity-iOS'),'atlas':('Atlas','packages/Atlas-Releases-Apple')}
+for key,path,scope in [('connect',connect,['sdk/MyVnc.Realtime.Apple','native/rtc']),('identity',identity,['packages/AgentIdentity-iOS']),('atlas',atlas,['packages/Atlas-Releases-Apple'])]:
     commit=subprocess.check_output(['git','-C',str(path),'rev-parse','HEAD'],text=True).strip()
     remote=subprocess.check_output(['git','-C',str(path),'ls-remote','origin','refs/heads/main'],text=True).split()[0]
     assert commit==remote, key+' source is not pushed main'
     subprocess.run(['git','-C',str(path),'diff','--quiet','HEAD','--',*scope],check=True)
     receipts[key]=commit
     # Freeze only the public SDK inputs; unrelated concurrent app work stays outside the archive.
-    target=Path(__import__('os').environ['ATLAS_BUILD_WORK'])/('MyVnc' if key=='connect' else 'AgentIdentity')
-    package='sdk/MyVnc.Realtime.Apple' if key=='connect' else 'packages/AgentIdentity-iOS'
+    directory,package=packages[key]
+    target=Path(__import__('os').environ['ATLAS_BUILD_WORK'])/directory
     archive=subprocess.Popen(['git','-C',str(path),'archive',commit,package],stdout=subprocess.PIPE)
     subprocess.run(['tar','-x','-C',str(target)],stdin=archive.stdout,check=True)
     archive.stdout.close(); assert archive.wait()==0
