@@ -1,3 +1,4 @@
+import AgentIdentityLocalization
 import Foundation
 
 enum DearShareInbox {
@@ -31,7 +32,7 @@ enum DearShareInbox {
     static func root() throws -> URL {
         guard let url = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: groupID) else {
             throw NSError(domain: "DearShareInbox", code: 1,
-                          userInfo: [NSLocalizedDescriptionKey: "共享空间不可用，请重新安装 Linko Moment。"])
+                          userInfo: [NSLocalizedDescriptionKey: String(localized: "共享空间不可用，请重新安装 Linko Moment。", bundle: AgentIdentityLanguage.appBundle(language: AgentIdentityLanguage.current(defaults: UserDefaults(suiteName: groupID) ?? .standard)), locale: Locale(identifier: AgentIdentityLanguage.current(defaults: UserDefaults(suiteName: groupID) ?? .standard)))])
         }
         return url
     }

@@ -12,18 +12,24 @@ struct Record: Identifiable {
     func amount(_ key: String) -> String { number(key).formatted(.number.precision(.fractionLength(0...2))) }
     static func list(_ value: Any, key: String) throws -> [Record] {
         guard let object = value as? [String: Any], let rows = object[key] else {
-            throw APIError.message("服务返回的\(key)数据格式不正确。")
+            throw APIError.invalidData(key)
         }
         return try list(rows)
     }
     static func list(_ value: Any) throws -> [Record] {
-        guard let values = value as? [[String: Any]] else { throw APIError.message("服务返回的数据格式不正确。") }
+        guard let values = value as? [[String: Any]] else { throw APIError.invalidData(nil) }
         return values.map { Record(fields: $0) }
     }
 }
 enum APIError: LocalizedError {
     case message(String)
-    var errorDescription: String? { if case .message(let text) = self { return text }; return nil }
+    case invalidData(String?)
+    var errorDescription: String? {
+        switch self {
+        case .message(let text): return text
+        case .invalidData: return "The service returned invalid data."
+        }
+    }
 }
 struct FormField: Identifiable {
     let key: String

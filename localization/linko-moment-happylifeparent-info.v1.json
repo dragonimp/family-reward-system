@@ -1,0 +1,20 @@
+{
+  "catalogVersion": 1,
+  "messages": {
+    "moment.nsmotionusagedescription": {
+      "iosKey": "NSMotionUsageDescription",
+      "zh-Hans": "在您开始运动后读取本机步数，用于散步、慢跑等运动记录。",
+      "en": "Linko Moment uses motion data to count steps during your exercise sessions."
+    },
+    "moment.nscamerausagedescription": {
+      "iosKey": "NSCameraUsageDescription",
+      "zh-Hans": "扫描孩子手表的二维码以填写配对码并确认绑定。",
+      "en": "Linko Moment uses the camera to scan watch pairing QR codes."
+    },
+    "moment.nslocationwheninuseusagedescription": {
+      "iosKey": "NSLocationWhenInUseUsageDescription",
+      "zh-Hans": "在活动中主动打卡时获取当前位置、地址和海拔，并保存到该活动。",
+      "en": "Linko Moment uses your location to record exercise routes and activity check-ins when you choose to use these features."
+    }
+  }
+}

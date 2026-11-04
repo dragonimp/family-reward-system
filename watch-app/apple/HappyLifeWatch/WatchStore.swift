@@ -1,3 +1,4 @@
+import AgentIdentityLocalization
 import SwiftUI
 #if canImport(WatchConnectivity)
 import WatchConnectivity
@@ -21,7 +22,7 @@ private final class WatchActivityTransport: NSObject, WCSessionDelegate {
 
     func request(_ message: [String: Any]) async throws -> [String: Any] {
         guard let session, session.activationState == .activated, session.isReachable else {
-            throw APIError(status: 0, message: "请让配对的 iPhone 保持连接，并在 iPhone 上登录 Linko Moment 后重试。")
+            throw APIError(status: 0, message: String(localized: "请让配对的 iPhone 保持连接，并在 iPhone 上登录 Linko Moment 后重试。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)))
         }
         return try await withCheckedThrowingContinuation { continuation in
             session.sendMessage(message, replyHandler: { reply in
@@ -29,7 +30,7 @@ private final class WatchActivityTransport: NSObject, WCSessionDelegate {
                     continuation.resume(throwing: APIError(status: 0, message: error))
                 } else { continuation.resume(returning: reply) }
             }, errorHandler: { error in
-                continuation.resume(throwing: APIError(status: 0, message: "无法连接配对的 iPhone：\(error.localizedDescription)"))
+                continuation.resume(throwing: APIError(status: 0, message: String(localized: "无法连接配对的 iPhone：\(watchDisplayError(error))", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))))
             })
         }
     }
@@ -39,7 +40,7 @@ private final class WatchActivityTransport: NSObject, WCSessionDelegate {
     func sendPhoto(_ data: Data, metadata: [String: Any]) async throws {
         guard let session, session.activationState == .activated,
               let operationID = metadata["operationId"] as? String else {
-            throw APIError(status: 0, message: "手表与 iPhone 的照片传输尚未就绪。")
+            throw APIError(status: 0, message: String(localized: "手表与 iPhone 的照片传输尚未就绪。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)))
         }
         let path = FileManager.default.temporaryDirectory.appendingPathComponent(operationID + ".jpg")
         try data.write(to: path, options: .atomic)
@@ -50,7 +51,7 @@ private final class WatchActivityTransport: NSObject, WCSessionDelegate {
                 try? await Task.sleep(for: .seconds(120))
                 guard let pending = photoTransfers.removeValue(forKey: operationID) else { return }
                 pending.1.cancel()
-                pending.0.resume(throwing: APIError(status: 0, message: "照片传输超时，请让配对的 iPhone 保持连接后重试。"))
+                pending.0.resume(throwing: APIError(status: 0, message: String(localized: "照片传输超时，请让配对的 iPhone 保持连接后重试。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))))
             }
         }
     }
@@ -69,10 +70,10 @@ private final class WatchActivityTransport: NSObject, WCSessionDelegate {
 private final class WatchActivityTransport {
     func activate() { }
     func request(_ message: [String: Any]) async throws -> [String: Any] {
-        throw APIError(status: 0, message: "手表活动照片需要 Apple Watch。")
+        throw APIError(status: 0, message: String(localized: "手表活动照片需要 Apple Watch。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)))
     }
     func sendPhoto(_ data: Data, metadata: [String: Any]) async throws {
-        throw APIError(status: 0, message: "手表活动照片需要 Apple Watch。")
+        throw APIError(status: 0, message: String(localized: "手表活动照片需要 Apple Watch。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)))
     }
 }
 #endif
@@ -84,7 +85,7 @@ final class WatchStore: ObservableObject {
         let challenge: PairingChallenge
     }
     @Published private(set) var pairing: PairingChallenge?
-    @Published private(set) var pairingMessage = "请家长扫码，或在家庭管理中输入设备码"
+    @Published private(set) var pairingMessage = String(localized: "请家长扫码，或在家庭管理中输入设备码", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))
     @Published private(set) var pairingExpired = false
     @Published private(set) var token: String?
     @Published private(set) var score: ScoreResponse?
@@ -108,6 +109,9 @@ final class WatchStore: ObservableObject {
     @Published var message: String?
     private let api: WatchAPI
     private let activityTransport = WatchActivityTransport()
+    // Watch pairing is a device credential; it does not prove the paired phone's account owns this Watch identity.
+    lazy var languagePreferences = AgentIdentityLanguageStore(applicationKey: "net.impx.happylife.parent.watchkitapp",
+        load: { nil }, save: { _ in })
     private let readCredential: () throws -> String?
     private let saveCredential: (String) throws -> Void
     private let clearCredential: () throws -> Void
@@ -154,7 +158,7 @@ final class WatchStore: ObservableObject {
             }
             self.pairing = challenge
             self.pairingExpired = false
-            self.pairingMessage = "请家长扫码，或在家庭管理中输入设备码"
+            self.pairingMessage = String(localized: "请家长扫码，或在家庭管理中输入设备码", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))
         }
     }
 
@@ -170,10 +174,10 @@ final class WatchStore: ObservableObject {
                 await refresh()
             } else if result.status == "expired" {
                 pairingExpired = true
-                pairingMessage = "设备码已过期，请刷新后让家长重新扫码"
-            } else { pairingMessage = "等待家长选择孩子并确认绑定" }
+                pairingMessage = String(localized: "设备码已过期，请刷新后让家长重新扫码", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))
+            } else { pairingMessage = String(localized: "等待家长选择孩子并确认绑定", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)) }
         } catch {
-            if !Task.isCancelled { pairingMessage = "暂时无法连接，请检查网络；联网后会自动继续" }
+            if !Task.isCancelled { pairingMessage = String(localized: "暂时无法连接，请检查网络；联网后会自动继续", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)) }
         }
     }
 
@@ -186,7 +190,7 @@ final class WatchStore: ObservableObject {
             self.token = response.deviceToken
             do { try self.saveCredential(response.deviceToken) }
             catch {
-                throw APIError(status: 0, message: "绑定已成功，但凭据保存失败。请勿退出 App；请解锁手表后点击刷新重试保存。")
+                throw APIError(status: 0, message: String(localized: "绑定已成功，但凭据保存失败。请勿退出 App；请解锁手表后点击刷新重试保存。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)))
             }
             try await self.load()
         }
@@ -204,10 +208,10 @@ final class WatchStore: ObservableObject {
             guard let token = self.token else { return }
             try await self.api.send("requests", token: token, body: [
                 "rule_id": String(rule.id), "note": note])
-            self.message = "已提交，等待家长确认"
+            self.message = String(localized: "已提交，等待家长确认", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))
             // A refresh failure must not suggest that the successful write should be retried.
             do { try await self.load() }
-            catch { self.message = "申请已提交；列表刷新失败，请点击刷新查看，勿重复提交。" }
+            catch { self.message = String(localized: "申请已提交；列表刷新失败，请点击刷新查看，勿重复提交。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)) }
         }
     }
 
@@ -216,7 +220,7 @@ final class WatchStore: ObservableObject {
             guard let token = self.token else { return }
             try await self.api.send("device-unbind", token: token, body: ["code": code])
             try self.clearBinding()
-            self.message = "设备已解绑"
+            self.message = String(localized: "设备已解绑", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))
         }
     }
 
@@ -246,12 +250,12 @@ final class WatchStore: ObservableObject {
         defer { socialLoading = false }
         do {
             let reply = try await activityTransport.request(["action": "spaces"])
-            guard let rows = reply["items"] as? [[String: Any]] else { throw APIError(status: 0, message: "空间列表无效。") }
+            guard let rows = reply["items"] as? [[String: Any]] else { throw APIError(status: 0, message: String(localized: "空间列表无效。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) }
             socialSpaces = rows.compactMap { row in
                 guard let id = row["id"] as? String, let name = row["name"] as? String else { return nil }
                 return WatchSocialSpace(id: id, name: name, owner: row["owner"] as? Bool ?? false)
             }
-        } catch { socialError = error.localizedDescription }
+        } catch { socialError = watchDisplayError(error) }
     }
 
     func loadSocialActivities(spaceID: String) async {
@@ -259,14 +263,14 @@ final class WatchStore: ObservableObject {
         defer { socialLoading = false }
         do {
             let reply = try await activityTransport.request(["action": "activities", "spaceId": spaceID])
-            guard let rows = reply["items"] as? [[String: Any]] else { throw APIError(status: 0, message: "活动列表无效。") }
+            guard let rows = reply["items"] as? [[String: Any]] else { throw APIError(status: 0, message: String(localized: "活动列表无效。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) }
             socialActivities = rows.compactMap { row in
                 guard let id = row["id"] as? String, let title = row["title"] as? String else { return nil }
                 return WatchSocialActivity(id: id, title: title,
                                            sourceTenantId: row["sourceTenantId"] as? String ?? spaceID,
                                            canEdit: row["canEdit"] as? Bool ?? false)
             }
-        } catch { socialError = error.localizedDescription }
+        } catch { socialError = watchDisplayError(error) }
     }
 
     func loadSocialPhotos(spaceID: String, activityID: String, more: Bool = false) async {
@@ -277,7 +281,7 @@ final class WatchStore: ObservableObject {
         do {
             let reply = try await activityTransport.request(["action": "photos", "spaceId": spaceID,
                                                              "activityId": activityID, "offset": more ? socialPhotos.count : 0])
-            guard let rows = reply["items"] as? [[String: Any]] else { throw APIError(status: 0, message: "照片列表无效。") }
+            guard let rows = reply["items"] as? [[String: Any]] else { throw APIError(status: 0, message: String(localized: "照片列表无效。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) }
             let page = rows.compactMap { row -> WatchSocialPhoto? in
                 guard let id = row["id"] as? String, let name = row["name"] as? String else { return nil }
                 return WatchSocialPhoto(id: id, name: name, author: row["author"] as? String ?? "",
@@ -286,22 +290,22 @@ final class WatchStore: ObservableObject {
             }
             socialPhotos = more ? socialPhotos + page : page
             socialPhotosHasMore = reply["hasMore"] as? Bool ?? false
-        } catch { socialError = error.localizedDescription }
+        } catch { socialError = watchDisplayError(error) }
     }
 
     func socialPreview(spaceID: String, activityID: String, photoID: String) async throws -> Data {
-        guard token != nil else { throw APIError(status: 401, message: "请先绑定手表。") }
+        guard token != nil else { throw APIError(status: 401, message: String(localized: "请先绑定手表。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) }
         let reply = try await activityTransport.request(["action": "thumbnail", "spaceId": spaceID,
                                                          "activityId": activityID, "photoId": photoID])
         guard let data = reply["image"] as? Data, data.count <= 100_000 else {
-            throw APIError(status: 0, message: "照片预览无法读取。")
+            throw APIError(status: 0, message: String(localized: "照片预览无法读取。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)))
         }
         return data
     }
 
     func socialRequest(_ action: String, spaceID: String? = nil, activityID: String? = nil,
                        fields: [String: Any] = [:]) async throws -> [String: Any] {
-        guard token != nil else { throw APIError(status: 401, message: "请先绑定手表。") }
+        guard token != nil else { throw APIError(status: 401, message: String(localized: "请先绑定手表。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) }
         var message = fields
         message["action"] = action
         if let spaceID { message["spaceId"] = spaceID }
@@ -310,13 +314,13 @@ final class WatchStore: ObservableObject {
     }
 
     func shareSocialPhoto(_ data: Data, spaceID: String, activityID: String) async throws {
-        guard token != nil else { throw APIError(status: 401, message: "请先绑定手表。") }
+        guard token != nil else { throw APIError(status: 401, message: String(localized: "请先绑定手表。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) }
         guard data.count > 0, data.count <= 50 * 1024 * 1024 else {
-            throw APIError(status: 0, message: "照片超过 50 MB，请选择较小的照片。")
+            throw APIError(status: 0, message: String(localized: "照片超过 50 MB，请选择较小的照片。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)))
         }
         let operationID = UUID().uuidString
         try await activityTransport.sendPhoto(data, metadata: ["operationId": operationID,
-            "spaceId": spaceID, "activityId": activityID, "name": "手表照片.jpg"])
+            "spaceId": spaceID, "activityId": activityID, "name": String(localized: "手表照片.jpg", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))])
         for _ in 0..<30 {
             let reply = try await socialRequest("photoTransferStatus", fields: ["operationId": operationID])
             let status = reply["status"] as? String ?? "waiting"
@@ -324,7 +328,7 @@ final class WatchStore: ObservableObject {
             if status.hasPrefix("error: ") { throw APIError(status: 0, message: String(status.dropFirst(7))) }
             try await Task.sleep(for: .seconds(4))
         }
-        throw APIError(status: 0, message: "照片已发送到 iPhone，登记尚未确认，请稍后刷新相册。")
+        throw APIError(status: 0, message: String(localized: "照片已发送到 iPhone，登记尚未确认，请稍后刷新相册。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)))
     }
 
     func makeFriendCode() async {
@@ -339,7 +343,7 @@ final class WatchStore: ObservableObject {
         await perform {
             guard let token = self.token else { return }
             self.friends = try await self.api.call("friends", token: token, body: ["code": code])
-            self.message = "已添加好友"
+            self.message = String(localized: "已添加好友", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))
         }
     }
 
@@ -350,7 +354,7 @@ final class WatchStore: ObservableObject {
             try await self.api.send("warm-moments", token: token, body: [
                 "householdMemberId": String(parentID), "content": content, "inputMethod": "text"])
             saved = true
-            self.message = "已保存，爸爸妈妈会看到这份温暖"
+            self.message = String(localized: "已保存，爸爸妈妈会看到这份温暖", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))
         }
         return saved
     }
@@ -362,7 +366,7 @@ final class WatchStore: ObservableObject {
             self.connections = try await self.api.call("family-connections", token: token, body: [
                 "kind": kind, "title": title, "intent": intent, "requestId": requestID.uuidString])
             saved = true
-            self.message = "已告诉家长，可以一起慢慢聊"
+            self.message = String(localized: "已告诉家长，可以一起慢慢聊", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))
         }
         return saved
     }
@@ -436,9 +440,9 @@ final class WatchStore: ObservableObject {
         defer { busy = false }
         do { try await action() }
         catch let error as APIError where error.status == 401 {
-            do { try clearBinding(); message = "设备绑定已失效，请让家长扫描新的设备码绑定。" }
-            catch { message = error.localizedDescription }
+            do { try clearBinding(); message = String(localized: "设备绑定已失效，请让家长扫描新的设备码绑定。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)) }
+            catch { message = watchDisplayError(error) }
         }
-        catch { message = error.localizedDescription }
+        catch { message = watchDisplayError(error) }
     }
 }

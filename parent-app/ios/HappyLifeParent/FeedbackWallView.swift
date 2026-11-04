@@ -47,6 +47,7 @@ private final class FeedbackWallStore: ObservableObject {
             throw URLError(.badURL)
         }
         var request = URLRequest(url: url)
+        request.setValue(AgentIdentityLanguage.current, forHTTPHeaderField: "Accept-Language")
         request.httpMethod = method
         request.timeoutInterval = 30
         request.setValue("application/json", forHTTPHeaderField: "Accept")
@@ -75,7 +76,7 @@ private final class FeedbackWallStore: ObservableObject {
                 mine = []
             }
             error = nil
-        } catch { self.error = error.localizedDescription }
+        } catch { self.error = momentDisplayError(error) }
     }
 
     func submit(requestId: UUID, category: String, title: String, content: String, requestedPublic: Bool) async -> Bool {
@@ -90,7 +91,7 @@ private final class FeedbackWallStore: ObservableObject {
             await refresh()
             return true
         } catch {
-            self.error = error.localizedDescription
+            self.error = momentDisplayError(error)
             return false
         }
     }
@@ -102,7 +103,7 @@ private final class FeedbackWallStore: ObservableObject {
         do {
             let _: WallPost = try await call("/\(post.id)/vote", method: "PUT", body: ["value": value])
             await refresh()
-        } catch { self.error = error.localizedDescription }
+        } catch { self.error = momentDisplayError(error) }
     }
 }
 
@@ -110,9 +111,9 @@ private enum WallError: LocalizedError {
     case loginRequired, unavailable, server(Int)
     var errorDescription: String? {
         switch self {
-        case .loginRequired: "请先在“我的”登录用户中心。"
-        case .unavailable: "反馈服务暂时不可用。"
-        case .server(let code): "反馈服务返回错误（\(code)），请稍后重试。"
+        case .loginRequired: String(localized: "请先在“我的”登录用户中心。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))
+        case .unavailable: String(localized: "反馈服务暂时不可用。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))
+        case .server(let code): String(localized: "反馈服务返回错误（\(code)），请稍后重试。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))
         }
     }
 }
@@ -130,17 +131,17 @@ struct FeedbackWallView: View {
     var body: some View {
         List {
             Section {
-                Picker("栏目", selection: $category) {
-                    Text("心愿墙").tag("wish")
-                    Text("意见墙").tag("opinion")
+                Picker(String(localized: "栏目", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), selection: $category) {
+                    Text(String(localized: "心愿墙", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))).tag("wish")
+                    Text(String(localized: "意见墙", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))).tag("opinion")
                 }
                 .pickerStyle(.segmented)
                 HStack {
-                    Text("已公开 \(store.snapshot.total)")
+                    Text(String(localized: "已公开 \(store.snapshot.total)", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)))
                     Spacer()
-                    Text("赞成 \(store.snapshot.upvotes)")
+                    Text(String(localized: "赞成 \(store.snapshot.upvotes)", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)))
                     Spacer()
-                    Text("反对 \(store.snapshot.downvotes)")
+                    Text(String(localized: "反对 \(store.snapshot.downvotes)", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)))
                 }
                 .font(.footnote)
                 .foregroundStyle(.secondary)
@@ -148,22 +149,22 @@ struct FeedbackWallView: View {
             if let error = store.error {
                 Section { Text(error).foregroundStyle(.red) }
             }
-            Section(category == "wish" ? "心愿提案 · \(store.snapshot.wishes)" : "意见提案 · \(store.snapshot.opinions)") {
+            Section(category == "wish" ? String(localized: "心愿提案 · \(store.snapshot.wishes)", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)) : String(localized: "意见提案 · \(store.snapshot.opinions)", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) {
                 if store.snapshot.items.contains(where: { $0.category == category }) {
                     ForEach(store.snapshot.items.filter { $0.category == category }) { post in
                         postRow(post, voting: true)
                     }
                 } else {
-                    Text("还没有审核通过的提案").foregroundStyle(.secondary)
+                    Text(String(localized: "还没有审核通过的提案", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))).foregroundStyle(.secondary)
                 }
             }
         }
-        .navigationTitle("用户反馈")
+        .navigationTitle(String(localized: "用户反馈", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)))
         .toolbar {
             ToolbarItemGroup(placement: .topBarTrailing) {
-                Button("我的反馈") { showingMine = true }
+                Button(String(localized: "我的反馈", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) { showingMine = true }
                 Button { showingComposer = true } label: { Image(systemName: "square.and.pencil") }
-                    .accessibilityLabel("发布反馈")
+                    .accessibilityLabel(String(localized: "发布反馈", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)))
             }
         }
         .refreshable { await store.refresh() }
@@ -178,15 +179,15 @@ struct FeedbackWallView: View {
             NavigationStack {
                 List {
                     if !store.isAuthenticated {
-                        Text("请先返回“我的”登录用户中心。").foregroundStyle(.secondary)
+                        Text(String(localized: "请先返回“我的”登录用户中心。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))).foregroundStyle(.secondary)
                     } else if store.mine.isEmpty {
-                        Text("还没有提交反馈。").foregroundStyle(.secondary)
+                        Text(String(localized: "还没有提交反馈。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))).foregroundStyle(.secondary)
                     } else {
                         ForEach(store.mine) { post in postRow(post, voting: false) }
                     }
                 }
-                .navigationTitle("我的反馈")
-                .toolbar { Button("完成") { showingMine = false } }
+                .navigationTitle(String(localized: "我的反馈", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)))
+                .toolbar { Button(String(localized: "完成", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) { showingMine = false } }
                 .refreshable { await store.refresh() }
             }
         }
@@ -208,14 +209,14 @@ struct FeedbackWallView: View {
                     } label: {
                         Label("\(post.downvotes)", systemImage: post.myVote == -1 ? "hand.thumbsdown.fill" : "hand.thumbsdown")
                     }
-                    Text("净支持 \(post.score)").foregroundStyle(.secondary)
+                    Text(String(localized: "净支持 \(post.score)", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))).foregroundStyle(.secondary)
                 }
                 .buttonStyle(.borderless)
                 .disabled(post.isMine || store.busy)
             } else {
                 Text(status(post)).font(.footnote).foregroundStyle(.secondary)
                 if let reply = post.replyContent, !reply.isEmpty {
-                    Text("回复：\(reply)").font(.footnote)
+                    Text(String(localized: "回复：\(reply)", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))).font(.footnote)
                 }
             }
         }
@@ -224,11 +225,11 @@ struct FeedbackWallView: View {
 
     private func status(_ post: WallPost) -> String {
         switch post.moderationStatus {
-        case "private": "仅自己可见"
-        case "pending": "申请公开 · 待审核"
-        case "approved": "已公开"
-        case "rejected": "公开申请未通过"
-        default: "处理中"
+        case "private": String(localized: "仅自己可见", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))
+        case "pending": String(localized: "申请公开 · 待审核", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))
+        case "approved": String(localized: "已公开", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))
+        case "rejected": String(localized: "公开申请未通过", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))
+        default: String(localized: "处理中", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))
         }
     }
 }
@@ -249,28 +250,28 @@ private struct FeedbackComposer: View {
         NavigationStack {
             Form {
                 Section {
-                    TextField("简短标题", text: $title)
+                    TextField(String(localized: "简短标题", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), text: $title)
                         .focused($titleFocused)
                     TextEditor(text: $content)
                         .frame(minHeight: 150)
-                        .accessibilityLabel("反馈内容")
+                        .accessibilityLabel(String(localized: "反馈内容", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)))
                 } header: {
-                    Text(category == "wish" ? "提交心愿" : "提交意见")
+                    Text(category == "wish" ? String(localized: "提交心愿", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)) : String(localized: "提交意见", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)))
                 }
                 Section {
-                    Toggle("审核通过后公开展示", isOn: $requestedPublic)
-                    Text("关闭时仅自己和管理员可见。开启后，审核通过才会出现在公开墙，其他用户可点赞或点踩。")
+                    Toggle(String(localized: "审核通过后公开展示", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), isOn: $requestedPublic)
+                    Text(String(localized: "关闭时仅自己和管理员可见。开启后，审核通过才会出现在公开墙，其他用户可点赞或点踩。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)))
                         .font(.footnote).foregroundStyle(.secondary)
                 }
                 if let error {
                     Section { Text(error).foregroundStyle(.red) }
                 }
             }
-            .navigationTitle(category == "wish" ? "写心愿" : "提意见")
+            .navigationTitle(category == "wish" ? String(localized: "写心愿", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)) : String(localized: "提意见", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)))
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) { Button("取消") { dismiss() } }
+                ToolbarItem(placement: .cancellationAction) { Button(String(localized: "取消", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) { dismiss() } }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("提交") {
+                    Button(String(localized: "提交", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) {
                         busy = true
                         Task {
                             if await submit(requestId, title.trimmingCharacters(in: .whitespacesAndNewlines),

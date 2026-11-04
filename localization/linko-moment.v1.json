@@ -1,0 +1,4700 @@
+{
+  "catalogVersion": 1,
+  "messages": {
+    "moment.t5a3f06390303": {
+      "zh-Hans": " · 已包含",
+      "en": " · Included",
+      "iosKey": " · 已包含"
+    },
+    "moment.t4a0ebfbdc48c": {
+      "zh-Hans": " · 已开通",
+      "en": " · Activated",
+      "iosKey": " · 已开通"
+    },
+    "moment.t61648a7ff708": {
+      "zh-Hans": " · 我",
+      "en": " · Me",
+      "iosKey": " · 我"
+    },
+    "moment.t57be362a03ec": {
+      "zh-Hans": " · 未开通",
+      "en": " · Not activated",
+      "iosKey": " · 未开通"
+    },
+    "moment.t421f465daee8": {
+      "zh-Hans": " 件",
+      "en": " items",
+      "iosKey": " 件"
+    },
+    "moment.tf21ab50f5fd7": {
+      "zh-Hans": " 元",
+      "en": " CNY",
+      "iosKey": " 元"
+    },
+    "moment.tb75a03ace74c": {
+      "zh-Hans": " 分",
+      "en": " points",
+      "iosKey": " 分"
+    },
+    "moment.td938829c934e": {
+      "zh-Hans": " 可重试同一笔记录，或关闭后在记录页核对。",
+      "en": " You can retry this same record or close and check it on the records page.",
+      "iosKey": " 可重试同一笔记录，或关闭后在记录页核对。"
+    },
+    "moment.tf235a9964706": {
+      "zh-Hans": " 如网络中断，请先检查记录再重试。",
+      "en": " If the connection is interrupted, check the records before trying again.",
+      "iosKey": " 如网络中断，请先检查记录再重试。"
+    },
+    "moment.t32ded95d61e3": {
+      "zh-Hans": " 积分",
+      "en": " points",
+      "iosKey": " 积分"
+    },
+    "moment.t65eb549f6bfd": {
+      "zh-Hans": "%@ #%lld",
+      "en": "%@ #%lld",
+      "iosKey": "%@ #%lld"
+    },
+    "moment.tad918ef6f33b": {
+      "zh-Hans": "%@ (%@)",
+      "en": "%@ (%@)",
+      "iosKey": "%@ (%@)"
+    },
+    "moment.tce126c8e47cf": {
+      "zh-Hans": "%@ · %@",
+      "en": "%@ · %@",
+      "iosKey": "%@ · %@"
+    },
+    "moment.t5f111bd8d4dc": {
+      "zh-Hans": "%@ · 地图",
+      "en": "%@ · Map",
+      "iosKey": "%@ · 地图"
+    },
+    "moment.taed60fcf5dd5": {
+      "zh-Hans": "%@ · 海拔 %@ 米",
+      "en": "%@ · Altitude %@ m",
+      "iosKey": "%@ · 海拔 %@ 米"
+    },
+    "moment.t84bbc0f0e333": {
+      "zh-Hans": "%@ 分",
+      "en": "%@ points",
+      "iosKey": "%@ 分"
+    },
+    "moment.te311a154c4dd": {
+      "zh-Hans": "%@ 测试邀请",
+      "en": "%@ test invitation",
+      "iosKey": "%@ 测试邀请"
+    },
+    "moment.t5edad90b0ad2": {
+      "zh-Hans": "%@ 积分 · %@",
+      "en": "%@ points · %@",
+      "iosKey": "%@ 积分 · %@"
+    },
+    "moment.ta74ffababbb7": {
+      "zh-Hans": "%@ 积分 · ¥%@",
+      "en": "%@ points · ¥%@",
+      "iosKey": "%@ 积分 · ¥%@"
+    },
+    "moment.tdbc45e3c323d": {
+      "zh-Hans": "%@%@%@",
+      "en": "%@%@%@",
+      "iosKey": "%@%@%@"
+    },
+    "moment.t0942cb9c4fb7": {
+      "zh-Hans": "%@%lld",
+      "en": "%@%lld",
+      "iosKey": "%@%lld"
+    },
+    "moment.t3cb32c48619b": {
+      "zh-Hans": "%@的信用分",
+      "en": "%@’s reliability score",
+      "iosKey": "%@的信用分"
+    },
+    "moment.t7d27686997f3": {
+      "zh-Hans": "%@的打卡",
+      "en": "%@’s check-in",
+      "iosKey": "%@的打卡"
+    },
+    "moment.tedf8541e37fb": {
+      "zh-Hans": "%@（当地时间）",
+      "en": "%@ (local time)",
+      "iosKey": "%@（当地时间）"
+    },
+    "moment.t95021053c9a0": {
+      "zh-Hans": "%@，%@",
+      "en": "%@，%@",
+      "iosKey": "%@，%@"
+    },
+    "moment.t3909a0f60531": {
+      "zh-Hans": "%@，%@，%@，%@",
+      "en": "%@，%@，%@，%@",
+      "iosKey": "%@，%@，%@，%@"
+    },
+    "moment.tdaea457f25c8": {
+      "zh-Hans": "%lld",
+      "en": "%lld",
+      "iosKey": "%lld"
+    },
+    "moment.t25c263f4297e": {
+      "zh-Hans": "%lld 个打卡点 · %lld 项定位照片或视频；其他照片也可在地图页查看。",
+      "en": "%lld check-ins · %lld photos or videos with locations. Other photos are also available on the map page.",
+      "iosKey": "%lld 个打卡点 · %lld 项定位照片或视频；其他照片也可在地图页查看。"
+    },
+    "moment.ta28a1418a27f": {
+      "zh-Hans": "%lld 位人物 · %@",
+      "en": "%lld people · %@",
+      "iosKey": "%lld 位人物 · %@"
+    },
+    "moment.t3767ac614b9c": {
+      "zh-Hans": "%lld 位人物 · %lld 位已加入成员",
+      "en": "%lld people · %lld joined members",
+      "iosKey": "%lld 位人物 · %lld 位已加入成员"
+    },
+    "moment.te9784d977554": {
+      "zh-Hans": "%lld 待处理",
+      "en": "%lld pending",
+      "iosKey": "%lld 待处理"
+    },
+    "moment.t0b17363b68cf": {
+      "zh-Hans": "%lld 步",
+      "en": "%lld steps",
+      "iosKey": "%lld 步"
+    },
+    "moment.t371e62028287": {
+      "zh-Hans": "%lld 项未定位",
+      "en": "%lld items without locations",
+      "iosKey": "%lld 项未定位"
+    },
+    "moment.t64ead1ea73db": {
+      "zh-Hans": "%lld年",
+      "en": "%lld",
+      "iosKey": "%lld年"
+    },
+    "moment.t94da2932d03a": {
+      "zh-Hans": "%lld年%lld月",
+      "en": "%lld/%lld",
+      "iosKey": "%lld年%lld月"
+    },
+    "moment.t493b447ec68d": {
+      "zh-Hans": "%lld年%lld月%lld日",
+      "en": "%lld/%lld/%lld",
+      "iosKey": "%lld年%lld月%lld日"
+    },
+    "moment.td365f68f138b": {
+      "zh-Hans": "+%@ 分",
+      "en": "+%@ points",
+      "iosKey": "+%@ 分"
+    },
+    "moment.t1b0049fcfd41": {
+      "zh-Hans": "AI 助手",
+      "en": "AI assistant",
+      "iosKey": "AI 助手"
+    },
+    "moment.t69825479a95e": {
+      "zh-Hans": "AI 对话",
+      "en": "AI chat",
+      "iosKey": "AI 对话"
+    },
+    "moment.tc4424d160bca": {
+      "zh-Hans": "App Store",
+      "en": "App Store",
+      "iosKey": "App Store"
+    },
+    "moment.t5a5c68820fcb": {
+      "zh-Hans": "App Store 暂无可用版本",
+      "en": "No version is available in the App Store",
+      "iosKey": "App Store 暂无可用版本"
+    },
+    "moment.t8fdec194d9fb": {
+      "zh-Hans": "Linko Moment",
+      "en": "Linko Moment",
+      "iosKey": "Linko Moment"
+    },
+    "moment.tfe1982c9d1d1": {
+      "zh-Hans": "Linko Moment %@ (%@)",
+      "en": "Linko Moment %@ (%@)",
+      "iosKey": "Linko Moment %@ (%@)"
+    },
+    "moment.t4c6dc89fb0d9": {
+      "zh-Hans": "Linko Moment 图标",
+      "en": "Linko Moment icon",
+      "iosKey": "Linko Moment 图标"
+    },
+    "moment.tc9709a0e88b6": {
+      "zh-Hans": "Linko Social 返回的数据格式不正确。",
+      "en": "Linko Social returned an invalid data format.",
+      "iosKey": "Linko Social 返回的数据格式不正确。"
+    },
+    "moment.t43d431e1cdfd": {
+      "zh-Hans": "VIP 家庭+",
+      "en": "VIP Family+",
+      "iosKey": "VIP 家庭+"
+    },
+    "moment.t3df1b88ed450": {
+      "zh-Hans": "VIP 表盘",
+      "en": "VIP watch faces",
+      "iosKey": "VIP 表盘"
+    },
+    "moment.tec70a134f98a": {
+      "zh-Hans": "iPhone照片",
+      "en": "iPhone photo",
+      "iosKey": "iPhone照片"
+    },
+    "moment.tcbad9815b380": {
+      "zh-Hans": "iPhone视频.mov",
+      "en": "iPhone video.mov",
+      "iosKey": "iPhone视频.mov"
+    },
+    "moment.t0ebc122c1eeb": {
+      "zh-Hans": "iPhone视频.mp4",
+      "en": "iPhone video.mp4",
+      "iosKey": "iPhone视频.mp4"
+    },
+    "moment.t70953e740cb7": {
+      "zh-Hans": "一起想办法",
+      "en": "Let’s find a solution together",
+      "iosKey": "一起想办法"
+    },
+    "moment.t0b3c2ead977e": {
+      "zh-Hans": "一起照顾每一天",
+      "en": "Care for each day together",
+      "iosKey": "一起照顾每一天"
+    },
+    "moment.td0080e47abda": {
+      "zh-Hans": "一起记录生活里的\n重要时刻",
+      "en": "Record life’s important\nmoments together",
+      "iosKey": "一起记录生活里的\n重要时刻"
+    },
+    "moment.t0d01ff568677": {
+      "zh-Hans": "一起记录生活里的\\n重要时刻",
+      "en": "Record life’s important\\nmoments together",
+      "iosKey": "一起记录生活里的\\n重要时刻"
+    },
+    "moment.t2e33759eb01f": {
+      "zh-Hans": "七天后完成复盘",
+      "en": "Review after seven days",
+      "iosKey": "七天后完成复盘"
+    },
+    "moment.tacfc4e74a650": {
+      "zh-Hans": "下一步",
+      "en": "Next step",
+      "iosKey": "下一步"
+    },
+    "moment.t407a77fa2d0c": {
+      "zh-Hans": "不填写",
+      "en": "Not provided",
+      "iosKey": "不填写"
+    },
+    "moment.t898d41e310d8": {
+      "zh-Hans": "专属测试邀请",
+      "en": "Your test invitation",
+      "iosKey": "专属测试邀请"
+    },
+    "moment.t86a28c087b43": {
+      "zh-Hans": "专心陪伴时间",
+      "en": "Focused time together",
+      "iosKey": "专心陪伴时间"
+    },
+    "moment.tf4d9a7fe32f0": {
+      "zh-Hans": "东经",
+      "en": "East",
+      "iosKey": "东经"
+    },
+    "moment.t1dc40755cb22": {
+      "zh-Hans": "为 %@ 选择族谱中的同一人。本人只能关联已绑定自己账号的人物。",
+      "en": "Select the person in the genealogy who represents %@. You can only link yourself to a person already bound to your account.",
+      "iosKey": "为 %@ 选择族谱中的同一人。本人只能关联已绑定自己账号的人物。"
+    },
+    "moment.t95ae6f6e4190": {
+      "zh-Hans": "为此人添加关系",
+      "en": "Add a relationship for this person",
+      "iosKey": "为此人添加关系"
+    },
+    "moment.t1f8908889283": {
+      "zh-Hans": "互动方式",
+      "en": "Connection activity",
+      "iosKey": "互动方式"
+    },
+    "moment.tfecb2e15ad4d": {
+      "zh-Hans": "互动记录",
+      "en": "Connection records",
+      "iosKey": "互动记录"
+    },
+    "moment.t29e9b3a41f45": {
+      "zh-Hans": "亲子互动",
+      "en": "Parent–child connection",
+      "iosKey": "亲子互动"
+    },
+    "moment.t23546077a2aa": {
+      "zh-Hans": "亲属",
+      "en": "Relative",
+      "iosKey": "亲属"
+    },
+    "moment.ted5bdd4d61ef": {
+      "zh-Hans": "亲属关系",
+      "en": "Family relationships",
+      "iosKey": "亲属关系"
+    },
+    "moment.tac22b5f7c97c": {
+      "zh-Hans": "人类成员",
+      "en": "People",
+      "iosKey": "人类成员"
+    },
+    "moment.t581af8b554ab": {
+      "zh-Hans": "仅保存所选精度，未选定的月日不会补值。",
+      "en": "Only the selected precision is saved. Unselected months or days are not filled in.",
+      "iosKey": "仅保存所选精度，未选定的月日不会补值。"
+    },
+    "moment.tffd621936c2a": {
+      "zh-Hans": "仅可删除没有其他成员、照片或日常记录的活动。",
+      "en": "Only activities without other members, photos, or moments can be deleted.",
+      "iosKey": "仅可删除没有其他成员、照片或日常记录的活动。"
+    },
+    "moment.tbcfcaa96cb44": {
+      "zh-Hans": "仅可删除没有其他成员、照片或日常记录的活动；已发出的邀请会失效。",
+      "en": "Only activities without other members, photos, or moments can be deleted. Existing invitations will expire.",
+      "iosKey": "仅可删除没有其他成员、照片或日常记录的活动；已发出的邀请会失效。"
+    },
+    "moment.t5548466b4ccd": {
+      "zh-Hans": "仅可删除没有活动、其他成员或分享记录的空间。",
+      "en": "Only spaces with no activities, other members, or sharing records can be deleted.",
+      "iosKey": "仅可删除没有活动、其他成员或分享记录的空间。"
+    },
+    "moment.t805d2901c16c": {
+      "zh-Hans": "仅向你要绑定的孩子提供此授权码。",
+      "en": "Give this authorization code only to the child you intend to link.",
+      "iosKey": "仅向你要绑定的孩子提供此授权码。"
+    },
+    "moment.t6ed3a780f2b1": {
+      "zh-Hans": "仅年份",
+      "en": "Year only",
+      "iosKey": "仅年份"
+    },
+    "moment.t33c7823a56bd": {
+      "zh-Hans": "仅自己可见",
+      "en": "Only visible to you",
+      "iosKey": "仅自己可见"
+    },
+    "moment.t9edc64267c30": {
+      "zh-Hans": "今天也要开心成长。",
+      "en": "Keep growing happily today.",
+      "iosKey": "今天也要开心成长。"
+    },
+    "moment.t8614bf415f99": {
+      "zh-Hans": "今日鼓励",
+      "en": "Today’s encouragement",
+      "iosKey": "今日鼓励"
+    },
+    "moment.t7d42cea96c0f": {
+      "zh-Hans": "介绍你与家族的关系（可选）",
+      "en": "Describe your connection to the family (optional)",
+      "iosKey": "介绍你与家族的关系（可选）"
+    },
+    "moment.te3283eae2fbc": {
+      "zh-Hans": "从 80 分开通",
+      "en": "Activate with 80 points",
+      "iosKey": "从 80 分开通"
+    },
+    "moment.te7c3ede5f4bc": {
+      "zh-Hans": "从孩子详情中记录奖励与扣分。",
+      "en": "Record rewards and deductions from the child’s details.",
+      "iosKey": "从孩子详情中记录奖励与扣分。"
+    },
+    "moment.tfd3923828964": {
+      "zh-Hans": "从日历选择生日",
+      "en": "Choose birthday from calendar",
+      "iosKey": "从日历选择生日"
+    },
+    "moment.t0f551a432048": {
+      "zh-Hans": "优先显示照片自带的定位；无定位时使用填写地点。",
+      "en": "Use the photo’s embedded location first; otherwise use the location entered here.",
+      "iosKey": "优先显示照片自带的定位；无定位时使用填写地点。"
+    },
+    "moment.te0c412d97fe3": {
+      "zh-Hans": "会话名称",
+      "en": "Chat name",
+      "iosKey": "会话名称"
+    },
+    "moment.tea5e72963290": {
+      "zh-Hans": "会话状态",
+      "en": "Chat status",
+      "iosKey": "会话状态"
+    },
+    "moment.t359656f33c8d": {
+      "zh-Hans": "会话管理",
+      "en": "Manage chats",
+      "iosKey": "会话管理"
+    },
+    "moment.t5d3850a6c782": {
+      "zh-Hans": "位置访问未获授权。",
+      "en": "Location access is not authorized.",
+      "iosKey": "位置访问未获授权。"
+    },
+    "moment.t04f7a8b0d068": {
+      "zh-Hans": "位置访问未获授权，请在系统设置中开启。",
+      "en": "Location access is not authorized. Enable it in Settings.",
+      "iosKey": "位置访问未获授权，请在系统设置中开启。"
+    },
+    "moment.t61373f8be552": {
+      "zh-Hans": "你的姓名",
+      "en": "Your name",
+      "iosKey": "你的姓名"
+    },
+    "moment.tdf01e14ded47": {
+      "zh-Hans": "使用帮助",
+      "en": "Help",
+      "iosKey": "使用帮助"
+    },
+    "moment.tf59e40cf1d00": {
+      "zh-Hans": "使用现有规则",
+      "en": "Use existing rule",
+      "iosKey": "使用现有规则"
+    },
+    "moment.t43bc80cb7240": {
+      "zh-Hans": "例如：周末野餐",
+      "en": "For example: Weekend picnic",
+      "iosKey": "例如：周末野餐"
+    },
+    "moment.ta3030bf8f16d": {
+      "zh-Hans": "保存",
+      "en": "Save",
+      "iosKey": "保存"
+    },
+    "moment.t75c27efd2c08": {
+      "zh-Hans": "保存基本信息",
+      "en": "Save details",
+      "iosKey": "保存基本信息"
+    },
+    "moment.tc4741780b42c": {
+      "zh-Hans": "保存或分享已获取的 %lld 项",
+      "en": "Save or share %lld downloaded items",
+      "iosKey": "保存或分享已获取的 %lld 项"
+    },
+    "moment.tda2fbbd61e7b": {
+      "zh-Hans": "保存暖心时刻",
+      "en": "Save warm moment",
+      "iosKey": "保存暖心时刻"
+    },
+    "moment.t6110042e7d03": {
+      "zh-Hans": "保存约定",
+      "en": "Save commitment",
+      "iosKey": "保存约定"
+    },
+    "moment.t93426c72e85b": {
+      "zh-Hans": "保存记录",
+      "en": "Save record",
+      "iosKey": "保存记录"
+    },
+    "moment.ta7a9e9726231": {
+      "zh-Hans": "保留扣分",
+      "en": "Keep deduction",
+      "iosKey": "保留扣分"
+    },
+    "moment.t4e789660a26f": {
+      "zh-Hans": "信用分",
+      "en": "Credit score",
+      "iosKey": "信用分"
+    },
+    "moment.ta83921d470d9": {
+      "zh-Hans": "信用分数据格式不正确",
+      "en": "The credit-score data format is invalid",
+      "iosKey": "信用分数据格式不正确"
+    },
+    "moment.te7654cd5e388": {
+      "zh-Hans": "信用分数据格式不正确。",
+      "en": "The credit-score data format is invalid.",
+      "iosKey": "信用分数据格式不正确。"
+    },
+    "moment.td6c9ab873280": {
+      "zh-Hans": "修改“%@”名称",
+      "en": "Rename “%@”",
+      "iosKey": "修改“%@”名称"
+    },
+    "moment.t186c8b2c7b6d": {
+      "zh-Hans": "修改会话名称",
+      "en": "Rename chat",
+      "iosKey": "修改会话名称"
+    },
+    "moment.t9fb4a61cae08": {
+      "zh-Hans": "修改姓名与备注",
+      "en": "Change name and notes",
+      "iosKey": "修改姓名与备注"
+    },
+    "moment.t0e57fac84ae9": {
+      "zh-Hans": "修改孩子资料",
+      "en": "Edit child profile",
+      "iosKey": "修改孩子资料"
+    },
+    "moment.t08d008062411": {
+      "zh-Hans": "修改密码",
+      "en": "Change password",
+      "iosKey": "修改密码"
+    },
+    "moment.t08e2205f0cdd": {
+      "zh-Hans": "修改打卡",
+      "en": "Edit check-in",
+      "iosKey": "修改打卡"
+    },
+    "moment.t98c72dddf3bd": {
+      "zh-Hans": "修改活动名称",
+      "en": "Rename activity",
+      "iosKey": "修改活动名称"
+    },
+    "moment.t737747efb25b": {
+      "zh-Hans": "修改空间名称",
+      "en": "Rename space",
+      "iosKey": "修改空间名称"
+    },
+    "moment.t8d85fca3c58e": {
+      "zh-Hans": "兄弟姐妹",
+      "en": "Siblings",
+      "iosKey": "兄弟姐妹"
+    },
+    "moment.t2d4eaa0abd22": {
+      "zh-Hans": "兄弟姐妹的子女",
+      "en": "Siblings’ children",
+      "iosKey": "兄弟姐妹的子女"
+    },
+    "moment.tc8b3152b3579": {
+      "zh-Hans": "先听听",
+      "en": "Listen first",
+      "iosKey": "先听听"
+    },
+    "moment.t51c9a67299ec": {
+      "zh-Hans": "先听我说",
+      "en": "Hear me first",
+      "iosKey": "先听我说"
+    },
+    "moment.td950f6ded12b": {
+      "zh-Hans": "先邀请对方加入本空间的活动，再从活动访客设为空间成员。空间成员可查看本空间的所有原生活动；收藏活动仍遵循原活动权限。",
+      "en": "Invite the person to an activity in this space first, then promote them from activity guest to space member. Space members can view all original activities in this space. Saved activities still follow the original activity’s permissions.",
+      "iosKey": "先邀请对方加入本空间的活动，再从活动访客设为空间成员。空间成员可查看本空间的所有原生活动；收藏活动仍遵循原活动权限。"
+    },
+    "moment.t11802f7662c8": {
+      "zh-Hans": "公共规则",
+      "en": "Shared rules",
+      "iosKey": "公共规则"
+    },
+    "moment.t60924335d4f5": {
+      "zh-Hans": "公开申请未通过",
+      "en": "Public access request declined",
+      "iosKey": "公开申请未通过"
+    },
+    "moment.t078b2882c21a": {
+      "zh-Hans": "共 %lld 条",
+      "en": "%lld total",
+      "iosKey": "共 %lld 条"
+    },
+    "moment.t319b4992cdbd": {
+      "zh-Hans": "共享中",
+      "en": "Sharing",
+      "iosKey": "共享中"
+    },
+    "moment.td6a01e7a419a": {
+      "zh-Hans": "共享媒体.jpg",
+      "en": "Shared media.jpg",
+      "iosKey": "共享媒体.jpg"
+    },
+    "moment.t99bfac094467": {
+      "zh-Hans": "共享手表照片",
+      "en": "Share watch photos",
+      "iosKey": "共享手表照片"
+    },
+    "moment.t72b6ad2d10c1": {
+      "zh-Hans": "共享照片",
+      "en": "Shared photos",
+      "iosKey": "共享照片"
+    },
+    "moment.t1da5f5e7999e": {
+      "zh-Hans": "共享空间不可用，请重新安装 Linko Moment。",
+      "en": "Shared storage is unavailable. Reinstall Linko Moment.",
+      "iosKey": "共享空间不可用，请重新安装 Linko Moment。"
+    },
+    "moment.t253aaff19a39": {
+      "zh-Hans": "关系",
+      "en": "Relationship",
+      "iosKey": "关系"
+    },
+    "moment.t7ca989fbcf32": {
+      "zh-Hans": "关系已移除。",
+      "en": "Connection removed.",
+      "iosKey": "关系已移除。"
+    },
+    "moment.t670376acb357": {
+      "zh-Hans": "关联人物",
+      "en": "Link person",
+      "iosKey": "关联人物"
+    },
+    "moment.tce998cdce567": {
+      "zh-Hans": "关联族谱人物",
+      "en": "Link family-tree person",
+      "iosKey": "关联族谱人物"
+    },
+    "moment.t3fd47edce45b": {
+      "zh-Hans": "关闭",
+      "en": "Close",
+      "iosKey": "关闭"
+    },
+    "moment.t3aee2b67948c": {
+      "zh-Hans": "关闭时仅自己和管理员可见。开启后，审核通过才会出现在公开墙，其他用户可点赞或点踩。",
+      "en": "When off, only you and administrators can see this. When on, it appears on the public wall after approval, where others can vote up or down.",
+      "iosKey": "关闭时仅自己和管理员可见。开启后，审核通过才会出现在公开墙，其他用户可点赞或点踩。"
+    },
+    "moment.td2909f1647e7": {
+      "zh-Hans": "其他",
+      "en": "Other",
+      "iosKey": "其他"
+    },
+    "moment.t713b76b2565e": {
+      "zh-Hans": "其他调整",
+      "en": "Other adjustment",
+      "iosKey": "其他调整"
+    },
+    "moment.t7a688306423b": {
+      "zh-Hans": "内容",
+      "en": "Content",
+      "iosKey": "内容"
+    },
+    "moment.t1268e71ac939": {
+      "zh-Hans": "写下生活日常",
+      "en": "Write about your day",
+      "iosKey": "写下生活日常"
+    },
+    "moment.t3a5b6907a54d": {
+      "zh-Hans": "写心愿",
+      "en": "Make a wish",
+      "iosKey": "写心愿"
+    },
+    "moment.teace8d83227d": {
+      "zh-Hans": "净支持 %lld",
+      "en": "Net support %lld",
+      "iosKey": "净支持 %lld"
+    },
+    "moment.t43c9f2ba7404": {
+      "zh-Hans": "减少",
+      "en": "Decrease",
+      "iosKey": "减少"
+    },
+    "moment.t1b55b966ffa0": {
+      "zh-Hans": "分享今天的事",
+      "en": "Share something from today",
+      "iosKey": "分享今天的事"
+    },
+    "moment.t9cfad7023842": {
+      "zh-Hans": "分享到 Linko Moment",
+      "en": "Share to Linko Moment",
+      "iosKey": "分享到 Linko Moment"
+    },
+    "moment.t24e35213bf6e": {
+      "zh-Hans": "分享到活动",
+      "en": "Share to activity",
+      "iosKey": "分享到活动"
+    },
+    "moment.t9e1eb562eee5": {
+      "zh-Hans": "分享原文件",
+      "en": "Share original file",
+      "iosKey": "分享原文件"
+    },
+    "moment.t8887eac58cd0": {
+      "zh-Hans": "分享家庭邀请",
+      "en": "Share family invitation",
+      "iosKey": "分享家庭邀请"
+    },
+    "moment.t53516b0d6b24": {
+      "zh-Hans": "分享已删除，本机副本暂未清理；App 会继续重试。",
+      "en": "The share was deleted, but the local copy could not be removed yet. The app will keep trying.",
+      "iosKey": "分享已删除，本机副本暂未清理；App 会继续重试。"
+    },
+    "moment.t561a0b3fa671": {
+      "zh-Hans": "分享时间：%@",
+      "en": "Shared at: %@",
+      "iosKey": "分享时间：%@"
+    },
+    "moment.t9ea9d070c55d": {
+      "zh-Hans": "分享者：%@",
+      "en": "Shared by: %@",
+      "iosKey": "分享者：%@"
+    },
+    "moment.t1735acb0d175": {
+      "zh-Hans": "分享邀请",
+      "en": "Share invitation",
+      "iosKey": "分享邀请"
+    },
+    "moment.tbd86e5a1534f": {
+      "zh-Hans": "分享邀请链接",
+      "en": "Share invitation link",
+      "iosKey": "分享邀请链接"
+    },
+    "moment.taedd6814ff8c": {
+      "zh-Hans": "列表",
+      "en": "List",
+      "iosKey": "列表"
+    },
+    "moment.tcde2cd071d25": {
+      "zh-Hans": "创建",
+      "en": "Create",
+      "iosKey": "创建"
+    },
+    "moment.tbc9b8586a7b5": {
+      "zh-Hans": "创建于 ",
+      "en": "Created at ",
+      "iosKey": "创建于 "
+    },
+    "moment.t454b791ab1be": {
+      "zh-Hans": "创建对话失败。",
+      "en": "Could not create the chat.",
+      "iosKey": "创建对话失败。"
+    },
+    "moment.tf78935232684": {
+      "zh-Hans": "创建或加入一个群组，开始共同记录成长。",
+      "en": "Create or join a group to start recording growth together.",
+      "iosKey": "创建或加入一个群组，开始共同记录成长。"
+    },
+    "moment.t3127be90d6b1": {
+      "zh-Hans": "创建族谱",
+      "en": "Create family tree",
+      "iosKey": "创建族谱"
+    },
+    "moment.t2077b54e1486": {
+      "zh-Hans": "创建活动",
+      "en": "Create activity",
+      "iosKey": "创建活动"
+    },
+    "moment.t9afb05b80ec1": {
+      "zh-Hans": "创建空间",
+      "en": "Create space",
+      "iosKey": "创建空间"
+    },
+    "moment.t864027a01a9b": {
+      "zh-Hans": "创建群组",
+      "en": "Create group",
+      "iosKey": "创建群组"
+    },
+    "moment.t5979dc7df4ea": {
+      "zh-Hans": "删除“%@”",
+      "en": "Delete “%@”",
+      "iosKey": "删除“%@”"
+    },
+    "moment.t910c95f5e73f": {
+      "zh-Hans": "删除共享照片？",
+      "en": "Delete shared photo?",
+      "iosKey": "删除共享照片？"
+    },
+    "moment.t5bd0ef78eb50": {
+      "zh-Hans": "删除分享",
+      "en": "Delete share",
+      "iosKey": "删除分享"
+    },
+    "moment.t4b1ce5cd05b7": {
+      "zh-Hans": "删除我的“%@”",
+      "en": "Delete my “%@”",
+      "iosKey": "删除我的“%@”"
+    },
+    "moment.t705c52be7fd4": {
+      "zh-Hans": "删除我的记录",
+      "en": "Delete my record",
+      "iosKey": "删除我的记录"
+    },
+    "moment.t693497b48055": {
+      "zh-Hans": "删除活动",
+      "en": "Delete activity",
+      "iosKey": "删除活动"
+    },
+    "moment.t3b38c49a5a45": {
+      "zh-Hans": "删除活动「%@」？",
+      "en": "Delete activity “%@”?",
+      "iosKey": "删除活动「%@」？"
+    },
+    "moment.t74c9530b3988": {
+      "zh-Hans": "删除空间",
+      "en": "Delete space",
+      "iosKey": "删除空间"
+    },
+    "moment.t877aae4d67df": {
+      "zh-Hans": "删除空间「%@」？",
+      "en": "Delete space “%@”?",
+      "iosKey": "删除空间「%@」？"
+    },
+    "moment.t436a09ff0273": {
+      "zh-Hans": "删除这条日常？",
+      "en": "Delete this moment?",
+      "iosKey": "删除这条日常？"
+    },
+    "moment.t3295667cb5f0": {
+      "zh-Hans": "删除这项分享？",
+      "en": "Delete this share?",
+      "iosKey": "删除这项分享？"
+    },
+    "moment.taee887434131": {
+      "zh-Hans": "刷新",
+      "en": "Refresh",
+      "iosKey": "刷新"
+    },
+    "moment.t94cf409b9a30": {
+      "zh-Hans": "刷新日常",
+      "en": "Refresh moments",
+      "iosKey": "刷新日常"
+    },
+    "moment.t73072add2a33": {
+      "zh-Hans": "刷新相册",
+      "en": "Refresh album",
+      "iosKey": "刷新相册"
+    },
+    "moment.t621e17c543bc": {
+      "zh-Hans": "刷新记录",
+      "en": "Refresh requests",
+      "iosKey": "刷新记录"
+    },
+    "moment.tf0920fef970b": {
+      "zh-Hans": "刷新设备码",
+      "en": "Refresh device code",
+      "iosKey": "刷新设备码"
+    },
+    "moment.t28816afa721a": {
+      "zh-Hans": "前往用户中心注销账号？",
+      "en": "Open User Center to delete your account?",
+      "iosKey": "前往用户中心注销账号？"
+    },
+    "moment.t2b4f401efac0": {
+      "zh-Hans": "加入 %@",
+      "en": "Join %@",
+      "iosKey": "加入 %@"
+    },
+    "moment.t73637262ea5c": {
+      "zh-Hans": "加入分享",
+      "en": "Add to shares",
+      "iosKey": "加入分享"
+    },
+    "moment.t2d32b144320e": {
+      "zh-Hans": "加入族谱",
+      "en": "Join family tree",
+      "iosKey": "加入族谱"
+    },
+    "moment.t35013104cd00": {
+      "zh-Hans": "加入群组",
+      "en": "Join group",
+      "iosKey": "加入群组"
+    },
+    "moment.taf90a08fec8e": {
+      "zh-Hans": "加载更多",
+      "en": "Load more",
+      "iosKey": "加载更多"
+    },
+    "moment.tf751772e7c46": {
+      "zh-Hans": "加载更多照片",
+      "en": "Load more photos",
+      "iosKey": "加载更多照片"
+    },
+    "moment.tb48e2728043e": {
+      "zh-Hans": "动一动，记录自己的节奏",
+      "en": "Move and find your own pace",
+      "iosKey": "动一动，记录自己的节奏"
+    },
+    "moment.tccc32f1f77d6": {
+      "zh-Hans": "包含不支持的文件类型。",
+      "en": "Unsupported file type included.",
+      "iosKey": "包含不支持的文件类型。"
+    },
+    "moment.t21a787ed8dcc": {
+      "zh-Hans": "北纬",
+      "en": "North",
+      "iosKey": "北纬"
+    },
+    "moment.t16f9cd5fb409": {
+      "zh-Hans": "十分钟陪伴",
+      "en": "Ten minutes together",
+      "iosKey": "十分钟陪伴"
+    },
+    "moment.t4e13ae6bf663": {
+      "zh-Hans": "南纬",
+      "en": "South",
+      "iosKey": "南纬"
+    },
+    "moment.tf029d9cb4a76": {
+      "zh-Hans": "原因",
+      "en": "Reason",
+      "iosKey": "原因"
+    },
+    "moment.t93f2d6c29187": {
+      "zh-Hans": "原图传输格式无效。",
+      "en": "The original-photo transfer format is invalid.",
+      "iosKey": "原图传输格式无效。"
+    },
+    "moment.t5b3fd670dd41": {
+      "zh-Hans": "原图传输消息无效。",
+      "en": "The original-photo transfer message is invalid.",
+      "iosKey": "原图传输消息无效。"
+    },
+    "moment.t51f45d54906c": {
+      "zh-Hans": "原图传输顺序无效。",
+      "en": "The original-photo transfer sequence is invalid.",
+      "iosKey": "原图传输顺序无效。"
+    },
+    "moment.t6fc36a63b017": {
+      "zh-Hans": "原图大小不匹配。",
+      "en": "The original-photo size does not match.",
+      "iosKey": "原图大小不匹配。"
+    },
+    "moment.tde3530f65172": {
+      "zh-Hans": "原图无法显示。",
+      "en": "Unable to display the original photo.",
+      "iosKey": "原图无法显示。"
+    },
+    "moment.td8f3571dd89b": {
+      "zh-Hans": "原图留在此 iPhone；对方获取原图时，请保持 Linko Moment 打开。",
+      "en": "Originals stay on this iPhone. Keep Linko Moment open while others download them.",
+      "iosKey": "原图留在此 iPhone；对方获取原图时，请保持 Linko Moment 打开。"
+    },
+    "moment.tc1daeb3ddd8f": {
+      "zh-Hans": "原图续传信息不匹配。",
+      "en": "The original-photo resume information does not match.",
+      "iosKey": "原图续传信息不匹配。"
+    },
+    "moment.t7f4ec16ec2ac": {
+      "zh-Hans": "原图请求回执无效。",
+      "en": "The original-photo request receipt is invalid.",
+      "iosKey": "原图请求回执无效。"
+    },
+    "moment.t3687f99a8d41": {
+      "zh-Hans": "原文件从分享者设备传来，获取时请保持对方的分享应用打开。",
+      "en": "The original file comes from the sender’s device. Ask them to keep their sharing app open during the transfer.",
+      "iosKey": "原文件从分享者设备传来，获取时请保持对方的分享应用打开。"
+    },
+    "moment.t189e67ca28e1": {
+      "zh-Hans": "原文件发送进度",
+      "en": "Original file transfer progress",
+      "iosKey": "原文件发送进度"
+    },
+    "moment.t23646a075dae": {
+      "zh-Hans": "原文件完整性校验失败。",
+      "en": "The original file failed integrity verification.",
+      "iosKey": "原文件完整性校验失败。"
+    },
+    "moment.t5fa250c65205": {
+      "zh-Hans": "原文件已发生变化。",
+      "en": "The original file has changed.",
+      "iosKey": "原文件已发生变化。"
+    },
+    "moment.t6d30424b19e1": {
+      "zh-Hans": "原文件接收进度",
+      "en": "Original file transfer progress",
+      "iosKey": "原文件接收进度"
+    },
+    "moment.tee92bed89cca": {
+      "zh-Hans": "双方提出想法后，写下本周试行安排",
+      "en": "After both sides share their ideas, write down an arrangement to try this week",
+      "iosKey": "双方提出想法后，写下本周试行安排"
+    },
+    "moment.t73c7c15041cf": {
+      "zh-Hans": "反对 %lld",
+      "en": "%lld votes against",
+      "iosKey": "反对 %lld"
+    },
+    "moment.t0215ff0b3cce": {
+      "zh-Hans": "反馈内容",
+      "en": "Feedback",
+      "iosKey": "反馈内容"
+    },
+    "moment.t21f622fce1f4": {
+      "zh-Hans": "反馈服务暂时不可用。",
+      "en": "The feedback service is temporarily unavailable.",
+      "iosKey": "反馈服务暂时不可用。"
+    },
+    "moment.td51a528e5e02": {
+      "zh-Hans": "反馈服务返回错误（%lld），请稍后重试。",
+      "en": "The feedback service returned an error (%lld). Please try again later.",
+      "iosKey": "反馈服务返回错误（%lld），请稍后重试。"
+    },
+    "moment.t549f00c0e864": {
+      "zh-Hans": "发布反馈",
+      "en": "Post feedback",
+      "iosKey": "发布反馈"
+    },
+    "moment.t6ce55cb59df9": {
+      "zh-Hans": "发布日常",
+      "en": "Post a moment",
+      "iosKey": "发布日常"
+    },
+    "moment.tdcba42c77876": {
+      "zh-Hans": "发现新版本，前往升级",
+      "en": "A new version is available. Update now.",
+      "iosKey": "发现新版本，前往升级"
+    },
+    "moment.t663e5c11883e": {
+      "zh-Hans": "发生了什么",
+      "en": "What happened?",
+      "iosKey": "发生了什么"
+    },
+    "moment.te962f910d3d4": {
+      "zh-Hans": "发起互动",
+      "en": "Start connection",
+      "iosKey": "发起互动"
+    },
+    "moment.tedecf0ae6e51": {
+      "zh-Hans": "发送",
+      "en": "Send",
+      "iosKey": "发送"
+    },
+    "moment.t3a3bcf41a1ab": {
+      "zh-Hans": "发送邀请",
+      "en": "Send invitation",
+      "iosKey": "发送邀请"
+    },
+    "moment.t2cd0f3be8738": {
+      "zh-Hans": "取消",
+      "en": "Cancel",
+      "iosKey": "取消"
+    },
+    "moment.t5e7c45164805": {
+      "zh-Hans": "取消互动",
+      "en": "Cancel connection",
+      "iosKey": "取消互动"
+    },
+    "moment.tdca60869e7d2": {
+      "zh-Hans": "取消收藏",
+      "en": "Remove from saved",
+      "iosKey": "取消收藏"
+    },
+    "moment.t4cbafe2f3105": {
+      "zh-Hans": "变动记录",
+      "en": "Score history",
+      "iosKey": "变动记录"
+    },
+    "moment.t97e62612dc7f": {
+      "zh-Hans": "变化 %@%lld 分",
+      "en": "Change %@%lld points",
+      "iosKey": "变化 %@%lld 分"
+    },
+    "moment.tb0f5eb18a569": {
+      "zh-Hans": "另一位成员",
+      "en": "Another member",
+      "iosKey": "另一位成员"
+    },
+    "moment.tf916b9e22963": {
+      "zh-Hans": "另一张照片正在共享，请稍后重试。",
+      "en": "Another photo is being shared. Please try again later.",
+      "iosKey": "另一张照片正在共享，请稍后重试。"
+    },
+    "moment.t0acdf5551381": {
+      "zh-Hans": "只想说说",
+      "en": "Just let me talk",
+      "iosKey": "只想说说"
+    },
+    "moment.t4f43c8e9e497": {
+      "zh-Hans": "只有活动创建者可以移除其他成员。",
+      "en": "Only the activity creator can remove other members.",
+      "iosKey": "只有活动创建者可以移除其他成员。"
+    },
+    "moment.t14f469ab8eae": {
+      "zh-Hans": "只有活动组织者可以修改基本信息。",
+      "en": "Only the activity organizer can edit its details.",
+      "iosKey": "只有活动组织者可以修改基本信息。"
+    },
+    "moment.t59b6b451535b": {
+      "zh-Hans": "只有活动组织者可以删除活动。",
+      "en": "Only the activity organizer can delete the activity.",
+      "iosKey": "只有活动组织者可以删除活动。"
+    },
+    "moment.t2f55155beda5": {
+      "zh-Hans": "只有空间所有者可以修改名称。",
+      "en": "Only the space owner can change its name.",
+      "iosKey": "只有空间所有者可以修改名称。"
+    },
+    "moment.tc829b8d0772f": {
+      "zh-Hans": "只有空间所有者可以删除空间。",
+      "en": "Only the space owner can delete the space.",
+      "iosKey": "只有空间所有者可以删除空间。"
+    },
+    "moment.t1bbd2b5a5288": {
+      "zh-Hans": "只有空间所有者可以取消收藏。",
+      "en": "Only the space owner can remove saved activities.",
+      "iosKey": "只有空间所有者可以取消收藏。"
+    },
+    "moment.t74279ec7ec8e": {
+      "zh-Hans": "只能修改自己的打卡。",
+      "en": "You can only edit your own check-ins.",
+      "iosKey": "只能修改自己的打卡。"
+    },
+    "moment.t4a66f2631efc": {
+      "zh-Hans": "可使用手表系统听写输入，最多 500 字。",
+      "en": "You can use your watch’s dictation to enter up to 500 characters.",
+      "iosKey": "可使用手表系统听写输入，最多 500 字。"
+    },
+    "moment.t057feecd5dd6": {
+      "zh-Hans": "同一活动不会自动建立好友关系，需要对方确认。",
+      "en": "Joining the same activity does not automatically make you friends. The other person must confirm.",
+      "iosKey": "同一活动不会自动建立好友关系，需要对方确认。"
+    },
+    "moment.t45d9f8cd745b": {
+      "zh-Hans": "同行共创",
+      "en": "Co-creators",
+      "iosKey": "同行共创"
+    },
+    "moment.t5b8df73981b9": {
+      "zh-Hans": "同行共创成员",
+      "en": "Co-creator members",
+      "iosKey": "同行共创成员"
+    },
+    "moment.t5315e6481155": {
+      "zh-Hans": "听见彼此，留出陪伴时间。互动记录不计积分、不评分。",
+      "en": "Listen to each other and make time together. Connection records do not award points or scores.",
+      "iosKey": "听见彼此，留出陪伴时间。互动记录不计积分、不评分。"
+    },
+    "moment.tf40c131f352f": {
+      "zh-Hans": "吵架后的重连",
+      "en": "Reconnect after an argument",
+      "iosKey": "吵架后的重连"
+    },
+    "moment.tf7ba25956b85": {
+      "zh-Hans": "吵架后重连",
+      "en": "Reconnect after an argument",
+      "iosKey": "吵架后重连"
+    },
+    "moment.tebafb42a32b8": {
+      "zh-Hans": "告诉家长",
+      "en": "Tell a parent",
+      "iosKey": "告诉家长"
+    },
+    "moment.t3d7c1d7ee165": {
+      "zh-Hans": "和家人朋友共建活动、分享照片与打卡；家长还可管理孩子的成长和积分。",
+      "en": "Create activities, share photos, and check in with family and friends. Parents can also manage children’s growth and rewards.",
+      "iosKey": "和家人朋友共建活动、分享照片与打卡；家长还可管理孩子的成长和积分。"
+    },
+    "moment.t1c92b4df9429": {
+      "zh-Hans": "响应格式不正确。",
+      "en": "The response format is invalid.",
+      "iosKey": "响应格式不正确。"
+    },
+    "moment.t76e1efdab528": {
+      "zh-Hans": "回复：%@",
+      "en": "Reply: %@",
+      "iosKey": "回复：%@"
+    },
+    "moment.t979266664b77": {
+      "zh-Hans": "在“活动”创建或加入共同活动，收藏到自己的空间，并与成员分享照片和打卡。访问别人分享的原图时，提供照片的成员需要打开 App 完成传输。",
+      "en": "Create or join shared activities in Activities, save them to your space, and share photos and check-ins with members. To access another member’s original photos, that member must open the app to transfer them.",
+      "iosKey": "在“活动”创建或加入共同活动，收藏到自己的空间，并与成员分享照片和打卡。访问别人分享的原图时，提供照片的成员需要打开 App 完成传输。"
+    },
+    "moment.t6e60795c4208": {
+      "zh-Hans": "在“群组”管理家庭成员、奖励审批和积分记录；在“我的”维护族谱、家庭成员及设备权限。",
+      "en": "Manage family members, reward approvals, and points in Groups. Manage family trees, family members, and device permissions in My.",
+      "iosKey": "在“群组”管理家庭成员、奖励审批和积分记录；在“我的”维护族谱、家庭成员及设备权限。"
+    },
+    "moment.t3c13ca83ea16": {
+      "zh-Hans": "在当前位置打卡",
+      "en": "Check in here",
+      "iosKey": "在当前位置打卡"
+    },
+    "moment.tca293d6490e3": {
+      "zh-Hans": "地点未记录",
+      "en": "No location recorded",
+      "iosKey": "地点未记录"
+    },
+    "moment.tcbc03bc4abc3": {
+      "zh-Hans": "地点：%@",
+      "en": "Location: %@",
+      "iosKey": "地点：%@"
+    },
+    "moment.te8df05872569": {
+      "zh-Hans": "基本信息",
+      "en": "Basic information",
+      "iosKey": "基本信息"
+    },
+    "moment.t6b995756c716": {
+      "zh-Hans": "基础功能",
+      "en": "Basic features",
+      "iosKey": "基础功能"
+    },
+    "moment.t31569c4ccee8": {
+      "zh-Hans": "堂表亲",
+      "en": "Cousins",
+      "iosKey": "堂表亲"
+    },
+    "moment.tbce53fe72c92": {
+      "zh-Hans": "增加",
+      "en": "Increase",
+      "iosKey": "增加"
+    },
+    "moment.t694b71bc8013": {
+      "zh-Hans": "处理中",
+      "en": "In progress",
+      "iosKey": "处理中"
+    },
+    "moment.tdaede9881787": {
+      "zh-Hans": "备注",
+      "en": "Notes",
+      "iosKey": "备注"
+    },
+    "moment.tfbeffffaa90c": {
+      "zh-Hans": "备注不能超过 1000 字。",
+      "en": "Notes cannot exceed 1,000 characters.",
+      "iosKey": "备注不能超过 1000 字。"
+    },
+    "moment.t2f1a883ca767": {
+      "zh-Hans": "备注（仅成员可见）",
+      "en": "Notes (members only)",
+      "iosKey": "备注（仅成员可见）"
+    },
+    "moment.t7ba096dfb6b4": {
+      "zh-Hans": "备注（选填）",
+      "en": "Note (optional)",
+      "iosKey": "备注（选填）"
+    },
+    "moment.t57132552f93f": {
+      "zh-Hans": "备注（默认地址）",
+      "en": "Note (address by default)",
+      "iosKey": "备注（默认地址）"
+    },
+    "moment.t8e86f9b1d54f": {
+      "zh-Hans": "复制链接",
+      "en": "Copy link",
+      "iosKey": "复制链接"
+    },
+    "moment.tbc811c8bd599": {
+      "zh-Hans": "复盘",
+      "en": "Review",
+      "iosKey": "复盘"
+    },
+    "moment.t7e5d6e585f16": {
+      "zh-Hans": "多选下载原文件",
+      "en": "Download original files",
+      "iosKey": "多选下载原文件"
+    },
+    "moment.t0c0ec6af25fb": {
+      "zh-Hans": "多选共享 iPhone 照片或视频",
+      "en": "Select iPhone photos or videos to share",
+      "iosKey": "多选共享 iPhone 照片或视频"
+    },
+    "moment.t536973323139": {
+      "zh-Hans": "多选原文件接收进度",
+      "en": "Original file transfer progress",
+      "iosKey": "多选原文件接收进度"
+    },
+    "moment.ta21911780672": {
+      "zh-Hans": "奖励",
+      "en": "Reward",
+      "iosKey": "奖励"
+    },
+    "moment.td90830e66053": {
+      "zh-Hans": "奖励与行为规则",
+      "en": "Rewards and behavior rules",
+      "iosKey": "奖励与行为规则"
+    },
+    "moment.t6aec98fc96f0": {
+      "zh-Hans": "奖励审批",
+      "en": "Reward approvals",
+      "iosKey": "奖励审批"
+    },
+    "moment.tdefc1f011b1a": {
+      "zh-Hans": "套餐功能",
+      "en": "Plan features",
+      "iosKey": "套餐功能"
+    },
+    "moment.t0b6f91ac20c0": {
+      "zh-Hans": "套餐权益",
+      "en": "Plan benefits",
+      "iosKey": "套餐权益"
+    },
+    "moment.t0ab4610b9257": {
+      "zh-Hans": "女",
+      "en": "Female",
+      "iosKey": "女"
+    },
+    "moment.tb9b1480dd6ec": {
+      "zh-Hans": "好友",
+      "en": "Friends",
+      "iosKey": "好友"
+    },
+    "moment.t49649f18efa8": {
+      "zh-Hans": "好友关系 · 跨空间",
+      "en": "Friendships · Across spaces",
+      "iosKey": "好友关系 · 跨空间"
+    },
+    "moment.t8cf756fb4230": {
+      "zh-Hans": "好友关系暂时无法读取：%@",
+      "en": "Unable to load friendships: %@",
+      "iosKey": "好友关系暂时无法读取：%@"
+    },
+    "moment.tcdec47722628": {
+      "zh-Hans": "好友申请已发出。",
+      "en": "Friend request sent.",
+      "iosKey": "好友申请已发出。"
+    },
+    "moment.tb761ca3de1e9": {
+      "zh-Hans": "好友的认证码",
+      "en": "Friend’s verification code",
+      "iosKey": "好友的认证码"
+    },
+    "moment.t517a43156317": {
+      "zh-Hans": "好友积分榜",
+      "en": "Friends’ leaderboard",
+      "iosKey": "好友积分榜"
+    },
+    "moment.t50b5b1d2abef": {
+      "zh-Hans": "姓名",
+      "en": "Name",
+      "iosKey": "姓名"
+    },
+    "moment.t26468c0e3eeb": {
+      "zh-Hans": "子女",
+      "en": "Children",
+      "iosKey": "子女"
+    },
+    "moment.t514191076dec": {
+      "zh-Hans": "孙辈",
+      "en": "Grandchildren",
+      "iosKey": "孙辈"
+    },
+    "moment.t5f887419f463": {
+      "zh-Hans": "孩子",
+      "en": "Child",
+      "iosKey": "孩子"
+    },
+    "moment.tb00605b84651": {
+      "zh-Hans": "孩子 · %lld",
+      "en": "Child · %lld",
+      "iosKey": "孩子 · %lld"
+    },
+    "moment.t2a5fd2706dda": {
+      "zh-Hans": "孩子从手表提交的奖励申请会显示在这里。",
+      "en": "Reward requests submitted by the child’s watch appear here.",
+      "iosKey": "孩子从手表提交的奖励申请会显示在这里。"
+    },
+    "moment.t9c510788e8c3": {
+      "zh-Hans": "孩子决定的十分钟",
+      "en": "Ten minutes chosen by the child",
+      "iosKey": "孩子决定的十分钟"
+    },
+    "moment.te512a6d4d7a6": {
+      "zh-Hans": "孩子姓名",
+      "en": "Child’s name",
+      "iosKey": "孩子姓名"
+    },
+    "moment.t63f68c4fd29c": {
+      "zh-Hans": "孩子希望：%@",
+      "en": "Child’s hope: %@",
+      "iosKey": "孩子希望：%@"
+    },
+    "moment.te034017b4c09": {
+      "zh-Hans": "孩子成长、奖励审批和积分记录，都在这里。",
+      "en": "Children’s growth, reward approvals, and point records are all here.",
+      "iosKey": "孩子成长、奖励审批和积分记录，都在这里。"
+    },
+    "moment.t55f4e7580bc1": {
+      "zh-Hans": "孩子的好友",
+      "en": "Child’s friends",
+      "iosKey": "孩子的好友"
+    },
+    "moment.t71470d37dfcc": {
+      "zh-Hans": "孩子的异议",
+      "en": "Child’s objection",
+      "iosKey": "孩子的异议"
+    },
+    "moment.tbc996224fe59": {
+      "zh-Hans": "孩子资料",
+      "en": "Child profile",
+      "iosKey": "孩子资料"
+    },
+    "moment.tf2fa7eff172c": {
+      "zh-Hans": "守约信用分",
+      "en": "Commitment credit score",
+      "iosKey": "守约信用分"
+    },
+    "moment.tad777b0feb82": {
+      "zh-Hans": "守约信用分：%@",
+      "en": "Reliability score: %@",
+      "iosKey": "守约信用分：%@"
+    },
+    "moment.tc0b3fbff51cc": {
+      "zh-Hans": "完成",
+      "en": "Done",
+      "iosKey": "完成"
+    },
+    "moment.t4d2d1809ed3c": {
+      "zh-Hans": "完成一次运动后，时长和步数会保存在这里。",
+      "en": "Complete an exercise session to save its duration and steps here.",
+      "iosKey": "完成一次运动后，时长和步数会保存在这里。"
+    },
+    "moment.ta43387547994": {
+      "zh-Hans": "完成互动",
+      "en": "Finish connection",
+      "iosKey": "完成互动"
+    },
+    "moment.td5500afba3ba": {
+      "zh-Hans": "完成多选",
+      "en": "Finish selection",
+      "iosKey": "完成多选"
+    },
+    "moment.te27e58ce3f5c": {
+      "zh-Hans": "完整日期",
+      "en": "Full date",
+      "iosKey": "完整日期"
+    },
+    "moment.t3b39b1a51cb9": {
+      "zh-Hans": "定位中",
+      "en": "Locating",
+      "iosKey": "定位中"
+    },
+    "moment.t21a7478abf29": {
+      "zh-Hans": "定位失败：%@",
+      "en": "Unable to get location: %@",
+      "iosKey": "定位失败：%@"
+    },
+    "moment.tb3ec01e5b2ca": {
+      "zh-Hans": "审核通过后公开展示",
+      "en": "Make public after approval",
+      "iosKey": "审核通过后公开展示"
+    },
+    "moment.t36d87c4d5455": {
+      "zh-Hans": "家庭与成长",
+      "en": "Family and growth",
+      "iosKey": "家庭与成长"
+    },
+    "moment.tb07f78f7b267": {
+      "zh-Hans": "家庭小会议",
+      "en": "Family meeting",
+      "iosKey": "家庭小会议"
+    },
+    "moment.t885d75c757df": {
+      "zh-Hans": "家庭成员",
+      "en": "Family members",
+      "iosKey": "家庭成员"
+    },
+    "moment.td02f4524e410": {
+      "zh-Hans": "家族姓氏（可选）",
+      "en": "Family surname (optional)",
+      "iosKey": "家族姓氏（可选）"
+    },
+    "moment.t7745f319e431": {
+      "zh-Hans": "家族成员",
+      "en": "Family members",
+      "iosKey": "家族成员"
+    },
+    "moment.tb85d57aac036": {
+      "zh-Hans": "家族族谱",
+      "en": "Family genealogy",
+      "iosKey": "家族族谱"
+    },
+    "moment.t23e514d947e5": {
+      "zh-Hans": "家长",
+      "en": "Parent",
+      "iosKey": "家长"
+    },
+    "moment.t30bdbc100a33": {
+      "zh-Hans": "家长扫码绑定二维码",
+      "en": "Parent pairing QR code",
+      "iosKey": "家长扫码绑定二维码"
+    },
+    "moment.tf727000fd476": {
+      "zh-Hans": "家长说",
+      "en": "Parent said",
+      "iosKey": "家长说"
+    },
+    "moment.t570f61d32e87": {
+      "zh-Hans": "家长调整",
+      "en": "Parent adjustment",
+      "iosKey": "家长调整"
+    },
+    "moment.t185ee3e7dd87": {
+      "zh-Hans": "家长资料暂时无法读取。",
+      "en": "The parent profile is temporarily unavailable.",
+      "iosKey": "家长资料暂时无法读取。"
+    },
+    "moment.t96f502a602b1": {
+      "zh-Hans": "对准手表上的配对二维码，识别后返回确认绑定。",
+      "en": "Point the camera at the watch’s pairing QR code. After recognition, return to confirm pairing.",
+      "iosKey": "对准手表上的配对二维码，识别后返回确认绑定。"
+    },
+    "moment.t9661c03c2b9e": {
+      "zh-Hans": "对应人物",
+      "en": "Linked person",
+      "iosKey": "对应人物"
+    },
+    "moment.t28b7c1c3e8d2": {
+      "zh-Hans": "对方确认加入后才能查看这场活动的分享。",
+      "en": "The recipient must confirm joining before they can view this activity’s shares.",
+      "iosKey": "对方确认加入后才能查看这场活动的分享。"
+    },
+    "moment.t6bf6d3f3d626": {
+      "zh-Hans": "对话",
+      "en": "Chat",
+      "iosKey": "对话"
+    },
+    "moment.tb3d2a96ac859": {
+      "zh-Hans": "对话响应无效。",
+      "en": "The chat response is invalid.",
+      "iosKey": "对话响应无效。"
+    },
+    "moment.t5ccc3865950b": {
+      "zh-Hans": "对话数据格式不正确。",
+      "en": "The chat data format is invalid.",
+      "iosKey": "对话数据格式不正确。"
+    },
+    "moment.tdce6e18d4178": {
+      "zh-Hans": "对话请求失败（%lld）。",
+      "en": "Conversation request failed (%lld).",
+      "iosKey": "对话请求失败（%lld）。"
+    },
+    "moment.tc71e9108d2ae": {
+      "zh-Hans": "寻找族谱",
+      "en": "Find family tree",
+      "iosKey": "寻找族谱"
+    },
+    "moment.tea28afec5578": {
+      "zh-Hans": "将「%@」移出活动？",
+      "en": "Remove “%@” from this activity?",
+      "iosKey": "将「%@」移出活动？"
+    },
+    "moment.t645adf1bc564": {
+      "zh-Hans": "尚未加入族谱，可先到“家族族谱”创建或加入。",
+      "en": "You have not joined a family tree. Create or join one from Family tree.",
+      "iosKey": "尚未加入族谱，可先到“家族族谱”创建或加入。"
+    },
+    "moment.t84b57b391ca0": {
+      "zh-Hans": "尚未成为好友",
+      "en": "Not friends yet",
+      "iosKey": "尚未成为好友"
+    },
+    "moment.t98336189c351": {
+      "zh-Hans": "已从相册共享 %lld 项到活动；请保持 App 打开，以便他人获取原文件。",
+      "en": "Shared %lld items from the photo library to the activity. Keep the app open so others can download the originals.",
+      "iosKey": "已从相册共享 %lld 项到活动；请保持 App 打开，以便他人获取原文件。"
+    },
+    "moment.t1bd91a7d0c53": {
+      "zh-Hans": "已保存",
+      "en": "Saved",
+      "iosKey": "已保存"
+    },
+    "moment.te6d7d11a77a8": {
+      "zh-Hans": "已保存，爸爸妈妈会看到这份温暖",
+      "en": "Saved. Your parents will see this warm moment.",
+      "iosKey": "已保存，爸爸妈妈会看到这份温暖"
+    },
+    "moment.t8e1f5e13ff18": {
+      "zh-Hans": "已公开",
+      "en": "Public",
+      "iosKey": "已公开"
+    },
+    "moment.t3c6fb89bb535": {
+      "zh-Hans": "已公开 %lld",
+      "en": "%lld public",
+      "iosKey": "已公开 %lld"
+    },
+    "moment.ta0a51a3546b7": {
+      "zh-Hans": "已共享 %lld 项；请保持此 iPhone 可以响应原文件请求。",
+      "en": "Shared %lld items. Keep this iPhone available to respond to original file requests.",
+      "iosKey": "已共享 %lld 项；请保持此 iPhone 可以响应原文件请求。"
+    },
+    "moment.tf8a2f0f7bb5a": {
+      "zh-Hans": "已关联到‘我的’中的家庭成员",
+      "en": "Linked to family members in My",
+      "iosKey": "已关联到‘我的’中的家庭成员"
+    },
+    "moment.tf8e5a067738b": {
+      "zh-Hans": "已加入共同活动，可收藏到自己的空间。",
+      "en": "You have joined the shared activity and can save it to your own space.",
+      "iosKey": "已加入共同活动，可收藏到自己的空间。"
+    },
+    "moment.t9e6c61ee3bf2": {
+      "zh-Hans": "已取消收藏，原活动仍在。",
+      "en": "Removed from space. The original activity remains available.",
+      "iosKey": "已取消收藏，原活动仍在。"
+    },
+    "moment.t3520d4916218": {
+      "zh-Hans": "已告诉家长，可以一起慢慢聊",
+      "en": "Your parent has been told. You can take your time talking together.",
+      "iosKey": "已告诉家长，可以一起慢慢聊"
+    },
+    "moment.t8f6f8d979c98": {
+      "zh-Hans": "已复制",
+      "en": "Copied",
+      "iosKey": "已复制"
+    },
+    "moment.tf28461bb49c8": {
+      "zh-Hans": "已完成",
+      "en": "Completed",
+      "iosKey": "已完成"
+    },
+    "moment.te863cf35995a": {
+      "zh-Hans": "已完成绑定",
+      "en": "Pairing complete",
+      "iosKey": "已完成绑定"
+    },
+    "moment.tfe5c7b8f22fc": {
+      "zh-Hans": "已将成员移出活动。",
+      "en": "Member removed from activity.",
+      "iosKey": "已将成员移出活动。"
+    },
+    "moment.t82395d423099": {
+      "zh-Hans": "已归档",
+      "en": "Archived",
+      "iosKey": "已归档"
+    },
+    "moment.t49bab446a387": {
+      "zh-Hans": "已接收部分与本机原文件不匹配，请重新获取。",
+      "en": "The received portion does not match the original on this device. Fetch it again.",
+      "iosKey": "已接收部分与本机原文件不匹配，请重新获取。"
+    },
+    "moment.t0ebc4b4acc1a": {
+      "zh-Hans": "已提交，等待家长确认",
+      "en": "Submitted. Waiting for a parent’s confirmation.",
+      "iosKey": "已提交，等待家长确认"
+    },
+    "moment.t033b88d915f6": {
+      "zh-Hans": "已是朋友",
+      "en": "Friends",
+      "iosKey": "已是朋友"
+    },
+    "moment.teb0c326b60ae": {
+      "zh-Hans": "已暂停",
+      "en": "Paused",
+      "iosKey": "已暂停"
+    },
+    "moment.t408ed8781772": {
+      "zh-Hans": "已添加好友",
+      "en": "Friend added",
+      "iosKey": "已添加好友"
+    },
+    "moment.t46ae6fddbe9e": {
+      "zh-Hans": "已确认好友关系。",
+      "en": "Friendship confirmed.",
+      "iosKey": "已确认好友关系。"
+    },
+    "moment.tbd64add6e4c4": {
+      "zh-Hans": "已解绑",
+      "en": "Unlinked",
+      "iosKey": "已解绑"
+    },
+    "moment.t5be0323e8adc": {
+      "zh-Hans": "已连接",
+      "en": "Connected",
+      "iosKey": "已连接"
+    },
+    "moment.t8aed29e6e6cb": {
+      "zh-Hans": "已选 %lld 项",
+      "en": "%lld selected",
+      "iosKey": "已选 %lld 项"
+    },
+    "moment.t3fa9b684903a": {
+      "zh-Hans": "已通过",
+      "en": "Approved",
+      "iosKey": "已通过"
+    },
+    "moment.t13c68d134847": {
+      "zh-Hans": "已逾期",
+      "en": "Overdue",
+      "iosKey": "已逾期"
+    },
+    "moment.tad55a6553845": {
+      "zh-Hans": "希望怎样被倾听",
+      "en": "How would you like to be heard?",
+      "iosKey": "希望怎样被倾听"
+    },
+    "moment.te0860bedf048": {
+      "zh-Hans": "带上手机，随时开始一场散步或轻运动。",
+      "en": "Take your phone and start a walk or light exercise whenever you like.",
+      "iosKey": "带上手机，随时开始一场散步或轻运动。"
+    },
+    "moment.t9019b34795a9": {
+      "zh-Hans": "帮助与隐私",
+      "en": "Help and privacy",
+      "iosKey": "帮助与隐私"
+    },
+    "moment.t8c0a80f77b76": {
+      "zh-Hans": "年和月",
+      "en": "Year and month",
+      "iosKey": "年和月"
+    },
+    "moment.t01c8d45c760a": {
+      "zh-Hans": "应用与设置",
+      "en": "App and settings",
+      "iosKey": "应用与设置"
+    },
+    "moment.t8b8a082dab3a": {
+      "zh-Hans": "应用资料暂不可用。",
+      "en": "App information is temporarily unavailable.",
+      "iosKey": "应用资料暂不可用。"
+    },
+    "moment.tf4de32e833a2": {
+      "zh-Hans": "应用资料来源不正确。",
+      "en": "The app information came from an unexpected source.",
+      "iosKey": "应用资料来源不正确。"
+    },
+    "moment.te2aecb4f314f": {
+      "zh-Hans": "建立新族谱",
+      "en": "Create a new family tree",
+      "iosKey": "建立新族谱"
+    },
+    "moment.tef1a21e7d669": {
+      "zh-Hans": "开始%@",
+      "en": "Start %@",
+      "iosKey": "开始%@"
+    },
+    "moment.t2d9033809495": {
+      "zh-Hans": "开始一周试行",
+      "en": "Start a one-week trial",
+      "iosKey": "开始一周试行"
+    },
+    "moment.t5a83c9391463": {
+      "zh-Hans": "开始一段互动",
+      "en": "Start a connection activity",
+      "iosKey": "开始一段互动"
+    },
+    "moment.t44720f217c6a": {
+      "zh-Hans": "开始运动",
+      "en": "Start exercise",
+      "iosKey": "开始运动"
+    },
+    "moment.t5292ab1a36c5": {
+      "zh-Hans": "归档",
+      "en": "Archive",
+      "iosKey": "归档"
+    },
+    "moment.t0a388587455a": {
+      "zh-Hans": "归档会话",
+      "en": "Archive chat",
+      "iosKey": "归档会话"
+    },
+    "moment.t6be6c8248ec6": {
+      "zh-Hans": "当前位置",
+      "en": "Current location",
+      "iosKey": "当前位置"
+    },
+    "moment.t2009cab3e301": {
+      "zh-Hans": "当前只支持 MP4 或 MOV 视频。",
+      "en": "Only MP4 and MOV videos are supported.",
+      "iosKey": "当前只支持 MP4 或 MOV 视频。"
+    },
+    "moment.t5336aacf5168": {
+      "zh-Hans": "当前已是 App Store 最新版本",
+      "en": "You have the latest App Store version",
+      "iosKey": "当前已是 App Store 最新版本"
+    },
+    "moment.t9bf7a38adb5d": {
+      "zh-Hans": "当前权益",
+      "en": "Current benefits",
+      "iosKey": "当前权益"
+    },
+    "moment.t837bc9576721": {
+      "zh-Hans": "当前版本",
+      "en": "Current version",
+      "iosKey": "当前版本"
+    },
+    "moment.t1f035b4abcda": {
+      "zh-Hans": "当前群组",
+      "en": "Current group",
+      "iosKey": "当前群组"
+    },
+    "moment.td6c9835296b8": {
+      "zh-Hans": "彼此说的话",
+      "en": "What we said",
+      "iosKey": "彼此说的话"
+    },
+    "moment.t815fa544eab6": {
+      "zh-Hans": "待办与记录",
+      "en": "Tasks and records",
+      "iosKey": "待办与记录"
+    },
+    "moment.t999a459c3f3f": {
+      "zh-Hans": "待处理",
+      "en": "Pending",
+      "iosKey": "待处理"
+    },
+    "moment.tf8c8d106e584": {
+      "zh-Hans": "待审核申请",
+      "en": "Requests awaiting review",
+      "iosKey": "待审核申请"
+    },
+    "moment.t6c6f57fd3b40": {
+      "zh-Hans": "待家长确认",
+      "en": "Awaiting parent confirmation",
+      "iosKey": "待家长确认"
+    },
+    "moment.ta8b0bd9c65f7": {
+      "zh-Hans": "待确认",
+      "en": "Awaiting confirmation",
+      "iosKey": "待确认"
+    },
+    "moment.t279bdaa8a4ec": {
+      "zh-Hans": "待确认的活动邀请",
+      "en": "Activity invitations awaiting confirmation",
+      "iosKey": "待确认的活动邀请"
+    },
+    "moment.tc89d76cda811": {
+      "zh-Hans": "待确认邀请",
+      "en": "Pending invitations",
+      "iosKey": "待确认邀请"
+    },
+    "moment.t3e640b9b80a2": {
+      "zh-Hans": "心愿墙",
+      "en": "Wish wall",
+      "iosKey": "心愿墙"
+    },
+    "moment.tc9284916289a": {
+      "zh-Hans": "心愿提案 · %lld",
+      "en": "Wish proposals · %lld",
+      "iosKey": "心愿提案 · %lld"
+    },
+    "moment.ta752a7d8c127": {
+      "zh-Hans": "性别",
+      "en": "Gender",
+      "iosKey": "性别"
+    },
+    "moment.t60643e4e1128": {
+      "zh-Hans": "性别（可选）",
+      "en": "Gender (optional)",
+      "iosKey": "性别（可选）"
+    },
+    "moment.te0534b8a4e46": {
+      "zh-Hans": "恢复",
+      "en": "Restore",
+      "iosKey": "恢复"
+    },
+    "moment.tcbe48cfa3a55": {
+      "zh-Hans": "恢复会话",
+      "en": "Restore chat",
+      "iosKey": "恢复会话"
+    },
+    "moment.tb2ff9672d8de": {
+      "zh-Hans": "想一起做什么",
+      "en": "What would you like to do together?",
+      "iosKey": "想一起做什么"
+    },
+    "moment.t231593c0275f": {
+      "zh-Hans": "想和家长说",
+      "en": "Talk to a parent",
+      "iosKey": "想和家长说"
+    },
+    "moment.t10ba9bdcb641": {
+      "zh-Hans": "想聊什么",
+      "en": "What would you like to talk about?",
+      "iosKey": "想聊什么"
+    },
+    "moment.t47fbdb262b13": {
+      "zh-Hans": "想要安慰",
+      "en": "I need comfort",
+      "iosKey": "想要安慰"
+    },
+    "moment.ta1cb97fb9382": {
+      "zh-Hans": "想记录谁",
+      "en": "Who is this about?",
+      "iosKey": "想记录谁"
+    },
+    "moment.t16a0f59bfe0f": {
+      "zh-Hans": "想说的话",
+      "en": "What I want to say",
+      "iosKey": "想说的话"
+    },
+    "moment.t2745ccb884fc": {
+      "zh-Hans": "意见反馈",
+      "en": "Feedback",
+      "iosKey": "意见反馈"
+    },
+    "moment.tf6b9eea30e97": {
+      "zh-Hans": "意见墙",
+      "en": "Feedback wall",
+      "iosKey": "意见墙"
+    },
+    "moment.t96f018b78da4": {
+      "zh-Hans": "意见提案 · %lld",
+      "en": "Feedback proposals · %lld",
+      "iosKey": "意见提案 · %lld"
+    },
+    "moment.t84390ddd71e8": {
+      "zh-Hans": "慢跑",
+      "en": "Jogging",
+      "iosKey": "慢跑"
+    },
+    "moment.t6e6d6ddbb7c1": {
+      "zh-Hans": "成员",
+      "en": "Members",
+      "iosKey": "成员"
+    },
+    "moment.tb9cac159b8d3": {
+      "zh-Hans": "成员与邀请",
+      "en": "Members and invitations",
+      "iosKey": "成员与邀请"
+    },
+    "moment.t7a9640250654": {
+      "zh-Hans": "成员资料",
+      "en": "Member profile",
+      "iosKey": "成员资料"
+    },
+    "moment.tb26ce2cbcabd": {
+      "zh-Hans": "成员资料暂不可用。",
+      "en": "Member information is temporarily unavailable.",
+      "iosKey": "成员资料暂不可用。"
+    },
+    "moment.t21e334e80e98": {
+      "zh-Hans": "成员资料来源不正确。",
+      "en": "Member information came from an unexpected source.",
+      "iosKey": "成员资料来源不正确。"
+    },
+    "moment.tc5ccee8365c6": {
+      "zh-Hans": "成长周报",
+      "en": "Weekly growth report",
+      "iosKey": "成长周报"
+    },
+    "moment.tc22644124698": {
+      "zh-Hans": "成长足迹",
+      "en": "Growth history",
+      "iosKey": "成长足迹"
+    },
+    "moment.tb70bb4acc048": {
+      "zh-Hans": "我",
+      "en": "Me",
+      "iosKey": "我"
+    },
+    "moment.t017e30a1dd45": {
+      "zh-Hans": "我们的互动",
+      "en": "Our interactions",
+      "iosKey": "我们的互动"
+    },
+    "moment.t9c469d95ffe0": {
+      "zh-Hans": "我们的话",
+      "en": "Our conversations",
+      "iosKey": "我们的话"
+    },
+    "moment.t82e31f48f5f4": {
+      "zh-Hans": "我希望",
+      "en": "I hope",
+      "iosKey": "我希望"
+    },
+    "moment.t7f1d9dd04cd1": {
+      "zh-Hans": "我的",
+      "en": "My",
+      "iosKey": "我的"
+    },
+    "moment.t432331aeb213": {
+      "zh-Hans": "我的反馈",
+      "en": "My feedback",
+      "iosKey": "我的反馈"
+    },
+    "moment.t0f1afd780afe": {
+      "zh-Hans": "我的好友",
+      "en": "My friends",
+      "iosKey": "我的好友"
+    },
+    "moment.ta5163653c790": {
+      "zh-Hans": "我的孩子 · 共 %lld 条",
+      "en": "My children · %lld total",
+      "iosKey": "我的孩子 · 共 %lld 条"
+    },
+    "moment.tdcafeca4672c": {
+      "zh-Hans": "我的感受",
+      "en": "My feelings",
+      "iosKey": "我的感受"
+    },
+    "moment.t4775c0726f5f": {
+      "zh-Hans": "我的提议",
+      "en": "My suggestion",
+      "iosKey": "我的提议"
+    },
+    "moment.t95d43a3c8ee3": {
+      "zh-Hans": "我的族谱",
+      "en": "My family trees",
+      "iosKey": "我的族谱"
+    },
+    "moment.t04a7d3cfb8da": {
+      "zh-Hans": "我的期待",
+      "en": "What I hope for",
+      "iosKey": "我的期待"
+    },
+    "moment.te8c4f71b3601": {
+      "zh-Hans": "我的积分",
+      "en": "My points",
+      "iosKey": "我的积分"
+    },
+    "moment.td7064f0a7c32": {
+      "zh-Hans": "我的空间",
+      "en": "My spaces",
+      "iosKey": "我的空间"
+    },
+    "moment.ta99de5579329": {
+      "zh-Hans": "我的群组",
+      "en": "My groups",
+      "iosKey": "我的群组"
+    },
+    "moment.t78f684ec385e": {
+      "zh-Hans": "我的规则",
+      "en": "My rules",
+      "iosKey": "我的规则"
+    },
+    "moment.t8f9afc5208d2": {
+      "zh-Hans": "我说",
+      "en": "I said",
+      "iosKey": "我说"
+    },
+    "moment.t9a1d321bb040": {
+      "zh-Hans": "截止 %@ · %@",
+      "en": "Due %@ · %@",
+      "iosKey": "截止 %@ · %@"
+    },
+    "moment.t15f26621cdce": {
+      "zh-Hans": "截止时间",
+      "en": "Deadline",
+      "iosKey": "截止时间"
+    },
+    "moment.t6257ca3f6caf": {
+      "zh-Hans": "手表上显示的配对码",
+      "en": "Pairing code shown on the watch",
+      "iosKey": "手表上显示的配对码"
+    },
+    "moment.t94d7d49971d8": {
+      "zh-Hans": "手表与 iPhone 的照片传输尚未就绪。",
+      "en": "Photo transfer between the watch and iPhone is not ready yet.",
+      "iosKey": "手表与 iPhone 的照片传输尚未就绪。"
+    },
+    "moment.t69c83fe3247d": {
+      "zh-Hans": "手表与成长",
+      "en": "Watch and growth",
+      "iosKey": "手表与成长"
+    },
+    "moment.t39b8ec1346b5": {
+      "zh-Hans": "手表位置无效，请重新定位。",
+      "en": "The watch location is invalid. Get your location again.",
+      "iosKey": "手表位置无效，请重新定位。"
+    },
+    "moment.t3c77938b6477": {
+      "zh-Hans": "手表活动照片需要 Apple Watch。",
+      "en": "Sharing watch activity photos requires Apple Watch.",
+      "iosKey": "手表活动照片需要 Apple Watch。"
+    },
+    "moment.t8f820e5bcda8": {
+      "zh-Hans": "手表活动请求无效。",
+      "en": "The watch activity request is invalid.",
+      "iosKey": "手表活动请求无效。"
+    },
+    "moment.t9f065db53123": {
+      "zh-Hans": "手表照片.jpg",
+      "en": "Watch photo.jpg",
+      "iosKey": "手表照片.jpg"
+    },
+    "moment.tb2042dc62b05": {
+      "zh-Hans": "手表设备",
+      "en": "Watch devices",
+      "iosKey": "手表设备"
+    },
+    "moment.t924dc24e57ca": {
+      "zh-Hans": "打卡已保存，海拔 %.1f 米。",
+      "en": "Check-in saved. Altitude: %.1f m.",
+      "iosKey": "打卡已保存，海拔 %.1f 米。"
+    },
+    "moment.tf9763a7fded5": {
+      "zh-Hans": "打卡已更新。",
+      "en": "Check-in updated.",
+      "iosKey": "打卡已更新。"
+    },
+    "moment.tfa4191a2a501": {
+      "zh-Hans": "打卡详情",
+      "en": "Check-in details",
+      "iosKey": "打卡详情"
+    },
+    "moment.t0407dbdaf0dd": {
+      "zh-Hans": "打开系统设置",
+      "en": "Open Settings",
+      "iosKey": "打开系统设置"
+    },
+    "moment.t4db040ea6d5f": {
+      "zh-Hans": "扣除",
+      "en": "Deduct",
+      "iosKey": "扣除"
+    },
+    "moment.t270864739592": {
+      "zh-Hans": "扫描已中断，请返回重试或手动输入设备码。",
+      "en": "Scanning was interrupted. Go back and try again or enter the device code manually.",
+      "iosKey": "扫描已中断，请返回重试或手动输入设备码。"
+    },
+    "moment.t7cca9df89b85": {
+      "zh-Hans": "扫描手表二维码",
+      "en": "Scan watch QR code",
+      "iosKey": "扫描手表二维码"
+    },
+    "moment.t84cdfb7d5c2d": {
+      "zh-Hans": "扫码打开邀请",
+      "en": "Scan to open invitation",
+      "iosKey": "扫码打开邀请"
+    },
+    "moment.tc2af8c06e2ac": {
+      "zh-Hans": "批准 %@ 的申请",
+      "en": "Approve %@’s request",
+      "iosKey": "批准 %@ 的申请"
+    },
+    "moment.t58fb169ae886": {
+      "zh-Hans": "批准申请",
+      "en": "Approve request",
+      "iosKey": "批准申请"
+    },
+    "moment.td66fd405c011": {
+      "zh-Hans": "承担责任",
+      "en": "Taking responsibility",
+      "iosKey": "承担责任"
+    },
+    "moment.t136de7a8c46f": {
+      "zh-Hans": "拒绝",
+      "en": "Reject",
+      "iosKey": "拒绝"
+    },
+    "moment.tb74728bc73a6": {
+      "zh-Hans": "按姓名或支系查找",
+      "en": "Search by name or branch",
+      "iosKey": "按姓名或支系查找"
+    },
+    "moment.t231e2dcac20f": {
+      "zh-Hans": "授权码",
+      "en": "Authorization code",
+      "iosKey": "授权码"
+    },
+    "moment.t329fcec61856": {
+      "zh-Hans": "接受",
+      "en": "Accept",
+      "iosKey": "接受"
+    },
+    "moment.t08a85f4ab4ba": {
+      "zh-Hans": "提交",
+      "en": "Submit",
+      "iosKey": "提交"
+    },
+    "moment.t386de9d4acf9": {
+      "zh-Hans": "提交心愿",
+      "en": "Submit wish",
+      "iosKey": "提交心愿"
+    },
+    "moment.tb5bc877b2155": {
+      "zh-Hans": "提交意见",
+      "en": "Submit feedback",
+      "iosKey": "提交意见"
+    },
+    "moment.t9cc5e4d81ec2": {
+      "zh-Hans": "提交申请",
+      "en": "Submit request",
+      "iosKey": "提交申请"
+    },
+    "moment.tda78b7d91b34": {
+      "zh-Hans": "提交给家长",
+      "en": "Send to parent",
+      "iosKey": "提交给家长"
+    },
+    "moment.tb97ea9aad661": {
+      "zh-Hans": "提意见",
+      "en": "Give feedback",
+      "iosKey": "提意见"
+    },
+    "moment.tf56c6c82203b": {
+      "zh-Hans": "提示",
+      "en": "Notice",
+      "iosKey": "提示"
+    },
+    "moment.tb39edeaac6ba": {
+      "zh-Hans": "搜索内容不能超过 80 字",
+      "en": "Search text cannot exceed 80 characters",
+      "iosKey": "搜索内容不能超过 80 字"
+    },
+    "moment.ta10b604898e8": {
+      "zh-Hans": "搜索已加载的孩子、内容、类别",
+      "en": "Search loaded children, content, or categories",
+      "iosKey": "搜索已加载的孩子、内容、类别"
+    },
+    "moment.t5bcdc8ba08ad": {
+      "zh-Hans": "撤销这笔记录",
+      "en": "Reverse this record",
+      "iosKey": "撤销这笔记录"
+    },
+    "moment.t2c1e5ec62145": {
+      "zh-Hans": "操作失败，请稍后重试。",
+      "en": "Operation failed. Try again later.",
+      "iosKey": "操作失败，请稍后重试。"
+    },
+    "moment.t83f4727f2b46": {
+      "zh-Hans": "操作已取消。",
+      "en": "Operation cancelled.",
+      "iosKey": "操作已取消。"
+    },
+    "moment.tb87b880332e2": {
+      "zh-Hans": "操作提示",
+      "en": "Notice",
+      "iosKey": "操作提示"
+    },
+    "moment.te11579ca0ebc": {
+      "zh-Hans": "操作未能完成，请稍后重试。",
+      "en": "The operation could not be completed. Please try again later.",
+      "iosKey": "操作未能完成，请稍后重试。"
+    },
+    "moment.t9344f023fa78": {
+      "zh-Hans": "支系",
+      "en": "Branch",
+      "iosKey": "支系"
+    },
+    "moment.t2bf5fda899a5": {
+      "zh-Hans": "支系（可选）",
+      "en": "Branch (optional)",
+      "iosKey": "支系（可选）"
+    },
+    "moment.t49a2d818ae85": {
+      "zh-Hans": "收藏到当前空间",
+      "en": "Save to current space",
+      "iosKey": "收藏到当前空间"
+    },
+    "moment.t678c5b1a981e": {
+      "zh-Hans": "改为活动访客",
+      "en": "Make activity guest",
+      "iosKey": "改为活动访客"
+    },
+    "moment.td4e25a7e386b": {
+      "zh-Hans": "散步",
+      "en": "Walking",
+      "iosKey": "散步"
+    },
+    "moment.tba8ba95c18c7": {
+      "zh-Hans": "数量（大于 0）",
+      "en": "Quantity (greater than 0)",
+      "iosKey": "数量（大于 0）"
+    },
+    "moment.td662da0ba8bf": {
+      "zh-Hans": "新增空间",
+      "en": "Add space",
+      "iosKey": "新增空间"
+    },
+    "moment.t6897a8ef070b": {
+      "zh-Hans": "新建对话",
+      "en": "New chat",
+      "iosKey": "新建对话"
+    },
+    "moment.t07d637a3a4f1": {
+      "zh-Hans": "新建本人记录",
+      "en": "Create my person record",
+      "iosKey": "新建本人记录"
+    },
+    "moment.t418d188129f4": {
+      "zh-Hans": "新建约定",
+      "en": "New commitment",
+      "iosKey": "新建约定"
+    },
+    "moment.t09c01683ba3f": {
+      "zh-Hans": "新活动名称",
+      "en": "New activity name",
+      "iosKey": "新活动名称"
+    },
+    "moment.tcc29a3c5e4eb": {
+      "zh-Hans": "新空间名称",
+      "en": "New space name",
+      "iosKey": "新空间名称"
+    },
+    "moment.t1121471a0ff4": {
+      "zh-Hans": "方向",
+      "en": "Direction",
+      "iosKey": "方向"
+    },
+    "moment.t91697a026c35": {
+      "zh-Hans": "方式",
+      "en": "How",
+      "iosKey": "方式"
+    },
+    "moment.t1e773ab784bf": {
+      "zh-Hans": "族谱",
+      "en": "Family tree",
+      "iosKey": "族谱"
+    },
+    "moment.te113f525e973": {
+      "zh-Hans": "族谱人物",
+      "en": "Family-tree person",
+      "iosKey": "族谱人物"
+    },
+    "moment.t59632cfa01ff": {
+      "zh-Hans": "族谱名称",
+      "en": "Family-tree name",
+      "iosKey": "族谱名称"
+    },
+    "moment.t1e3b386e24de": {
+      "zh-Hans": "无法保存接收的原文件。",
+      "en": "Could not save the received original file.",
+      "iosKey": "无法保存接收的原文件。"
+    },
+    "moment.t231cae530d24": {
+      "zh-Hans": "无法处理照片预览。",
+      "en": "Could not process the photo preview.",
+      "iosKey": "无法处理照片预览。"
+    },
+    "moment.te7f5d07e5b6a": {
+      "zh-Hans": "无法扫描",
+      "en": "Unable to scan",
+      "iosKey": "无法扫描"
+    },
+    "moment.t9928596d2189": {
+      "zh-Hans": "无法显示照片预览",
+      "en": "Unable to display the photo preview",
+      "iosKey": "无法显示照片预览"
+    },
+    "moment.tc7d926e497fa": {
+      "zh-Hans": "无法确认当前用户名。",
+      "en": "Could not confirm the current username.",
+      "iosKey": "无法确认当前用户名。"
+    },
+    "moment.t81a30afa034c": {
+      "zh-Hans": "无法确认用户名。",
+      "en": "Unable to confirm the username.",
+      "iosKey": "无法确认用户名。"
+    },
+    "moment.t0cba7ce4ef7e": {
+      "zh-Hans": "无法识别照片格式。",
+      "en": "Could not identify the photo format.",
+      "iosKey": "无法识别照片格式。"
+    },
+    "moment.t1a64930b12af": {
+      "zh-Hans": "无法读取家长身份。",
+      "en": "Could not identify the parent account.",
+      "iosKey": "无法读取家长身份。"
+    },
+    "moment.tb3ec4fc85064": {
+      "zh-Hans": "无法读取或保存分享文件，请重试。",
+      "en": "Unable to read or save shared files. Try again.",
+      "iosKey": "无法读取或保存分享文件，请重试。"
+    },
+    "moment.tdcd00f6c38a4": {
+      "zh-Hans": "无法读取所选照片。",
+      "en": "Unable to read the selected photo.",
+      "iosKey": "无法读取所选照片。"
+    },
+    "moment.tec2f82b5dcbb": {
+      "zh-Hans": "无法读取所选视频。",
+      "en": "Unable to read the selected video.",
+      "iosKey": "无法读取所选视频。"
+    },
+    "moment.t7043b85d626a": {
+      "zh-Hans": "无法读取最新积分记录。",
+      "en": "Could not load the latest point records.",
+      "iosKey": "无法读取最新积分记录。"
+    },
+    "moment.t161fe7e48a15": {
+      "zh-Hans": "无法读取相册中的原文件。",
+      "en": "Unable to read the original file from your photo library.",
+      "iosKey": "无法读取相册中的原文件。"
+    },
+    "moment.t029b66dec9a7": {
+      "zh-Hans": "无法读取积分记录。",
+      "en": "Could not load point records.",
+      "iosKey": "无法读取积分记录。"
+    },
+    "moment.td89a06be3eef": {
+      "zh-Hans": "无法连接配对的 iPhone：%@",
+      "en": "Unable to connect to the paired iPhone: %@",
+      "iosKey": "无法连接配对的 iPhone：%@"
+    },
+    "moment.tf648d6712cf8": {
+      "zh-Hans": "日常",
+      "en": "Daily",
+      "iosKey": "日常"
+    },
+    "moment.tb3934005c110": {
+      "zh-Hans": "日常已删除。",
+      "en": "Moment deleted.",
+      "iosKey": "日常已删除。"
+    },
+    "moment.tee5d50ae955a": {
+      "zh-Hans": "日常已发布。",
+      "en": "Moment posted.",
+      "iosKey": "日常已发布。"
+    },
+    "moment.t70d0c1b33626": {
+      "zh-Hans": "日期",
+      "en": "Date",
+      "iosKey": "日期"
+    },
+    "moment.t00fa1e25255d": {
+      "zh-Hans": "日期（当地日历）",
+      "en": "Date (local calendar)",
+      "iosKey": "日期（当地日历）"
+    },
+    "moment.t8d3d73a18aff": {
+      "zh-Hans": "显示方式",
+      "en": "Display",
+      "iosKey": "显示方式"
+    },
+    "moment.t48d8b79c5e91": {
+      "zh-Hans": "智能体对话",
+      "en": "Agent chat",
+      "iosKey": "智能体对话"
+    },
+    "moment.t0f4cfc91f78f": {
+      "zh-Hans": "智能体成员",
+      "en": "Agents",
+      "iosKey": "智能体成员"
+    },
+    "moment.tf36cac96220b": {
+      "zh-Hans": "暂不可用",
+      "en": "Temporarily unavailable",
+      "iosKey": "暂不可用"
+    },
+    "moment.t8d12fc0d4eb2": {
+      "zh-Hans": "暂停",
+      "en": "Pause",
+      "iosKey": "暂停"
+    },
+    "moment.tf65799b57118": {
+      "zh-Hans": "暂停期间不计时、不计步。锁屏后计时继续，返回时读取系统步数。步数来自本机，可能稍有延迟。",
+      "en": "Pauses do not count time or steps. Timing continues while the screen is locked, and system step counts are read when you return. Steps come from this device and may be slightly delayed.",
+      "iosKey": "暂停期间不计时、不计步。锁屏后计时继续，返回时读取系统步数。步数来自本机，可能稍有延迟。"
+    },
+    "moment.t998e1231259c": {
+      "zh-Hans": "暂无亲属关系",
+      "en": "No family relationships",
+      "iosKey": "暂无亲属关系"
+    },
+    "moment.t69e71f0380ae": {
+      "zh-Hans": "暂无会话",
+      "en": "No chats yet",
+      "iosKey": "暂无会话"
+    },
+    "moment.t257aad1c57ef": {
+      "zh-Hans": "暂无公开成员",
+      "en": "No public members",
+      "iosKey": "暂无公开成员"
+    },
+    "moment.t66f26571b1ae": {
+      "zh-Hans": "暂无可推导的关系",
+      "en": "No relationships can be inferred",
+      "iosKey": "暂无可推导的关系"
+    },
+    "moment.tcf6395d2226f": {
+      "zh-Hans": "暂无可用智能体",
+      "en": "No agents available",
+      "iosKey": "暂无可用智能体"
+    },
+    "moment.tc41fc374442c": {
+      "zh-Hans": "暂无可申请规则，请家长添加奖励规则。",
+      "en": "No reward rules available. Ask a parent to add one.",
+      "iosKey": "暂无可申请规则，请家长添加奖励规则。"
+    },
+    "moment.t1f600e0a1a00": {
+      "zh-Hans": "暂无地图位置",
+      "en": "No map locations",
+      "iosKey": "暂无地图位置"
+    },
+    "moment.t2a1740754801": {
+      "zh-Hans": "暂无好友",
+      "en": "No friends yet",
+      "iosKey": "暂无好友"
+    },
+    "moment.t73fc87f831bf": {
+      "zh-Hans": "暂无归档会话",
+      "en": "No archived chats",
+      "iosKey": "暂无归档会话"
+    },
+    "moment.t51c54a24eb22": {
+      "zh-Hans": "暂无成员",
+      "en": "No members yet",
+      "iosKey": "暂无成员"
+    },
+    "moment.t3fa3e074bdff": {
+      "zh-Hans": "暂无成长统计",
+      "en": "No growth statistics",
+      "iosKey": "暂无成长统计"
+    },
+    "moment.tbc4b7a44c634": {
+      "zh-Hans": "暂无打卡或共享照片。",
+      "en": "No check-ins or shared photos yet.",
+      "iosKey": "暂无打卡或共享照片。"
+    },
+    "moment.tffa2434d97d1": {
+      "zh-Hans": "暂无排行",
+      "en": "No rankings yet",
+      "iosKey": "暂无排行"
+    },
+    "moment.t1c5ebfa2ee1d": {
+      "zh-Hans": "暂无申请",
+      "en": "No requests",
+      "iosKey": "暂无申请"
+    },
+    "moment.tc6e81f808093": {
+      "zh-Hans": "暂无申请记录",
+      "en": "No requests yet",
+      "iosKey": "暂无申请记录"
+    },
+    "moment.t53fbed3d02ed": {
+      "zh-Hans": "暂无空间",
+      "en": "No spaces yet",
+      "iosKey": "暂无空间"
+    },
+    "moment.t46ca86da52b3": {
+      "zh-Hans": "暂无记录",
+      "en": "No records",
+      "iosKey": "暂无记录"
+    },
+    "moment.tcb92c0093cb4": {
+      "zh-Hans": "暂无记录，孩子也可以从手表发起。",
+      "en": "No records yet. Children can also start an activity from their watch.",
+      "iosKey": "暂无记录，孩子也可以从手表发起。"
+    },
+    "moment.t43d4ee9620c4": {
+      "zh-Hans": "暂无预览，请在 iPhone 查看",
+      "en": "No preview available. View on your iPhone.",
+      "iosKey": "暂无预览，请在 iPhone 查看"
+    },
+    "moment.t4b8c4281957f": {
+      "zh-Hans": "暂时无法检查更新",
+      "en": "Could not check for updates",
+      "iosKey": "暂时无法检查更新"
+    },
+    "moment.t8ac268528dc5": {
+      "zh-Hans": "暂时无法连接，请检查网络；联网后会自动继续",
+      "en": "Unable to connect. Check your network. This will resume when you are online.",
+      "iosKey": "暂时无法连接，请检查网络；联网后会自动继续"
+    },
+    "moment.tcc20fd46fec6": {
+      "zh-Hans": "暖心时刻",
+      "en": "Warm moments",
+      "iosKey": "暖心时刻"
+    },
+    "moment.t51ea7f1f75cc": {
+      "zh-Hans": "更换绑定孩子",
+      "en": "Change linked child",
+      "iosKey": "更换绑定孩子"
+    },
+    "moment.t41b6ea55f61a": {
+      "zh-Hans": "更新你的空间名称。",
+      "en": "Update your space’s name.",
+      "iosKey": "更新你的空间名称。"
+    },
+    "moment.t968c5b802bc2": {
+      "zh-Hans": "最新版本：%@",
+      "en": "Latest version: %@",
+      "iosKey": "最新版本：%@"
+    },
+    "moment.t5426cc301deb": {
+      "zh-Hans": "最近在线：",
+      "en": "Last online: ",
+      "iosKey": "最近在线："
+    },
+    "moment.tbf02476a73b3": {
+      "zh-Hans": "最近打卡海拔 %.1f 米",
+      "en": "Latest check-in altitude: %.1f m",
+      "iosKey": "最近打卡海拔 %.1f 米"
+    },
+    "moment.t3c4d80869dfa": {
+      "zh-Hans": "有人请求原图时需要通知提醒。请在系统设置中允许 Linko Moment 发送通知，并保持 App 打开完成传输。",
+      "en": "Notifications alert you when someone requests an original photo. Allow Linko Moment notifications in Settings and keep the app open to finish the transfer.",
+      "iosKey": "有人请求原图时需要通知提醒。请在系统设置中允许 Linko Moment 发送通知，并保持 App 打开完成传输。"
+    },
+    "moment.tdf2642414cf0": {
+      "zh-Hans": "有效期至 ",
+      "en": "Valid until ",
+      "iosKey": "有效期至 "
+    },
+    "moment.t54a58abfcf24": {
+      "zh-Hans": "有效期至 %@（北京时间）",
+      "en": "Expires %@ (Beijing time)",
+      "iosKey": "有效期至 %@（北京时间）"
+    },
+    "moment.t5f7ce1a29458": {
+      "zh-Hans": "有效期至 %@（当地时间）",
+      "en": "Expires %@ (local time)",
+      "iosKey": "有效期至 %@（当地时间）"
+    },
+    "moment.t589e88094ac3": {
+      "zh-Hans": "有效至 %@",
+      "en": "Valid until %@",
+      "iosKey": "有效至 %@"
+    },
+    "moment.t48728db29742": {
+      "zh-Hans": "有活动成员正在请求原图，请保持 App 打开直到传输完成。",
+      "en": "An activity member is requesting an original photo. Keep the app open until the transfer finishes.",
+      "iosKey": "有活动成员正在请求原图，请保持 App 打开直到传输完成。"
+    },
+    "moment.t677aad1a0ee4": {
+      "zh-Hans": "朋友",
+      "en": "Friend",
+      "iosKey": "朋友"
+    },
+    "moment.t9d762f329fe8": {
+      "zh-Hans": "服务地址必须使用 HTTPS",
+      "en": "The service address must use HTTPS.",
+      "iosKey": "服务地址必须使用 HTTPS"
+    },
+    "moment.t82b7376d6a2e": {
+      "zh-Hans": "服务暂时不可用（%lld）",
+      "en": "Service temporarily unavailable (%lld)",
+      "iosKey": "服务暂时不可用（%lld）"
+    },
+    "moment.t5cf4c576e3db": {
+      "zh-Hans": "服务返回的%@数据格式不正确。",
+      "en": "The service returned invalid %@ data.",
+      "iosKey": "服务返回的%@数据格式不正确。"
+    },
+    "moment.t1cc41cce7f4e": {
+      "zh-Hans": "服务返回的数据格式不正确。",
+      "en": "The service returned invalid data.",
+      "iosKey": "服务返回的数据格式不正确。"
+    },
+    "moment.t7f05190592e5": {
+      "zh-Hans": "未填写",
+      "en": "Not provided",
+      "iosKey": "未填写"
+    },
+    "moment.t162efbc72c2d": {
+      "zh-Hans": "未开通",
+      "en": "Not activated",
+      "iosKey": "未开通"
+    },
+    "moment.t4d8c1c5b4283": {
+      "zh-Hans": "未知",
+      "en": "Unknown",
+      "iosKey": "未知"
+    },
+    "moment.t5a067035f105": {
+      "zh-Hans": "未获得运动与健身权限，可在系统设置中开启；计时仍可使用。",
+      "en": "Motion and Fitness permission has not been granted. Enable it in Settings. The timer remains available.",
+      "iosKey": "未获得运动与健身权限，可在系统设置中开启；计时仍可使用。"
+    },
+    "moment.t7450cc5b16e2": {
+      "zh-Hans": "未记录",
+      "en": "Not recorded",
+      "iosKey": "未记录"
+    },
+    "moment.t2875bc4f7fcb": {
+      "zh-Hans": "未通过",
+      "en": "Declined",
+      "iosKey": "未通过"
+    },
+    "moment.t13d10010d53a": {
+      "zh-Hans": "本周成长 · 北京时间",
+      "en": "This week’s growth · Beijing time",
+      "iosKey": "本周成长 · 北京时间"
+    },
+    "moment.t3cafc7b73b04": {
+      "zh-Hans": "本周记录",
+      "en": "Records this week",
+      "iosKey": "本周记录"
+    },
+    "moment.t2b6d410cb672": {
+      "zh-Hans": "本周试行：%@",
+      "en": "Trial plan this week: %@",
+      "iosKey": "本周试行：%@"
+    },
+    "moment.td8ec2be31e34": {
+      "zh-Hans": "本地部分文件与分享源不一致，再次获取将从头开始。",
+      "en": "The local partial file differs from the shared source. Fetching it again will restart the download.",
+      "iosKey": "本地部分文件与分享源不一致，再次获取将从头开始。"
+    },
+    "moment.t4a99771f2905": {
+      "zh-Hans": "本机登录凭据将清除。用户中心的浏览器登录状态由用户中心管理。",
+      "en": "Sign-in credentials on this device will be cleared. User Center manages its browser sign-in state.",
+      "iosKey": "本机登录凭据将清除。用户中心的浏览器登录状态由用户中心管理。"
+    },
+    "moment.t8b22270395c6": {
+      "zh-Hans": "本次登录验证码：%@",
+      "en": "Verification code for this sign-in: %@",
+      "iosKey": "本次登录验证码：%@"
+    },
+    "moment.t3003318e729a": {
+      "zh-Hans": "查找",
+      "en": "Find",
+      "iosKey": "查找"
+    },
+    "moment.tdb8db0530432": {
+      "zh-Hans": "查看",
+      "en": "View",
+      "iosKey": "查看"
+    },
+    "moment.tb9f8251490aa": {
+      "zh-Hans": "查看好友与申请",
+      "en": "View friends and requests",
+      "iosKey": "查看好友与申请"
+    },
+    "moment.td8790d307c36": {
+      "zh-Hans": "查看空间成员",
+      "en": "View space members",
+      "iosKey": "查看空间成员"
+    },
+    "moment.tc940a0ee8f04": {
+      "zh-Hans": "标准版 · 基础功能已包含",
+      "en": "Standard · Basic features included",
+      "iosKey": "标准版 · 基础功能已包含"
+    },
+    "moment.tc8d0cf3f4788": {
+      "zh-Hans": "栏目",
+      "en": "Category",
+      "iosKey": "栏目"
+    },
+    "moment.t62e5111ef91f": {
+      "zh-Hans": "核对并重试同一笔记录",
+      "en": "Review and retry the same record",
+      "iosKey": "核对并重试同一笔记录"
+    },
+    "moment.t716fb1765209": {
+      "zh-Hans": "根据已有关系推导",
+      "en": "Inferred from existing relationships",
+      "iosKey": "根据已有关系推导"
+    },
+    "moment.t29133fccd53c": {
+      "zh-Hans": "欢迎使用 Linko Moment",
+      "en": "Welcome to Linko Moment",
+      "iosKey": "欢迎使用 Linko Moment"
+    },
+    "moment.t6bdb4435095e": {
+      "zh-Hans": "正在保存…",
+      "en": "Saving…",
+      "iosKey": "正在保存…"
+    },
+    "moment.te910cf0a1012": {
+      "zh-Hans": "正在准备今天的鼓励…",
+      "en": "Preparing today’s encouragement…",
+      "iosKey": "正在准备今天的鼓励…"
+    },
+    "moment.tee4191b3f24b": {
+      "zh-Hans": "正在分享",
+      "en": "Sharing",
+      "iosKey": "正在分享"
+    },
+    "moment.t21bd738e0d71": {
+      "zh-Hans": "正在加载…",
+      "en": "Loading…",
+      "iosKey": "正在加载…"
+    },
+    "moment.t465f3273bb83": {
+      "zh-Hans": "正在加载照片",
+      "en": "Loading photo",
+      "iosKey": "正在加载照片"
+    },
+    "moment.t21ec5c565cc1": {
+      "zh-Hans": "正在定位并打卡…",
+      "en": "Locating and checking in…",
+      "iosKey": "正在定位并打卡…"
+    },
+    "moment.tfe3bbe9423d5": {
+      "zh-Hans": "正在实时传输原文件：%lld%%；请保持 App 打开。",
+      "en": "Transferring original file: %lld%%. Keep the app open.",
+      "iosKey": "正在实时传输原文件：%lld%%；请保持 App 打开。"
+    },
+    "moment.tfb0eb4dcd527": {
+      "zh-Hans": "正在实时接收：%lld%%",
+      "en": "Receiving: %lld%%",
+      "iosKey": "正在实时接收：%lld%%"
+    },
+    "moment.t3706a5ffa936": {
+      "zh-Hans": "正在打开相机…",
+      "en": "Opening camera…",
+      "iosKey": "正在打开相机…"
+    },
+    "moment.t26ef00b7d061": {
+      "zh-Hans": "正在提交…",
+      "en": "Submitting…",
+      "iosKey": "正在提交…"
+    },
+    "moment.te6442ce18f53": {
+      "zh-Hans": "正在更新…",
+      "en": "Updating…",
+      "iosKey": "正在更新…"
+    },
+    "moment.t43e07da7687f": {
+      "zh-Hans": "正在检查新版本",
+      "en": "Checking for a new version",
+      "iosKey": "正在检查新版本"
+    },
+    "moment.t191d7e717354": {
+      "zh-Hans": "正在生成邀请链接…",
+      "en": "Creating invitation link…",
+      "iosKey": "正在生成邀请链接…"
+    },
+    "moment.t274669c38450": {
+      "zh-Hans": "正在等待回复…",
+      "en": "Waiting for a reply…",
+      "iosKey": "正在等待回复…"
+    },
+    "moment.tbd8b05830169": {
+      "zh-Hans": "正在获取位置和地址…",
+      "en": "Getting location and address…",
+      "iosKey": "正在获取位置和地址…"
+    },
+    "moment.tcc0fcfef3216": {
+      "zh-Hans": "正在获取原文件…",
+      "en": "Getting original files…",
+      "iosKey": "正在获取原文件…"
+    },
+    "moment.te1fa1bf0cd78": {
+      "zh-Hans": "正在计算…",
+      "en": "Calculating…",
+      "iosKey": "正在计算…"
+    },
+    "moment.t1af9b4217e3f": {
+      "zh-Hans": "正在读取家长资料…",
+      "en": "Loading parent profile…",
+      "iosKey": "正在读取家长资料…"
+    },
+    "moment.t72ab4aa38984": {
+      "zh-Hans": "正在读取已有活动…",
+      "en": "Loading existing activities…",
+      "iosKey": "正在读取已有活动…"
+    },
+    "moment.ta0ce5a06b70d": {
+      "zh-Hans": "正在读取成员…",
+      "en": "Loading members…",
+      "iosKey": "正在读取成员…"
+    },
+    "moment.t90b27efe6949": {
+      "zh-Hans": "正在读取记录…",
+      "en": "Loading records…",
+      "iosKey": "正在读取记录…"
+    },
+    "moment.t0a107004fd20": {
+      "zh-Hans": "正在读取邀请活动…",
+      "en": "Loading invitation activity…",
+      "iosKey": "正在读取邀请活动…"
+    },
+    "moment.teefe6f4c12c9": {
+      "zh-Hans": "此人物已绑定用户。",
+      "en": "This person is already linked to a user.",
+      "iosKey": "此人物已绑定用户。"
+    },
+    "moment.tdcfbc84f7917": {
+      "zh-Hans": "此应用暂未配置测试邀请。",
+      "en": "No test invitation is configured for this app.",
+      "iosKey": "此应用暂未配置测试邀请。"
+    },
+    "moment.t9acc42dabfe9": {
+      "zh-Hans": "此空间由你管理，可收藏参加过的活动。",
+      "en": "You manage this space and can save activities you have joined.",
+      "iosKey": "此空间由你管理，可收藏参加过的活动。"
+    },
+    "moment.t792e0850deef": {
+      "zh-Hans": "此设备不支持扫描，请返回手动输入手表设备码。",
+      "en": "This device does not support scanning. Go back and enter the watch device code manually.",
+      "iosKey": "此设备不支持扫描，请返回手动输入手表设备码。"
+    },
+    "moment.t7f5264ac6ac7": {
+      "zh-Hans": "此设备不支持计步，可继续使用运动计时。",
+      "en": "Step counting is not supported on this device. You can still use the exercise timer.",
+      "iosKey": "此设备不支持计步，可继续使用运动计时。"
+    },
+    "moment.ted933916065f": {
+      "zh-Hans": "此设备的语言设置不影响家长或孩子的用户中心账号。",
+      "en": "This device’s language setting does not change the parent’s or child’s User Center account.",
+      "iosKey": "此设备的语言设置不影响家长或孩子的用户中心账号。"
+    },
+    "moment.ta631989838db": {
+      "zh-Hans": "步数待获取",
+      "en": "Step count pending",
+      "iosKey": "步数待获取"
+    },
+    "moment.tad84588df5ca": {
+      "zh-Hans": "步数未获取",
+      "en": "Step count unavailable",
+      "iosKey": "步数未获取"
+    },
+    "moment.t283262fd81a7": {
+      "zh-Hans": "每个人管理自己的空间，同一活动可收藏到多个空间。",
+      "en": "Everyone manages their own spaces. The same activity can be saved to multiple spaces.",
+      "iosKey": "每个人管理自己的空间，同一活动可收藏到多个空间。"
+    },
+    "moment.t5080b7bfe963": {
+      "zh-Hans": "每日成长记录数量",
+      "en": "Daily growth record count",
+      "iosKey": "每日成长记录数量"
+    },
+    "moment.t9519b5cbb463": {
+      "zh-Hans": "比上周%@ %lld 条记录",
+      "en": "%@ %lld records compared with last week",
+      "iosKey": "比上周%@ %lld 条记录"
+    },
+    "moment.t55244e1266c7": {
+      "zh-Hans": "氏",
+      "en": "family",
+      "iosKey": "氏"
+    },
+    "moment.t058d43e5f90c": {
+      "zh-Hans": "没有获取到有效的位置与海拔，请重试。",
+      "en": "Unable to get a valid location and altitude. Try again.",
+      "iosKey": "没有获取到有效的位置与海拔，请重试。"
+    },
+    "moment.t4a275c6f6f01": {
+      "zh-Hans": "没有获取到有效的位置和海拔，请重试。",
+      "en": "Unable to get a valid location and altitude. Try again.",
+      "iosKey": "没有获取到有效的位置和海拔，请重试。"
+    },
+    "moment.ta13debac69eb": {
+      "zh-Hans": "注册用户中心账号",
+      "en": "Create a User Center account",
+      "iosKey": "注册用户中心账号"
+    },
+    "moment.t9e9bead81498": {
+      "zh-Hans": "活动",
+      "en": "Activities",
+      "iosKey": "活动"
+    },
+    "moment.t328780edb124": {
+      "zh-Hans": "活动与分享",
+      "en": "Activities and sharing",
+      "iosKey": "活动与分享"
+    },
+    "moment.tffeed1540442": {
+      "zh-Hans": "活动与照片",
+      "en": "Activities and photos",
+      "iosKey": "活动与照片"
+    },
+    "moment.t3b18cde5ef12": {
+      "zh-Hans": "活动介绍",
+      "en": "About this activity",
+      "iosKey": "活动介绍"
+    },
+    "moment.t4a810f2d9e5c": {
+      "zh-Hans": "活动介绍不能超过 2000 字。",
+      "en": "The activity description cannot exceed 2,000 characters.",
+      "iosKey": "活动介绍不能超过 2000 字。"
+    },
+    "moment.t5085b3a0fab7": {
+      "zh-Hans": "活动内容暂时无法读取：%@",
+      "en": "Unable to load activity content: %@",
+      "iosKey": "活动内容暂时无法读取：%@"
+    },
+    "moment.t127799c804cd": {
+      "zh-Hans": "活动列表",
+      "en": "Activities",
+      "iosKey": "活动列表"
+    },
+    "moment.ta8621fe0b4b1": {
+      "zh-Hans": "活动列表无效。",
+      "en": "Invalid activity list.",
+      "iosKey": "活动列表无效。"
+    },
+    "moment.t30db88b23b2e": {
+      "zh-Hans": "活动名称",
+      "en": "Activity name",
+      "iosKey": "活动名称"
+    },
+    "moment.tafc982956b4e": {
+      "zh-Hans": "活动地图",
+      "en": "Activity map",
+      "iosKey": "活动地图"
+    },
+    "moment.t4c7a52b4454e": {
+      "zh-Hans": "活动基本信息已更新。",
+      "en": "Activity details updated.",
+      "iosKey": "活动基本信息已更新。"
+    },
+    "moment.t59313659fbf8": {
+      "zh-Hans": "活动已创建。",
+      "en": "Activity created.",
+      "iosKey": "活动已创建。"
+    },
+    "moment.tc2e08adf6766": {
+      "zh-Hans": "活动已删除。",
+      "en": "Activity deleted.",
+      "iosKey": "活动已删除。"
+    },
+    "moment.t902405f3e5a3": {
+      "zh-Hans": "活动已收藏到空间。",
+      "en": "Activity saved to space.",
+      "iosKey": "活动已收藏到空间。"
+    },
+    "moment.t6d5aeff6d6e8": {
+      "zh-Hans": "活动成员",
+      "en": "Activity members",
+      "iosKey": "活动成员"
+    },
+    "moment.t1222901699ad": {
+      "zh-Hans": "活动成员与好友",
+      "en": "Activity members and friends",
+      "iosKey": "活动成员与好友"
+    },
+    "moment.t591d97f8752e": {
+      "zh-Hans": "活动成员将无法再获取此文件；iPhone 相册中的原文件不会删除。",
+      "en": "Activity members will no longer be able to download this file. The original in your iPhone photo library will remain.",
+      "iosKey": "活动成员将无法再获取此文件；iPhone 相册中的原文件不会删除。"
+    },
+    "moment.tcfcb30397c99": {
+      "zh-Hans": "活动打卡",
+      "en": "Activity check-ins",
+      "iosKey": "活动打卡"
+    },
+    "moment.t9f6849302b58": {
+      "zh-Hans": "活动数据暂时不可用。",
+      "en": "Activity data is temporarily unavailable.",
+      "iosKey": "活动数据暂时不可用。"
+    },
+    "moment.t0f43733fca7c": {
+      "zh-Hans": "活动日期",
+      "en": "Activity date",
+      "iosKey": "活动日期"
+    },
+    "moment.t5d0beaa5f252": {
+      "zh-Hans": "活动日期 ",
+      "en": "Activity date ",
+      "iosKey": "活动日期 "
+    },
+    "moment.t4ac2de55e9d4": {
+      "zh-Hans": "活动服务暂不可用。",
+      "en": "The activity service is temporarily unavailable.",
+      "iosKey": "活动服务暂不可用。"
+    },
+    "moment.t5391f899e161": {
+      "zh-Hans": "活动标识无效。",
+      "en": "The activity ID is invalid.",
+      "iosKey": "活动标识无效。"
+    },
+    "moment.tcb08becf33b1": {
+      "zh-Hans": "活动照片",
+      "en": "Activity photos",
+      "iosKey": "活动照片"
+    },
+    "moment.t3f9191636aa7": {
+      "zh-Hans": "活动照片与视频",
+      "en": "Activity photos and videos",
+      "iosKey": "活动照片与视频"
+    },
+    "moment.t84a635036555": {
+      "zh-Hans": "活动空间",
+      "en": "Activity space",
+      "iosKey": "活动空间"
+    },
+    "moment.tb07b3c02ac95": {
+      "zh-Hans": "活动管理",
+      "en": "Manage activities",
+      "iosKey": "活动管理"
+    },
+    "moment.t6f2d95335262": {
+      "zh-Hans": "活动访客",
+      "en": "Activity guests",
+      "iosKey": "活动访客"
+    },
+    "moment.t68d94dc5b649": {
+      "zh-Hans": "活动详情",
+      "en": "Activity details",
+      "iosKey": "活动详情"
+    },
+    "moment.t117f9230cee0": {
+      "zh-Hans": "活动读取失败：%@",
+      "en": "Unable to load activities: %@",
+      "iosKey": "活动读取失败：%@"
+    },
+    "moment.t3f4670c81956": {
+      "zh-Hans": "活动邀请暂时无法读取：%@",
+      "en": "Unable to load activity invitations: %@",
+      "iosKey": "活动邀请暂时无法读取：%@"
+    },
+    "moment.t829827347a7f": {
+      "zh-Hans": "活跃天数",
+      "en": "Active days",
+      "iosKey": "活跃天数"
+    },
+    "moment.tcbaf7f676b26": {
+      "zh-Hans": "测试邀请",
+      "en": "Test invitation",
+      "iosKey": "测试邀请"
+    },
+    "moment.t22e82a886bb2": {
+      "zh-Hans": "海拔 %.1f 米",
+      "en": "Altitude: %.1f m",
+      "iosKey": "海拔 %.1f 米"
+    },
+    "moment.t7a8a11ead507": {
+      "zh-Hans": "添加",
+      "en": "Add",
+      "iosKey": "添加"
+    },
+    "moment.tf015adba28dc": {
+      "zh-Hans": "添加关系",
+      "en": "Add relationship",
+      "iosKey": "添加关系"
+    },
+    "moment.tfac9062e9065": {
+      "zh-Hans": "添加好友",
+      "en": "Add friend",
+      "iosKey": "添加好友"
+    },
+    "moment.t9547e8ace48f": {
+      "zh-Hans": "添加孩子",
+      "en": "Add child",
+      "iosKey": "添加孩子"
+    },
+    "moment.tc8ae731a2ed7": {
+      "zh-Hans": "添加家庭成员",
+      "en": "Add family member",
+      "iosKey": "添加家庭成员"
+    },
+    "moment.te67eecf2b441": {
+      "zh-Hans": "添加家族成员",
+      "en": "Add family member",
+      "iosKey": "添加家族成员"
+    },
+    "moment.tc9f9e18b0623": {
+      "zh-Hans": "添加规则",
+      "en": "Add rule",
+      "iosKey": "添加规则"
+    },
+    "moment.tde15094e7697": {
+      "zh-Hans": "温和地写下想表达的内容",
+      "en": "Write gently about what you want to express",
+      "iosKey": "温和地写下想表达的内容"
+    },
+    "moment.t26d871bce662": {
+      "zh-Hans": "温暖瞬间",
+      "en": "Warm moments",
+      "iosKey": "温暖瞬间"
+    },
+    "moment.t627206d252c1": {
+      "zh-Hans": "点右上角“完成”后自动保存。",
+      "en": "Saved automatically when you tap Done at the top right.",
+      "iosKey": "点右上角“完成”后自动保存。"
+    },
+    "moment.t7b50017ae47e": {
+      "zh-Hans": "照片",
+      "en": "Photos",
+      "iosKey": "照片"
+    },
+    "moment.ta3c6847a866c": {
+      "zh-Hans": "照片上限 50 MB，视频上限 500 MB。",
+      "en": "Photos can be up to 50 MB and videos up to 500 MB.",
+      "iosKey": "照片上限 50 MB，视频上限 500 MB。"
+    },
+    "moment.t204d84bdd831": {
+      "zh-Hans": "照片与视频 · %@",
+      "en": "Photos and videos · %@",
+      "iosKey": "照片与视频 · %@"
+    },
+    "moment.te1861dc7fb51": {
+      "zh-Hans": "照片会从此活动撤销共享。",
+      "en": "This photo will no longer be shared in this activity.",
+      "iosKey": "照片会从此活动撤销共享。"
+    },
+    "moment.t1f036498a5fc": {
+      "zh-Hans": "照片会以配对 iPhone 的账号共享；原图留在 iPhone，获取原图时请保持 iPhone 上的 Linko Moment 打开。",
+      "en": "Photos are shared using the paired iPhone’s account. Originals stay on the iPhone. Keep Linko Moment open on the iPhone during original file transfers.",
+      "iosKey": "照片会以配对 iPhone 的账号共享；原图留在 iPhone，获取原图时请保持 iPhone 上的 Linko Moment 打开。"
+    },
+    "moment.t693218fc2ac1": {
+      "zh-Hans": "照片传输文件无效。",
+      "en": "The photo-transfer file is invalid.",
+      "iosKey": "照片传输文件无效。"
+    },
+    "moment.t069668771106": {
+      "zh-Hans": "照片传输超时，请让配对的 iPhone 保持连接后重试。",
+      "en": "Photo transfer timed out. Keep your paired iPhone connected and try again.",
+      "iosKey": "照片传输超时，请让配对的 iPhone 保持连接后重试。"
+    },
+    "moment.tda6e7facc665": {
+      "zh-Hans": "照片分享设备登记失败。",
+      "en": "Could not register the photo-sharing device.",
+      "iosKey": "照片分享设备登记失败。"
+    },
+    "moment.t4394adfb1d9a": {
+      "zh-Hans": "照片列表无效。",
+      "en": "Invalid photo list.",
+      "iosKey": "照片列表无效。"
+    },
+    "moment.t25b8f995493a": {
+      "zh-Hans": "照片地点（可选，供活动成员查看）",
+      "en": "Photo location (optional, visible to activity members)",
+      "iosKey": "照片地点（可选，供活动成员查看）"
+    },
+    "moment.tc363020f50b8": {
+      "zh-Hans": "照片已发送到 iPhone，登记尚未确认，请稍后刷新相册。",
+      "en": "Photo sent to iPhone, but registration is not confirmed yet. Refresh the album shortly.",
+      "iosKey": "照片已发送到 iPhone，登记尚未确认，请稍后刷新相册。"
+    },
+    "moment.t7785510baa07": {
+      "zh-Hans": "照片或视频文件超过大小限制。",
+      "en": "The photo or video exceeds the size limit.",
+      "iosKey": "照片或视频文件超过大小限制。"
+    },
+    "moment.t1dbdcf5cdd08": {
+      "zh-Hans": "照片或视频标识无效。",
+      "en": "The photo or video ID is invalid.",
+      "iosKey": "照片或视频标识无效。"
+    },
+    "moment.tdfd4932d5589": {
+      "zh-Hans": "照片文件无效或超过 50 MB。",
+      "en": "The photo file is invalid or exceeds 50 MB.",
+      "iosKey": "照片文件无效或超过 50 MB。"
+    },
+    "moment.t340ea0bc7b0b": {
+      "zh-Hans": "照片标识无效。",
+      "en": "The photo ID is invalid.",
+      "iosKey": "照片标识无效。"
+    },
+    "moment.t985c4c75e13f": {
+      "zh-Hans": "照片没有记录坐标时仍可在下方查看，但无法固定到地图上。",
+      "en": "Photos without recorded coordinates remain available below but cannot be placed on the map.",
+      "iosKey": "照片没有记录坐标时仍可在下方查看，但无法固定到地图上。"
+    },
+    "moment.t60eafcef8742": {
+      "zh-Hans": "照片登记回执无效。",
+      "en": "The photo registration receipt is invalid.",
+      "iosKey": "照片登记回执无效。"
+    },
+    "moment.tb0e6b1fb7ac0": {
+      "zh-Hans": "照片超过 50 MB，请选择较小的照片。",
+      "en": "This photo exceeds 50 MB. Choose a smaller photo.",
+      "iosKey": "照片超过 50 MB，请选择较小的照片。"
+    },
+    "moment.t5f43e45ddf0a": {
+      "zh-Hans": "照片预览",
+      "en": "Photo preview",
+      "iosKey": "照片预览"
+    },
+    "moment.t2a96fdb46a1b": {
+      "zh-Hans": "照片预览不可用，请在 iPhone 上查看。",
+      "en": "The photo preview is unavailable. View it on your iPhone.",
+      "iosKey": "照片预览不可用，请在 iPhone 上查看。"
+    },
+    "moment.t22dd7e4f08b0": {
+      "zh-Hans": "照片预览无法压缩。",
+      "en": "Could not compress the photo preview.",
+      "iosKey": "照片预览无法压缩。"
+    },
+    "moment.t86ee2347a561": {
+      "zh-Hans": "照片预览无法读取。",
+      "en": "Unable to load the photo preview.",
+      "iosKey": "照片预览无法读取。"
+    },
+    "moment.t1661a2ed1863": {
+      "zh-Hans": "照片预览格式无效。",
+      "en": "The photo preview format is invalid.",
+      "iosKey": "照片预览格式无效。"
+    },
+    "moment.t34838e3babd1": {
+      "zh-Hans": "照片预览网络响应无效。",
+      "en": "The photo preview response is invalid.",
+      "iosKey": "照片预览网络响应无效。"
+    },
+    "moment.t3ae39e1e3b4b": {
+      "zh-Hans": "照片预览读取失败（%lld），请刷新相册。",
+      "en": "Unable to load photo preview (%lld). Refresh the album.",
+      "iosKey": "照片预览读取失败（%lld），请刷新相册。"
+    },
+    "moment.t4a5193f7a0db": {
+      "zh-Hans": "照片预览过大，请在 iPhone 上查看。",
+      "en": "The photo preview is too large. View it on your iPhone.",
+      "iosKey": "照片预览过大，请在 iPhone 上查看。"
+    },
+    "moment.t37042cdb90eb": {
+      "zh-Hans": "父母",
+      "en": "Parents",
+      "iosKey": "父母"
+    },
+    "moment.t5a2df34ab159": {
+      "zh-Hans": "父母的兄弟姐妹",
+      "en": "Parents’ siblings",
+      "iosKey": "父母的兄弟姐妹"
+    },
+    "moment.t35ad218d791e": {
+      "zh-Hans": "爸爸妈妈的闪光时刻",
+      "en": "Parents’ shining moments",
+      "iosKey": "爸爸妈妈的闪光时刻"
+    },
+    "moment.te640f4336e94": {
+      "zh-Hans": "版本升级",
+      "en": "Version updates",
+      "iosKey": "版本升级"
+    },
+    "moment.t7c89d6ebe1f9": {
+      "zh-Hans": "物品",
+      "en": "Items",
+      "iosKey": "物品"
+    },
+    "moment.tb411fd04a9b3": {
+      "zh-Hans": "物品名称",
+      "en": "Item name",
+      "iosKey": "物品名称"
+    },
+    "moment.t14ed992426ab": {
+      "zh-Hans": "现金 %@ · 物品 %lld",
+      "en": "Cash %@ · Items %lld",
+      "iosKey": "现金 %@ · 物品 %lld"
+    },
+    "moment.tb7796fa2176f": {
+      "zh-Hans": "生成七天有效的邀请链接",
+      "en": "Create an invitation link valid for seven days",
+      "iosKey": "生成七天有效的邀请链接"
+    },
+    "moment.t4859b59ecb11": {
+      "zh-Hans": "生成好友码",
+      "en": "Create friend code",
+      "iosKey": "生成好友码"
+    },
+    "moment.t322d5877dd8d": {
+      "zh-Hans": "生成孩子授权码",
+      "en": "Create child authorization code",
+      "iosKey": "生成孩子授权码"
+    },
+    "moment.te49e625b2026": {
+      "zh-Hans": "生成新链接",
+      "en": "Create a new link",
+      "iosKey": "生成新链接"
+    },
+    "moment.tfb6c7981e164": {
+      "zh-Hans": "生成邀请失败，请稍后重试。",
+      "en": "Could not create the invitation. Please try again later.",
+      "iosKey": "生成邀请失败，请稍后重试。"
+    },
+    "moment.tbd85d0c0543f": {
+      "zh-Hans": "生成邀请链接",
+      "en": "Create invitation link",
+      "iosKey": "生成邀请链接"
+    },
+    "moment.t8f5ecd9fc269": {
+      "zh-Hans": "生日",
+      "en": "Birthday",
+      "iosKey": "生日"
+    },
+    "moment.t4dea19e70fe5": {
+      "zh-Hans": "生日精度",
+      "en": "Birthday precision",
+      "iosKey": "生日精度"
+    },
+    "moment.t91e4a1c3e029": {
+      "zh-Hans": "生活分享",
+      "en": "Life sharing",
+      "iosKey": "生活分享"
+    },
+    "moment.t6446298a6b33": {
+      "zh-Hans": "生活空间",
+      "en": "Life spaces",
+      "iosKey": "生活空间"
+    },
+    "moment.tc2b9eedd7d98": {
+      "zh-Hans": "用户与权益",
+      "en": "Account and benefits",
+      "iosKey": "用户与权益"
+    },
+    "moment.tdb03f085f625": {
+      "zh-Hans": "用户中心用户名",
+      "en": "User Center username",
+      "iosKey": "用户中心用户名"
+    },
+    "moment.tfa41cf87b55c": {
+      "zh-Hans": "用户中心登录",
+      "en": "Sign in with User Center",
+      "iosKey": "用户中心登录"
+    },
+    "moment.t616ab7d78a1a": {
+      "zh-Hans": "用户中心账号：",
+      "en": "User Center account: ",
+      "iosKey": "用户中心账号："
+    },
+    "moment.t4fe66feee9c7": {
+      "zh-Hans": "用户协议",
+      "en": "User agreement",
+      "iosKey": "用户协议"
+    },
+    "moment.t71659e25c869": {
+      "zh-Hans": "用户协议未配置",
+      "en": "User agreement is not configured",
+      "iosKey": "用户协议未配置"
+    },
+    "moment.tcdf39463b5c9": {
+      "zh-Hans": "用户反馈",
+      "en": "User feedback",
+      "iosKey": "用户反馈"
+    },
+    "moment.td0ecb0e2e0d6": {
+      "zh-Hans": "由父母与子女关系自动计算，基础关系变化后会更新；缺少性别和年龄时使用中性称谓。",
+      "en": "Calculated from parent–child relationships and updated when those relationships change. Neutral relationship names are used when gender or age is missing.",
+      "iosKey": "由父母与子女关系自动计算，基础关系变化后会更新；缺少性别和年龄时使用中性称谓。"
+    },
+    "moment.tca62c8d5a361": {
+      "zh-Hans": "申请公开 · 待审核",
+      "en": "Public access requested · Awaiting review",
+      "iosKey": "申请公开 · 待审核"
+    },
+    "moment.t3c6dde9b7d62": {
+      "zh-Hans": "申请加入",
+      "en": "Request to join",
+      "iosKey": "申请加入"
+    },
+    "moment.t7f18a55e92b4": {
+      "zh-Hans": "申请加入「%@」",
+      "en": "Request to join “%@”",
+      "iosKey": "申请加入「%@」"
+    },
+    "moment.t6c00fec40502": {
+      "zh-Hans": "申请奖励",
+      "en": "Request a reward",
+      "iosKey": "申请奖励"
+    },
+    "moment.tadf8dbacf7d0": {
+      "zh-Hans": "申请好友",
+      "en": "Send friend request",
+      "iosKey": "申请好友"
+    },
+    "moment.t55006d50fa07": {
+      "zh-Hans": "申请已提交；列表刷新失败，请点击刷新查看，勿重复提交。",
+      "en": "Request submitted, but the list could not refresh. Tap Refresh to check. Do not submit again.",
+      "iosKey": "申请已提交；列表刷新失败，请点击刷新查看，勿重复提交。"
+    },
+    "moment.t923cb04eae69": {
+      "zh-Hans": "申请记录",
+      "en": "My requests",
+      "iosKey": "申请记录"
+    },
+    "moment.t4e79758a9900": {
+      "zh-Hans": "男",
+      "en": "Male",
+      "iosKey": "男"
+    },
+    "moment.te68dbf8ac9a9": {
+      "zh-Hans": "留空时使用上方地址作为备注。",
+      "en": "Leave blank to use the address above as the note.",
+      "iosKey": "留空时使用上方地址作为备注。"
+    },
+    "moment.tdcd5bd0328e4": {
+      "zh-Hans": "登录和注册在系统认证窗口中完成。登录后自动返回 App。",
+      "en": "Sign-in and registration take place in the secure system window. You return to the app automatically when finished.",
+      "iosKey": "登录和注册在系统认证窗口中完成。登录后自动返回 App。"
+    },
+    "moment.t0784368a0508": {
+      "zh-Hans": "登录已过期。",
+      "en": "Your session has expired.",
+      "iosKey": "登录已过期。"
+    },
+    "moment.t18b4f39557c3": {
+      "zh-Hans": "登录已过期，请重新登录。",
+      "en": "Your session has expired. Sign in again.",
+      "iosKey": "登录已过期，请重新登录。"
+    },
+    "moment.t80cd50b38852": {
+      "zh-Hans": "登录并生成邀请",
+      "en": "Sign in and create invitation",
+      "iosKey": "登录并生成邀请"
+    },
+    "moment.t0ad4a3fe55ae": {
+      "zh-Hans": "登录由用户中心提供。遇到问题可在“我的”中的“心愿墙与意见墙”提交反馈。",
+      "en": "Sign-in is provided by User Center. If you need help, submit feedback through Wishes and feedback in My.",
+      "iosKey": "登录由用户中心提供。遇到问题可在“我的”中的“心愿墙与意见墙”提交反馈。"
+    },
+    "moment.t35e3c79d4e64": {
+      "zh-Hans": "相册分享尚未完成：%@。打开 App 后会重试。",
+      "en": "Photo library sharing is not finished: %@. It will retry when you open the app.",
+      "iosKey": "相册分享尚未完成：%@。打开 App 后会重试。"
+    },
+    "moment.t992878f52049": {
+      "zh-Hans": "相册刷新失败：%@",
+      "en": "Unable to refresh album: %@",
+      "iosKey": "相册刷新失败：%@"
+    },
+    "moment.te30b71a68ee0": {
+      "zh-Hans": "相册照片",
+      "en": "Photo library photo",
+      "iosKey": "相册照片"
+    },
+    "moment.t661dd2a84ed4": {
+      "zh-Hans": "相册视频",
+      "en": "Photo library video",
+      "iosKey": "相册视频"
+    },
+    "moment.t363113f40868": {
+      "zh-Hans": "相机暂时无法使用，请重试或手动输入设备码。",
+      "en": "The camera is temporarily unavailable. Try again or enter the device code manually.",
+      "iosKey": "相机暂时无法使用，请重试或手动输入设备码。"
+    },
+    "moment.tde32e20193ad": {
+      "zh-Hans": "知道了",
+      "en": "Got it",
+      "iosKey": "知道了"
+    },
+    "moment.t36f33adaf094": {
+      "zh-Hans": "确认",
+      "en": "Confirm",
+      "iosKey": "确认"
+    },
+    "moment.ta3ea3c17b401": {
+      "zh-Hans": "确认删除",
+      "en": "Confirm deletion",
+      "iosKey": "确认删除"
+    },
+    "moment.t946fefd3e79e": {
+      "zh-Hans": "确认删除活动",
+      "en": "Delete this activity?",
+      "iosKey": "确认删除活动"
+    },
+    "moment.td383b4480437": {
+      "zh-Hans": "确认删除活动？",
+      "en": "Delete this activity?",
+      "iosKey": "确认删除活动？"
+    },
+    "moment.t0698c9a0109d": {
+      "zh-Hans": "确认删除空间",
+      "en": "Confirm space deletion",
+      "iosKey": "确认删除空间"
+    },
+    "moment.t13031ebe041d": {
+      "zh-Hans": "确认删除空间？",
+      "en": "Delete this space?",
+      "iosKey": "确认删除空间？"
+    },
+    "moment.tbe737f021569": {
+      "zh-Hans": "确认加入",
+      "en": "Confirm joining",
+      "iosKey": "确认加入"
+    },
+    "moment.td96f1c2f2246": {
+      "zh-Hans": "确认后生成临时授权码，有效期 10 分钟。",
+      "en": "Confirmation creates a temporary authorization code valid for 10 minutes.",
+      "iosKey": "确认后生成临时授权码，有效期 10 分钟。"
+    },
+    "moment.t8fac14d4b362": {
+      "zh-Hans": "确认完成",
+      "en": "Confirm completion",
+      "iosKey": "确认完成"
+    },
+    "moment.t2748df44d924": {
+      "zh-Hans": "确认打卡",
+      "en": "Confirm check-in",
+      "iosKey": "确认打卡"
+    },
+    "moment.t885c48cdba9c": {
+      "zh-Hans": "确认申请",
+      "en": "Confirm request",
+      "iosKey": "确认申请"
+    },
+    "moment.tff27eec8d046": {
+      "zh-Hans": "确认移出",
+      "en": "Confirm removal",
+      "iosKey": "确认移出"
+    },
+    "moment.tfe4a4a165215": {
+      "zh-Hans": "确认调整",
+      "en": "Confirm adjustment",
+      "iosKey": "确认调整"
+    },
+    "moment.t7383b94018e5": {
+      "zh-Hans": "确认逾期",
+      "en": "Confirm overdue",
+      "iosKey": "确认逾期"
+    },
+    "moment.teddf6b39cfa7": {
+      "zh-Hans": "祖辈",
+      "en": "Grandparents",
+      "iosKey": "祖辈"
+    },
+    "moment.t10939f548645": {
+      "zh-Hans": "积分",
+      "en": "Points",
+      "iosKey": "积分"
+    },
+    "moment.tc3e7acd2efc0": {
+      "zh-Hans": "积分与奖励记录",
+      "en": "Points and reward records",
+      "iosKey": "积分与奖励记录"
+    },
+    "moment.t669203ec066f": {
+      "zh-Hans": "积分（负数表示扣分）",
+      "en": "Points (negative values deduct points)",
+      "iosKey": "积分（负数表示扣分）"
+    },
+    "moment.t27521b16c728": {
+      "zh-Hans": "称呼",
+      "en": "Relationship name",
+      "iosKey": "称呼"
+    },
+    "moment.tc93ee6c50977": {
+      "zh-Hans": "移出后，对方将无法查看这场活动的新内容；已有邀请链接仍可再次用于加入。",
+      "en": "This person will no longer see new activity content. Existing invitation links can still be used to rejoin.",
+      "iosKey": "移出后，对方将无法查看这场活动的新内容；已有邀请链接仍可再次用于加入。"
+    },
+    "moment.t1b1f8691b2e3": {
+      "zh-Hans": "移出活动",
+      "en": "Remove from activity",
+      "iosKey": "移出活动"
+    },
+    "moment.t6135d4159e89": {
+      "zh-Hans": "移除",
+      "en": "Remove",
+      "iosKey": "移除"
+    },
+    "moment.ted3999409a15": {
+      "zh-Hans": "空间主人",
+      "en": "Space owner",
+      "iosKey": "空间主人"
+    },
+    "moment.t06653ee96eb8": {
+      "zh-Hans": "空间列表无效。",
+      "en": "Invalid space list.",
+      "iosKey": "空间列表无效。"
+    },
+    "moment.t39d0533d0b20": {
+      "zh-Hans": "空间名称",
+      "en": "Space name",
+      "iosKey": "空间名称"
+    },
+    "moment.t4c0fa6e42646": {
+      "zh-Hans": "空间名称已更新。",
+      "en": "Space name updated.",
+      "iosKey": "空间名称已更新。"
+    },
+    "moment.tff1a29778746": {
+      "zh-Hans": "空间已创建。",
+      "en": "Space created.",
+      "iosKey": "空间已创建。"
+    },
+    "moment.tee6498c45061": {
+      "zh-Hans": "空间已删除。",
+      "en": "Space deleted.",
+      "iosKey": "空间已删除。"
+    },
+    "moment.t1b1d4c2861b8": {
+      "zh-Hans": "空间成员",
+      "en": "Space members",
+      "iosKey": "空间成员"
+    },
+    "moment.t026c8d43e236": {
+      "zh-Hans": "空间标识无效。",
+      "en": "The space ID is invalid.",
+      "iosKey": "空间标识无效。"
+    },
+    "moment.t12696483d8a1": {
+      "zh-Hans": "空间菜单",
+      "en": "Space menu",
+      "iosKey": "空间菜单"
+    },
+    "moment.t1a16be99740d": {
+      "zh-Hans": "第 %lld 项：%@",
+      "en": "Item %lld: %@",
+      "iosKey": "第 %lld 项：%@"
+    },
+    "moment.tdd14b5c4efbb": {
+      "zh-Hans": "等待审核",
+      "en": "Awaiting review",
+      "iosKey": "等待审核"
+    },
+    "moment.t3c33069fd389": {
+      "zh-Hans": "等待家长选择孩子并确认绑定",
+      "en": "Waiting for a parent to select a child and confirm pairing",
+      "iosKey": "等待家长选择孩子并确认绑定"
+    },
+    "moment.tc412380d930b": {
+      "zh-Hans": "等待对方确认",
+      "en": "Waiting for their confirmation",
+      "iosKey": "等待对方确认"
+    },
+    "moment.t46c847864883": {
+      "zh-Hans": "简介（仅成员可见）",
+      "en": "Description (members only)",
+      "iosKey": "简介（仅成员可见）"
+    },
+    "moment.tb3a25632a3f5": {
+      "zh-Hans": "简短标题",
+      "en": "Short title",
+      "iosKey": "简短标题"
+    },
+    "moment.t7872f479cb29": {
+      "zh-Hans": "管理 · %@",
+      "en": "Manage · %@",
+      "iosKey": "管理 · %@"
+    },
+    "moment.t544f36a9c0fb": {
+      "zh-Hans": "管理%@",
+      "en": "Manage %@",
+      "iosKey": "管理%@"
+    },
+    "moment.te19796712f1c": {
+      "zh-Hans": "管理员",
+      "en": "Administrator",
+      "iosKey": "管理员"
+    },
+    "moment.t4acf57fb325e": {
+      "zh-Hans": "管理当前空间",
+      "en": "Manage current space",
+      "iosKey": "管理当前空间"
+    },
+    "moment.t0d12cbd6562b": {
+      "zh-Hans": "类别",
+      "en": "Category",
+      "iosKey": "类别"
+    },
+    "moment.tba40014ff496": {
+      "zh-Hans": "类型",
+      "en": "Type",
+      "iosKey": "类型"
+    },
+    "moment.tc315e8df31c9": {
+      "zh-Hans": "约定",
+      "en": "Commitments",
+      "iosKey": "约定"
+    },
+    "moment.t11a7be79e8ab": {
+      "zh-Hans": "约定内容",
+      "en": "Commitment description",
+      "iosKey": "约定内容"
+    },
+    "moment.tef00c7c5932a": {
+      "zh-Hans": "约定时间",
+      "en": "Agreed time",
+      "iosKey": "约定时间"
+    },
+    "moment.taf8e35b4952c": {
+      "zh-Hans": "约定时间：%@",
+      "en": "Scheduled time: %@",
+      "iosKey": "约定时间：%@"
+    },
+    "moment.t71100040c0fd": {
+      "zh-Hans": "约定时间：%@（当地时间）",
+      "en": "Scheduled time: %@ (local time)",
+      "iosKey": "约定时间：%@（当地时间）"
+    },
+    "moment.tfd899e9e5a87": {
+      "zh-Hans": "纬度 %.6f，经度 %.6f",
+      "en": "Latitude %.6f, longitude %.6f",
+      "iosKey": "纬度 %.6f，经度 %.6f"
+    },
+    "moment.t6ea50c5c0463": {
+      "zh-Hans": "绑定已成功，但凭据保存失败。请勿退出 App；请解锁手表后点击刷新重试保存。",
+      "en": "Pairing succeeded, but credentials could not be saved. Keep the app open, unlock your watch, and tap Refresh to try saving again.",
+      "iosKey": "绑定已成功，但凭据保存失败。请勿退出 App；请解锁手表后点击刷新重试保存。"
+    },
+    "moment.tb8c8a014a10f": {
+      "zh-Hans": "结束并保存",
+      "en": "Finish and save",
+      "iosKey": "结束并保存"
+    },
+    "moment.t73ed7738fd7f": {
+      "zh-Hans": "结束本次运动并保存记录？",
+      "en": "Finish this exercise and save the record?",
+      "iosKey": "结束本次运动并保存记录？"
+    },
+    "moment.td9b67eca5c12": {
+      "zh-Hans": "结果超过 100 位，请输入姓名或支系缩小范围。 ",
+      "en": "More than 100 people matched. Enter a name or branch to narrow the results. ",
+      "iosKey": "结果超过 100 位，请输入姓名或支系缩小范围。 "
+    },
+    "moment.t099010ccbc18": {
+      "zh-Hans": "给孩子的话",
+      "en": "A message for your child",
+      "iosKey": "给孩子的话"
+    },
+    "moment.t7c9691192f1b": {
+      "zh-Hans": "继续",
+      "en": "Resume",
+      "iosKey": "继续"
+    },
+    "moment.tc4b483d7f6bf": {
+      "zh-Hans": "继续加油，每一点进步都值得被看见。",
+      "en": "Keep going. Every bit of progress deserves to be seen.",
+      "iosKey": "继续加油，每一点进步都值得被看见。"
+    },
+    "moment.tdfe794dbe627": {
+      "zh-Hans": "继续注销",
+      "en": "Continue deletion",
+      "iosKey": "继续注销"
+    },
+    "moment.t70ed754c2c77": {
+      "zh-Hans": "继续获取原文件",
+      "en": "Resume original file transfer",
+      "iosKey": "继续获取原文件"
+    },
+    "moment.t9b4ffb4341ca": {
+      "zh-Hans": "续传原文件已发生变化。",
+      "en": "The original file to resume has changed.",
+      "iosKey": "续传原文件已发生变化。"
+    },
+    "moment.t82973f849fc5": {
+      "zh-Hans": "续传请求无效。",
+      "en": "The resume request is invalid.",
+      "iosKey": "续传请求无效。"
+    },
+    "moment.t051836569928": {
+      "zh-Hans": "编辑",
+      "en": "Edit",
+      "iosKey": "编辑"
+    },
+    "moment.t36111a85e21c": {
+      "zh-Hans": "编辑基本信息",
+      "en": "Edit basic information",
+      "iosKey": "编辑基本信息"
+    },
+    "moment.tefe0feab9fd4": {
+      "zh-Hans": "编辑规则",
+      "en": "Edit rule",
+      "iosKey": "编辑规则"
+    },
+    "moment.te41ecc67ca28": {
+      "zh-Hans": "网格",
+      "en": "Grid",
+      "iosKey": "网格"
+    },
+    "moment.te2fbe9c0a2ce": {
+      "zh-Hans": "网络响应无效。",
+      "en": "The network response is invalid.",
+      "iosKey": "网络响应无效。"
+    },
+    "moment.te7b068fd0444": {
+      "zh-Hans": "网络连接失败，请检查网络后重试。",
+      "en": "The network connection failed. Check your connection and try again.",
+      "iosKey": "网络连接失败，请检查网络后重试。"
+    },
+    "moment.t85df559413d1": {
+      "zh-Hans": "网络连接失败，请稍后重试。",
+      "en": "Network connection failed. Try again later.",
+      "iosKey": "网络连接失败，请稍后重试。"
+    },
+    "moment.tf3f8bcf3f57d": {
+      "zh-Hans": "群组",
+      "en": "Groups",
+      "iosKey": "群组"
+    },
+    "moment.tcf01e71b4c13": {
+      "zh-Hans": "群组协作",
+      "en": "Group collaboration",
+      "iosKey": "群组协作"
+    },
+    "moment.t7f7f88883c30": {
+      "zh-Hans": "群组名称",
+      "en": "Group name",
+      "iosKey": "群组名称"
+    },
+    "moment.tfe0509265227": {
+      "zh-Hans": "群组成长",
+      "en": "Group growth",
+      "iosKey": "群组成长"
+    },
+    "moment.t17f17d111acc": {
+      "zh-Hans": "群组简介",
+      "en": "Group description",
+      "iosKey": "群组简介"
+    },
+    "moment.tc5d670ed01ee": {
+      "zh-Hans": "群组邀请码",
+      "en": "Group invitation code",
+      "iosKey": "群组邀请码"
+    },
+    "moment.t4cac90c8056a": {
+      "zh-Hans": "联系支持",
+      "en": "Contact support",
+      "iosKey": "联系支持"
+    },
+    "moment.t558e13872b1b": {
+      "zh-Hans": "自由运动",
+      "en": "Free exercise",
+      "iosKey": "自由运动"
+    },
+    "moment.tdf014b34b7d7": {
+      "zh-Hans": "获取原文件",
+      "en": "Get original file",
+      "iosKey": "获取原文件"
+    },
+    "moment.t401ee1dc7de1": {
+      "zh-Hans": "获取当前位置",
+      "en": "Get current location",
+      "iosKey": "获取当前位置"
+    },
+    "moment.t701249d88099": {
+      "zh-Hans": "获取设备码",
+      "en": "Get device code",
+      "iosKey": "获取设备码"
+    },
+    "moment.taabb977aafd4": {
+      "zh-Hans": "获取选中原文件",
+      "en": "Get selected original files",
+      "iosKey": "获取选中原文件"
+    },
+    "moment.t2c3396662bf0": {
+      "zh-Hans": "虚报完成",
+      "en": "Falsely reported completion",
+      "iosKey": "虚报完成"
+    },
+    "moment.t9d427338c6be": {
+      "zh-Hans": "虚拟群组 · 一起成长",
+      "en": "Shared group · Growing together",
+      "iosKey": "虚拟群组 · 一起成长"
+    },
+    "moment.t75cfa4483aef": {
+      "zh-Hans": "补救待确认",
+      "en": "Remedy awaiting confirmation",
+      "iosKey": "补救待确认"
+    },
+    "moment.t025db3b14410": {
+      "zh-Hans": "表盘设置",
+      "en": "Appearance",
+      "iosKey": "表盘设置"
+    },
+    "moment.te4ecfd104908": {
+      "zh-Hans": "西经",
+      "en": "West",
+      "iosKey": "西经"
+    },
+    "moment.t18dba51b47c8": {
+      "zh-Hans": "规则名称",
+      "en": "Rule name",
+      "iosKey": "规则名称"
+    },
+    "moment.tc20f7618d330": {
+      "zh-Hans": "视频",
+      "en": "Video",
+      "iosKey": "视频"
+    },
+    "moment.t5e8ba38fc569": {
+      "zh-Hans": "视频必须在 500 MB 以内。",
+      "en": "Videos must be no larger than 500 MB.",
+      "iosKey": "视频必须在 500 MB 以内。"
+    },
+    "moment.t17bc197350fa": {
+      "zh-Hans": "解绑后手表将退出当前孩子，需重新扫码才能使用。",
+      "en": "The watch will sign out of the child’s account and must be paired again.",
+      "iosKey": "解绑后手表将退出当前孩子，需重新扫码才能使用。"
+    },
+    "moment.te1d86ed09109": {
+      "zh-Hans": "解绑认证码",
+      "en": "Unlinking code",
+      "iosKey": "解绑认证码"
+    },
+    "moment.tccdebb93f7f9": {
+      "zh-Hans": "解除",
+      "en": "Unlink",
+      "iosKey": "解除"
+    },
+    "moment.tfb3f6cc3047d": {
+      "zh-Hans": "解除绑定",
+      "en": "Unlink",
+      "iosKey": "解除绑定"
+    },
+    "moment.t679375ad3f35": {
+      "zh-Hans": "解除这只手表与当前孩子的绑定？",
+      "en": "Unlink this watch from the current child?",
+      "iosKey": "解除这只手表与当前孩子的绑定？"
+    },
+    "moment.tb9c501dfd5c0": {
+      "zh-Hans": "计步暂不可用：%@。已保留计时记录。",
+      "en": "Step counting unavailable: %@. The timer record has been retained.",
+      "iosKey": "计步暂不可用：%@。已保留计时记录。"
+    },
+    "moment.t218b0aa69aa0": {
+      "zh-Hans": "计步暂不可用：%@。计时仍可使用。",
+      "en": "Step counting unavailable: %@. The timer is still available.",
+      "iosKey": "计步暂不可用：%@。计时仍可使用。"
+    },
+    "moment.t9fad24e2c377": {
+      "zh-Hans": "记录",
+      "en": "Records",
+      "iosKey": "记录"
+    },
+    "moment.t563a16937e9b": {
+      "zh-Hans": "记录内容",
+      "en": "Record description",
+      "iosKey": "记录内容"
+    },
+    "moment.td7381dc00684": {
+      "zh-Hans": "记录奖励",
+      "en": "Record reward",
+      "iosKey": "记录奖励"
+    },
+    "moment.t0d2890feaa41": {
+      "zh-Hans": "记录奖励 / 扣分",
+      "en": "Record reward / Deduct points",
+      "iosKey": "记录奖励 / 扣分"
+    },
+    "moment.tc00ed49f5c95": {
+      "zh-Hans": "记录孩子的日常进步，积累成长轨迹。",
+      "en": "Record everyday progress and build a growth history.",
+      "iosKey": "记录孩子的日常进步，积累成长轨迹。"
+    },
+    "moment.tf20c7f4b334e": {
+      "zh-Hans": "记录守约与责任行为，与可兑换积分分别计算。",
+      "en": "Tracks commitments and responsibility separately from redeemable points.",
+      "iosKey": "记录守约与责任行为，与可兑换积分分别计算。"
+    },
+    "moment.te3097d3ec362": {
+      "zh-Hans": "记录想法",
+      "en": "Record thoughts",
+      "iosKey": "记录想法"
+    },
+    "moment.t44fd9db74a73": {
+      "zh-Hans": "记录按当前账号保存在此手机，暂不跨设备同步。",
+      "en": "Records are saved for the current account on this phone and do not sync between devices yet.",
+      "iosKey": "记录按当前账号保存在此手机，暂不跨设备同步。"
+    },
+    "moment.tab2a4f66de9a": {
+      "zh-Hans": "设为空间成员",
+      "en": "Make space member",
+      "iosKey": "设为空间成员"
+    },
+    "moment.td3ae4837e1a9": {
+      "zh-Hans": "设备凭据存储不可用（%d），请解锁手表后重试",
+      "en": "Device credential storage is unavailable (%d). Unlock your watch and try again.",
+      "iosKey": "设备凭据存储不可用（%d），请解锁手表后重试"
+    },
+    "moment.t507b4da76f2f": {
+      "zh-Hans": "设备已解绑",
+      "en": "Device unlinked",
+      "iosKey": "设备已解绑"
+    },
+    "moment.taa8169d308a1": {
+      "zh-Hans": "设备码 · 10 分钟内有效",
+      "en": "Device code · valid for 10 minutes",
+      "iosKey": "设备码 · 10 分钟内有效"
+    },
+    "moment.tfccac3fb51b1": {
+      "zh-Hans": "设备码已过期，请刷新后让家长重新扫码",
+      "en": "Device code expired. Refresh it and ask a parent to scan again.",
+      "iosKey": "设备码已过期，请刷新后让家长重新扫码"
+    },
+    "moment.tfc0c22fcb481": {
+      "zh-Hans": "设备绑定已失效，请让家长扫描新的设备码绑定。",
+      "en": "Device pairing is no longer valid. Ask a parent to scan a new device code to pair again.",
+      "iosKey": "设备绑定已失效，请让家长扫描新的设备码绑定。"
+    },
+    "moment.tcbb224acd1f0": {
+      "zh-Hans": "设备解绑",
+      "en": "Unlink device",
+      "iosKey": "设备解绑"
+    },
+    "moment.t91d6cc6de357": {
+      "zh-Hans": "设置 Linko Moment App 内的主题外观。",
+      "en": "Set the appearance theme in Linko Moment.",
+      "iosKey": "设置 Linko Moment App 内的主题外观。"
+    },
+    "moment.t05645f9a78cb": {
+      "zh-Hans": "诚实说明",
+      "en": "Honest explanation",
+      "iosKey": "诚实说明"
+    },
+    "moment.t225a743b3fb0": {
+      "zh-Hans": "该照片格式暂不支持共享。",
+      "en": "This photo format cannot be shared yet.",
+      "iosKey": "该照片格式暂不支持共享。"
+    },
+    "moment.t91b92012be1f": {
+      "zh-Hans": "详细使用手册",
+      "en": "Detailed user guide",
+      "iosKey": "详细使用手册"
+    },
+    "moment.t4262c45dc797": {
+      "zh-Hans": "说明",
+      "en": "Description",
+      "iosKey": "说明"
+    },
+    "moment.t4a7c182bfdd9": {
+      "zh-Hans": "说说你的想法",
+      "en": "Share your thoughts",
+      "iosKey": "说说你的想法"
+    },
+    "moment.t9b6bfc8373aa": {
+      "zh-Hans": "请先在 iPhone 上登录 Linko Moment。",
+      "en": "Sign in to Linko Moment on your iPhone first.",
+      "iosKey": "请先在 iPhone 上登录 Linko Moment。"
+    },
+    "moment.t9c061f708dbc": {
+      "zh-Hans": "请先在“我的”登录用户中心。",
+      "en": "Sign in to User Center in My first.",
+      "iosKey": "请先在“我的”登录用户中心。"
+    },
+    "moment.t1accafb8d7f8": {
+      "zh-Hans": "请先在族谱中选择对应的人物，再生成专属邀请链接。对方登录并确认后会绑定该人物。",
+      "en": "Select the matching person in the family tree before creating a personal invitation link. The person is linked after they sign in and confirm.",
+      "iosKey": "请先在族谱中选择对应的人物，再生成专属邀请链接。对方登录并确认后会绑定该人物。"
+    },
+    "moment.tff00159b20d0": {
+      "zh-Hans": "请先在配对的 iPhone 上登录 Linko Moment。",
+      "en": "Sign in to Linko Moment on the paired iPhone first.",
+      "iosKey": "请先在配对的 iPhone 上登录 Linko Moment。"
+    },
+    "moment.td5f0579fb3c6": {
+      "zh-Hans": "请先打开 Linko Moment，登录并进入活动页读取活动列表。",
+      "en": "Open Linko Moment, sign in, and open the activities page to load the activity list first.",
+      "iosKey": "请先打开 Linko Moment，登录并进入活动页读取活动列表。"
+    },
+    "moment.t357a50cc4ccf": {
+      "zh-Hans": "请先登录用户中心。",
+      "en": "Sign in to User Center first.",
+      "iosKey": "请先登录用户中心。"
+    },
+    "moment.t8bf4233bbdb4": {
+      "zh-Hans": "请先绑定手表。",
+      "en": "Pair your watch first.",
+      "iosKey": "请先绑定手表。"
+    },
+    "moment.te5669fd63865": {
+      "zh-Hans": "请先获取当前位置。",
+      "en": "Get your current location first.",
+      "iosKey": "请先获取当前位置。"
+    },
+    "moment.t10e90aab5f90": {
+      "zh-Hans": "请先返回“我的”登录用户中心。",
+      "en": "Return to My and sign in to User Center first.",
+      "iosKey": "请先返回“我的”登录用户中心。"
+    },
+    "moment.t9cbabce442e6": {
+      "zh-Hans": "请先选择自己的空间。",
+      "en": "Select one of your spaces first.",
+      "iosKey": "请先选择自己的空间。"
+    },
+    "moment.t2898f4a311f9": {
+      "zh-Hans": "请刷新获取积分",
+      "en": "Refresh to get your points",
+      "iosKey": "请刷新获取积分"
+    },
+    "moment.t3e253af53022": {
+      "zh-Hans": "请在 Linko Moment 中授权智能体后刷新。",
+      "en": "Authorize an agent in Linko Moment, then refresh.",
+      "iosKey": "请在 Linko Moment 中授权智能体后刷新。"
+    },
+    "moment.t917de485c8d7": {
+      "zh-Hans": "请在手表设置中允许位置访问。",
+      "en": "Allow location access in your watch’s Settings.",
+      "iosKey": "请在手表设置中允许位置访问。"
+    },
+    "moment.t7cf94d57370e": {
+      "zh-Hans": "请在日历中选定生日后保存。",
+      "en": "Select a birthday in the calendar before saving.",
+      "iosKey": "请在日历中选定生日后保存。"
+    },
+    "moment.td1bca6497921": {
+      "zh-Hans": "请在系统设置中允许 Linko Moment 使用相机，或返回手动输入设备码。",
+      "en": "Allow camera access for Linko Moment in Settings, or go back and enter the device code manually.",
+      "iosKey": "请在系统设置中允许 Linko Moment 使用相机，或返回手动输入设备码。"
+    },
+    "moment.t1a161f988b9a": {
+      "zh-Hans": "请在系统设置中允许此 App 使用位置后重试。",
+      "en": "Allow location access for this app in Settings, then try again.",
+      "iosKey": "请在系统设置中允许此 App 使用位置后重试。"
+    },
+    "moment.tf0478ba7c3f0": {
+      "zh-Hans": "请填写 1 至 1000 字的日常内容。",
+      "en": "Enter a moment between 1 and 1,000 characters.",
+      "iosKey": "请填写 1 至 1000 字的日常内容。"
+    },
+    "moment.t280d9d7d4164": {
+      "zh-Hans": "请填写不超过 200 字的活动名称。",
+      "en": "Enter an activity name of up to 200 characters.",
+      "iosKey": "请填写不超过 200 字的活动名称。"
+    },
+    "moment.taa1049524f4a": {
+      "zh-Hans": "请填写不超过 200 字的空间名称。",
+      "en": "Enter a space name of up to 200 characters.",
+      "iosKey": "请填写不超过 200 字的空间名称。"
+    },
+    "moment.tde9318d0129d": {
+      "zh-Hans": "请家长为当前设备生成一次性解绑认证码。",
+      "en": "Ask a parent to generate a one-time unlinking code for this device.",
+      "iosKey": "请家长为当前设备生成一次性解绑认证码。"
+    },
+    "moment.tead467ff4942": {
+      "zh-Hans": "请家长先配置家庭成员",
+      "en": "Ask a parent to set up family members first.",
+      "iosKey": "请家长先配置家庭成员"
+    },
+    "moment.td9e6ec8e0dbe": {
+      "zh-Hans": "请家长扫码，或在家庭管理中输入设备码",
+      "en": "Ask a parent to scan the code or enter the device code in family settings.",
+      "iosKey": "请家长扫码，或在家庭管理中输入设备码"
+    },
+    "moment.tc580b0a4abf0": {
+      "zh-Hans": "请求失败（%lld），请重试。",
+      "en": "Request failed (%lld). Try again.",
+      "iosKey": "请求失败（%lld），请重试。"
+    },
+    "moment.t3ba0c71fd75f": {
+      "zh-Hans": "请求标识无效。",
+      "en": "The request ID is invalid.",
+      "iosKey": "请求标识无效。"
+    },
+    "moment.tdf6d159f29fd": {
+      "zh-Hans": "请用右上角“…”新增个人空间。",
+      "en": "Use the … button at the top right to add a personal space.",
+      "iosKey": "请用右上角“…”新增个人空间。"
+    },
+    "moment.t74c9fe037c74": {
+      "zh-Hans": "请让配对的 iPhone 保持连接，并在 iPhone 上登录 Linko Moment 后重试。",
+      "en": "Keep your paired iPhone connected, sign in to Linko Moment on the iPhone, then try again.",
+      "iosKey": "请让配对的 iPhone 保持连接，并在 iPhone 上登录 Linko Moment 后重试。"
+    },
+    "moment.t623c88212349": {
+      "zh-Hans": "请输入 2–50 字的名称或姓氏",
+      "en": "Enter a name or surname of 2–50 characters",
+      "iosKey": "请输入 2–50 字的名称或姓氏"
+    },
+    "moment.ta1abcea56881": {
+      "zh-Hans": "请输入会话名称。",
+      "en": "Enter a chat name.",
+      "iosKey": "请输入会话名称。"
+    },
+    "moment.td3f9b0152597": {
+      "zh-Hans": "请输入手表上显示的 8 位设备码。",
+      "en": "Enter the 8-digit device code shown on the watch.",
+      "iosKey": "请输入手表上显示的 8 位设备码。"
+    },
+    "moment.tda590a8fe3ce": {
+      "zh-Hans": "请选择",
+      "en": "Select",
+      "iosKey": "请选择"
+    },
+    "moment.tc5493e2b863f": {
+      "zh-Hans": "请选择 1 至 50 项照片或视频。",
+      "en": "Select between 1 and 50 photos or videos.",
+      "iosKey": "请选择 1 至 50 项照片或视频。"
+    },
+    "moment.t88b082c47bfc": {
+      "zh-Hans": "请重新生成好友码",
+      "en": "Create a new friend code",
+      "iosKey": "请重新生成好友码"
+    },
+    "moment.t465c03b272ea": {
+      "zh-Hans": "读取中",
+      "en": "Loading",
+      "iosKey": "读取中"
+    },
+    "moment.t1663134e88db": {
+      "zh-Hans": "读取照片",
+      "en": "Load photo",
+      "iosKey": "读取照片"
+    },
+    "moment.t3748889a1a7a": {
+      "zh-Hans": "读取设备凭据",
+      "en": "Read device credentials",
+      "iosKey": "读取设备凭据"
+    },
+    "moment.t311bb313fdec": {
+      "zh-Hans": "账号",
+      "en": "Account",
+      "iosKey": "账号"
+    },
+    "moment.t12b3e30398a4": {
+      "zh-Hans": "账号与支持",
+      "en": "Account and support",
+      "iosKey": "账号与支持"
+    },
+    "moment.t634569cc40a1": {
+      "zh-Hans": "账号注销",
+      "en": "Delete account",
+      "iosKey": "账号注销"
+    },
+    "moment.t16fb1776b267": {
+      "zh-Hans": "账号注销会影响同一用户中心账号使用的其他应用。用户中心还会要求进一步确认。",
+      "en": "Deleting this account affects other apps using the same User Center account. User Center requires further confirmation.",
+      "iosKey": "账号注销会影响同一用户中心账号使用的其他应用。用户中心还会要求进一步确认。"
+    },
+    "moment.t48dfb71043c1": {
+      "zh-Hans": "赞成 %lld",
+      "en": "%lld votes for",
+      "iosKey": "赞成 %lld"
+    },
+    "moment.t0470f1bc22d2": {
+      "zh-Hans": "辈分",
+      "en": "Generation",
+      "iosKey": "辈分"
+    },
+    "moment.t15b63ecbe0ee": {
+      "zh-Hans": "辈分（可选）",
+      "en": "Generation (optional)",
+      "iosKey": "辈分（可选）"
+    },
+    "moment.t7c020bde9e35": {
+      "zh-Hans": "输入内容须为 1 至 %lld 字。",
+      "en": "Enter between 1 and %lld characters.",
+      "iosKey": "输入内容须为 1 至 %lld 字。"
+    },
+    "moment.td5e3774b3dd1": {
+      "zh-Hans": "输入族谱名称或姓氏",
+      "en": "Enter a family-tree name or surname",
+      "iosKey": "输入族谱名称或姓氏"
+    },
+    "moment.ta410452649b3": {
+      "zh-Hans": "输入消息",
+      "en": "Enter message",
+      "iosKey": "输入消息"
+    },
+    "moment.ta9d130d79595": {
+      "zh-Hans": "运动",
+      "en": "Exercise",
+      "iosKey": "运动"
+    },
+    "moment.td79ec8ad0a80": {
+      "zh-Hans": "运动中",
+      "en": "Exercising",
+      "iosKey": "运动中"
+    },
+    "moment.t0c585c825879": {
+      "zh-Hans": "运动时长",
+      "en": "Exercise duration",
+      "iosKey": "运动时长"
+    },
+    "moment.t4304dafa42dc": {
+      "zh-Hans": "运动记录 · 当地时间",
+      "en": "Exercise records · Local time",
+      "iosKey": "运动记录 · 当地时间"
+    },
+    "moment.t576a547447bb": {
+      "zh-Hans": "运动记录尚未保存：%@。请保留页面并重试保存。",
+      "en": "Exercise record has not been saved: %@. Keep this page open and try saving again.",
+      "iosKey": "运动记录尚未保存：%@。请保留页面并重试保存。"
+    },
+    "moment.t990a86b82fa2": {
+      "zh-Hans": "运动记录暂时无法读取，请重新打开页面后重试。原记录已保留。",
+      "en": "Exercise records could not be read. Reopen this page and try again. Your original records were preserved.",
+      "iosKey": "运动记录暂时无法读取，请重新打开页面后重试。原记录已保留。"
+    },
+    "moment.ta045744990c4": {
+      "zh-Hans": "运动项目",
+      "en": "Exercise type",
+      "iosKey": "运动项目"
+    },
+    "moment.t572cf45ba436": {
+      "zh-Hans": "返回",
+      "en": "Back",
+      "iosKey": "返回"
+    },
+    "moment.t638e22865c0c": {
+      "zh-Hans": "还没有分享的日常",
+      "en": "No moments shared yet",
+      "iosKey": "还没有分享的日常"
+    },
+    "moment.t6a19eee31178": {
+      "zh-Hans": "还没有分享的日常。",
+      "en": "No daily moments have been shared yet.",
+      "iosKey": "还没有分享的日常。"
+    },
+    "moment.te9f4255378ca": {
+      "zh-Hans": "还没有分享的照片或视频",
+      "en": "No shared photos or videos yet",
+      "iosKey": "还没有分享的照片或视频"
+    },
+    "moment.t56f24fab273f": {
+      "zh-Hans": "还没有加入族谱",
+      "en": "You have not joined a family tree",
+      "iosKey": "还没有加入族谱"
+    },
+    "moment.t4a9146da8247": {
+      "zh-Hans": "还没有好友关系或申请。",
+      "en": "No friends or requests yet.",
+      "iosKey": "还没有好友关系或申请。"
+    },
+    "moment.t9d2432cbe2c4": {
+      "zh-Hans": "还没有孩子",
+      "en": "No children yet",
+      "iosKey": "还没有孩子"
+    },
+    "moment.ta348055aef87": {
+      "zh-Hans": "还没有审核通过的提案",
+      "en": "No approved proposals yet",
+      "iosKey": "还没有审核通过的提案"
+    },
+    "moment.te64beb0cf35b": {
+      "zh-Hans": "还没有打卡记录",
+      "en": "No check-ins yet",
+      "iosKey": "还没有打卡记录"
+    },
+    "moment.ta77e48478d50": {
+      "zh-Hans": "还没有打卡记录。",
+      "en": "No check-ins yet.",
+      "iosKey": "还没有打卡记录。"
+    },
+    "moment.te060d69ff5ae": {
+      "zh-Hans": "还没有提交反馈。",
+      "en": "You have not submitted any feedback yet.",
+      "iosKey": "还没有提交反馈。"
+    },
+    "moment.td443a4fe2a7d": {
+      "zh-Hans": "还没有活动",
+      "en": "No activities yet",
+      "iosKey": "还没有活动"
+    },
+    "moment.tad1cc902c9c2": {
+      "zh-Hans": "还没有约定",
+      "en": "No commitments yet",
+      "iosKey": "还没有约定"
+    },
+    "moment.t359172f74ce3": {
+      "zh-Hans": "还没有记录",
+      "en": "No records yet",
+      "iosKey": "还没有记录"
+    },
+    "moment.t71812afd9c4e": {
+      "zh-Hans": "还没有运动记录",
+      "en": "No exercise records yet",
+      "iosKey": "还没有运动记录"
+    },
+    "moment.td68d8b48dfa8": {
+      "zh-Hans": "这不是有效的手表配对二维码，请返回重试或手动输入设备码。",
+      "en": "This is not a valid watch pairing QR code. Go back and try again or enter the device code manually.",
+      "iosKey": "这不是有效的手表配对二维码，请返回重试或手动输入设备码。"
+    },
+    "moment.t62f6784b2710": {
+      "zh-Hans": "这个空间暂无活动",
+      "en": "No activities in this space yet",
+      "iosKey": "这个空间暂无活动"
+    },
+    "moment.tb7d65e173cfd": {
+      "zh-Hans": "这场活动还没有照片",
+      "en": "No photos in this activity yet",
+      "iosKey": "这场活动还没有照片"
+    },
+    "moment.t92c1e6304435": {
+      "zh-Hans": "这次想聊什么或一起做什么",
+      "en": "What would you like to talk about or do together?",
+      "iosKey": "这次想聊什么或一起做什么"
+    },
+    "moment.t3edb8f24dbdf": {
+      "zh-Hans": "这里不计积分，也不评分。",
+      "en": "No points or scores here.",
+      "iosKey": "这里不计积分，也不评分。"
+    },
+    "moment.ta526bb546c51": {
+      "zh-Hans": "这里记录真实家庭成员。可明确关联族谱中的同一人；不会按姓名自动合并或改写亲属关系。",
+      "en": "This records actual family members. You can explicitly link the same person in a family tree. People are not merged or relationships changed automatically by name.",
+      "iosKey": "这里记录真实家庭成员。可明确关联族谱中的同一人；不会按姓名自动合并或改写亲属关系。"
+    },
+    "moment.tdc9591e56d50": {
+      "zh-Hans": "进行中",
+      "en": "In progress",
+      "iosKey": "进行中"
+    },
+    "moment.tfcf1dcd614ec": {
+      "zh-Hans": "连接孩子手表",
+      "en": "Connect child’s watch",
+      "iosKey": "连接孩子手表"
+    },
+    "moment.tc79c1337c771": {
+      "zh-Hans": "连接手表",
+      "en": "Connect watch",
+      "iosKey": "连接手表"
+    },
+    "moment.t9d269b5a70db": {
+      "zh-Hans": "连续天数",
+      "en": "Consecutive days",
+      "iosKey": "连续天数"
+    },
+    "moment.t498e1d59b4d7": {
+      "zh-Hans": "退出",
+      "en": "Leave",
+      "iosKey": "退出"
+    },
+    "moment.tdc6b5da4d5ff": {
+      "zh-Hans": "退出 Linko Moment？",
+      "en": "Sign out of Linko Moment?",
+      "iosKey": "退出 Linko Moment？"
+    },
+    "moment.t3ab8cc15939f": {
+      "zh-Hans": "退出登录",
+      "en": "Sign out",
+      "iosKey": "退出登录"
+    },
+    "moment.t7cb587545830": {
+      "zh-Hans": "选择族谱",
+      "en": "Select family tree",
+      "iosKey": "选择族谱"
+    },
+    "moment.t680c78ec60f4": {
+      "zh-Hans": "选择日期",
+      "en": "Select date",
+      "iosKey": "选择日期"
+    },
+    "moment.tb81826c3ba1f": {
+      "zh-Hans": "选择智能体",
+      "en": "Select agent",
+      "iosKey": "选择智能体"
+    },
+    "moment.t52a9289df946": {
+      "zh-Hans": "通知、照片与位置权限",
+      "en": "Notification, photo, and location permissions",
+      "iosKey": "通知、照片与位置权限"
+    },
+    "moment.t1e9f2561b7cf": {
+      "zh-Hans": "通过",
+      "en": "Approve",
+      "iosKey": "通过"
+    },
+    "moment.te0604301158e": {
+      "zh-Hans": "通过配对的 iPhone 使用已登录账号管理活动。",
+      "en": "Use the account signed in on your paired iPhone to manage activities.",
+      "iosKey": "通过配对的 iPhone 使用已登录账号管理活动。"
+    },
+    "moment.t1955b265d568": {
+      "zh-Hans": "邀请",
+      "en": "Invite",
+      "iosKey": "邀请"
+    },
+    "moment.td2712aa5a631": {
+      "zh-Hans": "邀请与反馈",
+      "en": "Invitations and feedback",
+      "iosKey": "邀请与反馈"
+    },
+    "moment.t3eeb6fb1ba50": {
+      "zh-Hans": "邀请你成为朋友",
+      "en": "Invites you to become friends",
+      "iosKey": "邀请你成为朋友"
+    },
+    "moment.t168d57ea98db": {
+      "zh-Hans": "邀请其他人参加活动后，可以互相申请好友。",
+      "en": "Invite others to the activity to send each other friend requests.",
+      "iosKey": "邀请其他人参加活动后，可以互相申请好友。"
+    },
+    "moment.tadd2baf885e6": {
+      "zh-Hans": "邀请参加",
+      "en": "Invite participants",
+      "iosKey": "邀请参加"
+    },
+    "moment.tac8fdb837372": {
+      "zh-Hans": "邀请地址无效。",
+      "en": "The invitation address is invalid.",
+      "iosKey": "邀请地址无效。"
+    },
+    "moment.t39c1c99b41a1": {
+      "zh-Hans": "邀请家人",
+      "en": "Invite family",
+      "iosKey": "邀请家人"
+    },
+    "moment.tda0e0686050e": {
+      "zh-Hans": "邀请已发出，等待对方确认。",
+      "en": "Invitation sent. Waiting for confirmation.",
+      "iosKey": "邀请已发出，等待对方确认。"
+    },
+    "moment.ta6baef5668c8": {
+      "zh-Hans": "邀请已发送，等待对方确认。",
+      "en": "Invitation sent. Waiting for confirmation.",
+      "iosKey": "邀请已发送，等待对方确认。"
+    },
+    "moment.td833aebc6c22": {
+      "zh-Hans": "邀请本人加入",
+      "en": "Invite this person",
+      "iosKey": "邀请本人加入"
+    },
+    "moment.tc8b56dca7aed": {
+      "zh-Hans": "邀请码",
+      "en": "Invitation code",
+      "iosKey": "邀请码"
+    },
+    "moment.t4cc35f63ba93": {
+      "zh-Hans": "邀请组员",
+      "en": "Invite group members",
+      "iosKey": "邀请组员"
+    },
+    "moment.t5df67371dc3a": {
+      "zh-Hans": "邀请链接二维码",
+      "en": "Invitation QR code",
+      "iosKey": "邀请链接二维码"
+    },
+    "moment.t2dc3945488d4": {
+      "zh-Hans": "邀请链接无效。",
+      "en": "The invitation link is invalid.",
+      "iosKey": "邀请链接无效。"
+    },
+    "moment.t0a178c464735": {
+      "zh-Hans": "邀请链接格式不正确",
+      "en": "The invitation link format is invalid",
+      "iosKey": "邀请链接格式不正确"
+    },
+    "moment.t21b345550a39": {
+      "zh-Hans": "部分运动已超过系统计步保留期，步数无法完整获取。",
+      "en": "Some exercise is older than the system’s step-count retention period, so complete step counts are unavailable.",
+      "iosKey": "部分运动已超过系统计步保留期，步数无法完整获取。"
+    },
+    "moment.t0fd6889156f2": {
+      "zh-Hans": "配偶",
+      "en": "Spouse",
+      "iosKey": "配偶"
+    },
+    "moment.t2462547fcf64": {
+      "zh-Hans": "采纳并撤销扣分",
+      "en": "Accept and reverse deduction",
+      "iosKey": "采纳并撤销扣分"
+    },
+    "moment.t0d0cbac2eee5": {
+      "zh-Hans": "重命名",
+      "en": "Rename",
+      "iosKey": "重命名"
+    },
+    "moment.t7bdd5ce1e298": {
+      "zh-Hans": "重新加载",
+      "en": "Reload",
+      "iosKey": "重新加载"
+    },
+    "moment.t88363068b601": {
+      "zh-Hans": "重新定位",
+      "en": "Locate again",
+      "iosKey": "重新定位"
+    },
+    "moment.tc25fb86b1e96": {
+      "zh-Hans": "重新检查",
+      "en": "Check again",
+      "iosKey": "重新检查"
+    },
+    "moment.tb8784c8dd563": {
+      "zh-Hans": "重试",
+      "en": "Retry",
+      "iosKey": "重试"
+    },
+    "moment.tae8812ef8da2": {
+      "zh-Hans": "重试会使用同一个记录编号，避免重复记分。提交后请以服务端记录为准。",
+      "en": "Retries use the same record ID to prevent duplicate points. Use the server record as confirmation after submitting.",
+      "iosKey": "重试会使用同一个记录编号，避免重复记分。提交后请以服务端记录为准。"
+    },
+    "moment.t3d586526ce6c": {
+      "zh-Hans": "重试保存记录",
+      "en": "Retry saving record",
+      "iosKey": "重试保存记录"
+    },
+    "moment.t7bec46a5c914": {
+      "zh-Hans": "重试读取应用资料",
+      "en": "Reload app information",
+      "iosKey": "重试读取应用资料"
+    },
+    "moment.t36be7e0a83c2": {
+      "zh-Hans": "重试读取步数",
+      "en": "Retry step count",
+      "iosKey": "重试读取步数"
+    },
+    "moment.t09c0a03bed45": {
+      "zh-Hans": "链接七天内有效，请只分享给要邀请的人。",
+      "en": "This link is valid for seven days. Share it only with the people you want to invite.",
+      "iosKey": "链接七天内有效，请只分享给要邀请的人。"
+    },
+    "moment.tcfeb79d0cf1b": {
+      "zh-Hans": "链接有效 7 天，仅可使用一次；重新生成会让旧链接失效。",
+      "en": "The link is valid for seven days and can be used once. Creating a new link invalidates the old one.",
+      "iosKey": "链接有效 7 天，仅可使用一次；重新生成会让旧链接失效。"
+    },
+    "moment.te464b41fd5c4": {
+      "zh-Hans": "隐私政策",
+      "en": "Privacy policy",
+      "iosKey": "隐私政策"
+    },
+    "moment.td02492fc1e25": {
+      "zh-Hans": "隐私政策与支持",
+      "en": "Privacy policy and support",
+      "iosKey": "隐私政策与支持"
+    },
+    "moment.t756e82db463f": {
+      "zh-Hans": "隐私政策未配置",
+      "en": "Privacy policy is not configured",
+      "iosKey": "隐私政策未配置"
+    },
+    "moment.tcd163a4af59f": {
+      "zh-Hans": "零用钱",
+      "en": "Pocket money",
+      "iosKey": "零用钱"
+    },
+    "moment.t866871dbdb36": {
+      "zh-Hans": "预览上传失败。",
+      "en": "Preview upload failed.",
+      "iosKey": "预览上传失败。"
+    },
+    "moment.t9094e63b8f45": {
+      "zh-Hans": "预览失败",
+      "en": "Preview failed",
+      "iosKey": "预览失败"
+    },
+    "moment.ta05550c6c510": {
+      "zh-Hans": "预览尚未就绪，点开可重试",
+      "en": "Preview is not ready. Open it to retry.",
+      "iosKey": "预览尚未就绪，点开可重试"
+    },
+    "moment.te4e02753ebb9": {
+      "zh-Hans": "预计 %lld → %lld 分",
+      "en": "Estimated %lld → %lld points",
+      "iosKey": "预计 %lld → %lld 分"
+    },
+    "moment.tfe7e0da71325": {
+      "zh-Hans": "验证并解绑",
+      "en": "Verify and unlink",
+      "iosKey": "验证并解绑"
+    },
+    "moment.t76e9dccb7a28": {
+      "zh-Hans": "默认填写当前位置地址",
+      "en": "Use the current address by default",
+      "iosKey": "默认填写当前位置地址"
+    },
+    "moment.t9a236901cabe": {
+      "zh-Hans": "默认选择最近一次活动。完成后打开 Linko Moment，照片或视频会发布到该活动。",
+      "en": "The most recent activity is selected by default. After finishing, open Linko Moment to publish the photos or videos to that activity.",
+      "iosKey": "默认选择最近一次活动。完成后打开 Linko Moment，照片或视频会发布到该活动。"
+    }
+  }
+}

@@ -1,3 +1,4 @@
+import AgentIdentity
 import SwiftUI
 
 // The Family API owns Orbit authorization and uses Goldfish.WebAppSdk. The iOS
@@ -75,9 +76,9 @@ struct FamilyChatView: View {
                 }
             }
             HStack(alignment: .bottom) {
-                TextField("输入消息", text: $draft, axis: .vertical).lineLimit(1...5).textFieldStyle(.roundedBorder)
+                TextField(String(localized: "输入消息", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), text: $draft, axis: .vertical).lineLimit(1...5).textFieldStyle(.roundedBorder)
                     .focused($composerFocused)
-                Button("发送", systemImage: "arrow.up.circle.fill") { Task { await send() } }
+                Button(String(localized: "发送", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), systemImage: "arrow.up.circle.fill") { Task { await send() } }
                     .labelStyle(.iconOnly).font(.title2)
                     .disabled(busy || selectedAgent == nil || draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
             }.padding().background(.bar)
@@ -118,29 +119,29 @@ struct FamilyChatView: View {
                                         }
                                     } label: {
                                         HStack {
-                                            Text(session["name"] as? String ?? "对话")
+                                            Text(session["name"] as? String ?? String(localized: "对话", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)))
                                             Spacer()
                                             if id == sessionID { Image(systemName: "checkmark") }
                                         }
                                     }
                                     .swipeActions(edge: .trailing) {
-                                        Button(showingArchived ? "恢复" : "归档", systemImage: showingArchived ? "arrow.uturn.backward" : "archivebox") {
+                                        Button(showingArchived ? String(localized: "恢复", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)) : String(localized: "归档", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), systemImage: showingArchived ? "arrow.uturn.backward" : "archivebox") {
                                             Task { await changeArchive(id, archived: !showingArchived) }
                                         }
                                         .tint(showingArchived ? .teal : .orange)
                                         if !showingArchived {
-                                            Button("重命名", systemImage: "pencil") {
+                                            Button(String(localized: "重命名", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), systemImage: "pencil") {
                                                 sessionName = session["name"] as? String ?? ""
                                                 renamingSessionID = id
                                             }.tint(.blue)
                                         }
                                     }
                                     .contextMenu {
-                                        Button(showingArchived ? "恢复会话" : "归档会话") {
+                                        Button(showingArchived ? String(localized: "恢复会话", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)) : String(localized: "归档会话", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) {
                                             Task { await changeArchive(id, archived: !showingArchived) }
                                         }
                                         if !showingArchived {
-                                            Button("重命名") {
+                                            Button(String(localized: "重命名", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) {
                                                 sessionName = session["name"] as? String ?? ""
                                                 renamingSessionID = id
                                             }
@@ -154,18 +155,18 @@ struct FamilyChatView: View {
             }
             .overlay {
                 if !sessions.contains(where: { ($0["isArchived"] as? Bool == true) == showingArchived }) {
-                    ContentUnavailableView(showingArchived ? "暂无归档会话" : "暂无会话", systemImage: "tray")
+                    ContentUnavailableView(showingArchived ? String(localized: "暂无归档会话", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)) : String(localized: "暂无会话", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), systemImage: "tray")
                 }
             }
-            .navigationTitle("会话管理")
+            .navigationTitle(String(localized: "会话管理", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)))
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
-                    Picker("会话状态", selection: $showingArchived) {
-                        Text("进行中").tag(false)
-                        Text("已归档").tag(true)
+                    Picker(String(localized: "会话状态", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), selection: $showingArchived) {
+                        Text(String(localized: "进行中", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))).tag(false)
+                        Text(String(localized: "已归档", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))).tag(true)
                     }.pickerStyle(.segmented)
                 }
-                ToolbarItem(placement: .topBarTrailing) { Button("完成") { showingSessions = false } }
+                ToolbarItem(placement: .topBarTrailing) { Button(String(localized: "完成", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) { showingSessions = false } }
             }
             .refreshable { await load() }
         }
@@ -197,7 +198,7 @@ struct FamilyChatView: View {
                 await open(sessionID)
             } else if sessionID != nil { newConversation() }
             error = nil
-        } catch { self.error = error.localizedDescription }
+        } catch { self.error = momentDisplayError(error) }
     }
 
     private func open(_ id: String) async {
@@ -211,7 +212,7 @@ struct FamilyChatView: View {
             selectedAgentID = agentID
             sessionID = id
             error = nil
-        } catch { self.error = error.localizedDescription }
+        } catch { self.error = momentDisplayError(error) }
     }
 
     private func changeArchive(_ id: String, archived: Bool, openAfterRestore: Bool = false) async {
@@ -221,19 +222,19 @@ struct FamilyChatView: View {
             try await loadSessions()
             if openAfterRestore { showingSessions = false; await open(id) }
             error = nil
-        } catch { self.error = error.localizedDescription }
+        } catch { self.error = momentDisplayError(error) }
     }
 
     private func renameSession() async {
         guard let id = renamingSessionID else { return }
         let name = sessionName.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !name.isEmpty else { error = "请输入会话名称。"; return }
+        guard !name.isEmpty else { error = String(localized: "请输入会话名称。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)); return }
         do {
             _ = try await store.call("/api/agentfree/sessions/\(id.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? id)", method: "PUT", body: ["name": name])
             try await loadSessions()
             renamingSessionID = nil
             error = nil
-        } catch { self.error = error.localizedDescription }
+        } catch { self.error = momentDisplayError(error) }
     }
 
     private func send() async {
@@ -245,7 +246,7 @@ struct FamilyChatView: View {
         do {
             if sessionID == nil {
                 guard let created = try await store.call("/api/agentfree/sessions", method: "POST", body: ["agentId": agent.id, "name": String(message.prefix(24))]) as? [String: Any],
-                      let id = created["id"] as? String else { throw APIError.message("创建对话失败。") }
+                      let id = created["id"] as? String else { throw APIError.message(String(localized: "创建对话失败。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) }
                 sessionID = id
             }
             guard let sessionID else { return }
@@ -256,12 +257,12 @@ struct FamilyChatView: View {
             await open(sessionID)
         } catch {
             if let sessionID { await open(sessionID) }
-            self.error = error.localizedDescription
+            self.error = momentDisplayError(error)
         }
     }
 
     private func stringRecords(_ value: Any) throws -> [[String: Any]] {
-        guard let rows = value as? [[String: Any]] else { throw APIError.message("对话数据格式不正确。") }
+        guard let rows = value as? [[String: Any]] else { throw APIError.message(String(localized: "对话数据格式不正确。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) }
         return rows
     }
 }

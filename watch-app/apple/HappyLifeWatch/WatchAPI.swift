@@ -1,3 +1,4 @@
+import AgentIdentityLocalization
 import Foundation
 
 struct ScoreResponse: Decodable { let familyGroupName: String; let children: [ChildScore] }
@@ -111,9 +112,10 @@ final class WatchAPI {
     func send(_ path: String, token: String? = nil,
               body: [String: String]? = nil, method: String? = nil) async throws -> Data {
         guard baseURL.scheme == "https", baseURL.host != nil else {
-            throw APIError(status: 0, message: "服务地址必须使用 HTTPS")
+            throw APIError(status: 0, message: String(localized: "服务地址必须使用 HTTPS", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)))
         }
         var request = URLRequest(url: baseURL.appendingPathComponent("api/watch/" + path))
+        request.setValue(AgentIdentityLanguage.current, forHTTPHeaderField: "Accept-Language")
         request.timeoutInterval = 20
         request.cachePolicy = .reloadIgnoringLocalCacheData
         request.setValue("application/json", forHTTPHeaderField: "Accept")
@@ -128,8 +130,27 @@ final class WatchAPI {
         guard (200..<300).contains(response.statusCode) else {
             let payload = try? JSONDecoder().decode([String: String].self, from: data)
             throw APIError(status: response.statusCode,
-                           message: payload?["error"] ?? "服务暂时不可用（\(response.statusCode)）")
+                           message: payload?["error"] ?? String(localized: "服务暂时不可用（\(response.statusCode)）", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)))
         }
         return data
     }
+}
+
+func watchDisplayError(_ error: Error) -> String {
+    if let error = error as? APIError { return error.message }
+    if error is CancellationError { return String(localized: "操作已取消。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)) }
+    if error is URLError { return String(localized: "网络连接失败，请稍后重试。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)) }
+    return String(localized: "操作失败，请稍后重试。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))
+}
+
+func watchLocalTime(_ value: String) -> String {
+    let iso = ISO8601DateFormatter()
+    iso.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+    guard let date = iso.date(from: value) ?? ISO8601DateFormatter().date(from: value) else { return value }
+    let formatter = DateFormatter()
+    formatter.locale = Locale(identifier: AgentIdentityLanguage.current)
+    formatter.timeZone = .current
+    formatter.dateStyle = .medium
+    formatter.timeStyle = .short
+    return formatter.string(from: date)
 }

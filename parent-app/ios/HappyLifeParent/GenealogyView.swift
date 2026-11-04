@@ -1,3 +1,4 @@
+import AgentIdentity
 import SwiftUI
 
 private func genealogyQuery(_ text: String) -> String {
@@ -23,75 +24,75 @@ struct GenealogyView: View {
     var body: some View {
         List {
             if let error { Section { Text(error).foregroundStyle(.red) } }
-            Section("我的族谱") {
-                if trees.isEmpty { Text("还没有加入族谱").foregroundStyle(.secondary) }
+            Section(String(localized: "我的族谱", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) {
+                if trees.isEmpty { Text(String(localized: "还没有加入族谱", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))).foregroundStyle(.secondary) }
                 ForEach(trees) { tree in
                     NavigationLink { GenealogyDetailView(store: store, treeID: tree.id) } label: {
                         VStack(alignment: .leading, spacing: 4) {
                             Text(tree.text("name")).font(.headline)
-                            Text("\(tree.int("peopleCount")) 位人物 · \(tree.text("role") == "owner" ? "管理员" : "成员")").font(.caption).foregroundStyle(.secondary)
+                            Text(String(localized: "\(tree.int("peopleCount")) 位人物 · \(tree.text("role") == "owner" ? String(localized: "管理员", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)) : String(localized: "成员", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)))", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))).font(.caption).foregroundStyle(.secondary)
                         }
                     }
                 }
             }
-            Section("寻找族谱") {
-                TextField("输入族谱名称或姓氏", text: $query).textInputAutocapitalization(.never)
-                Button("查找", systemImage: "magnifyingglass") { Task { await search() } }.disabled(busy || query.trimmingCharacters(in: .whitespacesAndNewlines).count < 2)
+            Section(String(localized: "寻找族谱", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) {
+                TextField(String(localized: "输入族谱名称或姓氏", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), text: $query).textInputAutocapitalization(.never)
+                Button(String(localized: "查找", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), systemImage: "magnifyingglass") { Task { await search() } }.disabled(busy || query.trimmingCharacters(in: .whitespacesAndNewlines).count < 2)
                 ForEach(found) { tree in
                     HStack {
                         VStack(alignment: .leading) {
                             Text(tree.text("name"))
-                            if !tree.text("surname").isEmpty { Text(tree.text("surname") + "氏").font(.caption).foregroundStyle(.secondary) }
+                            if !tree.text("surname").isEmpty { Text(tree.text("surname") + String(localized: "氏", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))).font(.caption).foregroundStyle(.secondary) }
                         }
                         Spacer()
-                        Button("申请加入") { joining = tree }.disabled(busy)
+                        Button(String(localized: "申请加入", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) { joining = tree }.disabled(busy)
                     }
                 }
                 ForEach(requests) { request in
                     LabeledContent(request.text("treeName"), value: status(request.text("status"))).font(.subheadline)
                 }
             }
-            Section("建立新族谱") {
-                TextField("族谱名称", text: $treeName)
-                TextField("家族姓氏（可选）", text: $surname)
-                TextField("简介（仅成员可见）", text: $treeDescription, axis: .vertical).lineLimit(2...4)
-                Button("创建族谱", systemImage: "plus.circle.fill") { Task { await create() } }.disabled(busy || treeName.trimmingCharacters(in: .whitespacesAndNewlines).count < 2)
+            Section(String(localized: "建立新族谱", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) {
+                TextField(String(localized: "族谱名称", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), text: $treeName)
+                TextField(String(localized: "家族姓氏（可选）", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), text: $surname)
+                TextField(String(localized: "简介（仅成员可见）", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), text: $treeDescription, axis: .vertical).lineLimit(2...4)
+                Button(String(localized: "创建族谱", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), systemImage: "plus.circle.fill") { Task { await create() } }.disabled(busy || treeName.trimmingCharacters(in: .whitespacesAndNewlines).count < 2)
             }
         }
         .frame(maxWidth: 860).frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color(uiColor: .systemGroupedBackground))
-        .navigationTitle("家族族谱")
+        .navigationTitle(String(localized: "家族族谱", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)))
         .refreshable { await load() }
         .task { await load() }
         .sheet(item: $joining) { tree in
             NavigationStack {
                 Form {
-                    Section { Text("申请加入「\(tree.text("name"))」"); TextField("你的姓名", text: $joinName); TextField("介绍你与家族的关系（可选）", text: $joinMessage, axis: .vertical).lineLimit(2...4) }
+                    Section { Text(String(localized: "申请加入「\(tree.text("name"))」", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))); TextField(String(localized: "你的姓名", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), text: $joinName); TextField(String(localized: "介绍你与家族的关系（可选）", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), text: $joinMessage, axis: .vertical).lineLimit(2...4) }
                     if let error { Text(error).foregroundStyle(.red) }
-                    Button("提交申请") { Task { await join(tree) } }.disabled(busy || joinName.trimmingCharacters(in: .whitespacesAndNewlines).count < 2)
+                    Button(String(localized: "提交申请", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) { Task { await join(tree) } }.disabled(busy || joinName.trimmingCharacters(in: .whitespacesAndNewlines).count < 2)
                 }
-                .navigationTitle("加入族谱")
-                .toolbar { Button("取消") { joining = nil } }
+                .navigationTitle(String(localized: "加入族谱", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)))
+                .toolbar { Button(String(localized: "取消", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) { joining = nil } }
             }
         }
     }
     private func status(_ value: String) -> String {
-        switch value { case "pending": "等待审核"; case "approved": "已通过"; default: "未通过" }
+        switch value { case "pending": String(localized: "等待审核", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)); case "approved": String(localized: "已通过", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)); default: String(localized: "未通过", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)) }
     }
     private func load() async {
         do {
             trees = try Record.list(await store.call("/api/genealogies"))
             requests = try Record.list(await store.call("/api/genealogies/my-join-requests"))
             error = nil
-        } catch is CancellationError {} catch { self.error = error.localizedDescription }
+        } catch is CancellationError {} catch { self.error = momentDisplayError(error) }
     }
     private func search() async {
         busy = true; error = nil; defer { busy = false }
         do {
             let value = query.trimmingCharacters(in: .whitespacesAndNewlines)
-            guard value.count >= 2 && value.count <= 50 else { throw APIError.message("请输入 2–50 字的名称或姓氏") }
+            guard value.count >= 2 && value.count <= 50 else { throw APIError.message(String(localized: "请输入 2–50 字的名称或姓氏", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) }
             found = try Record.list(await store.call("/api/genealogies/discover?q=\(genealogyQuery(value))"))
-        } catch { self.error = error.localizedDescription }
+        } catch { self.error = momentDisplayError(error) }
     }
     private func create() async {
         busy = true; error = nil; defer { busy = false }
@@ -99,14 +100,14 @@ struct GenealogyView: View {
             _ = try await store.call("/api/genealogies", method: "POST", body: ["name": treeName.trimmingCharacters(in: .whitespacesAndNewlines), "surname": surname.trimmingCharacters(in: .whitespacesAndNewlines), "description": treeDescription.trimmingCharacters(in: .whitespacesAndNewlines)])
             treeName = ""; surname = ""; treeDescription = ""
             await load()
-        } catch { self.error = error.localizedDescription }
+        } catch { self.error = momentDisplayError(error) }
     }
     private func join(_ tree: Record) async {
         busy = true; error = nil; defer { busy = false }
         do {
             _ = try await store.call("/api/genealogies/\(tree.id)/join-requests", method: "POST", body: ["displayName": joinName.trimmingCharacters(in: .whitespacesAndNewlines), "message": joinMessage.trimmingCharacters(in: .whitespacesAndNewlines)])
             joining = nil; joinName = ""; joinMessage = ""; await load()
-        } catch { self.error = error.localizedDescription }
+        } catch { self.error = momentDisplayError(error) }
     }
 }
 
@@ -152,38 +153,38 @@ struct GenealogyDetailView: View {
             if let tree {
                 Section {
                     Text(tree.text("name")).font(.title2.bold())
-                    Text("\(tree.int("peopleCount")) 位人物 · \(tree.int("memberCount")) 位已加入成员").foregroundStyle(.secondary)
+                    Text(String(localized: "\(tree.int("peopleCount")) 位人物 · \(tree.int("memberCount")) 位已加入成员", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))).foregroundStyle(.secondary)
                     if !tree.text("description").isEmpty { Text(tree.text("description")) }
                     if owner {
-                        Button("添加家族成员", systemImage: "person.badge.plus") { openAddPerson() }
+                        Button(String(localized: "添加家族成员", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), systemImage: "person.badge.plus") { openAddPerson() }
                             .buttonStyle(.borderedProminent)
                     }
                 }
             }
             if owner && !requests.isEmpty {
-                Section("待审核申请") {
+                Section(String(localized: "待审核申请", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) {
                     ForEach(requests) { request in
                         VStack(alignment: .leading, spacing: 8) {
                             Text(request.text("displayName")).font(.headline)
-                            Text("用户中心账号：" + request.text("accountName")).font(.caption).foregroundStyle(.secondary)
+                            Text(String(localized: "用户中心账号：", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)) + request.text("accountName")).font(.caption).foregroundStyle(.secondary)
                             if !request.text("message").isEmpty { Text(request.text("message")) }
-                            Picker("关联人物", selection: Binding(get: { matches[request.id] ?? 0 }, set: { matches[request.id] = $0 })) {
-                                Text("新建本人记录").tag(0)
+                            Picker(String(localized: "关联人物", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), selection: Binding(get: { matches[request.id] ?? 0 }, set: { matches[request.id] = $0 })) {
+                                Text(String(localized: "新建本人记录", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))).tag(0)
                                 ForEach(people.filter { !$0.flag("isLinked") }) { person in Text(person.text("displayName") + " #\(person.id)").tag(person.id) }
                             }
                             HStack {
-                                Button("通过") { Task { await decide(request, "approve") } }
+                                Button(String(localized: "通过", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) { Task { await decide(request, "approve") } }
                                 Spacer()
-                                Button("拒绝", role: .destructive) { Task { await decide(request, "reject") } }
+                                Button(String(localized: "拒绝", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), role: .destructive) { Task { await decide(request, "reject") } }
                             }.disabled(busy)
                         }
                     }
                 }
             }
-            Section("家族成员") {
+            Section(String(localized: "家族成员", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) {
                 HStack {
-                    TextField("按姓名或支系查找", text: $query)
-                    Button("查找") { Task { await loadPeople() } }.disabled(busy)
+                    TextField(String(localized: "按姓名或支系查找", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), text: $query)
+                    Button(String(localized: "查找", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) { Task { await loadPeople() } }.disabled(busy)
                 }
                 ForEach(people) { person in
                     Button { openPerson(person) } label: {
@@ -191,64 +192,64 @@ struct GenealogyDetailView: View {
                             VStack(alignment: .leading, spacing: 4) {
                                 Text(person.text("displayName")).font(.headline)
                                 Text([person.text("generationLabel"), person.text("branchName")].filter { !$0.isEmpty }.joined(separator: " · ")).font(.caption).foregroundStyle(.secondary)
-                                Text([genderLabel(person.text("gender")), birthdayLabel(person)].filter { $0 != "未填写" }.joined(separator: " · ")).font(.caption).foregroundStyle(.secondary)
+                                Text([genderLabel(person.text("gender")), birthdayLabel(person)].filter { $0 != String(localized: "未填写", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)) }.joined(separator: " · ")).font(.caption).foregroundStyle(.secondary)
                             }
                             Spacer()
-                            if person.flag("isSelf") { Text("我").font(.caption).foregroundStyle(.teal) }
+                            if person.flag("isSelf") { Text(String(localized: "我", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))).font(.caption).foregroundStyle(.teal) }
                             Image(systemName: "chevron.right").font(.caption).foregroundStyle(.secondary)
                         }
                     }.foregroundStyle(.primary)
                 }
-                if hasMore { Text("结果超过 100 位，请输入姓名或支系缩小范围。 ").font(.caption).foregroundStyle(.secondary) }
+                if hasMore { Text(String(localized: "结果超过 100 位，请输入姓名或支系缩小范围。 ", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))).font(.caption).foregroundStyle(.secondary) }
             }
         }
         .frame(maxWidth: 860).frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color(uiColor: .systemGroupedBackground))
-        .navigationTitle(tree?.text("name") ?? "族谱")
+        .navigationTitle(tree?.text("name") ?? String(localized: "族谱", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)))
         .refreshable { await load() }
         .task { await load() }
         .sheet(item: $selected) { person in
             NavigationStack {
                 Form {
                     if let editError { Section { Text(editError).foregroundStyle(.red) } }
-                    Section("成员资料") {
+                    Section(String(localized: "成员资料", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) {
                         if householdLinks.contains(where: { $0.int("treeId") == treeID && $0.int("personId") == person.id }) {
-                            Text("已关联到‘我的’中的家庭成员").foregroundStyle(.green)
+                            Text(String(localized: "已关联到‘我的’中的家庭成员", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))).foregroundStyle(.green)
                         }
                         if owner {
                             personEditorFields
                         } else {
-                            LabeledContent("姓名", value: person.text("displayName"))
-                            if !person.text("generationLabel").isEmpty { LabeledContent("辈分", value: person.text("generationLabel")) }
-                            if !person.text("branchName").isEmpty { LabeledContent("支系", value: person.text("branchName")) }
-                            LabeledContent("性别", value: genderLabel(person.text("gender")))
-                            LabeledContent("生日", value: birthdayLabel(person))
+                            LabeledContent(String(localized: "姓名", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), value: person.text("displayName"))
+                            if !person.text("generationLabel").isEmpty { LabeledContent(String(localized: "辈分", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), value: person.text("generationLabel")) }
+                            if !person.text("branchName").isEmpty { LabeledContent(String(localized: "支系", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), value: person.text("branchName")) }
+                            LabeledContent(String(localized: "性别", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), value: genderLabel(person.text("gender")))
+                            LabeledContent(String(localized: "生日", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), value: birthdayLabel(person))
                             if !person.text("note").isEmpty { Text(person.text("note")) }
                         }
                     }
-                    Section("亲属关系") {
+                    Section(String(localized: "亲属关系", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) {
                         let related = relationships.filter { $0.int("fromPersonId") == person.id || $0.int("toPersonId") == person.id }
-                        if related.isEmpty { Text("暂无亲属关系").foregroundStyle(.secondary) }
+                        if related.isEmpty { Text(String(localized: "暂无亲属关系", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))).foregroundStyle(.secondary) }
                         ForEach(related) { relation in
                             let selectedIsFrom = relation.int("fromPersonId") == person.id
                             let otherID = selectedIsFrom ? relation.int("toPersonId") : relation.int("fromPersonId")
                             HStack {
                                 VStack(alignment: .leading) {
-                                    Text(relation.text("kind") == "spouse" ? "配偶" : selectedIsFrom ? "子女" : "父母").font(.caption).foregroundStyle(.secondary)
+                                    Text(relation.text("kind") == "spouse" ? String(localized: "配偶", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)) : selectedIsFrom ? String(localized: "子女", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)) : String(localized: "父母", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))).font(.caption).foregroundStyle(.secondary)
                                     Button(selectedIsFrom ? relation.text("toName") : relation.text("fromName")) { Task { await selectPerson(otherID) } }
                                 }
                                 Spacer()
-                                if owner { Button("移除", role: .destructive) { Task { await remove(relation) } }.disabled(busy) }
+                                if owner { Button(String(localized: "移除", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), role: .destructive) { Task { await remove(relation) } }.disabled(busy) }
                             }
                         }
                     }
-                    Section("根据已有关系推导") {
-                        Text("由父母与子女关系自动计算，基础关系变化后会更新；缺少性别和年龄时使用中性称谓。")
+                    Section(String(localized: "根据已有关系推导", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) {
+                        Text(String(localized: "由父母与子女关系自动计算，基础关系变化后会更新；缺少性别和年龄时使用中性称谓。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)))
                             .font(.caption).foregroundStyle(.secondary)
-                        if inferenceLoading { ProgressView("正在计算…") }
+                        if inferenceLoading { ProgressView(String(localized: "正在计算…", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) }
                         if let inferenceError { Text(inferenceError).foregroundStyle(.red) }
                         if !inferenceLoading && inferenceError == nil && inferred.isEmpty {
-                            Text("暂无可推导的关系").foregroundStyle(.secondary)
+                            Text(String(localized: "暂无可推导的关系", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))).foregroundStyle(.secondary)
                         }
                         ForEach(["sibling", "grandparent", "grandchild", "parentSibling", "siblingChild", "cousin"], id: \.self) { kind in
                             let matches = inferred.filter { $0.text("kind") == kind }
@@ -263,29 +264,29 @@ struct GenealogyDetailView: View {
                         }
                     }
                     if owner {
-                        Section("为此人添加关系") {
-                            Picker("关系", selection: $relationKind) {
-                                Text("父母").tag("parent")
-                                Text("子女").tag("child")
-                                Text("配偶").tag("spouse")
+                        Section(String(localized: "为此人添加关系", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) {
+                            Picker(String(localized: "关系", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), selection: $relationKind) {
+                                Text(String(localized: "父母", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))).tag("parent")
+                                Text(String(localized: "子女", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))).tag("child")
+                                Text(String(localized: "配偶", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))).tag("spouse")
                             }
-                            Picker("另一位成员", selection: $relatedPersonID) {
-                                Text("请选择").tag(0)
+                            Picker(String(localized: "另一位成员", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), selection: $relatedPersonID) {
+                                Text(String(localized: "请选择", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))).tag(0)
                                 ForEach(people.filter { $0.id != person.id }) { other in
                                     Text(other.text("displayName") + " #\(other.id)").tag(other.id)
                                 }
                             }
-                            Button("添加关系") { Task { await addRelation(person.id) } }
+                            Button(String(localized: "添加关系", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) { Task { await addRelation(person.id) } }
                                 .disabled(busy || relatedPersonID == 0)
                         }
-                        Section("邀请本人加入") {
+                        Section(String(localized: "邀请本人加入", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) {
                             if person.flag("isLinked") {
-                                Text("此人物已绑定用户。").foregroundStyle(.secondary)
+                                Text(String(localized: "此人物已绑定用户。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))).foregroundStyle(.secondary)
                             } else {
-                                Text("链接有效 7 天，仅可使用一次；重新生成会让旧链接失效。")
+                                Text(String(localized: "链接有效 7 天，仅可使用一次；重新生成会让旧链接失效。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)))
                                     .font(.caption).foregroundStyle(.secondary)
-                                Button("生成邀请链接") { Task { await createInvitation(person.id) } }.disabled(busy)
-                                if let invitationURL { ShareLink("分享邀请链接", item: invitationURL) }
+                                Button(String(localized: "生成邀请链接", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) { Task { await createInvitation(person.id) } }.disabled(busy)
+                                if let invitationURL { ShareLink(String(localized: "分享邀请链接", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), item: invitationURL) }
                             }
                         }
                     }
@@ -293,9 +294,9 @@ struct GenealogyDetailView: View {
                 .navigationTitle(person.text("displayName"))
                 .navigationBarTitleDisplayMode(.inline)
                 .toolbar {
-                    if owner { ToolbarItem(placement: .cancellationAction) { Button("取消") { selected = nil }.disabled(editBusy) } }
+                    if owner { ToolbarItem(placement: .cancellationAction) { Button(String(localized: "取消", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) { selected = nil }.disabled(editBusy) } }
                     ToolbarItem(placement: .confirmationAction) {
-                        Button("完成") {
+                        Button(String(localized: "完成", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) {
                             if owner { Task { await saveEdit(person.id) } }
                             else { selected = nil }
                         }
@@ -309,14 +310,14 @@ struct GenealogyDetailView: View {
             NavigationStack {
                 Form {
                     if let editError { Section { Text(editError).foregroundStyle(.red) } }
-                    Section("成员资料") { personEditorFields }
+                    Section(String(localized: "成员资料", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) { personEditorFields }
                 }
-                .navigationTitle("添加家族成员")
+                .navigationTitle(String(localized: "添加家族成员", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)))
                 .navigationBarTitleDisplayMode(.inline)
                 .toolbar {
-                    ToolbarItem(placement: .cancellationAction) { Button("取消") { showAddPerson = false }.disabled(editBusy) }
+                    ToolbarItem(placement: .cancellationAction) { Button(String(localized: "取消", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) { showAddPerson = false }.disabled(editBusy) }
                     ToolbarItem(placement: .confirmationAction) {
-                        Button("完成") { Task { await savePerson() } }
+                        Button(String(localized: "完成", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) { Task { await savePerson() } }
                             .disabled(editBusy || !personEditorValid)
                     }
                 }
@@ -329,12 +330,12 @@ struct GenealogyDetailView: View {
             && birthdaySelectionComplete(editBirthPrecision, editBirthYear, editBirthMonth, editBirthDay)
     }
     @ViewBuilder private var personEditorFields: some View {
-        TextField("姓名", text: $editName)
-        TextField("辈分（可选）", text: $editGeneration)
-        TextField("支系（可选）", text: $editBranch)
+        TextField(String(localized: "姓名", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), text: $editName)
+        TextField(String(localized: "辈分（可选）", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), text: $editGeneration)
+        TextField(String(localized: "支系（可选）", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), text: $editBranch)
         demographicFields(gender: $editGender, precision: $editBirthPrecision, year: $editBirthYear, month: $editBirthMonth, day: $editBirthDay)
-        TextField("备注（仅成员可见）", text: $editNote, axis: .vertical).lineLimit(2...4)
-        Text("点右上角“完成”后自动保存。")
+        TextField(String(localized: "备注（仅成员可见）", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), text: $editNote, axis: .vertical).lineLimit(2...4)
+        Text(String(localized: "点右上角“完成”后自动保存。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)))
             .font(.caption).foregroundStyle(.secondary)
     }
     private func load() async {
@@ -346,26 +347,26 @@ struct GenealogyDetailView: View {
             if let selected { await loadInferred(selected.id) }
             requests = owner ? try Record.list(await store.call(base + "/join-requests")) : []
             error = nil
-        } catch is CancellationError {} catch { self.error = error.localizedDescription }
+        } catch is CancellationError {} catch { self.error = momentDisplayError(error) }
     }
     private func loadPeople() async {
         do {
             let q = query.trimmingCharacters(in: .whitespacesAndNewlines)
-            guard q.count <= 80 else { throw APIError.message("搜索内容不能超过 80 字") }
+            guard q.count <= 80 else { throw APIError.message(String(localized: "搜索内容不能超过 80 字", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) }
             let result = try object(await store.call(base + "/people?q=\(genealogyQuery(q))"))
             people = try Record.list(result, key: "people")
             hasMore = result["hasMore"] as? Bool ?? false
             if let selected, let latest = people.first(where: { $0.id == selected.id }) { self.selected = latest }
-        } catch { self.error = error.localizedDescription }
+        } catch { self.error = momentDisplayError(error) }
     }
     private func object(_ value: Any) throws -> [String: Any] {
-        guard let result = value as? [String: Any] else { throw APIError.message("服务返回的数据格式不正确。") }
+        guard let result = value as? [String: Any] else { throw APIError.message(String(localized: "服务返回的数据格式不正确。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) }
         return result
     }
     private func mutate(_ path: String, method: String = "POST", body: [String: Any]? = nil) async {
         busy = true; error = nil; defer { busy = false }
         do { _ = try await store.call(path, method: method, body: body); await load() }
-        catch { self.error = error.localizedDescription }
+        catch { self.error = momentDisplayError(error) }
     }
     private func decide(_ request: Record, _ decision: String) async {
         var body: [String: Any] = ["decision": decision]
@@ -373,15 +374,15 @@ struct GenealogyDetailView: View {
         await mutate(base + "/join-requests/\(request.id)/decision", body: body)
     }
     private func genderLabel(_ gender: String) -> String {
-        switch gender { case "male": return "男"; case "female": return "女"; case "other": return "其他"; default: return "未填写" }
+        switch gender { case "male": return String(localized: "男", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)); case "female": return String(localized: "女", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)); case "other": return String(localized: "其他", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)); default: return String(localized: "未填写", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)) }
     }
     private func birthdayLabel(_ person: Record) -> String {
         let year = person.int("birthYear")
-        guard year > 0 else { return "未填写" }
+        guard year > 0 else { return String(localized: "未填写", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)) }
         let month = person.int("birthMonth")
-        guard month > 0 else { return "\(year)年" }
+        guard month > 0 else { return String(localized: "\(year)年", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)) }
         let day = person.int("birthDay")
-        return day > 0 ? "\(year)年\(month)月\(day)日" : "\(year)年\(month)月"
+        return day > 0 ? String(localized: "\(year)年\(month)月\(day)日", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)) : String(localized: "\(year)年\(month)月", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))
     }
     private func birthdaySelectionComplete(_ precision: String, _ year: String, _ month: String, _ day: String) -> Bool {
         precision == "none" || (!year.isEmpty && (precision == "year" || !month.isEmpty && (precision == "month" || !day.isEmpty)))
@@ -399,17 +400,17 @@ struct GenealogyDetailView: View {
         birthdayCalendarExpanded = false
     }
     @ViewBuilder private func demographicFields(gender: Binding<String>, precision: Binding<String>, year: Binding<String>, month: Binding<String>, day: Binding<String>) -> some View {
-        Picker("性别（可选）", selection: gender) {
-            Text("未填写").tag("")
-            Text("男").tag("male")
-            Text("女").tag("female")
-            Text("其他").tag("other")
+        Picker(String(localized: "性别（可选）", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), selection: gender) {
+            Text(String(localized: "未填写", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))).tag("")
+            Text(String(localized: "男", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))).tag("male")
+            Text(String(localized: "女", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))).tag("female")
+            Text(String(localized: "其他", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))).tag("other")
         }
-        Picker("生日精度", selection: precision) {
-            Text("不填写").tag("none")
-            Text("仅年份").tag("year")
-            Text("年和月").tag("month")
-            Text("完整日期").tag("date")
+        Picker(String(localized: "生日精度", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), selection: precision) {
+            Text(String(localized: "不填写", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))).tag("none")
+            Text(String(localized: "仅年份", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))).tag("year")
+            Text(String(localized: "年和月", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))).tag("month")
+            Text(String(localized: "完整日期", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))).tag("date")
         }
         .onChange(of: precision.wrappedValue) { _, value in
             birthdayCalendarExpanded = false
@@ -422,13 +423,13 @@ struct GenealogyDetailView: View {
                 get: { calendarDate(year.wrappedValue, month.wrappedValue, day.wrappedValue) },
                 set: { applyCalendarDate($0, precision: precision.wrappedValue, year: year, month: month, day: day) }
             )
-            DisclosureGroup("从日历选择生日", isExpanded: $birthdayCalendarExpanded) {
-                DatePicker("选择日期", selection: selection, displayedComponents: .date)
+            DisclosureGroup(String(localized: "从日历选择生日", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), isExpanded: $birthdayCalendarExpanded) {
+                DatePicker(String(localized: "选择日期", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), selection: selection, displayedComponents: .date)
                     .datePickerStyle(.graphical)
                     .environment(\.calendar, Calendar(identifier: .gregorian))
             }
             Text(birthdaySelectionComplete(precision.wrappedValue, year.wrappedValue, month.wrappedValue, day.wrappedValue)
-                ? "仅保存所选精度，未选定的月日不会补值。" : "请在日历中选定生日后保存。")
+                ? String(localized: "仅保存所选精度，未选定的月日不会补值。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)) : String(localized: "请在日历中选定生日后保存。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)))
                 .font(.caption).foregroundStyle(.secondary)
         }
     }
@@ -465,13 +466,13 @@ struct GenealogyDetailView: View {
     }
     private func inferenceLabel(_ kind: String) -> String {
         switch kind {
-        case "sibling": return "兄弟姐妹"
-        case "grandparent": return "祖辈"
-        case "grandchild": return "孙辈"
-        case "parentSibling": return "父母的兄弟姐妹"
-        case "siblingChild": return "兄弟姐妹的子女"
-        case "cousin": return "堂表亲"
-        default: return "亲属"
+        case "sibling": return String(localized: "兄弟姐妹", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))
+        case "grandparent": return String(localized: "祖辈", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))
+        case "grandchild": return String(localized: "孙辈", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))
+        case "parentSibling": return String(localized: "父母的兄弟姐妹", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))
+        case "siblingChild": return String(localized: "兄弟姐妹的子女", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))
+        case "cousin": return String(localized: "堂表亲", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))
+        default: return String(localized: "亲属", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))
         }
     }
     private func loadInferred(_ personID: Int) async {
@@ -483,7 +484,7 @@ struct GenealogyDetailView: View {
             let values = try Record.list(await store.call(base + "/people/\(personID)/inferred-relationships"))
             if selected?.id == personID { inferred = values; inferenceLoading = false }
         } catch {
-            if selected?.id == personID { inferenceError = error.localizedDescription; inferenceLoading = false }
+            if selected?.id == personID { inferenceError = momentDisplayError(error); inferenceLoading = false }
         }
     }
     private func savePerson() async {
@@ -493,7 +494,7 @@ struct GenealogyDetailView: View {
             _ = try await store.call(base + "/people", method: "POST", body: body)
             await load()
             showAddPerson = false
-        } catch { editError = error.localizedDescription }
+        } catch { editError = momentDisplayError(error) }
     }
     private func saveEdit(_ personID: Int) async {
         editBusy = true; editError = nil; defer { editBusy = false }
@@ -502,7 +503,7 @@ struct GenealogyDetailView: View {
             _ = try await store.call(base + "/people/\(personID)", method: "PUT", body: body)
             await load()
             selected = nil
-        } catch { editError = error.localizedDescription }
+        } catch { editError = momentDisplayError(error) }
     }
     private func personEditorBody() -> [String: Any] {
         ["displayName": editName.trimmingCharacters(in: .whitespacesAndNewlines),
@@ -525,14 +526,14 @@ struct GenealogyDetailView: View {
             let result = try object(await store.call(base + "/people/\(personID)/invitations", method: "POST"))
             guard let path = result["path"] as? String,
                   let url = URL(string: path, relativeTo: URL(string: "https://happylife.ai.impx.net")!)?.absoluteURL else {
-                throw APIError.message("邀请链接格式不正确")
+                throw APIError.message(String(localized: "邀请链接格式不正确", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)))
             }
             invitationURL = url
-        } catch { editError = error.localizedDescription }
+        } catch { editError = momentDisplayError(error) }
     }
     private func remove(_ relation: Record) async { await mutate(base + "/relationships/\(relation.id)", method: "DELETE") }
     private func selectPerson(_ id: Int) async {
         do { openPerson(Record(fields: try object(await store.call(base + "/people/\(id)")))) }
-        catch { self.error = error.localizedDescription }
+        catch { self.error = momentDisplayError(error) }
     }
 }

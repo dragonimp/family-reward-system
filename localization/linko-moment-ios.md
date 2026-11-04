@@ -1,0 +1,11 @@
+# Linko Moment native language resources
+
+`linko-moment.v1.json` is the versioned source catalog for iPhone, iPad, Apple Watch, and the iOS share extension. Each message retains its Swift compiler key in `iosKey`, so interpolation argument types remain stable. The InfoPlist catalogs localize permission prompts for each bundle.
+
+Generate platform resources with the official `AgentIdentity/localization/generate.py` tool. Run `python3 scripts/check-ios-localization.py` to verify catalog parity, English coverage, and interpolation arguments. The native verification entry point also checks the compiler's `.stringsdata` output, including alerts and dynamically constructed strings.
+
+The app uses the shared AgentIdentity global language preference and settings UI: System, Chinese, or English. Every signed-in app updates the same account setting; there is no per-app override or inheritance option. The Watch uses device-local system/Chinese/English settings. Pairing credentials do not prove that its bound child is the paired phone’s account, so it does not inherit or modify that account’s global preferences. Account-global preferences apply to clients signed in to User Center. The share extension reads the effective app language from the existing app group. No account tokens are copied into that group. Chinese and English ship in every bundle; unsupported system languages resolve to English.
+
+User-entered names, posts, messages, media names, and content returned by the server remain content. Requests carry `Accept-Language` to convey the active language. Backend-generated messages require the corresponding server localization; a client build or header check does not prove that server acceptance. Device-visible timestamps use device-local time. The existing growth-statistics endpoint currently returns Beijing-calendar weekly buckets, so its heading continues identifying that contract until the server supports client time zones.
+
+`parent-app/ios/check-local-time.sh` exercises the actual phone and Watch timestamp-formatting functions in America/Los_Angeles, including a UTC-to-local calendar-day change, Chinese/English and unsupported-language fallback, and unchanged calendar-only dates. It runs through the same host build queue and output manager.
