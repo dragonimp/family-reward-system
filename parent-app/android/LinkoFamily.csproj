@@ -23,4 +23,6 @@
     <PackageReference Include="Microsoft.Maui.Controls" Version="$(MauiVersion)" />
     <PackageReference Include="QRCoder" Version="1.7.0" />
   </ItemGroup>
+  <PropertyGroup><AtlasSdkRoot Condition="'$(AtlasSdkRoot)' == ''">$(MSBuildThisFileDirectory)../../../Atlas</AtlasSdkRoot></PropertyGroup>
+  <ItemGroup><ProjectReference Include="$(AtlasSdkRoot)/sdk/Atlas.Releases.Maui/Atlas.Releases.Maui.csproj" /></ItemGroup>
 </Project>
