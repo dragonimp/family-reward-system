@@ -36,7 +36,9 @@ with tempfile.TemporaryDirectory(prefix="happylife-parent-ipa-") as directory:
     assert any("linkofamily" in item.get("CFBundleURLSchemes", []) for item in info.get("CFBundleURLTypes", []))
     frameworks = subprocess.run(["xcrun", "otool", "-L", str(app / info["CFBundleExecutable"])], capture_output=True, text=True, check=True).stdout
     assert "SwiftUI.framework" in frameworks and "AuthenticationServices.framework" in frameworks
-    assert "WebKit.framework" not in frameworks
+    # Native WKWebView is required for in-app links; the app shell remains SwiftUI.
+    bundled_names = [p.name.lower() for p in app.rglob("*") if p.is_file()]
+    assert not any(name.endswith(".dll") or name.startswith(("libmonosgen", "libxamarin")) for name in bundled_names)
     assert fields["Identifier"] == expected
     assert fields["TeamIdentifier"] == "JQPH54K7SD"
     entitlements = plistlib.loads(subprocess.run(
