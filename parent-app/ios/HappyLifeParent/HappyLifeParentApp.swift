@@ -1,3 +1,4 @@
+import AtlasReleases
 import SwiftUI
 import CoreImage.CIFilterBuiltins
 import AgentIdentity
@@ -1184,46 +1185,7 @@ struct FamilyConnectionDetail: View {
 }
 
 private struct MomentVersionView: View {
-    private struct StoreResponse: Decodable {
-        struct App: Decodable { let bundleId: String; let version: String; let trackViewUrl: URL }
-        let results: [App]
-    }
-    @State private var app: StoreResponse.App?
-    @State private var checked = false
-    @State private var failure = false
-    private var version: String { Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "未知" }
-    private var build: String { Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "未知" }
     var body: some View {
-        List {
-            Section("当前版本") { Label("\(version) (\(build))", systemImage: "iphone") }
-            Section("App Store") {
-                if let app {
-                    Label("最新版本：\(app.version)", systemImage: "arrow.up.circle")
-                    if app.version.compare(version, options: .numeric) == .orderedDescending {
-                        Link("发现新版本，前往升级", destination: app.trackViewUrl)
-                    } else { Text("当前已是 App Store 最新版本").foregroundStyle(.secondary) }
-                } else if failure {
-                    Text("暂时无法检查更新").foregroundStyle(.secondary)
-                    Button("重新检查", systemImage: "arrow.clockwise") { Task { await check() } }
-                } else if checked { Text("App Store 暂无可用版本").foregroundStyle(.secondary) }
-                else { ProgressView("正在检查新版本") }
-            }
-        }
-        .navigationTitle("版本升级")
-        .task { await check() }
-    }
-    private func check() async {
-        guard let bundle = Bundle.main.bundleIdentifier,
-              let encoded = bundle.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed),
-              let url = URL(string: "https://itunes.apple.com/lookup?bundleId=\(encoded)&country=cn") else {
-            failure = true; return
-        }
-        checked = false; failure = false
-        do {
-            let (data, response) = try await URLSession.shared.data(from: url)
-            guard (response as? HTTPURLResponse)?.statusCode == 200 else { failure = true; return }
-            app = try JSONDecoder().decode(StoreResponse.self, from: data).results.first(where: { $0.bundleId == bundle })
-            checked = true
-        } catch { failure = true }
+        AppleApplicationUpdateView(testFlight: URL(string: "https://testflight.apple.com/join/dAHHKXM7"))
     }
 }
