@@ -92,7 +92,7 @@ public sealed class AtlasInformationPage : ContentPage
                 && url.UserInfo.Length == 0)
             {
                 var button = new Button { Text = label };
-                button.Clicked += async (_, _) => await Browser.Default.OpenAsync(url);
+                button.Clicked += async (_, _) => await AgentIdentity.Maui.InAppWebLinks.OpenAsync(url);
                 body.Add(button);
             }
             else body.Add(new Label { Text = label + "未配置", TextColor = Colors.DimGray });

@@ -290,12 +290,12 @@ public sealed class FamilyPage : ContentPage
             new AgentIdentity.Maui.UserCenterAccountRow {
                 Username = store.AccountProfile?.Username ?? store.Profile?.Text("username") ?? "",
                 DisplayName = store.AccountProfile?.DisplayName, IconEmoji = store.AccountProfile?.IconEmoji,
-                ProfileCommand = new Command(async () => await Browser.Default.OpenAsync(new Uri("https://auth.ai.xmkurt.com/personal/info"), BrowserLaunchMode.SystemPreferred)),
+                ProfileCommand = new Command(async () => await AgentIdentity.Maui.InAppWebLinks.OpenAsync(new Uri("https://auth.ai.xmkurt.com/personal/info"), BrowserLaunchMode.SystemPreferred)),
                 LogoutCommand = new Command(async () => await Logout()) },
             MomentStyle.Row("套餐权益", action: () => _ = Navigation.PushAsync(new SubscriptionBenefitsPage(store))),
             MomentStyle.Row("语言设置", action: () => _ = Navigation.PushAsync(new AgentIdentity.Maui.LanguageSettingsPage(new Uri("https://auth.ai.xmkurt.com"), "happylife.ai", store.GetIdentityTokenAsync))),
             MomentStyle.Row("消息中心", action: () => _ = Navigation.PushAsync(new MomentInboxPage(store))),
-            MomentStyle.Row("修改密码", action: () => _ = Browser.Default.OpenAsync(new Uri("https://auth.ai.xmkurt.com/personal/info?section=password"), BrowserLaunchMode.SystemPreferred)));
+            MomentStyle.Row("修改密码", action: () => _ = AgentIdentity.Maui.InAppWebLinks.OpenAsync(new Uri("https://auth.ai.xmkurt.com/personal/info?section=password"), BrowserLaunchMode.SystemPreferred)));
         if (store.AccountProfileError is { } profileError) content.Add(new Label { Text = profileError, FontSize = 12 });
         Section("应用与设置", MomentStyle.Row("家庭与成员", action: () => SelectTab("成长")), MomentStyle.Row("刷新资料", action: () => _ = Run(store.LoadAsync)));
         Section("帮助与隐私",
@@ -321,7 +321,7 @@ public sealed class FamilyPage : ContentPage
     private async Task DeleteAccount()
     {
         if (!await DisplayAlertAsync("前往用户中心注销账号？", "账号注销会影响同一用户中心账号使用的其他应用。用户中心还会要求进一步确认。", "继续注销", "取消")) return;
-        await Browser.Default.OpenAsync(new Uri("https://auth.ai.xmkurt.com/personal/info?deleteAccount=1"), BrowserLaunchMode.SystemPreferred);
+        await AgentIdentity.Maui.InAppWebLinks.OpenAsync(new Uri("https://auth.ai.xmkurt.com/personal/info?deleteAccount=1"), BrowserLaunchMode.SystemPreferred);
     }
 
     private async Task FamilyMenuAsync()
