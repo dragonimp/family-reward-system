@@ -216,8 +216,9 @@ public sealed class FamilyPage : ContentPage
         content.Add(Button("🔑 修改密码", () => _ = Browser.Default.OpenAsync(new Uri("https://auth.ai.xmkurt.com/personal/info?section=password"), BrowserLaunchMode.SystemPreferred)));
         content.Add(Button("🚫 账号注销", () => _ = DeleteAccount()));
         content.Add(Button("✦ 套餐权益", () => _ = Navigation.PushAsync(new SubscriptionBenefitsPage(store))));
-        content.Add(Button("🌐 语言偏好", () => _ = Browser.Default.OpenAsync(new Uri("https://auth.ai.xmkurt.com/auth/#/personal/language"), BrowserLaunchMode.SystemPreferred)));
+        content.Add(Button("🌐 语言设置", () => _ = Navigation.PushAsync(new AgentIdentity.Maui.LanguageSettingsPage(new Uri("https://auth.ai.xmkurt.com"), "happylife.ai", store.GetIdentityTokenAsync))));
         content.Add(Button("↻ 刷新", () => _ = Run(store.LoadAsync)));
+        content.Add(Button("消息中心", () => _ = Navigation.PushAsync(new AgentIdentity.Maui.MessageCenterPage(new Uri("https://auth.ai.xmkurt.com"), "happylife.ai", store.GetIdentityTokenAsync))));
         content.Add(Heading("应用与设置", 17));
         content.Add(Button("♙ 家庭与成员", () => { tab = "家庭"; Render(); }));
         content.Add(Heading("帮助与隐私", 17));
