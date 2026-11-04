@@ -25,4 +25,5 @@
   </ItemGroup>
   <PropertyGroup><AtlasSdkRoot Condition="'$(AtlasSdkRoot)' == ''">$(MSBuildThisFileDirectory)../../../Atlas</AtlasSdkRoot></PropertyGroup>
   <ItemGroup><ProjectReference Include="$(AtlasSdkRoot)/sdk/Atlas.Releases.Maui/Atlas.Releases.Maui.csproj" /></ItemGroup>
+  <ItemGroup><ProjectReference Include="$([System.IO.Path]::GetDirectoryName('$(AgentIdentityNativeClientProject)'))/../AgentIdentity.Maui/AgentIdentity.Maui.csproj" /></ItemGroup>
 </Project>
