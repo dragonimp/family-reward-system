@@ -513,6 +513,9 @@ struct AccountView: View {
                     NavigationLink { RemoteRecords(store: store, title: "套餐权益", path: "/api/subscription", mode: .subscription) } label: {
                         Label("套餐权益", systemImage: "checkmark.seal")
                     }
+                    Button { store.notifications.open() } label: {
+                        Label(store.language.text("messages.title"), systemImage: "bell.badge")
+                    }
                     NavigationLink { AgentIdentityLanguageSettingsView(store: store.language) } label: {
                         Label(store.language.text("language.settings"), systemImage: "character.bubble")
                     }
@@ -520,9 +523,6 @@ struct AccountView: View {
                 Section("应用与设置") {
                     NavigationLink { FamilyChatView(store: store) } label: {
                         Label("AI 对话", systemImage: "bubble.left.and.bubble.right.fill")
-                    }
-                    Button { store.notifications.open() } label: {
-                        Label("消息通知与下载请求", systemImage: "bell.badge")
                     }
                     NavigationLink { GenealogyView(store: store) } label: { Label("家族族谱", systemImage: "person.3.sequence.fill") }
                     NavigationLink { MembersView(store: store) } label: { Label("家庭成员", systemImage: "person.3.fill") }
