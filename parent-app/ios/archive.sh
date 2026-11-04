@@ -13,7 +13,7 @@ fi
 : "${APPLE_SIGNING_IDENTITY:?Missing signing identity}"
 : "${APPLE_SIGNING_KEYCHAIN:?Missing signing keychain}"
 xcodebuild -project HappyLifeParent.xcodeproj -scheme HappyLifeParent \
-  -configuration Release -destination 'generic/platform=iOS' \
+  -configuration Release -destination 'generic/platform=iOS' -jobs 2 -parallel-testing-enabled NO \
   -archivePath "$build_root/Linko Family-signed.xcarchive" \
   -derivedDataPath "$build_root/DerivedData" CODE_SIGNING_ALLOWED=NO IPHONEOS_DEPLOYMENT_TARGET=17.0 archive
 app="$build_root/Linko Family-signed.xcarchive/Products/Applications/Linko Moment.app"
