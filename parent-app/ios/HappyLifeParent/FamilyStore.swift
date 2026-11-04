@@ -66,6 +66,8 @@ private actor PhotoPreviewLoader {
 
 @MainActor final class FamilyStore: NSObject, ObservableObject {
     let identity = AgentIdentitySession(origin: URL(string: "https://happylife.ai.impx.net")!, callback: URL(string: "linkofamily://login-complete/")!, keychainService: "net.impx.happylife.identity")
+    lazy var language = AgentIdentityLanguageStore(applicationKey: "happylife.ai", authority: URL(string: "https://auth.ai.xmkurt.com")!, accountIdentifier: identity.accountIdentifier,
+        accountIdentifierProvider: { [weak self] in self?.identity.accountIdentifier }, tokenProvider: { [weak self] in try await self?.identity.validAccessToken() })
     private let base = URL(string: "https://happylife.ai.impx.net")!
     private let session = URLSession(configuration: .ephemeral)
     let photoSource = DearPhotoSource()

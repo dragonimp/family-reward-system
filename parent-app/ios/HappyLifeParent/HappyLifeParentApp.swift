@@ -71,7 +71,7 @@ extension View {
     @UIApplicationDelegateAdaptor(PhotoPushDelegate.self) private var photoPushDelegate
     @StateObject private var store = FamilyStore()
     @Environment(\.scenePhase) private var scenePhase
-    var body: some Scene { WindowGroup { FamilyRoot(store: store, identity: store.identity, notifications: store.notifications).tint(.teal).onAppear {
+    var body: some Scene { WindowGroup { FamilyRoot(store: store, identity: store.identity, notifications: store.notifications).environmentObject(store.language).tint(.teal).onAppear {
         photoPushDelegate.connect(store: store)
     }.onOpenURL { url in
         if let link = MomentActivityLink(url: url) {
@@ -79,12 +79,13 @@ extension View {
             store.pendingActivityLink = link
         }
     }.onChange(of: scenePhase) { _, phase in
-        if phase == .active { store.resumePhotoSharing(); Task { await store.refreshIfStale() } }
+        if phase == .active { store.resumePhotoSharing(); Task { await store.language.refresh(); await store.refreshIfStale() } }
         else { store.suspendPhotoSharing() }
     } } }
 }
 
 struct FamilyRoot: View {
+    @EnvironmentObject private var language: AgentIdentityLanguageStore
     @ObservedObject var store: FamilyStore
     @ObservedObject var identity: AgentIdentitySession
     @ObservedObject var notifications: MomentNotifications
@@ -108,7 +109,14 @@ struct FamilyRoot: View {
                 }
             }
         }
+        .environment(\.locale, language.locale)
+        .onChange(of: identity.accountIdentifier) { _, account in
+            store.language.accountDidChange(account)
+            Task { await store.language.refresh() }
+        }
         .task(id: identity.isAuthenticated) {
+            store.language.accountDidChange(identity.isAuthenticated ? identity.accountIdentifier : nil)
+            await store.language.refresh()
             if identity.isAuthenticated { await store.load(); store.resumePhotoSharing() }
         }
         .sheet(isPresented: Binding(get: { identity.isAuthenticated && notifications.showingInbox }, set: { notifications.showingInbox = $0 })) {
@@ -515,6 +523,9 @@ struct AccountView: View {
                     NavigationLink { RemoteRecords(store: store, title: "套餐权益", path: "/api/subscription", mode: .subscription) } label: {
                         Label("套餐权益", systemImage: "checkmark.seal")
                     }
+                    NavigationLink { AgentIdentityLanguageSettingsView(store: store.language) } label: {
+                        Label(store.language.text("language.settings"), systemImage: "character.bubble")
+                    }
                 }
                 Section("应用与设置") {
                     NavigationLink { FamilyChatView(store: store) } label: {
@@ -555,16 +566,16 @@ struct AccountView: View {
                     }
                 }
                 Section("邀请与反馈") {
-                    NavigationLink {
-                        FeedbackWallView(identity: store.identity)
-                    } label: {
-                        Label("意见反馈", systemImage: "bubble.left.and.bubble.right")
-                    }
                     NavigationLink { MomentTeamMembersView() } label: {
                         Label("同行共创", systemImage: "person.3")
                     }
                     NavigationLink { MomentTestInvitationView() } label: {
                         Label("测试邀请", systemImage: "square.and.arrow.up")
+                    }
+                    NavigationLink {
+                        FeedbackWallView(identity: store.identity)
+                    } label: {
+                        Label("意见反馈", systemImage: "bubble.left.and.bubble.right")
                     }
                 }
                 Text("Linko Moment \(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "未知") (\(Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "未知"))")
