@@ -210,10 +210,10 @@ public sealed class FamilyPage : ContentPage
         content.Add(new AgentIdentity.Maui.UserCenterAccountRow {
             Username = store.AccountProfile?.Username ?? store.Profile?.Text("username") ?? "",
             DisplayName = store.AccountProfile?.DisplayName, IconEmoji = store.AccountProfile?.IconEmoji,
-            ProfileCommand = new Command(async () => await Browser.Default.OpenAsync(new Uri("https://auth.ai.xmkurt.com/personal/info"), BrowserLaunchMode.SystemPreferred)),
+            ProfileCommand = new Command(async () => await AgentIdentity.Maui.InAppWebLinks.OpenAsync(new Uri("https://auth.ai.xmkurt.com/personal/info"), BrowserLaunchMode.SystemPreferred)),
             LogoutCommand = new Command(async () => await Logout()) });
         if (store.AccountProfileError is { } profileError) content.Add(new Label { Text = profileError, FontSize = 12 });
-        content.Add(Button("🔑 修改密码", () => _ = Browser.Default.OpenAsync(new Uri("https://auth.ai.xmkurt.com/personal/info?section=password"), BrowserLaunchMode.SystemPreferred)));
+        content.Add(Button("🔑 修改密码", () => _ = AgentIdentity.Maui.InAppWebLinks.OpenAsync(new Uri("https://auth.ai.xmkurt.com/personal/info?section=password"), BrowserLaunchMode.SystemPreferred)));
         content.Add(Button("🚫 账号注销", () => _ = DeleteAccount()));
         content.Add(Button("✦ 套餐权益", () => _ = Navigation.PushAsync(new SubscriptionBenefitsPage(store))));
         content.Add(Button("🌐 语言设置", () => _ = Navigation.PushAsync(new AgentIdentity.Maui.LanguageSettingsPage(new Uri("https://auth.ai.xmkurt.com"), "happylife.ai", store.GetIdentityTokenAsync))));
@@ -243,7 +243,7 @@ public sealed class FamilyPage : ContentPage
     private async Task DeleteAccount()
     {
         if (!await DisplayAlertAsync("前往用户中心注销账号？", "账号注销会影响同一用户中心账号使用的其他应用。用户中心还会要求进一步确认。", "继续注销", "取消")) return;
-        await Browser.Default.OpenAsync(new Uri("https://auth.ai.xmkurt.com/personal/info?deleteAccount=1"), BrowserLaunchMode.SystemPreferred);
+        await AgentIdentity.Maui.InAppWebLinks.OpenAsync(new Uri("https://auth.ai.xmkurt.com/personal/info?deleteAccount=1"), BrowserLaunchMode.SystemPreferred);
     }
 
     private async Task CreateFamily()

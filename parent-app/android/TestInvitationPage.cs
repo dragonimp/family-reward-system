@@ -42,7 +42,7 @@ public sealed class TestInvitationPage : ContentPage
         invitationCard.Add(new Label { Text = "扫码打开邀请", FontAttributes = FontAttributes.Bold,
             HorizontalTextAlignment = TextAlignment.Center });
         var linkButton = new Button { Text = "打开邀请链接" };
-        linkButton.Clicked += async (_, _) => { if (invitation is not null) await Browser.Default.OpenAsync(invitation); };
+        linkButton.Clicked += async (_, _) => { if (invitation is not null) await AgentIdentity.Maui.InAppWebLinks.OpenAsync(invitation); };
         invitationCard.Add(link);
         invitationCard.Add(linkButton);
         var copy = new Button { Text = "复制链接" };

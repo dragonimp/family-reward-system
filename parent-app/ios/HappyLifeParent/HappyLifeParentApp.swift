@@ -71,7 +71,7 @@ extension View {
     @UIApplicationDelegateAdaptor(PhotoPushDelegate.self) private var photoPushDelegate
     @StateObject private var store = FamilyStore()
     @Environment(\.scenePhase) private var scenePhase
-    var body: some Scene { WindowGroup { FamilyRoot(store: store, identity: store.identity, notifications: store.notifications).environmentObject(store.language).tint(.teal).onAppear {
+    var body: some Scene { WindowGroup { FamilyRoot(store: store, identity: store.identity, notifications: store.notifications).agentIdentityInAppLinks().environmentObject(store.language).tint(.teal).onAppear {
         photoPushDelegate.connect(store: store)
     }.onOpenURL { url in
         if let link = MomentActivityLink(url: url) {
