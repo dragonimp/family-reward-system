@@ -20,7 +20,6 @@
     <MauiFont Include="Resources/Fonts/*" />
     <MauiAsset Include="../../frontend/public/legal/linko-family-privacy.html" LogicalName="linko-family-privacy.html" />
     <ProjectReference Include="$(AgentIdentityNativeClientProject)" />
-    <ProjectReference Include="$([System.IO.Path]::GetDirectoryName('$(AgentIdentityNativeClientProject)'))/../AgentIdentity.Maui/AgentIdentity.Maui.csproj" />
     <PackageReference Include="Microsoft.Maui.Controls" Version="$(MauiVersion)" />
     <PackageReference Include="QRCoder" Version="1.7.0" />
   </ItemGroup>
