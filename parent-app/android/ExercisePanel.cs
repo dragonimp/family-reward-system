@@ -38,6 +38,7 @@ public sealed class ExercisePanel : ContentView
     private readonly IDispatcherTimer timer;
     private readonly StepListener listener;
     private readonly SensorManager? sensors;
+    private Border? metrics;
     private bool readable = true;
     private bool starting;
     private double stepLengthCm = 70;
@@ -85,11 +86,7 @@ public sealed class ExercisePanel : ContentView
         catch (Exception error) { notice.Text = $"记录尚未保存：{error.Message}。请重试保存。"; }
         return false;
     }
-    private static Button Action(string text, Action action)
-    {
-        var button = new Button { Text = text, BackgroundColor = Color.FromArgb("#0F766E"), TextColor = Colors.White };
-        button.Clicked += (_, _) => action(); return button;
-    }
+    private static Button Action(string text, Action action) => MomentStyle.Action(text, action, true);
     private async Task Start(string kind)
     {
         if (!readable || starting || archive.Active?.RunningSince != null) return;
@@ -154,9 +151,11 @@ public sealed class ExercisePanel : ContentView
     private void Render()
     {
         body.Children.Clear();
-        body.Add(new Label { Text = "运动", FontSize = 27, FontAttributes = FontAttributes.Bold });
-        body.Add(new Label { Text = "带上手机，记录一场散步或轻运动。" });
-        body.Add(clock); body.Add(distance); body.Add(steps); body.Add(notice);
+        body.Add(MomentStyle.Title("运动", 32));
+        body.Add(MomentStyle.Caption("带上手机，记录一场散步或轻运动。"));
+        clock.TextColor = MomentStyle.Accent; distance.TextColor = MomentStyle.Ink;
+        metrics ??= MomentStyle.Card(new VerticalStackLayout { Spacing = 14, Padding = new Thickness(4, 18), Children = { clock, distance, steps, notice } });
+        body.Add(metrics);
         if (archive.Active is { } active)
         {
             body.Add(new Label { Text = $"{active.Kind} · {(active.RunningSince != null ? "运动中" : "已暂停")}" });

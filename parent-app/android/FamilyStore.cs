@@ -12,6 +12,7 @@ public sealed class FamilyStore
     private readonly NativeSessionHandler session;
     private readonly HttpClient api;
     private readonly HttpClient loginHttp = new() { BaseAddress = Origin, Timeout = TimeSpan.FromSeconds(30) };
+    private readonly HttpClient notificationHttp = new() { Timeout = TimeSpan.FromSeconds(30) };
     private CancellationTokenSource? loginCancellation;
     private int generation;
 
@@ -102,19 +103,19 @@ public sealed class FamilyStore
         Groups = []; Children = []; Rules = []; Requests = []; Transactions = [];
     }
 
-    public async Task<JsonElement> CallAsync(string path, HttpMethod? method = null, object? body = null)
+    public async Task<JsonElement> CallAsync(string path, HttpMethod? method = null, object? body = null, CancellationToken ct = default)
     {
         if (!path.StartsWith("/api/", StringComparison.Ordinal)) throw new InvalidOperationException("Invalid business path.");
         using var request = new HttpRequestMessage(method ?? HttpMethod.Get, path);
         request.Headers.Accept.ParseAdd("application/json");
         if (body is not null) request.Content = JsonContent.Create(body);
-        using var response = await api.SendAsync(request);
+        using var response = await api.SendAsync(request, ct);
         if (response.StatusCode == HttpStatusCode.Unauthorized)
         {
             Logout();
             throw new FamilyApiException("登录已过期，请重新登录。");
         }
-        var content = await response.Content.ReadAsStringAsync();
+        var content = await response.Content.ReadAsStringAsync(ct);
         JsonElement data;
         try { data = JsonDocument.Parse(string.IsNullOrWhiteSpace(content) ? "{}" : content).RootElement.Clone(); }
         catch (JsonException) { throw new FamilyApiException($"服务返回的数据格式不正确（{(int)response.StatusCode}）。"); }
@@ -125,6 +126,31 @@ public sealed class FamilyStore
             throw new FamilyApiException(string.IsNullOrEmpty(message) ? $"请求失败（{(int)response.StatusCode}）。" : message);
         }
         return data;
+    }
+
+    public async Task<NotificationClient> NotificationsAsync(CancellationToken ct = default)
+    {
+        var config = await loginHttp.GetFromJsonAsync<JsonElement>("auth/native/configuration", ct);
+        var values = new FamilyRecord(config);
+        if (!Uri.TryCreate(values.Text("authority"), UriKind.Absolute, out var authority) || authority.Scheme != "https" || authority.UserInfo.Length != 0 || authority.AbsolutePath != "/" || authority.Query.Length != 0 || authority.Fragment.Length != 0 || string.IsNullOrWhiteSpace(values.Text("clientId")))
+            throw new FamilyApiException("用户中心消息配置暂不可用。");
+        return new NotificationClient(notificationHttp, authority, values.Text("clientId"), GetIdentityTokenAsync);
+    }
+
+    public async Task<byte[]> ThumbnailAsync(string path, CancellationToken ct)
+    {
+        if (!path.StartsWith("/api/dear/social/tenants/", StringComparison.Ordinal) || !path.EndsWith("/thumbnail", StringComparison.Ordinal)) throw new FamilyApiException("照片预览地址无效。");
+        using var response = await api.GetAsync(path, HttpCompletionOption.ResponseHeadersRead, ct);
+        if (!response.IsSuccessStatusCode) throw new FamilyApiException("照片预览暂不可用。");
+        await using var input = await response.Content.ReadAsStreamAsync(ct);
+        using var output = new MemoryStream();
+        var buffer = new byte[16384]; int count;
+        while ((count = await input.ReadAsync(buffer, ct)) > 0)
+        {
+            if (output.Length + count > 512 * 1024) throw new FamilyApiException("预览文件过大。");
+            output.Write(buffer, 0, count);
+        }
+        return output.ToArray();
     }
 
     public async Task LoadAsync()
@@ -186,8 +212,6 @@ public sealed class FamilyStore
         LedgerPage = page;
     }
 }
-
-public sealed class FamilyApiException(string message) : Exception(message);
 
 public readonly record struct FamilyRecord(JsonElement Data)
 {
