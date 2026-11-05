@@ -1,0 +1,99 @@
+{
+  "appCode": "linko-family-ios",
+  "version": "1.3.2",
+  "build": "202",
+  "sourceCommit": "3eea4f39c6620223ee94ddd9c8cb1521abc7adbf",
+  "githubBranch": "origin/main",
+  "artifactsVerifiedByDownload": [
+    {
+      "file": "Linko Moment.ipa",
+      "sha256": "e9879e27c7c48e2bc1e2da957746aca26e51d4ed2ba6c97eec8395fa5c5c71f3",
+      "bytes": 9878240,
+      "url": "https://home.ai.impx.net/api/marketplace/artifacts/e79872cf-01de-5209-a591-32465da15155/e9879e27c7c48e2bc1e2da957746aca26e51d4ed2ba6c97eec8395fa5c5c71f3"
+    },
+    {
+      "file": "Linko-Moment-symbols.zip",
+      "sha256": "8250a6f759df0e5685cf0de13c85be44eb385013f033afea6581bd5a48ea4661",
+      "bytes": 8382695,
+      "url": "https://home.ai.impx.net/api/marketplace/artifacts/e79872cf-01de-5209-a591-32465da15155/8250a6f759df0e5685cf0de13c85be44eb385013f033afea6581bd5a48ea4661"
+    },
+    {
+      "file": "release-identity.json",
+      "sha256": "9e1bfd5b842cfb333f3e97c629d7394841dad8a525664062417117e832cae1ca",
+      "bytes": 258,
+      "url": "https://home.ai.impx.net/api/marketplace/artifacts/e79872cf-01de-5209-a591-32465da15155/9e1bfd5b842cfb333f3e97c629d7394841dad8a525664062417117e832cae1ca"
+    },
+    {
+      "file": "sdk-dependencies.json",
+      "sha256": "7750219d43d78a16d51628ff43b5fc76d70ad3bfa2b7c24ed24bb223aab0b69a",
+      "bytes": 340,
+      "url": "https://home.ai.impx.net/api/marketplace/artifacts/e79872cf-01de-5209-a591-32465da15155/7750219d43d78a16d51628ff43b5fc76d70ad3bfa2b7c24ed24bb223aab0b69a"
+    },
+    {
+      "file": "source-commit.txt",
+      "sha256": "2c37b1384cd2fd357b4245dce117ee0ae11ecfe97f6b9df657253c20812f1d25",
+      "bytes": 41,
+      "url": "https://home.ai.impx.net/api/marketplace/artifacts/e79872cf-01de-5209-a591-32465da15155/2c37b1384cd2fd357b4245dce117ee0ae11ecfe97f6b9df657253c20812f1d25"
+    },
+    {
+      "file": "dining-validation.txt",
+      "sha256": "404b7ff0176fbc8bad24b9dace7ca09f14f18971251bc834e73f13e41e8d1fe5",
+      "bytes": 93,
+      "url": "https://home.ai.impx.net/api/marketplace/artifacts/e79872cf-01de-5209-a591-32465da15155/404b7ff0176fbc8bad24b9dace7ca09f14f18971251bc834e73f13e41e8d1fe5"
+    }
+  ],
+  "checks": [
+    "Swift dining models including GUID accounts, persistence and failed-write retention",
+    "authenticated dining HTTP contract, provider validation and failure paths",
+    "live Apple Maps search: 25 restaurants within public Shanghai test area",
+    "Android Debug build: zero warnings and errors",
+    "signed iOS/Watch/share archive and independent IPA validation",
+    "frontend ESLint",
+    "Integrated family API build: zero errors, two pre-existing shared SDK platform warnings"
+  ],
+  "androidProvider": {
+    "configured": false,
+    "requiredSetting": "Dining__AmapWebServiceKey",
+    "liveAmapAcceptance": "pending"
+  },
+  "deviceLocationAndNavigationAcceptance": "pending",
+  "appleStatus": "testflight_visible",
+  "invitationSync": {
+    "status": "blocked",
+    "adminApiStatus": 401,
+    "browserHost": "unavailable",
+    "existingLinkPreserved": true
+  },
+  "appleAttemptId": "a1b2e143-3c5c-4ee4-a291-fea55c3ec579",
+  "appleBuildId": "12d212b3-2f48-42d5-a1c7-d1ef6f05b28e",
+  "appleState": "VALID",
+  "materialOperationId": "477a530e-8c7e-44b9-83de-fab55d4d2832",
+  "materials": {
+    "ready": true,
+    "buildState": "VALID",
+    "extractedIcons": 4,
+    "localizations": [
+      "en-US",
+      "zh-Hans"
+    ],
+    "diningTestNotesVerified": true,
+    "revision": "f1e8756c1caa46ee8c33739df488c2e8c7aaf21d7d2f104a0c0121a3bde41626",
+    "operationId": "477a530e-8c7e-44b9-83de-fab55d4d2832"
+  },
+  "androidApiLiveStatus": 404,
+  "backendPublication": "pending provider configuration and real Amap acceptance",
+  "privacyWebsitePublication": "source updated; production web deployment pending",
+  "cleanup": {
+    "obsoleteUnpublishedCandidateRemovedBytes": 19087144,
+    "finalCompilerWorkspaceRemoved": true,
+    "kept": "final 1.3.2 IPA, symbols, managed build diagnostics and formal release receipt",
+    "remoteArtifactsVerified": true
+  },
+  "pendingActions": [
+    "Provide a controlled Amap Web Service Key location; do not send the raw key in chat",
+    "Publish and configure the Android dining API through Atlas, then verify real Amap search and navigation",
+    "Verify location permission and navigation on an actual phone",
+    "Synchronize matching invitation-page version through an authenticated Atlas administration entry"
+  ],
+  "verifiedAt": "2026-11-05T19:19:04.587228+00:00"
+}
