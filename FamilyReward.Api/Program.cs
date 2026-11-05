@@ -87,7 +87,7 @@ builder.Services.AddSingleton(new WatchPairingSessions());
 builder.Services.AddRateLimiter(options =>
 {
     options.RejectionStatusCode = 429;
-    foreach (var (name, limit) in new[] { ("pair-start", 6), ("pair-poll", 60), ("pair-approve", 10) })
+    foreach (var (name, limit) in new[] { ("pair-start", 6), ("pair-poll", 60), ("pair-approve", 10), ("dining-search", 12) })
         options.AddPolicy(name, context => RateLimitPartition.GetFixedWindowLimiter(
             context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
             _ => new FixedWindowRateLimiterOptions { PermitLimit = limit, Window = TimeSpan.FromMinutes(1), QueueLimit = 0 }));
@@ -103,6 +103,10 @@ builder.Services.AddCors(options =>
         policy.AllowAnyOrigin().AllowAnyHeader().AllowAnyMethod());
 });
 builder.Services.AddHttpClient();
+builder.Services.AddHttpClient("dining-amap", client => client.Timeout = TimeSpan.FromSeconds(12))
+    .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler { AllowAutoRedirect = false });
+// Provider URLs include a credential; suppress request URI logging for this named client.
+builder.Logging.AddFilter("System.Net.Http.HttpClient.dining-amap", LogLevel.None);
 builder.Services.AddSingleton<SocialServiceTokens>();
 builder.Services.AddHttpClient("dear-social-sso", client => client.Timeout = TimeSpan.FromSeconds(15));
 builder.Services.AddHttpClient("dear-social-api", client => client.Timeout = TimeSpan.FromMinutes(30))
@@ -145,6 +149,7 @@ app.MapAgentIdentityNativeLogin(new Uri("https://happylife.ai.impx.net"), new Ur
     additionalPublicOrigins: [new Uri("https://happylife.ai.xmkurt.com")]);
 app.MapLinkoSocialGateway();
 app.MapPublicActivityIntroduction();
+app.MapDiningEndpoints();
 app.MapAtlasReleaseVersion();
 if (!string.IsNullOrWhiteSpace(releaseControlApplicationId))
     app.MapAtlasReleaseDrain(ReleaseDrainExtensions.UpgradeControlPolicy);

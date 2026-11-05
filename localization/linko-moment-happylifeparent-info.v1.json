@@ -13,8 +13,8 @@
     },
     "moment.nslocationwheninuseusagedescription": {
       "iosKey": "NSLocationWhenInUseUsageDescription",
-      "zh-Hans": "在活动中主动打卡时获取当前位置、地址和海拔，并保存到该活动。",
-      "en": "Linko Moment uses your location to record exercise routes and activity check-ins when you choose to use these features."
+      "zh-Hans": "在您使用干饭推荐时搜索附近餐厅，或在活动中主动打卡时获取当前位置、地址和海拔。",
+      "en": "Use your location to find nearby restaurants when you request a meal recommendation, or to record a location, address and altitude when you check in to an activity."
     }
   }
 }

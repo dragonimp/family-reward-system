@@ -10,13 +10,15 @@ public sealed class FamilyPage : ContentPage
     private readonly ActivityIndicator spinner = new() { IsVisible = false, Color = Color.FromArgb("#0F766E") };
     private CancellationTokenSource? loginCancellation;
     private bool busy;
-    private string tab = "成长";
+    private string tab = "干饭";
     private readonly ContentView viewport = new();
-    private readonly Grid bottom = new() { ColumnDefinitions = new ColumnDefinitionCollection { new(GridLength.Star), new(GridLength.Star), new(GridLength.Star), new(GridLength.Star) }, Padding = new Thickness(6, 8, 6, 12), BackgroundColor = Colors.White };
+    private readonly Grid bottom = new() { ColumnDefinitions = new ColumnDefinitionCollection { new(GridLength.Star), new(GridLength.Star), new(GridLength.Star), new(GridLength.Star), new(GridLength.Star) }, Padding = new Thickness(6, 8, 6, 12), BackgroundColor = Colors.White };
     private readonly ScrollView scroll;
     private MomentActivityPanel? activities;
     private int? childId;
     private string? note;
+    private DiningPanel? dining;
+    private string? diningUser;
     private ExercisePanel? exercise;
     private string? exerciseUser;
 
@@ -46,10 +48,11 @@ public sealed class FamilyPage : ContentPage
         await Run(store.RestoreAsync);
     }
 
-    private void WindowStopped(object? sender, EventArgs e) { exercise?.Suspend(); activities?.Deactivate(); }
+    private void WindowStopped(object? sender, EventArgs e) { exercise?.Suspend(); dining?.Suspend(); activities?.Deactivate(); }
 
     private void SelectTab(string name)
     {
+        if (name != "干饭") dining?.Suspend();
         if (name != "运动") exercise?.Suspend();
         if (name != "活动") activities?.Deactivate();
         tab = name; childId = null; Render();
@@ -60,7 +63,7 @@ public sealed class FamilyPage : ContentPage
         bottom.Children.Clear();
         var selected = tab is "审批" or "记录" or "规则" or "管理" ? "成长" : tab;
         var column = 0;
-        foreach (var name in new[] { "成长", "活动", "运动", "我的" })
+        foreach (var name in new[] { "干饭", "成长", "活动", "运动", "我的" })
         {
             var active = selected == name;
             var view = new VerticalStackLayout { Spacing = 3, Padding = new Thickness(4, 3), MinimumHeightRequest = 52 };
@@ -99,13 +102,17 @@ public sealed class FamilyPage : ContentPage
     {
         content.Children.Clear();
         viewport.Content = scroll;
-        bottom.IsVisible = store.Authenticated && store.ParentReady;
+        bottom.IsVisible = store.Authenticated;
         if (bottom.IsVisible) RenderNavigation();
-        if (!store.Authenticated) { activities?.Reset(); activities = null; exercise?.Suspend(); exercise = null; exerciseUser = null; LoginContent(); return; }
-        if (!store.ParentReady) { ParentProfileUnavailableContent(); return; }
+        if (!store.Authenticated) { dining?.Suspend(); dining = null; diningUser = null; activities?.Reset(); activities = null; exercise?.Suspend(); exercise = null; exerciseUser = null; LoginContent(); return; }
+        if (!store.ParentReady && tab is not ("干饭" or "活动" or "运动" or "我的")) { ParentProfileUnavailableContent(); return; }
         if (childId is int id) { ChildContent(id); return; }
         switch (tab)
         {
+            case "干饭":
+                var diningId = store.AccountProfile?.Subject ?? store.Profile?.Text("unifiedUserId") ?? "";
+                if (dining == null || diningUser != diningId) { dining?.Suspend(); dining = new DiningPanel(store, this, diningId); diningUser = diningId; }
+                viewport.Content = dining; break;
             case "活动":
                 activities ??= new MomentActivityPanel(store, this, Render);
                 viewport.Content = activities;
@@ -355,7 +362,7 @@ public sealed class FamilyPage : ContentPage
     private async Task Logout()
     {
         if (!await DisplayAlertAsync("退出登录", "清除本机登录凭据？", "退出", "取消")) return;
-        store.Logout(); activities?.Reset(); activities = null; childId = null; tab = "成长"; Render();
+        store.Logout(); activities?.Reset(); activities = null; childId = null; tab = "干饭"; Render();
     }
 
     private async Task DeleteAccount()

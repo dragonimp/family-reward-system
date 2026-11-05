@@ -1,0 +1,7 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+  <PropertyGroup><TargetFramework>net10.0</TargetFramework><Nullable>enable</Nullable><ImplicitUsings>enable</ImplicitUsings></PropertyGroup>
+  <ItemGroup>
+    <Compile Include="../../FamilyReward.Api/DiningEndpoints.cs" Link="DiningEndpoints.cs" />
+    <Compile Include="../../parent-app/android/DiningModels.cs" Link="DiningModels.cs" />
+  </ItemGroup>
+</Project>
