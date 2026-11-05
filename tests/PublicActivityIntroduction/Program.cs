@@ -25,7 +25,7 @@ try
         Check(html.Contains("apple-itunes-app") && html.Contains("app-id=6828813434") && html.Contains("linkomoment://activity"), "system banner targets successor app");
         Check(html.Contains("https://home.ai.impx.net/invite/TvXoL3UTV60fnciLC1bjISYx") && !html.Contains("Linko MomentX") && !html.Contains("linkomomentx://"), "managed installation invitation without legacy prompt");
         Check(html.IndexOf("id=\"open-app\"", StringComparison.Ordinal) < html.IndexOf("class=\"install\"", StringComparison.Ordinal) && html.IndexOf("class=\"install\"", StringComparison.Ordinal) < html.IndexOf("class=\"secondary\"", StringComparison.Ordinal), "ordered app, installation and browser actions");
-        Check(html.Contains("og:image") && html.Contains("moment-app-icon.png") && html.Contains("class=\"cover\""), "public share logo, crawler image and activity cover");
+        Check(html.Contains("og:image") && html.Contains("/api/dear/public/brand/icon.png") && html.Contains("class=\"cover\""), "public share logo, crawler image and activity cover");
         Check(html.Contains("尚未安装 App") && html.Contains("https://apps.apple.com/app/id6828813434") && html.Contains("中国大陆区暂不可用"), "official store and explicit installation and region guidance");
         Check(html.Contains("id=\"wechat-guide\"") && html.Contains("微信右上角") && html.Contains("MicroMessenger") && html.Contains("event.preventDefault()"), "WeChat offers system browser guidance before app and install navigation");
         Check(html.Contains("datetime=\"2026-11-01T01:00:00.0000000+00:00\"") && html.Contains("toLocaleString"), "dates converted by browser timezone");

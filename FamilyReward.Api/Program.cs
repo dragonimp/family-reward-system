@@ -145,6 +145,7 @@ app.MapAgentIdentityNativeLogin(new Uri("https://happylife.ai.impx.net"), new Ur
     additionalPublicOrigins: [new Uri("https://happylife.ai.xmkurt.com")]);
 app.MapLinkoSocialGateway();
 app.MapPublicActivityIntroduction();
+app.MapExerciseEndpoints();
 app.MapAtlasReleaseVersion();
 if (!string.IsNullOrWhiteSpace(releaseControlApplicationId))
     app.MapAtlasReleaseDrain(ReleaseDrainExtensions.UpgradeControlPolicy);
