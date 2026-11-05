@@ -7,15 +7,14 @@ root="$(git rev-parse --show-toplevel)"
 checks="$ATLAS_BUILD_WORK/dining-checks"
 mkdir -p "$checks/source"
 git -C "$root" archive HEAD | tar -x -C "$checks/source"
-for repository in AgentIdentity MyVnc Atlas; do
-  ln -s "/Users/wengzhishan/Projects/$repository" "$checks/$repository"
-done
 export DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer
 cd "$checks/source"
 dotnet run --project tests/Dining/Dining.csproj --artifacts-path "$checks/server-tests" > "$ATLAS_BUILD_LOGS/dining-tests.log" 2>&1 || { tail -40 "$ATLAS_BUILD_LOGS/dining-tests.log"; exit 1; }
 cat "$ATLAS_BUILD_LOGS/dining-tests.log"
 dotnet build parent-app/android/LinkoFamily.csproj -f net10.0-android -c Debug \
   --artifacts-path "$checks/android" \
+  -p:AgentIdentityNativeClientProject=/Users/wengzhishan/Projects/AgentIdentity/src/AgentIdentity.NativeClient/AgentIdentity.NativeClient.csproj \
+  -p:AtlasSdkRoot=/Users/wengzhishan/Projects/Atlas \
   -p:AndroidSdkDirectory=/opt/homebrew/share/android-commandlinetools \
   -p:JavaSdkDirectory=/opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home \
   -m:2 -v:minimal > "$ATLAS_BUILD_LOGS/android.log" 2>&1 || { tail -45 "$ATLAS_BUILD_LOGS/android.log"; exit 1; }
