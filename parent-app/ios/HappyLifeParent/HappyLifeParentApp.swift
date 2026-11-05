@@ -168,7 +168,7 @@ struct FamilyRoot: View {
     private var main: some View {
         TabView(selection: $selectedTab) {
             DiningView(userID: identity.accountIdentifier ?? "").id(identity.accountIdentifier ?? "").tabItem { Label(String(localized: "干饭", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), systemImage: "fork.knife") }.tag(0)
-            Group { if store.ready { FamilyHome(store: store) } else { growthUnavailable } }.tabItem { Label("成长", systemImage: "person.3.fill") }
+            Group { if store.ready { FamilyHome(store: store) } else { growthUnavailable } }.tabItem { Label(String(localized: "成长", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), systemImage: "person.3.fill") }
                 .badge(store.requests.filter { $0.text("status") == "pending" }.count).tag(1)
             DearSocialView(store: store).tabItem { Label(String(localized: "活动", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), systemImage: "photo.on.rectangle.angled") }.tag(2)
             Group { if store.ready { ExerciseView(userID: store.profile?.text("unifiedUserId") ?? "").id(store.profile?.text("unifiedUserId") ?? "") } else { growthUnavailable } }.tabItem { Label(String(localized: "运动", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), systemImage: "figure.walk") }.tag(3)
@@ -578,7 +578,7 @@ struct AccountView: View {
                 }
                 Section(String(localized: "应用与设置", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) {
                     NavigationLink { FamilyChatView(store: store) } label: {
-                        Label("AI 对话", systemImage: "bubble.left.and.bubble.right.fill")
+                        Label(String(localized: "AI 对话", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), systemImage: "bubble.left.and.bubble.right.fill")
                     }
                     NavigationLink { GenealogyView(store: store) } label: { Label(String(localized: "家族族谱", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), systemImage: "person.3.sequence.fill") }
                     NavigationLink { MembersView(store: store) } label: { Label(String(localized: "家庭成员", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), systemImage: "person.3.fill") }
@@ -621,7 +621,7 @@ struct AccountView: View {
                     NavigationLink {
                         FeedbackWallView(identity: store.identity)
                     } label: {
-                        Label("意见反馈", systemImage: "bubble.left.and.bubble.right")
+                        Label(String(localized: "意见反馈", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), systemImage: "bubble.left.and.bubble.right")
                     }
                 }
                 Text(String(localized: "Linko Moment \(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? String(localized: "未知", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) (\(Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? String(localized: "未知", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))))", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)))

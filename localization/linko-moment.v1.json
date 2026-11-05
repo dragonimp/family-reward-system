@@ -5195,6 +5195,11 @@
       "zh-Hans": "%.2f 公里",
       "en": "%.2f km",
       "iosKey": "%.2f 公里"
+    },
+    "moment.exercise.growth-label": {
+      "iosKey": "成长",
+      "zh-Hans": "成长",
+      "en": "Growth"
     }
   }
 }
