@@ -1,0 +1,74 @@
+{
+  "appCode": "linko-family-ios",
+  "version": "1.2.101",
+  "build": "110",
+  "sourceCommit": "5201628bfe4832ea07f26135c85c7d5fc060ae98",
+  "remoteBranch": "origin/main",
+  "githubVerified": true,
+  "checks": [
+    "native model and activity-date checks",
+    "exercise persistence checks",
+    "iOS archive and independent signature/profile/icon verification",
+    "Android build: zero warnings and errors",
+    "frontend ESLint",
+    "localization catalog parity and no new raw strings; inherited full-check findings remain"
+  ],
+  "artifactsVerifiedByDownload": [
+    {
+      "file": "Linko Moment.ipa",
+      "sha256": "2ffa2515f9ad629eb1421e9d98144b09a8bd48b53c217a0ff5bfc4a7e4585679",
+      "bytes": 9568776,
+      "url": "https://home.ai.impx.net/api/marketplace/artifacts/e79872cf-01de-5209-a591-32465da15155/2ffa2515f9ad629eb1421e9d98144b09a8bd48b53c217a0ff5bfc4a7e4585679"
+    },
+    {
+      "file": "Linko-Moment-symbols.zip",
+      "sha256": "315a0ee79cdf0fe15b8191fd56488dc470a4f656b277399ec21b9ef49194087d",
+      "bytes": 8066648,
+      "url": "https://home.ai.impx.net/api/marketplace/artifacts/e79872cf-01de-5209-a591-32465da15155/315a0ee79cdf0fe15b8191fd56488dc470a4f656b277399ec21b9ef49194087d"
+    },
+    {
+      "file": "release-identity.json",
+      "sha256": "7db2a720a5f143e4ad7ba2896f2d88872e25e0f8917f262a9859c7c6727ec48a",
+      "bytes": 260,
+      "url": "https://home.ai.impx.net/api/marketplace/artifacts/e79872cf-01de-5209-a591-32465da15155/7db2a720a5f143e4ad7ba2896f2d88872e25e0f8917f262a9859c7c6727ec48a"
+    },
+    {
+      "file": "sdk-dependencies.json",
+      "sha256": "c68dee7cbffd85e37f85d503b2e1e6cbfb6ba38f604db394e954528e110e8aa7",
+      "bytes": 340,
+      "url": "https://home.ai.impx.net/api/marketplace/artifacts/e79872cf-01de-5209-a591-32465da15155/c68dee7cbffd85e37f85d503b2e1e6cbfb6ba38f604db394e954528e110e8aa7"
+    },
+    {
+      "file": "source-commit.txt",
+      "sha256": "14edee17bfead16fe204fee3c7627afe3f25c3f9247f607bb2f6642651c480e6",
+      "bytes": 41,
+      "url": "https://home.ai.impx.net/api/marketplace/artifacts/e79872cf-01de-5209-a591-32465da15155/14edee17bfead16fe204fee3c7627afe3f25c3f9247f607bb2f6642651c480e6"
+    }
+  ],
+  "appleAttemptId": "a63b73eb-30b3-438a-8171-00251cbb4964",
+  "appleStatus": "apple_processing",
+  "deviceInteractionAcceptance": "not performed",
+  "invitationSync": {
+    "status": "blocked",
+    "apiStatus": 401,
+    "browser": "host unavailable",
+    "existingInvitationPreserved": true
+  },
+  "cleanup": {
+    "reclaimedCompilerWorkBytes": 677679104,
+    "removedDuplicateOutputBytes": 18665126,
+    "kept": "final verified IPA, symbols and metadata while Apple processing; release receipt and remote artifacts"
+  },
+  "appleState": "PROCESSING",
+  "appleUploadId": "21533c6e-df7d-496b-a385-0030d905633e",
+  "pendingSteps": [
+    "Read back existing Apple attempt after processing; do not submit another upload",
+    "Add Chinese and English what-to-test text against the resulting Apple build, using a fresh readiness revision",
+    "Read back TestFlight group visibility separately from device interaction acceptance",
+    "Synchronize the matching invitation destination through Atlas once its admin authentication is available; preserve existing link and other platform destinations"
+  ],
+  "whatToTest": {
+    "zh-Hans": "成长首页依次显示自己的孩子积分与守约信用分、每周成长总结及最近明细台账。请检查右上角家庭组与孩子管理、规则等菜单，以及铃铛中的消息与积分申请审批。使用测试数据验证家庭切换、刷新、孩子详情、申请审批和完整台账分页。",
+    "en-US": "Growth shows your children’s points and credit, weekly growth summaries, and recent ledger entries. Check the top-right menu for family and child management and rules, and the bell for messages and reward requests. Use test data to verify family switching, refresh, child details, request approval, and full ledger paging."
+  }
+}
