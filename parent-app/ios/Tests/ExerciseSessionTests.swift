@@ -74,6 +74,10 @@ import Foundation
         precondition(routeRestored.routePoints.count == 2 && routeRestored.routePoints[0].segment != routeRestored.routePoints[1].segment)
         precondition(restored.route == nil && restored.routeEnabled == nil) // Historical files remain readable.
         precondition((archive.pendingDeletions ?? []).contains(restored.id))
+        let cloudWithMilliseconds = String(data: try encoder.encode(routeSession), encoding: .utf8)!.replacingOccurrences(of: "2026-10-29T23:59:50Z", with: "2026-10-29T23:59:50.000+00:00")
+        let fromCloud = try ExerciseSession.syncDecoder().decode(ExerciseSession.self, from: Data(cloudWithMilliseconds.utf8))
+        precondition(fromCloud.startedAt == routeSession.startedAt && fromCloud.routePoints.count == 2)
+        print("PASS: cloud timestamps accept timezone offsets and fractional seconds")
         print("PASS: route validation, pause segmentation, route persistence, historical compatibility and deletion outbox")
         print("PASS: targeted history deletion persists, active record retained, failed writes retain records, final record deletion")
         var distanceSession = ExerciseSession(kind: "慢跑", startedAt: start,

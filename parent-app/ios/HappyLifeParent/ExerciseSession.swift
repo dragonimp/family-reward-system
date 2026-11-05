@@ -71,6 +71,20 @@ struct ExerciseSession: Codable, Identifiable {
         guard !running, endedAt == nil else { return }
         intervals.append(ExerciseInterval(start: now))
     }
+    static func syncDecoder() -> JSONDecoder {
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .custom { decoder in
+            let container = try decoder.singleValueContainer()
+            let text = try container.decode(String.self)
+            let formatter = ISO8601DateFormatter()
+            formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+            if let value = formatter.date(from: text) { return value }
+            formatter.formatOptions = [.withInternetDateTime]
+            if let value = formatter.date(from: text) { return value }
+            throw DecodingError.dataCorruptedError(in: container, debugDescription: "Invalid ISO 8601 workout timestamp")
+        }
+        return decoder
+    }
     static func clock(_ duration: TimeInterval) -> String {
         let seconds = max(0, Int(duration))
         return String(format: "%02d:%02d:%02d", seconds / 3600, seconds / 60 % 60, seconds % 60)
