@@ -13,7 +13,7 @@ TABLES=[('parent-app/ios/HappyLifeParent','happylifeparent'),('parent-app/ios/Ha
 FORMAT=re.compile(r'%(?:\d+\$)?[-+0 #]*(?:@|lld|llu|ld|d|(?:\.[0-9]+)?[fge])')
 p=argparse.ArgumentParser();p.add_argument('--extracted',type=Path);p.add_argument('--report',type=Path);args=p.parse_args()
 # These raw exercise kinds are persisted and sent to the server; translated labels are separate.
-ALLOWED_RAW={'ExerciseView.swift': {'慢跑','散步','自由运动'}}
+ALLOWED_RAW={'ExerciseView.swift': {'慢跑','散步','自由运动'}, 'DiningModels.swift': {'川', '湘', '辣', '火锅'}}
 for folder,_ in TABLES:
  for path in (ROOT/folder).glob('*.swift'):
   source=path.read_text()

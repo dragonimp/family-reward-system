@@ -104,21 +104,7 @@ struct FamilyRoot: View {
     var body: some View {
         Group {
             if !identity.isAuthenticated { login }
-            else if store.ready { main }
-            else {
-                NavigationStack {
-                    VStack(spacing: 24) {
-                        Image(systemName: "person.2.circle.fill").font(.system(size: 64)).foregroundStyle(.teal)
-                        Text(String(localized: "欢迎使用 Linko Moment", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))).font(.title2.bold())
-                        if store.loading { ProgressView(String(localized: "正在读取家长资料…", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) }
-                        else {
-                            Text(String(localized: "家长资料暂时无法读取。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)))
-                            Button(String(localized: "重新加载", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) { Task { await store.load() } }.buttonStyle(.borderedProminent)
-                        }
-                        Button(String(localized: "退出登录", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) { store.logout() }
-                    }.padding().navigationTitle("Linko Moment")
-                }
-            }
+            else { main }
         }
         .environment(\.locale, language.locale)
         .onChange(of: identity.accountIdentifier) { _, account in
@@ -165,16 +151,31 @@ struct FamilyRoot: View {
             if !(error is CancellationError) && (error as NSError).code != NSURLErrorCancelled && ((error as NSError).domain != "com.apple.AuthenticationServices.WebAuthenticationSession" || (error as NSError).code != 1) { store.error = momentDisplayError(error) }
         } }
     }
+    private var growthUnavailable: some View {
+                NavigationStack {
+                    VStack(spacing: 24) {
+                        Image(systemName: "person.2.circle.fill").font(.system(size: 64)).foregroundStyle(.teal)
+                        Text(String(localized: "欢迎使用 Linko Moment", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))).font(.title2.bold())
+                        if store.loading { ProgressView(String(localized: "正在读取家长资料…", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) }
+                        else {
+                            Text(String(localized: "家长资料暂时无法读取。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)))
+                            Button(String(localized: "重新加载", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) { Task { await store.load() } }.buttonStyle(.borderedProminent)
+                        }
+                        Button(String(localized: "退出登录", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) { store.logout() }
+                    }.padding().navigationTitle("Linko Moment")
+                }
+    }
     private var main: some View {
         TabView(selection: $selectedTab) {
-            FamilyHome(store: store).tabItem { Label("成长", systemImage: "person.3.fill") }
-                .badge(store.requests.filter { $0.text("status") == "pending" }.count).tag(0)
-            DearSocialView(store: store).tabItem { Label(String(localized: "活动", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), systemImage: "photo.on.rectangle.angled") }.tag(1)
-            ExerciseView(userID: store.profile?.text("unifiedUserId") ?? "").id(store.profile?.text("unifiedUserId") ?? "").tabItem { Label(String(localized: "运动", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), systemImage: "figure.walk") }.tag(2)
-            AccountView(store: store).tabItem { Label(String(localized: "我的", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), systemImage: "person.crop.circle") }.badge(notifications.unreadCount).tag(3)
+            DiningView(userID: identity.accountIdentifier ?? "").id(identity.accountIdentifier ?? "").tabItem { Label(String(localized: "干饭", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), systemImage: "fork.knife") }.tag(0)
+            Group { if store.ready { FamilyHome(store: store) } else { growthUnavailable } }.tabItem { Label("成长", systemImage: "person.3.fill") }
+                .badge(store.requests.filter { $0.text("status") == "pending" }.count).tag(1)
+            DearSocialView(store: store).tabItem { Label(String(localized: "活动", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), systemImage: "photo.on.rectangle.angled") }.tag(2)
+            Group { if store.ready { ExerciseView(userID: store.profile?.text("unifiedUserId") ?? "").id(store.profile?.text("unifiedUserId") ?? "") } else { growthUnavailable } }.tabItem { Label(String(localized: "运动", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), systemImage: "figure.walk") }.tag(3)
+            AccountView(store: store).tabItem { Label(String(localized: "我的", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), systemImage: "person.crop.circle") }.badge(notifications.unreadCount).tag(4)
         }
-        .onAppear { if store.pendingActivityLink != nil { selectedTab = 1 } }
-        .onChange(of: store.pendingActivityLink?.id) { _, id in if id != nil { selectedTab = 1 } }
+        .onAppear { if store.pendingActivityLink != nil { selectedTab = 2 } }
+        .onChange(of: store.pendingActivityLink?.id) { _, id in if id != nil { selectedTab = 2 } }
     }
 }
 

@@ -15,7 +15,7 @@
 	<key>NSPhotoLibraryAddUsageDescription</key>
 	<string>将您拍摄的照片和视频保存到系统相册，保留原件并共享到活动。</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>在活动中主动打卡时获取当前位置、地址和海拔，并保存到该活动。</string>
+	<string>在您使用干饭推荐时搜索附近餐厅，或在活动中主动打卡时获取当前位置、地址和海拔。</string>
 	<key>CFBundleDevelopmentRegion</key>
 	<string>zh_CN</string>
 	<key>CFBundleDisplayName</key>
