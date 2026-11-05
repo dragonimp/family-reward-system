@@ -85,13 +85,15 @@ echo 'PASS: signed IPA, symbols and source receipt ready'
 python3 - <<'CLEANUP'
 import os,signal,subprocess,time
 work=os.environ['ATLAS_BUILD_WORK']
-result=subprocess.run(['lsof','-a','-d','cwd','-Fpcn'],capture_output=True,text=True)
+result=subprocess.run(['lsof','-a','-c','ibtoold','-Fpcn'],capture_output=True,text=True)
 pid=command=None
 for line in result.stdout.splitlines():
     if line.startswith('p'):pid=int(line[1:]);command=None
     elif line.startswith('c'):command=line[1:]
     elif line.startswith('n') and command=='ibtoold' and (line[1:]==work or line[1:].startswith(work+'/')):
-        try:os.kill(pid,signal.SIGTERM)
-        except ProcessLookupError:pass
+        usage=subprocess.run(['ps','-p',str(pid),'-o','%cpu='],capture_output=True,text=True).stdout.strip()
+        if usage and float(usage)<1:
+            try:os.kill(pid,signal.SIGTERM)
+            except ProcessLookupError:pass
 time.sleep(3)
 CLEANUP

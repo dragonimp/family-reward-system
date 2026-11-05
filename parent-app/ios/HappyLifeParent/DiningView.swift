@@ -38,7 +38,7 @@ import CryptoKit
         catch { readable = false; message = String(localized: "干饭记录暂时无法读取，原记录已保留，请重试。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)) }
     }
     func update(_ transform: (inout DiningArchive) -> Void) -> Bool {
-        guard readable else { return false }
+        guard readable else { message = String(localized: "干饭记录暂时无法读取，原记录已保留，请重试。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)); return false }
         var next = archive; transform(&next)
         do { try next.write(to: file); archive = next; return true }
         catch { message = String(localized: "记录没有保存成功，请重试。原记录已保留。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)); return false }

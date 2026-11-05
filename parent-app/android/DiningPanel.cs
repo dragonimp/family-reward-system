@@ -39,7 +39,7 @@ public sealed class DiningPanel : ContentView
     public void Suspend() { ++generation; operation?.Cancel(); busy = false; Render(); }
     private bool Update(Action<DiningArchive> change)
     {
-        if (!readable) return false;
+        if (!readable) { message = "干饭记录暂时无法读取，原记录已保留，请重试。"; return false; }
         try {
             var next = JsonSerializer.Deserialize<DiningArchive>(JsonSerializer.Serialize(archive), json)!;
             change(next);
