@@ -10,7 +10,11 @@ import MapKit
         request.resultTypes = .pointOfInterest
         request.pointOfInterestFilter = MKPointOfInterestFilter(including: [.restaurant])
         let response = try await MKLocalSearch(request: request).start()
-        let real = response.mapItems.filter { !($0.name ?? "").isEmpty && $0.placemark.location != nil }
+        let origin = CLLocation(latitude: 31.2304, longitude: 121.4737)
+        let real = response.mapItems.filter {
+            guard !($0.name ?? "").isEmpty, let location = $0.placemark.location else { return false }
+            return origin.distance(from: location) <= 3000
+        }
         guard !real.isEmpty else { throw NSError(domain: "DiningMapSearch", code: 1, userInfo: [NSLocalizedDescriptionKey: "No real restaurants returned for public test area"]) }
         print("PASS: live Apple Maps returned \(real.count) real restaurants for the public city-center test area")
     }
