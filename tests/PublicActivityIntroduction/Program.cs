@@ -31,11 +31,15 @@ try
         Check(html.Contains("datetime=\"2026-11-01T01:00:00.0000000+00:00\"") && html.Contains("toLocaleString"), "dates converted by browser timezone");
         Check(response.Headers.CacheControl?.NoStore == true && response.Headers.Contains("Content-Security-Policy"), "no-store and document protection");
     }
+    using (var icon = await client.GetAsync("/api/dear/public/brand/icon.png"))
+        Check(icon.IsSuccessStatusCode && icon.Content.Headers.ContentType?.MediaType == "image/png" && (await icon.Content.ReadAsByteArrayAsync()).Length > 100, "packaged logo is publicly readable");
+    using (var fallback = await client.GetAsync("/api/dear/public/brand/default-cover.svg"))
+        Check(fallback.IsSuccessStatusCode && fallback.Content.Headers.ContentType?.MediaType == "image/svg+xml", "packaged fallback cover is publicly readable");
     using (var cover = await client.GetAsync($"/api/dear/public/activities/{tenant}/{activity}/cover"))
         Check(cover.StatusCode == HttpStatusCode.OK && cover.Content.Headers.ContentType?.MediaType == "image/jpeg" && cover.Headers.CacheControl?.NoStore == true, "public cover is bounded image response with no-store");
     Check((await client.GetAsync($"/api/dear/public/activities/{Guid.Empty}/{activity}")).StatusCode == HttpStatusCode.NotFound, "missing activity remains 404");
     Check((await client.GetAsync("/api/dear/public/activities/invalid/invalid")).StatusCode == HttpStatusCode.NotFound, "invalid UUID rejected");
-    Console.WriteLine("PASS: 29 public activity introduction checks");
+    Console.WriteLine("PASS: 31 public activity introduction checks");
 }
 finally { await app.StopAsync(); await app.DisposeAsync(); }
 
