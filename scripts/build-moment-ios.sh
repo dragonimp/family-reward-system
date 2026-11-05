@@ -61,6 +61,8 @@ python3 "$source_dir/scripts/prepare-moment-ios-release.py" "$source_dir" \
   "$MOMENT_IOS_RELEASE_FLAVOR"
 xcrun swiftc "$source_dir/parent-app/ios/HappyLifeParent/NativeModels.swift" \
   "$source_dir/parent-app/ios/Tests/NativeModelTests.swift" -o "$ATLAS_BUILD_WORK/native-model-tests"
+xcrun swiftc -parse-as-library "$source_dir/parent-app/ios/HappyLifeParent/DiningModels.swift"   "$source_dir/parent-app/ios/Tests/DiningModelTests.swift" -o "$ATLAS_BUILD_WORK/dining-model-tests"
+"$ATLAS_BUILD_WORK/dining-model-tests"
 "$ATLAS_BUILD_WORK/native-model-tests"
 xcrun swiftc "$source_dir/parent-app/ios/HappyLifeParent/ExerciseSession.swift" \
   "$source_dir/parent-app/ios/Tests/ExerciseSessionTests.swift" -o "$ATLAS_BUILD_WORK/exercise-tests"

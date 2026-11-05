@@ -38,6 +38,7 @@ internal static class MomentStyle
     public static View Icon(string name, bool selected)
     {
         var data = name switch {
+            "干饭" => "M4,2 L4,10 Q4,13 8,13 L8,25 M8,2 L8,10 M12,2 L12,10 Q12,13 8,13 M21,2 Q15,6 16,15 L21,15 L21,25 M21,2 L21,15",
             "成长" => "M9,10 A3,3 0 1 0 9,4 A3,3 0 1 0 9,10 M3,21 L3,18 Q3,13 9,13 Q15,13 15,18 L15,21 M18,5 Q24,6 20,11 M19,14 Q24,15 24,21",
             "活动" => "M2,4 L23,4 L23,22 L2,22 Z M3,18 L9,12 L14,17 L18,13 L23,18 M16,8 L17,8",
             "消息" => "M4,20 L7,16 L7,10 Q7,3 13,3 Q19,3 19,10 L19,16 L22,20 Z M10,23 Q13,27 16,23",

@@ -4741,6 +4741,296 @@
       "en": "Notifications, %lld pending or unread",
       "iosKey": "消息通知，%lld 条待处理或未读"
     },
+    "dining.062356f73134": {
+      "zh-Hans": "✅ 就吃这家！",
+      "en": "✅ Let’s eat here!",
+      "iosKey": "✅ 就吃这家！"
+    },
+    "dining.6123f2471f79": {
+      "zh-Hans": "✨ 来点新鲜的",
+      "en": "✨ Something new",
+      "iosKey": "✨ 来点新鲜的"
+    },
+    "dining.4ef0af4af2ed": {
+      "zh-Hans": "❤️ 还是老样子",
+      "en": "❤️ My usual",
+      "iosKey": "❤️ 还是老样子"
+    },
+    "dining.cfa3749a8cb1": {
+      "zh-Hans": "不选条件也可以，一键安排。",
+      "en": "No filters needed. One tap decides.",
+      "iosKey": "不选条件也可以，一键安排。"
+    },
+    "dining.669239a9cae5": {
+      "zh-Hans": "人均与评分暂无可靠数据",
+      "en": "Price and rating are not available",
+      "iosKey": "人均与评分暂无可靠数据"
+    },
+    "dining.0a3abe8252f2": {
+      "zh-Hans": "今天吃啥？",
+      "en": "What should we eat?",
+      "iosKey": "今天吃啥？"
+    },
+    "dining.d7ba359d5467": {
+      "zh-Hans": "从附近真实餐厅中，为你挑了这一家。",
+      "en": "Picked for you from real nearby restaurants.",
+      "iosKey": "从附近真实餐厅中，为你挑了这一家。"
+    },
+    "dining.34cab1ec3039": {
+      "zh-Hans": "你以前选择过这里，熟悉的味道值得再试。",
+      "en": "You chose this place before. A familiar favorite is worth another visit.",
+      "iosKey": "你以前选择过这里，熟悉的味道值得再试。"
+    },
+    "dining.e4bb09d603a1": {
+      "zh-Hans": "你的干饭记录里还没有这家，来点新鲜的！",
+      "en": "This place is new to your meal history. Try something different!",
+      "iosKey": "你的干饭记录里还没有这家，来点新鲜的！"
+    },
+    "dining.c789741b0dd2": {
+      "zh-Hans": "使用当前位置",
+      "en": "Use current location",
+      "iosKey": "使用当前位置"
+    },
+    "dining.6c7df1c37f62": {
+      "zh-Hans": "保存后可直接发现该区域餐厅，无需每次重新定位。",
+      "en": "Save an area to discover restaurants there without locating again.",
+      "iosKey": "保存后可直接发现该区域餐厅，无需每次重新定位。"
+    },
+    "dining.e48aae00b19d": {
+      "zh-Hans": "公司附近",
+      "en": "Near work",
+      "iosKey": "公司附近"
+    },
+    "dining.767a645ac641": {
+      "zh-Hans": "别纠结了，这顿我安排！",
+      "en": "Stop overthinking. This meal is on the agenda!",
+      "iosKey": "别纠结了，这顿我安排！"
+    },
+    "dining.6a04e575a17c": {
+      "zh-Hans": "吃过了",
+      "en": "Ate here",
+      "iosKey": "吃过了"
+    },
+    "dining.5e464693e9f8": {
+      "zh-Hans": "命运安排好了，走，干饭！",
+      "en": "Decision made. Let’s eat!",
+      "iosKey": "命运安排好了，走，干饭！"
+    },
+    "dining.df835a6ddcf4": {
+      "zh-Hans": "安排好了！选择已记录，吃过后可在干饭记录中确认。",
+      "en": "Choice saved! Confirm your visit in meal history after eating.",
+      "iosKey": "安排好了！选择已记录，吃过后可在干饭记录中确认。"
+    },
+    "dining.c123208d8d73": {
+      "zh-Hans": "定位超时，请到开阔处重试，或选择已保存的生活圈。",
+      "en": "Location timed out. Try an open area or choose a saved area.",
+      "iosKey": "定位超时，请到开阔处重试，或选择已保存的生活圈。"
+    },
+    "dining.11b49fdf09b1": {
+      "zh-Hans": "家附近",
+      "en": "Near home",
+      "iosKey": "家附近"
+    },
+    "dining.e72622fe470d": {
+      "zh-Hans": "导航",
+      "en": "Directions",
+      "iosKey": "导航"
+    },
+    "dining.24e4ca05bb86": {
+      "zh-Hans": "将当前位置保存为生活圈",
+      "en": "Save current location as an area",
+      "iosKey": "将当前位置保存为生活圈"
+    },
+    "dining.095daba92351": {
+      "zh-Hans": "已选好，走，干饭！",
+      "en": "Chosen. Let’s eat!",
+      "iosKey": "已选好，走，干饭！"
+    },
+    "dining.7d1a8346d29c": {
+      "zh-Hans": "带我过去！",
+      "en": "Take me there!",
+      "iosKey": "带我过去！"
+    },
+    "dining.3ab32af7dc46": {
+      "zh-Hans": "干饭",
+      "en": "Let’s Eat",
+      "iosKey": "干饭"
+    },
+    "dining.dcc2a3172391": {
+      "zh-Hans": "干饭菜单",
+      "en": "Meal menu",
+      "iosKey": "干饭菜单"
+    },
+    "dining.368f7916db1a": {
+      "zh-Hans": "干饭记录 · 当地时间",
+      "en": "Meal history · Local time",
+      "iosKey": "干饭记录 · 当地时间"
+    },
+    "dining.e6fc8a194511": {
+      "zh-Hans": "干饭记录与收藏",
+      "en": "Meal history and favorites",
+      "iosKey": "干饭记录与收藏"
+    },
+    "dining.a80baa707af1": {
+      "zh-Hans": "干饭记录暂时无法读取，原记录已保留，请重试。",
+      "en": "Meal history could not be read. Existing records are preserved. Please try again.",
+      "iosKey": "干饭记录暂时无法读取，原记录已保留，请重试。"
+    },
+    "dining.85609ec92feb": {
+      "zh-Hans": "当前位置附近",
+      "en": "Near my current location",
+      "iosKey": "当前位置附近"
+    },
+    "dining.d3711bc542c6": {
+      "zh-Hans": "我吃过了",
+      "en": "I ate here",
+      "iosKey": "我吃过了"
+    },
+    "dining.9385bfefca58": {
+      "zh-Hans": "我的收藏",
+      "en": "My favorites",
+      "iosKey": "我的收藏"
+    },
+    "dining.0f85e824e9bc": {
+      "zh-Hans": "我的生活圈",
+      "en": "My areas",
+      "iosKey": "我的生活圈"
+    },
+    "dining.614f98f42725": {
+      "zh-Hans": "按店名与菜系线索挑选，具体辣度请向店家确认。",
+      "en": "Picked using clues from the name and cuisine. Ask the restaurant about spice levels.",
+      "iosKey": "按店名与菜系线索挑选，具体辣度请向店家确认。"
+    },
+    "dining.abe9ca973851": {
+      "zh-Hans": "收藏餐厅",
+      "en": "Favorite restaurant",
+      "iosKey": "收藏餐厅"
+    },
+    "dining.cae4059d732e": {
+      "zh-Hans": "暂时无法定位，请重试或使用已保存的生活圈。",
+      "en": "Location is unavailable. Try again or use a saved area.",
+      "iosKey": "暂时无法定位，请重试或使用已保存的生活圈。"
+    },
+    "dining.7261c1e4aef5": {
+      "zh-Hans": "暂未获取可靠的人均价格，点单前记得向店家确认。",
+      "en": "Reliable pricing is unavailable. Check with the restaurant before ordering.",
+      "iosKey": "暂未获取可靠的人均价格，点单前记得向店家确认。"
+    },
+    "dining.86f54a050302": {
+      "zh-Hans": "正在安排这顿饭…",
+      "en": "Deciding this meal…",
+      "iosKey": "正在安排这顿饭…"
+    },
+    "dining.ed1bada3dab6": {
+      "zh-Hans": "用户身份尚未就绪，请重新登录后重试。",
+      "en": "Your identity is not ready. Sign in again to retry.",
+      "iosKey": "用户身份尚未就绪，请重新登录后重试。"
+    },
+    "dining.92f8754cc536": {
+      "zh-Hans": "直线距离估算：",
+      "en": "Estimated straight-line distance: ",
+      "iosKey": "直线距离估算："
+    },
+    "dining.389c732ecc1a": {
+      "zh-Hans": "系统定位服务未开启，可使用已保存的生活圈。",
+      "en": "Location services are off. You can use a saved area.",
+      "iosKey": "系统定位服务未开启，可使用已保存的生活圈。"
+    },
+    "dining.979e440e22d0": {
+      "zh-Hans": "记录与习惯仅保存在本机，切换账号相互隔离。",
+      "en": "History and preferences stay on this device, separately for each account.",
+      "iosKey": "记录与习惯仅保存在本机，切换账号相互隔离。"
+    },
+    "dining.f450fc4659cb": {
+      "zh-Hans": "记录没有保存成功，请重试。原记录已保留。",
+      "en": "Could not save. Existing records are preserved. Please try again.",
+      "iosKey": "记录没有保存成功，请重试。原记录已保留。"
+    },
+    "dining.b6e432323d3e": {
+      "zh-Hans": "请在系统设置中允许位置访问，或选择已保存的生活圈。",
+      "en": "Allow location access in Settings, or choose a saved area.",
+      "iosKey": "请在系统设置中允许位置访问，或选择已保存的生活圈。"
+    },
+    "dining.3fb4e851d407": {
+      "zh-Hans": "还没有常吃记录，先从附近这家开始。",
+      "en": "No regular places yet. Start with this nearby restaurant.",
+      "iosKey": "还没有常吃记录，先从附近这家开始。"
+    },
+    "dining.e5733414d0dd": {
+      "zh-Hans": "还没有收藏餐厅",
+      "en": "No favorite restaurants yet",
+      "iosKey": "还没有收藏餐厅"
+    },
+    "dining.01e5266f7d5e": {
+      "zh-Hans": "选好餐厅后，记录会保存在这里。",
+      "en": "Your choices will be saved here.",
+      "iosKey": "选好餐厅后，记录会保存在这里。"
+    },
+    "dining.e500ce1c6ac1": {
+      "zh-Hans": "附近暂时只找到这一家，可换个生活圈再试。",
+      "en": "Only one restaurant was found nearby. Try another area for more options.",
+      "iosKey": "附近暂时只找到这一家，可换个生活圈再试。"
+    },
+    "dining.d3b552df9b66": {
+      "zh-Hans": "附近暂时没有找到餐厅。试试其他生活圈，或稍后重新定位。",
+      "en": "No nearby restaurants found. Try another area or refresh your location later.",
+      "iosKey": "附近暂时没有找到餐厅。试试其他生活圈，或稍后重新定位。"
+    },
+    "dining.b145e3946f6b": {
+      "zh-Hans": "附近的新选择有限，熟悉的店也保留机会。",
+      "en": "New nearby options are limited. Familiar places still get a chance.",
+      "iosKey": "附近的新选择有限，熟悉的店也保留机会。"
+    },
+    "dining.88069ab8d160": {
+      "zh-Hans": "附近餐厅来自 Apple 地图；人均与评分缺失时不作推测。位置仅用于本次地图搜索，习惯与记录保存在当前账号的本机空间。",
+      "en": "Nearby restaurants come from Apple Maps. Missing prices and ratings are not estimated. Location is used for this search; preferences and history stay on this device for your account.",
+      "iosKey": "附近餐厅来自 Apple 地图；人均与评分缺失时不作推测。位置仅用于本次地图搜索，习惯与记录保存在当前账号的本机空间。"
+    },
+    "dining.76573baca65b": {
+      "zh-Hans": "🌶️ 想吃点刺激的",
+      "en": "🌶️ Something spicy",
+      "iosKey": "🌶️ 想吃点刺激的"
+    },
+    "dining.95d77bff2029": {
+      "zh-Hans": "🎲 不行，再来一家！",
+      "en": "🎲 Try another place!",
+      "iosKey": "🎲 不行，再来一家！"
+    },
+    "dining.80df61cbcb4c": {
+      "zh-Hans": "🎲 帮我决定",
+      "en": "🎲 Decide for me",
+      "iosKey": "🎲 帮我决定"
+    },
+    "dining.469c5d26888f": {
+      "zh-Hans": "🎲 随便安排",
+      "en": "🎲 Surprise me",
+      "iosKey": "🎲 随便安排"
+    },
+    "dining.e55024077bb9": {
+      "zh-Hans": "🏠 家附近",
+      "en": "🏠 Near home",
+      "iosKey": "🏠 家附近"
+    },
+    "dining.274efb8033e1": {
+      "zh-Hans": "🏢 公司附近",
+      "en": "🏢 Near work",
+      "iosKey": "🏢 公司附近"
+    },
+    "dining.76f8c4df919d": {
+      "zh-Hans": "💰 今天省点钱",
+      "en": "💰 Save some money",
+      "iosKey": "💰 今天省点钱"
+    },
+    "dining.c3e878905a16": {
+      "zh-Hans": "😋 今天吃点好的",
+      "en": "😋 Treat myself",
+      "iosKey": "😋 今天吃点好的"
+    },
+    "dining.4242e79c95a0": {
+      "iosKey": "附近餐厅暂时无法读取，请稍后重试。",
+      "zh-Hans": "附近餐厅暂时无法读取，请稍后重试。",
+      "en": "Nearby restaurants could not be loaded. Please try again shortly."
+    },
     "moment.exercise.b95a2c01559c": {
       "zh-Hans": "删除失败，运动记录已保留，请稍后重试。",
       "en": "Could not delete the workout. It is still saved; try again later.",

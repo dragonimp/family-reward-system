@@ -15,7 +15,7 @@
 	<key>NSPhotoLibraryAddUsageDescription</key>
 	<string>将您拍摄的照片和视频保存到系统相册，保留原件并共享到活动。</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>在活动中主动打卡时获取位置、地址和海拔；在您开启运动地图模式后记录轨迹，完成后随运动记录同步到当前账号。</string>
+	<string>在活动打卡或搜索附近餐厅时获取位置；在您开启运动地图模式后记录轨迹，完成后随运动记录同步到当前账号。</string>
 	<key>UIBackgroundModes</key>
 	<array><string>location</string></array>
 	<key>CFBundleDevelopmentRegion</key>

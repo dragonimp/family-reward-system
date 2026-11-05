@@ -43,7 +43,7 @@ struct ExerciseSession: Codable, Identifiable {
         guard running, routeEnabled == true, point.valid, let start = intervals.last?.start,
               point.recordedAt >= start, (route?.count ?? 0) < 20_000,
               route?.last.map({ point.recordedAt > $0.recordedAt }) ?? true else { return false }
-        route = (route ?? []) + [point]
+        if route == nil { route = [] }; route?.append(point)
         return true
     }
     var running: Bool { endedAt == nil && intervals.last?.end == nil }

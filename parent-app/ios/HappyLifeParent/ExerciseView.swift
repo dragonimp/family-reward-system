@@ -187,7 +187,7 @@ import CoreLocation
             save()
             let encoder = JSONEncoder(); encoder.dateEncodingStrategy = .iso8601
             let decoder = JSONDecoder(); decoder.dateDecodingStrategy = .iso8601
-            for record in archive.history where !(archive.uploaded ?? []).contains(record.id) {
+            for record in archive.history where remote[record.id] == nil || !(archive.uploaded ?? []).contains(record.id) {
                 guard !(archive.pendingDeletions ?? []).contains(record.id) else { continue }
                 let body = try JSONSerialization.jsonObject(with: encoder.encode(record)) as! [String: Any]
                 _ = try await api.call("/api/exercise/records/\(record.id.uuidString)", method: "PUT", body: body)
