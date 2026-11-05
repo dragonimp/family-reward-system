@@ -107,6 +107,7 @@ struct FamilyRoot: View {
             else { main }
         }
         .environment(\.locale, language.locale)
+        .environmentObject(store)
         .onChange(of: identity.accountIdentifier) { _, account in
             store.language.accountDidChange(account)
             Task { await store.language.refresh() }
