@@ -5196,10 +5196,60 @@
       "en": "%.2f km",
       "iosKey": "%.2f 公里"
     },
-    "moment.exercise.growth-label": {
+    "moment.exercise.growth_label": {
       "iosKey": "成长",
       "zh-Hans": "成长",
       "en": "Growth"
+    },
+    "moment.t67338df5b82b": {
+      "zh-Hans": "构图建议",
+      "en": "Composition tips",
+      "iosKey": "构图建议"
+    },
+    "moment.t91649ffa458f": {
+      "zh-Hans": "三分构图",
+      "en": "Rule of thirds",
+      "iosKey": "三分构图"
+    },
+    "moment.t14636e79fb3e": {
+      "zh-Hans": "人像",
+      "en": "Portrait",
+      "iosKey": "人像"
+    },
+    "moment.t2c4bf49405aa": {
+      "zh-Hans": "合照",
+      "en": "Group photo",
+      "iosKey": "合照"
+    },
+    "moment.t0f70eef46ff0": {
+      "zh-Hans": "风景",
+      "en": "Landscape",
+      "iosKey": "风景"
+    },
+    "moment.t087a7510faee": {
+      "zh-Hans": "收起构图提示",
+      "en": "Hide tip",
+      "iosKey": "收起构图提示"
+    },
+    "moment.t8bf3a18291bb": {
+      "zh-Hans": "把画面想成九宫格，让主体靠近交点，视线方向多留一点空间。",
+      "en": "Imagine a three-by-three grid. Place the subject near an intersection and leave room in the direction they are looking.",
+      "iosKey": "把画面想成九宫格，让主体靠近交点，视线方向多留一点空间。"
+    },
+    "moment.t0db94ac2e7a2": {
+      "zh-Hans": "让眼睛靠近画面上方三分线，头顶留一点空间，避开杂乱背景。",
+      "en": "Place the eyes near the upper third, leave some room above the head, and keep the background simple.",
+      "iosKey": "让眼睛靠近画面上方三分线，头顶留一点空间，避开杂乱背景。"
+    },
+    "moment.tc3b19394afd4": {
+      "zh-Hans": "留出画面两侧的空间，确认每个人的脸都看得见。",
+      "en": "Leave space on both sides and make sure every face is visible.",
+      "iosKey": "留出画面两侧的空间，确认每个人的脸都看得见。"
+    },
+    "moment.t26d65657dc94": {
+      "zh-Hans": "先把地平线拍平，放在上方或下方三分线，突出更有看点的一侧。",
+      "en": "Level the horizon and place it on the upper or lower third to give the more interesting side more room.",
+      "iosKey": "先把地平线拍平，放在上方或下方三分线，突出更有看点的一侧。"
     }
   }
 }

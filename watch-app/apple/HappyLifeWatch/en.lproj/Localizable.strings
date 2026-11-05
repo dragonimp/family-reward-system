@@ -112,6 +112,7 @@
 "登录已过期。" = "Your session has expired.";
 "共 %lld 条" = "%lld total";
 "新建本人记录" = "Create my person record";
+"收起构图提示" = "Hide tip";
 "提交" = "Submit";
 "修改密码" = "Change password";
 "修改打卡" = "Edit check-in";
@@ -137,6 +138,7 @@
 "重命名" = "Rename";
 "类别" = "Category";
 "记录奖励 / 扣分" = "Record reward / Deduct points";
+"让眼睛靠近画面上方三分线，头顶留一点空间，避开杂乱背景。" = "Place the eyes near the upper third, leave some room above the head, and keep the background simple.";
 "修改孩子资料" = "Edit child profile";
 "iPhone视频.mp4" = "iPhone video.mp4";
 "已提交，等待家长确认" = "Submitted. Waiting for a parent’s confirmation.";
@@ -144,6 +146,7 @@
 "活动日期" = "Activity date";
 "智能体成员" = "Agents";
 "优先显示照片自带的定位；无定位时使用填写地点。" = "Use the photo’s embedded location first; otherwise use the location entered here.";
+"风景" = "Landscape";
 "配偶" = "Spouse";
 "积分" = "Points";
 "想聊什么" = "What would you like to talk about?";
@@ -161,6 +164,7 @@
 "拒绝" = "Reject";
 "已逾期" = "Overdue";
 "本周成长 · 北京时间" = "This week’s growth · Beijing time";
+"人像" = "Portrait";
 "现金 %@ · 物品 %lld" = "Cash %@ · Items %lld";
 "只有活动组织者可以修改基本信息。" = "Only the activity organizer can edit its details.";
 "辈分（可选）" = "Generation (optional)";
@@ -234,6 +238,7 @@
 "照片地点（可选，供活动成员查看）" = "Photo location (optional, visible to activity members)";
 "%lld 个打卡点 · %lld 项定位照片或视频；其他照片也可在地图页查看。" = "%lld check-ins · %lld photos or videos with locations. Other photos are also available on the map page.";
 "子女" = "Children";
+"先把地平线拍平，放在上方或下方三分线，突出更有看点的一侧。" = "Level the horizon and place it on the upper or lower third to give the more interesting side more room.";
 "温暖瞬间" = "Warm moments";
 "正在提交…" = "Submitting…";
 "扫描已中断，请返回重试或手动输入设备码。" = "Scanning was interrupted. Go back and try again or enter the device code manually.";
@@ -258,6 +263,7 @@
 "支系（可选）" = "Branch (optional)";
 "操作失败，请稍后重试。" = "Operation failed. Try again later.";
 "虚报完成" = "Falsely reported completion";
+"合照" = "Group photo";
 "取消" = "Cancel";
 "加入族谱" = "Join family tree";
 "兄弟姐妹的子女" = "Siblings’ children";
@@ -489,6 +495,7 @@
 "积分（负数表示扣分）" = "Points (negative values deduct points)";
 "暂无可推导的关系" = "No relationships can be inferred";
 "关联人物" = "Link person";
+"构图建议" = "Composition tips";
 "朋友" = "Friend";
 "改为活动访客" = "Make activity guest";
 "解除这只手表与当前孩子的绑定？" = "Unlink this watch from the current child?";
@@ -610,6 +617,7 @@
 "已选 %lld 项" = "%lld selected";
 "本次登录验证码：%@" = "Verification code for this sign-in: %@";
 "应用资料暂不可用。" = "App information is temporarily unavailable.";
+"把画面想成九宫格，让主体靠近交点，视线方向多留一点空间。" = "Imagine a three-by-three grid. Place the subject near an intersection and leave room in the direction they are looking.";
 "请先绑定手表。" = "Pair your watch first.";
 "年和月" = "Year and month";
 "好友关系暂时无法读取：%@" = "Unable to load friendships: %@";
@@ -629,6 +637,7 @@
 "预览失败" = "Preview failed";
 "正在读取记录…" = "Loading records…";
 "删除共享照片？" = "Delete shared photo?";
+"三分构图" = "Rule of thirds";
 "方式" = "How";
 "请在手表设置中允许位置访问。" = "Allow location access in your watch’s Settings.";
 "详细使用手册" = "Detailed user guide";
@@ -801,6 +810,7 @@
 "活动已删除。" = "Activity deleted.";
 "约定" = "Commitments";
 "照片已发送到 iPhone，登记尚未确认，请稍后刷新相册。" = "Photo sent to iPhone, but registration is not confirmed yet. Refresh the album shortly.";
+"留出画面两侧的空间，确认每个人的脸都看得见。" = "Leave space on both sides and make sure every face is visible.";
 "积分与奖励记录" = "Points and reward records";
 "等待对方确认" = "Waiting for their confirmation";
 "暂无可申请规则，请家长添加奖励规则。" = "No reward rules available. Ask a parent to add one.";
