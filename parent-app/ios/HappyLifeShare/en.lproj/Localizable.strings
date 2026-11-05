@@ -11,6 +11,7 @@
 "系统定位服务未开启，可使用已保存的生活圈。" = "Location services are off. You can use a saved area.";
 "干饭" = "Let’s Eat";
 "还没有常吃记录，先从附近这家开始。" = "No regular places yet. Start with this nearby restaurant.";
+"附近餐厅暂时无法读取，请稍后重试。" = "Nearby restaurants could not be loaded. Please try again shortly.";
 "🎲 随便安排" = "🎲 Surprise me";
 "❤️ 还是老样子" = "❤️ My usual";
 "命运安排好了，走，干饭！" = "Decision made. Let’s eat!";

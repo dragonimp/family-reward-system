@@ -78,6 +78,11 @@ import CryptoKit
                 request.resultTypes = .pointOfInterest
                 request.pointOfInterestFilter = MKPointOfInterestFilter(including: [.restaurant])
                 let operation = MKLocalSearch(request: request); search = operation
+                let deadline = Task {
+                    do { try await Task.sleep(for: .seconds(12)) } catch { return }
+                    operation.cancel()
+                }
+                defer { deadline.cancel() }
                 let response = try await operation.start()
                 guard current == generation else { return }
                 candidates = response.mapItems.compactMap { item in
@@ -102,7 +107,7 @@ import CryptoKit
             busy = false
             await loadWalking(next, generation: current)
         } catch is CancellationError { }
-        catch { if current == generation { message = error.localizedDescription } }
+        catch { if current == generation { message = (error as? APIError)?.localizedDescription ?? String(localized: "附近餐厅暂时无法读取，请稍后重试。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)) } }
     }
     func refreshLocation() { stop(); candidates = []; origin = nil; result = nil; walking = nil; confirmed = false }
     func stop() {

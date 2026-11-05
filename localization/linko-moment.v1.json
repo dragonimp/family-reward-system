@@ -5025,6 +5025,11 @@
       "zh-Hans": "😋 今天吃点好的",
       "en": "😋 Treat myself",
       "iosKey": "😋 今天吃点好的"
+    },
+    "dining.4242e79c95a0": {
+      "iosKey": "附近餐厅暂时无法读取，请稍后重试。",
+      "zh-Hans": "附近餐厅暂时无法读取，请稍后重试。",
+      "en": "Nearby restaurants could not be loaded. Please try again shortly."
     }
   }
 }
