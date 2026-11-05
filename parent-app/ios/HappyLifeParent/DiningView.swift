@@ -8,6 +8,7 @@ import CryptoKit
     @Published var archive = DiningArchive()
     @Published var mood: DiningMood = .automatic
     @Published var result: DiningPlace?
+    @Published var resultMood: DiningMood = .automatic
     @Published var busy = false
     @Published var message: String?
     @Published var confirmed = false
@@ -44,7 +45,7 @@ import CryptoKit
     }
     func confirm() {
         guard let place = result, !confirmed, !busy else { return }
-        if update({ $0.choose(place, mood: mood) }) { confirmed = true; message = String(localized: "安排好了！选择已记录，吃过后可在干饭记录中确认。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)) }
+        if update({ $0.choose(place, mood: resultMood) }) { confirmed = true; message = String(localized: "安排好了！选择已记录，吃过后可在干饭记录中确认。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)) }
     }
     func selectCircle(_ id: UUID?) {
         guard !busy else { return }
@@ -101,7 +102,7 @@ import CryptoKit
             }
             if let previous = result, !confirmed { _ = update { $0.habits[previous.id, default: DiningHabit()].skipped += 1 } }
             guard current == generation else { return }
-            result = next; confirmed = false
+            result = next; resultMood = mood; confirmed = false
             if candidates.count == 1 { message = String(localized: "附近暂时只找到这一家，可换个生活圈再试。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)) }
             // The blind box animates only while real location/search work is running.
             busy = false
@@ -109,7 +110,7 @@ import CryptoKit
         } catch is CancellationError { }
         catch { if current == generation { message = (error as? APIError)?.localizedDescription ?? String(localized: "附近餐厅暂时无法读取，请稍后重试。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)) } }
     }
-    func refreshLocation() { stop(); candidates = []; origin = nil; result = nil; walking = nil; confirmed = false }
+    func refreshLocation() { stop(); circleID = nil; candidates = []; origin = nil; result = nil; walking = nil; confirmed = false }
     func stop() {
         generation = UUID(); search?.cancel(); directions?.cancel(); timeout?.cancel(); locator.stopUpdatingLocation()
         waiting?.resume(throwing: CancellationError()); waiting = nil; busy = false
@@ -182,7 +183,7 @@ struct DiningView: View {
                     ScrollView(.horizontal, showsIndicators: false) {
                         HStack {
                             ForEach(DiningMood.allCases, id: \.self) { mood in
-                                Button(moodTitle(mood)) { model.mood = mood }.buttonStyle(.bordered).tint(model.mood == mood ? .orange : .gray).disabled(model.busy)
+                                Button(moodTitle(mood)) { model.mood = mood; if model.result != nil { Task { await model.decide() } } }.buttonStyle(.bordered).tint(model.mood == mood ? .orange : .gray).disabled(model.busy)
                             }
                         }
                     }
@@ -226,7 +227,7 @@ struct DiningView: View {
         }.padding(20).frame(maxWidth: .infinity, alignment: .leading).background(.background, in: RoundedRectangle(cornerRadius: 24))
     }
     private func reason(_ place: DiningPlace) -> String {
-        switch model.mood {
+        switch model.resultMood {
         case .familiar: return (model.archive.habits[place.id]?.selected ?? 0) > 0 ? String(localized: "你以前选择过这里，熟悉的味道值得再试。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)) : String(localized: "还没有常吃记录，先从附近这家开始。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))
         case .fresh: return (model.archive.habits[place.id]?.selected ?? 0) == 0 ? String(localized: "你的干饭记录里还没有这家，来点新鲜的！", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)) : String(localized: "附近的新选择有限，熟悉的店也保留机会。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))
         case .budget, .treat: return String(localized: "暂未获取可靠的人均价格，点单前记得向店家确认。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))

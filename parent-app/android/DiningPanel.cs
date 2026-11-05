@@ -16,6 +16,7 @@ public sealed class DiningPanel : ContentView
     private DiningPlace? result;
     private Guid? circleId;
     private string mood = "automatic";
+    private string resultMood = "automatic";
     private bool busy, confirmed, readable = true;
     private string? message;
     private CancellationTokenSource? operation;
@@ -62,7 +63,7 @@ public sealed class DiningPanel : ContentView
         var decide = MomentStyle.Action(busy ? "正在安排这顿饭…" : "🎲 帮我决定", () => _ = Decide(), true); decide.IsEnabled = !busy; decide.BackgroundColor = Colors.DarkOrange; hero.Add(decide);
         hero.Add(MomentStyle.Caption("不选条件也可以，一键安排。")); if (result is null || busy) body.Add(MomentStyle.Card(hero));
         var moods = new HorizontalStackLayout { Spacing = 8 };
-        foreach (var item in Moods) { var button = MomentStyle.Action(item.Title, () => { mood = item.Id; Render(); }, mood == item.Id); button.IsEnabled = !busy; moods.Add(button); }
+        foreach (var item in Moods) { var button = MomentStyle.Action(item.Title, () => { mood = item.Id; if (result != null) _ = Decide(); else Render(); }, mood == item.Id); button.IsEnabled = !busy; moods.Add(button); }
         body.Add(new ScrollView { Orientation = ScrollOrientation.Horizontal, Content = moods });
         if (result is { } place)
         {
@@ -73,7 +74,7 @@ public sealed class DiningPanel : ContentView
             card.Add(MomentStyle.Caption(place.Cost is > 0 ? $"人均参考 ¥{place.Cost:0.##}" : "人均暂无可靠数据"));
             if (place.Rating is { } rating) card.Add(MomentStyle.Caption($"地图评分 {rating:0.#} / 5"));
             card.Add(new Label { Text = Reason(place), FontSize = 15 });
-            var confirm = MomentStyle.Action(confirmed ? "已选好，走，干饭！" : "✅ 就吃这家！", () => { if (!confirmed && Update(a => a.Choose(place, mood))) { confirmed = true; message = "选择已记录，吃过后可在干饭记录中确认。"; } Render(); }, true); confirm.IsEnabled = !confirmed && !busy; card.Add(confirm);
+            var confirm = MomentStyle.Action(confirmed ? "已选好，走，干饭！" : "✅ 就吃这家！", () => { if (!confirmed && Update(a => a.Choose(place, resultMood))) { confirmed = true; message = "选择已记录，吃过后可在干饭记录中确认。"; } Render(); }, true); confirm.IsEnabled = !confirmed && !busy; card.Add(confirm);
             var another = MomentStyle.Action("🎲 不行，再来一家！", () => _ = Decide()); another.IsEnabled = !busy; card.Add(another);
             card.Add(MomentStyle.Action("🗺️ 带我过去！", () => _ = Navigate(place)));
             card.Add(MomentStyle.Action(archive.Favorites.Any(p => p.Id == place.Id) ? "♥ 已收藏" : "♡ 收藏餐厅", () => { Update(a => { if (a.Favorites.Any(p => p.Id == place.Id)) a.Favorites.RemoveAll(p => p.Id == place.Id); else a.Favorites.Add(place); }); Render(); }));
@@ -85,7 +86,7 @@ public sealed class DiningPanel : ContentView
     private string Reason(DiningPlace place)
     {
         var known = archive.Habits.GetValueOrDefault(place.Id)?.Selected > 0;
-        return mood switch {
+        return resultMood switch {
             "familiar" => known ? "你以前选择过这里，熟悉的味道值得再试。" : "还没有常吃记录，先从附近这家开始。",
             "fresh" => known ? "附近的新选择有限，熟悉的店也保留机会。" : "你的干饭记录里还没有这家，来点新鲜的！",
             "budget" or "treat" => place.Cost is > 0 ? "参考地图提供的人均价格挑选，实际消费以店家为准。" : "暂未获取可靠的人均价格，点单前记得向店家确认。",
@@ -111,7 +112,7 @@ public sealed class DiningPanel : ContentView
             var next = DiningRecommendation.Pick(candidates, mood, archive, result?.Id);
             if (next is null) { message = "附近暂时没有找到餐厅，换个生活圈或稍后重试。"; return; }
             if (result is { } old && !confirmed) Update(a => a.Habit(old.Id).Skipped++);
-            result = next; confirmed = false;
+            result = next; resultMood = mood; confirmed = false;
             if (candidates.Count == 1) message = "附近暂时只找到这一家，可换个生活圈再试。";
         } catch (OperationCanceledException) { if (current == generation) message = "定位或搜索超时，请重试，或使用已保存的生活圈。"; }
         catch (PermissionException) { message = "请在系统设置中允许位置访问，或选择已保存的生活圈。"; }
@@ -135,7 +136,7 @@ public sealed class DiningPanel : ContentView
         var choice = await owner.DisplayActionSheetAsync("干饭", "取消", null, "干饭记录与收藏", "我的生活圈", "重新定位");
         if (choice == "干饭记录与收藏") await Records();
         else if (choice == "我的生活圈") await Circles();
-        else if (choice == "重新定位") { candidates = []; result = null; confirmed = false; Render(); }
+        else if (choice == "重新定位") { circleId = null; candidates = []; result = null; confirmed = false; Render(); }
     }
     private async Task Records()
     {
