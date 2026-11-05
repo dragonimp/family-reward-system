@@ -2196,6 +2196,11 @@ struct MomentNotificationInbox: View {
     var body: some View {
         NavigationStack {
             List {
+                Section(String(localized: "积分申请通知", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) {
+                    NavigationLink { ApprovalList(store: store) } label: {
+                        LabeledContent(String(localized: "奖励审批", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), value: "\(store.requests.filter { $0.text("status") == "pending" }.count)")
+                    }
+                }
                 if !notifications.error.isEmpty { Section { Text(notifications.error).foregroundStyle(.red) } }
                 if !notifications.pushRegistrationError.isEmpty { Section { Text(notifications.pushRegistrationError).foregroundStyle(.red) } }
                 Section("请求与消息 · 未读 \(notifications.unreadCount)") {
@@ -2234,8 +2239,8 @@ struct MomentNotificationInbox: View {
                 Button("全部删除", role: .destructive) { Task { await notifications.deleteAll() } }
                 Button("取消", role: .cancel) { }
             } message: { Text("仅删除消息，原图下载请求和活动照片保留。") }
-            .refreshable { await notifications.reload() }
-            .task { await notifications.reload() }
+            .refreshable { await store.refreshRequests(); await notifications.reload() }
+            .task { await store.refreshRequests(); await notifications.reload() }
             .navigationDestination(isPresented: Binding(get: { notifications.selectedMessageID != nil && !notifications.items.isEmpty }, set: { if !$0 { notifications.selectedMessageID = nil } })) {
                 if let item = notifications.items.first(where: { $0.id == notifications.selectedMessageID }) {
                     MomentNotificationDetail(store: store, notifications: notifications, item: item)
@@ -2462,12 +2467,19 @@ private struct MomentPhotoRequestProgress: View {
     }
 }
 
-private struct MomentNotificationButton: View {
+struct MomentNotificationButton: View {
     @ObservedObject var notifications: MomentNotifications
+    var pendingRequests: Int = 0
+    private var count: Int { notifications.unreadCount + pendingRequests }
     var body: some View {
         Button { notifications.open() } label: {
-            Label("消息通知", systemImage: notifications.unreadCount > 0 ? "bell.badge" : "bell")
-        }.accessibilityLabel("消息通知，\(notifications.unreadCount) 条未读")
+            Image(systemName: count > 0 ? "bell.badge" : "bell")
+                .overlay(alignment: .topTrailing) {
+                    if count > 0 {
+                        Text(count > 99 ? "99+" : "\(count)").font(.caption2.bold()).foregroundStyle(.white).padding(3).background(.red, in: Capsule()).offset(x: 10, y: -8)
+                    }
+                }
+        }.accessibilityLabel(String(localized: "消息通知，\(count) 条待处理或未读", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)))
     }
 }
 

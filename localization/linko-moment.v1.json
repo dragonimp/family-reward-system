@@ -4695,6 +4695,51 @@
       "zh-Hans": "默认选择最近一次活动。完成后打开 Linko Moment，照片或视频会发布到该活动。",
       "en": "The most recent activity is selected by default. After finishing, open Linko Moment to publish the photos or videos to that activity.",
       "iosKey": "默认选择最近一次活动。完成后打开 Linko Moment，照片或视频会发布到该活动。"
+    },
+    "moment.t9f73bf8239b2": {
+      "zh-Hans": "我的孩子",
+      "en": "My children",
+      "iosKey": "我的孩子"
+    },
+    "moment.tdfddeaca981e": {
+      "zh-Hans": "孩子成长总结",
+      "en": "Child growth summary",
+      "iosKey": "孩子成长总结"
+    },
+    "moment.t0ab46e1b4b23": {
+      "zh-Hans": "暂无孩子成长报告",
+      "en": "No child growth reports yet",
+      "iosKey": "暂无孩子成长报告"
+    },
+    "moment.t8a9c1fff4405": {
+      "zh-Hans": "明细台账",
+      "en": "Detailed ledger",
+      "iosKey": "明细台账"
+    },
+    "moment.t94ed71e5099f": {
+      "zh-Hans": "家庭组与孩子管理",
+      "en": "Family and child management",
+      "iosKey": "家庭组与孩子管理"
+    },
+    "moment.t08efd244c5c1": {
+      "zh-Hans": "成长管理菜单",
+      "en": "Growth management menu",
+      "iosKey": "成长管理菜单"
+    },
+    "moment.teab15c3540ec": {
+      "zh-Hans": "成长管理",
+      "en": "Growth management",
+      "iosKey": "成长管理"
+    },
+    "moment.tbad028a542da": {
+      "zh-Hans": "积分申请通知",
+      "en": "Points requests",
+      "iosKey": "积分申请通知"
+    },
+    "moment.t53dcc861fae1": {
+      "zh-Hans": "消息通知，%lld 条待处理或未读",
+      "en": "Notifications, %lld pending or unread",
+      "iosKey": "消息通知，%lld 条待处理或未读"
     }
   }
 }

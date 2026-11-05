@@ -6,12 +6,14 @@ namespace LinkoFamily;
 internal sealed class MomentInboxPage : ContentPage
 {
     private readonly FamilyStore store;
+    private readonly Action? openApprovals;
     private readonly VerticalStackLayout rows = new() { Padding = 16, Spacing = 12 };
     private readonly Label status = MomentStyle.Caption("");
     private NotificationClient? client;
     private CancellationTokenSource? loading;
-    public MomentInboxPage(FamilyStore store)
+    public MomentInboxPage(FamilyStore store, Action? openApprovals = null)
     {
+        this.openApprovals = openApprovals;
         this.store = store; Title = "消息通知"; BackgroundColor = MomentStyle.Background; SafeAreaEdges = SafeAreaEdges.All;
         Content = new ScrollView { Content = rows };
         ToolbarItems.Add(new ToolbarItem("刷新", null, async () => await LoadAsync()));
@@ -21,7 +23,15 @@ internal sealed class MomentInboxPage : ContentPage
     private async Task LoadAsync()
     {
         loading?.Cancel(); var cancellation = loading = new CancellationTokenSource(); var session = store.SessionVersion;
-        rows.Children.Clear(); rows.Add(status); status.Text = "正在读取消息…";
+        rows.Children.Clear();
+        try { await store.RefreshRequestsAsync(); } catch (Exception) { }
+        if (cancellation.IsCancellationRequested || session != store.SessionVersion) return;
+        if (openApprovals != null) {
+            var pending = store.Requests.Count(r => r.Text("status") == "pending");
+            var approvals = MomentStyle.Action($"积分申请 · {pending} 条待处理", () => _ = OpenApprovalsAsync());
+            rows.Add(MomentStyle.Card(approvals));
+        }
+        rows.Add(status); status.Text = "正在读取消息…";
         try
         {
             client ??= await store.NotificationsAsync(cancellation.Token);
@@ -42,6 +52,11 @@ internal sealed class MomentInboxPage : ContentPage
         catch (OperationCanceledException) { }
         catch { if (!cancellation.IsCancellationRequested) status.Text = "消息暂时无法读取，请刷新或重新登录后重试。"; }
         finally { if (loading == cancellation) loading = null; cancellation.Dispose(); }
+    }
+    private async Task OpenApprovalsAsync()
+    {
+        await Navigation.PopAsync();
+        openApprovals?.Invoke();
     }
     private async Task OpenAsync(NotificationMessage message)
     {

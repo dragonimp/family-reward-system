@@ -58,7 +58,7 @@ public sealed class FamilyPage : ContentPage
     private void RenderNavigation()
     {
         bottom.Children.Clear();
-        var selected = tab is "审批" or "记录" or "规则" ? "成长" : tab;
+        var selected = tab is "审批" or "记录" or "规则" or "管理" ? "成长" : tab;
         var column = 0;
         foreach (var name in new[] { "成长", "活动", "运动", "我的" })
         {
@@ -74,7 +74,7 @@ public sealed class FamilyPage : ContentPage
     protected override bool OnBackButtonPressed()
     {
         if (childId != null) { childId = null; Render(); return true; }
-        if (tab is "审批" or "记录" or "规则") { SelectTab("成长"); return true; }
+        if (tab is "审批" or "记录" or "规则" or "管理") { SelectTab("成长"); return true; }
         if (tab == "活动" && activities?.Back() == true) return true;
         return base.OnBackButtonPressed();
     }
@@ -110,6 +110,7 @@ public sealed class FamilyPage : ContentPage
                 activities ??= new MomentActivityPanel(store, this, Render);
                 viewport.Content = activities;
                 _ = activities.ShowAsync(); break;
+            case "管理": FamilyManagementContent(); break;
             case "审批":
                 content.Add(Button("‹ 成长", () => SelectTab("成长")));
                 ApprovalContent(); break;
@@ -173,6 +174,64 @@ public sealed class FamilyPage : ContentPage
 
     private void FamilyContent()
     {
+        var header = new Grid { ColumnDefinitions = new ColumnDefinitionCollection { new(GridLength.Star), new(GridLength.Auto), new(GridLength.Auto) }, ColumnSpacing = 8 };
+        header.Add(Heading("成长", 32));
+        var menu = Button("⋯", () => _ = GrowthMenuAsync());
+        SemanticProperties.SetDescription(menu, "成长管理菜单"); header.Add(menu, 1, 0);
+        var pending = store.Requests.Count(r => r.Text("status") == "pending");
+        var bell = new Grid();
+        bell.Add(MomentStyle.IconButton("消息", $"积分申请与消息通知，{pending} 条申请待处理", () => _ = Navigation.PushAsync(new MomentInboxPage(store, () => SelectTab("审批")))));
+        if (pending > 0) bell.Add(new Label { Text = pending > 99 ? "99+" : pending.ToString(), FontSize = 11, TextColor = Colors.White, BackgroundColor = Colors.Red, HorizontalOptions = LayoutOptions.End, VerticalOptions = LayoutOptions.Start, Padding = 3, InputTransparent = true });
+        header.Add(bell, 2, 0);
+        content.Add(header);
+        content.Add(MomentStyle.Caption("我的孩子"));
+        ChildCards(store.HomeChildren);
+        if (store.HomeChildren.Count == 0) content.Add(MomentStyle.Caption("还没有孩子，可在右上角菜单添加。"));
+        content.Add(MomentStyle.Caption("孩子成长总结"));
+        foreach (var report in store.GrowthReports)
+        {
+            content.Add(Card(new VerticalStackLayout { Spacing = 8, Children = {
+                Heading(report.Text("subjectName"), 18),
+                MomentStyle.Caption(report.Text("periodStart") + " — " + report.Text("periodEnd")),
+                new Label { Text = report.Text("praise") }, new Label { Text = report.Text("changeSummary") },
+                MomentStyle.Caption(report.Text("nextStep")) } }));
+        }
+        if (store.GrowthReportError is { } error) content.Add(MomentStyle.Caption(error));
+        else if (store.GrowthReports.Count == 0) content.Add(MomentStyle.Caption("暂无孩子成长报告。"));
+        content.Add(MomentStyle.Caption("明细台账"));
+        LedgerContent(preview: true);
+    }
+
+    private async Task GrowthMenuAsync()
+    {
+        var choice = await DisplayActionSheetAsync("成长管理", "取消", null, "家庭组与孩子管理", "奖励与行为规则", "亲子互动", "刷新成长数据");
+        if (choice == "家庭组与孩子管理") SelectTab("管理");
+        else if (choice == "奖励与行为规则") SelectTab("规则");
+        else if (choice == "亲子互动") await AgentIdentity.Maui.InAppWebLinks.OpenAsync(new Uri("https://happylife.ai.impx.net/family-connections"), BrowserLaunchMode.SystemPreferred);
+        else if (choice == "刷新成长数据") await Run(store.LoadAsync);
+    }
+
+    private void ChildCards(IEnumerable<FamilyRecord> children)
+    {
+        foreach (var child in children)
+        {
+            var name = child.Text("name");
+            var avatar = new Border { WidthRequest = 48, HeightRequest = 48, BackgroundColor = MomentStyle.Accent.WithAlpha(0.12f), Stroke = Colors.Transparent,
+                StrokeShape = new Microsoft.Maui.Controls.Shapes.RoundRectangle { CornerRadius = 14 }, Content = new Label { Text = string.IsNullOrEmpty(name) ? "孩" : StringInfo.GetNextTextElement(name), FontSize = 22, FontAttributes = FontAttributes.Bold, TextColor = MomentStyle.Accent, HorizontalTextAlignment = TextAlignment.Center, VerticalTextAlignment = TextAlignment.Center } };
+            var info = new VerticalStackLayout { Spacing = 5 };
+            info.Add(Heading(name, 18));
+            info.Add(MomentStyle.Caption($"{child.Number("score")} 积分 · ¥{child.Number("cash")} · {child.Number("items")} 件物品"));
+            info.Add(new Label { Text = "守约信用分：" + (child.Bool("creditUnavailable") ? "暂不可用" : child.Bool("creditEnabled") ? $"{child.Number("creditScore")} / 100" : "未开通"), FontSize = 14, TextColor = MomentStyle.Accent });
+            var row = new Grid { ColumnDefinitions = new ColumnDefinitionCollection { new(GridLength.Auto), new(GridLength.Star), new(GridLength.Auto) }, ColumnSpacing = 14, MinimumHeightRequest = 76 };
+            row.Add(avatar); row.Add(info, 1, 0); row.Add(new Label { Text = "›", TextColor = Colors.Gray, FontSize = 24, VerticalTextAlignment = TextAlignment.Center }, 2, 0);
+            var tap = new TapGestureRecognizer(); tap.Tapped += (_, _) => { _ = Run(async () => { if (child.Int("familyGroupId") != store.GroupId && store.Groups.Any(g => g.Id == child.Int("familyGroupId"))) await store.SelectGroupAsync(child.Int("familyGroupId")); childId = child.Id; }); }; row.GestureRecognizers.Add(tap);
+            content.Add(Card(row));
+        }
+    }
+
+    private void FamilyManagementContent()
+    {
+        content.Add(Button("‹ 成长", () => SelectTab("成长")));
         content.Add(Heading(store.Groups.FirstOrDefault(g => g.Id == store.GroupId).Text("name") is { Length: > 0 } familyName ? familyName : "成长", 32));
         content.Add(Card(new VerticalStackLayout { Spacing = 8, Children = { Heading("一起照顾每一天", 22), MomentStyle.Caption("孩子成长、奖励审批和积分记录，都在这里。") } }));
         content.Add(MomentStyle.Caption("虚拟群组 · 一起成长"));
@@ -189,35 +248,15 @@ public sealed class FamilyPage : ContentPage
         family.Add(picker);
         family.Add(Button("家庭管理与邀请 ⋯", () => _ = FamilyMenuAsync()));
         content.Add(Card(family));
-        content.Add(MomentStyle.Caption("待办与记录"));
-        var records = new VerticalStackLayout { Spacing = 0 };
-        var pending = store.Requests.Count(r => r.Text("status") == "pending");
-        records.Add(MomentStyle.Row("奖励审批", pending > 0 ? $"{pending} 条待处理" : "", () => SelectTab("审批")));
-        records.Add(MomentStyle.Divider());
-        records.Add(MomentStyle.Row("积分与奖励记录", $"共 {store.LedgerTotal} 条", () => SelectTab("记录")));
-        content.Add(Card(records));
         content.Add(MomentStyle.Caption($"孩子 · {store.Children.Count}"));
-        foreach (var child in store.Children)
-        {
-            var name = child.Text("name");
-            var avatar = new Border { WidthRequest = 48, HeightRequest = 48, BackgroundColor = MomentStyle.Accent.WithAlpha(0.12f), Stroke = Colors.Transparent,
-                StrokeShape = new Microsoft.Maui.Controls.Shapes.RoundRectangle { CornerRadius = 14 }, Content = new Label { Text = string.IsNullOrEmpty(name) ? "孩" : StringInfo.GetNextTextElement(name), FontSize = 22, FontAttributes = FontAttributes.Bold, TextColor = MomentStyle.Accent, HorizontalTextAlignment = TextAlignment.Center, VerticalTextAlignment = TextAlignment.Center } };
-            var info = new VerticalStackLayout { Spacing = 5 };
-            info.Add(Heading(name, 18));
-            info.Add(MomentStyle.Caption($"{child.Number("score")} 积分 · ¥{child.Number("cash")} · {child.Number("items")} 件物品"));
-            info.Add(new Label { Text = "守约信用分：" + (child.Bool("creditUnavailable") ? "暂不可用" : child.Bool("creditEnabled") ? $"{child.Number("creditScore")} / 100" : "未开通"), FontSize = 14, TextColor = MomentStyle.Accent });
-            var row = new Grid { ColumnDefinitions = new ColumnDefinitionCollection { new(GridLength.Auto), new(GridLength.Star), new(GridLength.Auto) }, ColumnSpacing = 14, MinimumHeightRequest = 76 };
-            row.Add(avatar); row.Add(info, 1, 0); row.Add(new Label { Text = "›", TextColor = Colors.Gray, FontSize = 24, VerticalTextAlignment = TextAlignment.Center }, 2, 0);
-            var tap = new TapGestureRecognizer(); tap.Tapped += (_, _) => { childId = child.Id; Render(); Dispatcher.Dispatch(() => _ = scroll.ScrollToAsync(0, 0, false)); }; row.GestureRecognizers.Add(tap);
-            content.Add(Card(row));
-        }
+        ChildCards(store.Children);
         if (store.Children.Count == 0) content.Add(new Label { Text = "还没有孩子。" });
         content.Add(Button("添加孩子", () => _ = AddChild()));
         content.Add(MomentStyle.Caption("群组成长"));
         var growth = new VerticalStackLayout { Spacing = 0 };
         growth.Add(MomentStyle.Row("奖励与行为规则", action: () => SelectTab("规则"))); growth.Add(MomentStyle.Divider());
-        growth.Add(MomentStyle.Row("成长足迹", "↗", () => _ = Browser.Default.OpenAsync(new Uri("https://happylife.ai.impx.net/growth"), BrowserLaunchMode.SystemPreferred))); growth.Add(MomentStyle.Divider());
-        growth.Add(MomentStyle.Row("亲子互动", "↗", () => _ = Browser.Default.OpenAsync(new Uri("https://happylife.ai.impx.net/family-connections"), BrowserLaunchMode.SystemPreferred)));
+        growth.Add(MomentStyle.Row("成长足迹", "↗", () => _ = AgentIdentity.Maui.InAppWebLinks.OpenAsync(new Uri("https://happylife.ai.impx.net/growth"), BrowserLaunchMode.SystemPreferred))); growth.Add(MomentStyle.Divider());
+        growth.Add(MomentStyle.Row("亲子互动", "↗", () => _ = AgentIdentity.Maui.InAppWebLinks.OpenAsync(new Uri("https://happylife.ai.impx.net/family-connections"), BrowserLaunchMode.SystemPreferred)));
         content.Add(Card(growth));
         if (store.GroupId != 0) { content.Add(MomentStyle.Caption("群组协作")); content.Add(Card(MomentStyle.Row("邀请组员", action: () => _ = ShareInvite()))); }
         content.Add(Button("刷新成长数据", () => _ = Run(store.LoadAsync)));
@@ -258,10 +297,10 @@ public sealed class FamilyPage : ContentPage
         content.Add(Button("刷新申请", () => _ = Run(store.LoadAsync)));
     }
 
-    private void LedgerContent()
+    private void LedgerContent(bool preview = false)
     {
         content.Add(Heading($"记录 · 共 {store.LedgerTotal} 条", 21));
-        foreach (var row in store.Transactions)
+        foreach (var row in preview ? store.Transactions.Take(5) : store.Transactions)
         {
             var type = row.Text("type") == "cash" ? "元" : row.Text("type") == "item" ? "件" : "分";
             var box = new VerticalStackLayout { Spacing = 3 };
@@ -271,6 +310,7 @@ public sealed class FamilyPage : ContentPage
             content.Add(Card(box));
         }
         if (store.Transactions.Count == 0) content.Add(new Label { Text = "还没有记录。" });
+        if (preview) { content.Add(Button("查看全部记录", () => SelectTab("记录"))); return; }
         if (store.Transactions.Count < store.LedgerTotal)
             content.Add(Button("加载更多", () => _ = Run(store.LoadMoreLedgerAsync)));
         content.Add(Button("刷新记录", () => _ = Run(store.LoadAsync)));
@@ -297,7 +337,7 @@ public sealed class FamilyPage : ContentPage
             MomentStyle.Row("消息中心", action: () => _ = Navigation.PushAsync(new MomentInboxPage(store))),
             MomentStyle.Row("修改密码", action: () => _ = AgentIdentity.Maui.InAppWebLinks.OpenAsync(new Uri("https://auth.ai.xmkurt.com/personal/info?section=password"), BrowserLaunchMode.SystemPreferred)));
         if (store.AccountProfileError is { } profileError) content.Add(new Label { Text = profileError, FontSize = 12 });
-        Section("应用与设置", MomentStyle.Row("家庭与成员", action: () => SelectTab("成长")), MomentStyle.Row("刷新资料", action: () => _ = Run(store.LoadAsync)));
+        Section("应用与设置", MomentStyle.Row("家庭与成员", action: () => SelectTab("管理")), MomentStyle.Row("刷新资料", action: () => _ = Run(store.LoadAsync)));
         Section("帮助与隐私",
             MomentStyle.Row("隐私政策", action: () => _ = Navigation.PushModalAsync(new PrivacyPolicyPage())),
             MomentStyle.Row("用户协议", action: () => _ = Navigation.PushAsync(new AtlasInformationPage(false, "termsUrl"))),

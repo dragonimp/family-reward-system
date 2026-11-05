@@ -40,6 +40,9 @@ public sealed class FamilyStore
     public string? AccountProfileError { get; private set; }
     public List<FamilyRecord> Groups { get; private set; } = [];
     public List<FamilyRecord> Children { get; private set; } = [];
+    public List<FamilyRecord> HomeChildren { get; private set; } = [];
+    public List<FamilyRecord> GrowthReports { get; private set; } = [];
+    public string? GrowthReportError { get; private set; }
     public List<FamilyRecord> Rules { get; private set; } = [];
     public List<FamilyRecord> Requests { get; private set; } = [];
     public List<FamilyRecord> Transactions { get; private set; } = [];
@@ -100,7 +103,7 @@ public sealed class FamilyStore
         Authenticated = false;
         Profile = null; AccountProfile = null; AccountProfileError = null;
         GroupId = 0;
-        Groups = []; Children = []; Rules = []; Requests = []; Transactions = [];
+        Groups = []; Children = []; HomeChildren = []; GrowthReports = []; GrowthReportError = null; Rules = []; Requests = []; Transactions = [];
     }
 
     public async Task<JsonElement> CallAsync(string path, HttpMethod? method = null, object? body = null, CancellationToken ct = default)
@@ -184,22 +187,56 @@ public sealed class FamilyStore
         if (!Groups.Any(item => item.Id == id)) throw new FamilyApiException("无法访问该家庭。");
         ++generation;
         GroupId = id;
-        Children = []; Rules = []; Requests = []; Transactions = [];
+        Children = []; HomeChildren = []; GrowthReports = []; GrowthReportError = null; Rules = []; Requests = []; Transactions = [];
         await LoadFamilyAsync(generation);
     }
 
     private async Task LoadFamilyAsync(int current)
     {
         var children = FamilyRecord.Array(await CallAsync($"/api/children?{Scope}"));
+        var homeChildren = FamilyRecord.Array(await CallAsync("/api/children?ownedOnly=true"));
+        homeChildren = await WithCreditAsync(homeChildren);
         var rules = FamilyRecord.Array(await CallAsync("/api/rules"), "rules");
         var requests = FamilyRecord.Array(await CallAsync("/api/reward-requests?limit=50"), "requests");
         var ledger = await CallAsync("/api/transactions?page=1&pageSize=30");
         var data = new FamilyRecord(ledger).Get("data");
         var transactions = FamilyRecord.Array(data, "items");
         if (current != generation) return;
-        Children = children; Rules = rules; Requests = requests; Transactions = transactions;
+        Children = children; HomeChildren = homeChildren; Rules = rules; Requests = requests; Transactions = transactions;
         LedgerTotal = new FamilyRecord(data).Int("total");
         LedgerPage = 1;
+        try {
+            var reports = FamilyRecord.Array(await CallAsync("/api/growth-reports?audience=child&period=weekly&ai=false"), "reports");
+            if (current != generation) return;
+            GrowthReports = reports; GrowthReportError = null;
+        } catch (Exception) {
+            if (current != generation) return;
+            GrowthReports = []; GrowthReportError = "成长总结暂不可用，请刷新重试。";
+        }
+    }
+
+    private async Task<List<FamilyRecord>> WithCreditAsync(List<FamilyRecord> children)
+    {
+        List<FamilyRecord>? credit = null;
+        try { credit = FamilyRecord.Array(await CallAsync("/api/credit/overview"), "children"); }
+        catch (Exception) { }
+        return children.Select(child => {
+            var fields = JsonSerializer.Deserialize<Dictionary<string, JsonElement>>(child.Data.GetRawText())!;
+            if (credit is null) fields["creditUnavailable"] = JsonSerializer.SerializeToElement(true);
+            else {
+                var row = credit.FirstOrDefault(c => c.Text("profileKey") == child.Text("profileKey"));
+                if (row.Data.ValueKind == JsonValueKind.Object)
+                    foreach (var field in row.Data.EnumerateObject()) fields[field.Name] = field.Value;
+            }
+            return new FamilyRecord(JsonSerializer.SerializeToElement(fields));
+        }).ToList();
+    }
+
+    public async Task RefreshRequestsAsync()
+    {
+        var current = generation;
+        var requests = FamilyRecord.Array(await CallAsync("/api/reward-requests?limit=50"), "requests");
+        if (current == generation) Requests = requests;
     }
 
     public async Task LoadMoreLedgerAsync()

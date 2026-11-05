@@ -180,70 +180,101 @@ struct FamilyRoot: View {
 
 struct FamilyHome: View {
     @ObservedObject var store: FamilyStore
-    @State private var editor: EditorSpec?
     private var pendingRequests: Int { store.requests.filter { $0.text("status") == "pending" }.count }
     var body: some View {
         NavigationStack {
             List {
-                Section {
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text(String(localized: "一起照顾每一天", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))).font(.title2.bold())
-                        Text(String(localized: "孩子成长、奖励审批和积分记录，都在这里。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)))
-                            .font(.subheadline).foregroundStyle(.secondary)
-                    }.padding(.vertical, 8)
-                }
-                Section {
-                    if store.groups.isEmpty { Text(String(localized: "创建或加入一个群组，开始共同记录成长。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))).foregroundStyle(.secondary) }
-                    else {
-                        Picker(String(localized: "当前群组", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), selection: Binding(get: { store.groupID }, set: { value in Task { await store.chooseGroup(value) } })) {
-                            ForEach(store.groups) { Text($0.text("name")).tag($0.id) }
-                        }.disabled(store.loading)
-                    }
-                    HStack {
-                        Button(String(localized: "创建群组", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), systemImage: "plus.circle") { editor = EditorSpec(title: String(localized: "创建群组", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), path: "/api/family-groups", fields: [.init(key: "name", title: String(localized: "群组名称", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))), .init(key: "description", title: String(localized: "群组简介", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), required: false)]) }
-                        Spacer()
-                        Button(String(localized: "加入群组", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), systemImage: "person.badge.plus") { editor = EditorSpec(title: String(localized: "加入群组", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), path: "/api/family-groups/join", fields: [.init(key: "inviteCode", title: String(localized: "邀请码", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)))]) }
-                    }.buttonStyle(.borderless)
-                } header: { Text(String(localized: "虚拟群组 · 一起成长", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) }
-                Section(String(localized: "待办与记录", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) {
-                    NavigationLink { ApprovalList(store: store) } label: {
-                        HStack {
-                            Label(String(localized: "奖励审批", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), systemImage: "checkmark.bubble.fill")
-                            Spacer()
-                            if pendingRequests > 0 {
-                                Text(String(localized: "\(pendingRequests) 待处理", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)))
-                                    .font(.caption.bold()).foregroundStyle(.orange)
-                            }
-                        }
-                    }
-                    NavigationLink { LedgerView(store: store) } label: {
-                        HStack {
-                            Label(String(localized: "积分与奖励记录", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), systemImage: "list.bullet.rectangle")
-                            Spacer()
-                            Text(String(localized: "共 \(store.ledgerTotal) 条", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)))
-                                .font(.caption).foregroundStyle(.secondary)
-                        }
-                    }
-                }
-                Section {
-                    ForEach(store.children) { child in
+                Section(String(localized: "我的孩子", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) {
+                    ForEach(store.homeChildren) { child in
                         NavigationLink { ChildDetail(store: store, child: child) } label: { ChildRow(child: child) }
                     }
-                    if store.children.isEmpty && !store.loading { Text(String(localized: "还没有孩子", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))).foregroundStyle(.secondary) }
-                    Button(String(localized: "添加孩子", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), systemImage: "plus") {
-                        editor = EditorSpec(title: String(localized: "添加孩子", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), path: "/api/children", fields: [.init(key: "name", title: String(localized: "孩子姓名", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))), .init(key: "note", title: String(localized: "备注", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), required: false)], fixed: store.groupID == 0 ? [:] : ["familyGroupId": store.groupID])
+                    if store.homeChildren.isEmpty && !store.loading {
+                        Text(String(localized: "还没有孩子", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))).foregroundStyle(.secondary)
                     }
-                } header: { Text(String(localized: "孩子 · \(store.children.count)", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) }
-                Section(String(localized: "群组成长", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) {
-                    NavigationLink { RulesView(store: store) } label: { Label(String(localized: "奖励与行为规则", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), systemImage: "star.square.fill") }
-                    NavigationLink { GrowthView(store: store) } label: { Label(String(localized: "成长足迹", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), systemImage: "chart.xyaxis.line") }
-                    NavigationLink { FamilyConnectionsView(store: store) } label: { Label(String(localized: "亲子互动", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), systemImage: "heart.text.square") }
                 }
-                if store.groupID != 0 { Section(String(localized: "群组协作", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) { NavigationLink { RemoteRecords(store: store, title: String(localized: "群组邀请码", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), path: "/api/family-groups/\(store.groupID)/invite", mode: .invite) } label: { Label(String(localized: "邀请组员", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), systemImage: "qrcode") } } }
-                if store.loading { ProgressView(String(localized: "正在更新…", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) }
-            }.listStyle(.insetGrouped).readablePage().navigationTitle(store.selectedFamily).refreshable { await store.load() }
-                .sheet(item: $editor) { NativeEditor(store: store, spec: $0) }
+                Section(String(localized: "孩子成长总结", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) {
+                    ForEach(store.growthReports) { report in
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text(report.text("subjectName")).font(.headline)
+                            Text(report.text("periodStart") + " — " + report.text("periodEnd")).font(.caption).foregroundStyle(.secondary)
+                            Text(report.text("praise"))
+                            Text(report.text("changeSummary"))
+                            Text(report.text("nextStep")).foregroundStyle(.secondary)
+                        }.padding(.vertical, 4)
+                    }
+                    if let error = store.growthReportError { Text(error).foregroundStyle(.secondary) }
+                    else if store.growthReports.isEmpty && !store.loading {
+                        Text(String(localized: "暂无孩子成长报告", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))).foregroundStyle(.secondary)
+                    }
+                }
+                Section(String(localized: "明细台账", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) {
+                    ForEach(store.transactions.prefix(5)) { row in LedgerRow(row: row) }
+                    if store.transactions.isEmpty && !store.loading {
+                        Text(String(localized: "还没有记录", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))).foregroundStyle(.secondary)
+                    }
+                    NavigationLink { LedgerView(store: store) } label: {
+                        LabeledContent(String(localized: "积分与奖励记录", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), value: String(localized: "共 \(store.ledgerTotal) 条", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)))
+                    }
+                }
+                if store.loading { ProgressView() }
+            }
+            .listStyle(.insetGrouped).readablePage()
+            .navigationTitle(String(localized: "成长", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)))
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Menu {
+                        NavigationLink { FamilyManagement(store: store) } label: { Label(String(localized: "家庭组与孩子管理", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), systemImage: "person.3") }
+                        NavigationLink { RulesView(store: store) } label: { Label(String(localized: "奖励与行为规则", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), systemImage: "star.square") }
+                        NavigationLink { GrowthView(store: store) } label: { Label(String(localized: "成长足迹", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), systemImage: "chart.xyaxis.line") }
+                        NavigationLink { FamilyConnectionsView(store: store) } label: { Label(String(localized: "亲子互动", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), systemImage: "heart.text.square") }
+                        Button { Task { await store.load() } } label: { Label(String(localized: "刷新", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), systemImage: "arrow.clockwise") }
+                    } label: { Image(systemName: "ellipsis.circle").accessibilityLabel(String(localized: "成长管理菜单", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) }
+                }
+                ToolbarItem(placement: .topBarTrailing) {
+                    MomentNotificationButton(notifications: store.notifications, pendingRequests: pendingRequests)
+                }
+            }
+            .refreshable { await store.load() }
+            .task { await store.refreshIfStale() }
         }
+    }
+}
+struct FamilyManagement: View {
+    @ObservedObject var store: FamilyStore
+    @State private var editor: EditorSpec?
+    var body: some View {
+        List {
+            Section {
+                if store.groups.isEmpty { Text(String(localized: "创建或加入一个群组，开始共同记录成长。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))).foregroundStyle(.secondary) }
+                else {
+                    Picker(String(localized: "当前群组", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), selection: Binding(get: { store.groupID }, set: { value in Task { await store.chooseGroup(value) } })) {
+                        ForEach(store.groups) { Text($0.text("name")).tag($0.id) }
+                    }.disabled(store.loading)
+                }
+                HStack {
+                    Button(String(localized: "创建群组", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), systemImage: "plus.circle") { editor = EditorSpec(title: String(localized: "创建群组", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), path: "/api/family-groups", fields: [.init(key: "name", title: String(localized: "群组名称", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))), .init(key: "description", title: String(localized: "群组简介", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), required: false)]) }
+                    Spacer()
+                    Button(String(localized: "加入群组", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), systemImage: "person.badge.plus") { editor = EditorSpec(title: String(localized: "加入群组", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), path: "/api/family-groups/join", fields: [.init(key: "inviteCode", title: String(localized: "邀请码", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)))]) }
+                }.buttonStyle(.borderless)
+            } header: { Text(String(localized: "虚拟群组 · 一起成长", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) }
+            Section {
+                ForEach(store.children) { child in
+                    NavigationLink { ChildDetail(store: store, child: child) } label: { ChildRow(child: child) }
+                }
+                if store.children.isEmpty && !store.loading { Text(String(localized: "还没有孩子", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))).foregroundStyle(.secondary) }
+                Button(String(localized: "添加孩子", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), systemImage: "plus") {
+                    editor = EditorSpec(title: String(localized: "添加孩子", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), path: "/api/children", fields: [.init(key: "name", title: String(localized: "孩子姓名", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))), .init(key: "note", title: String(localized: "备注", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), required: false)], fixed: store.groupID == 0 ? [:] : ["familyGroupId": store.groupID])
+                }
+            } header: { Text(String(localized: "孩子 · \(store.children.count)", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) }
+            Section(String(localized: "群组成长", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) {
+                NavigationLink { RulesView(store: store) } label: { Label(String(localized: "奖励与行为规则", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), systemImage: "star.square.fill") }
+                NavigationLink { GrowthView(store: store) } label: { Label(String(localized: "成长足迹", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), systemImage: "chart.xyaxis.line") }
+                NavigationLink { FamilyConnectionsView(store: store) } label: { Label(String(localized: "亲子互动", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), systemImage: "heart.text.square") }
+            }
+            if store.groupID != 0 { Section(String(localized: "群组协作", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) { NavigationLink { RemoteRecords(store: store, title: String(localized: "群组邀请码", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), path: "/api/family-groups/\(store.groupID)/invite", mode: .invite) } label: { Label(String(localized: "邀请组员", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), systemImage: "qrcode") } } }
+            if store.loading { ProgressView(String(localized: "正在更新…", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) }
+            }.listStyle(.insetGrouped).readablePage().navigationTitle(String(localized: "成长管理", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))).refreshable { await store.load() }
+            .sheet(item: $editor) { NativeEditor(store: store, spec: $0) }
     }
 }
 struct ChildRow: View {
@@ -263,7 +294,7 @@ struct ChildDetail: View {
     let child: Record
     @State private var editor: EditorSpec?
     @State private var rewarding = false
-    var current: Record { store.children.first(where: { $0.id == child.id }) ?? child }
+    var current: Record { (store.homeChildren + store.children).first(where: { $0.id == child.id }) ?? child }
     var body: some View {
         List {
             Section { ChildRow(child: current); Button(String(localized: "记录奖励 / 扣分", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), systemImage: "plus.circle.fill") { rewarding = true } }
@@ -277,11 +308,15 @@ struct ChildDetail: View {
                 Button(String(localized: "连接手表", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) { editor = EditorSpec(title: String(localized: "连接孩子手表", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), path: "/api/children/\(child.id)/pair-device", fields: [.init(key: "code", title: String(localized: "手表上显示的配对码", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)))], scansWatchCode: true) }
                 Button(String(localized: "生成孩子授权码", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) { editor = EditorSpec(title: String(localized: "生成孩子授权码", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), path: "/api/children/\(child.id)/auth-code", fields: [], fixed: ["familyGroupId": store.groupID, "expiresInMinutes": 10], showsReceipt: true) }
                 NavigationLink(String(localized: "温暖瞬间", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) { RemoteRecords(store: store, title: String(localized: "温暖瞬间", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), path: "/api/warm-moments?childId=\(child.id)&limit=30", mode: .moments) }
-                NavigationLink(String(localized: "成长周报", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) { RemoteRecords(store: store, title: String(localized: "成长周报", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), path: "/api/growth-reports?childId=\(child.id)&audience=parent&period=weekly&ai=false", mode: .reports) }
+                NavigationLink(String(localized: "成长周报", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) { RemoteRecords(store: store, title: String(localized: "成长周报", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), path: "/api/growth-reports?childId=\(child.id)&audience=child&period=weekly&ai=false", mode: .reports) }
                 NavigationLink(String(localized: "好友", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) { RemoteRecords(store: store, title: String(localized: "孩子的好友", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), path: "/api/children/\(child.id)/friends?\(store.scope)", mode: .friends) }
             }
         }.readablePage().navigationTitle(current.text("name")).refreshable { await store.load() }
-            .task { await store.refreshIfStale() }
+            .task {
+                let group = child.int("familyGroupId")
+                if group != store.groupID && store.groups.contains(where: { $0.id == group }) { await store.chooseGroup(group) }
+                else { await store.refreshIfStale() }
+            }
             .sheet(item: $editor) { NativeEditor(store: store, spec: $0) }
             .sheet(isPresented: $rewarding) { RewardEditor(store: store, child: current) }
     }
@@ -307,6 +342,16 @@ struct ApprovalList: View {
         }.listStyle(.insetGrouped).readablePage().navigationTitle(String(localized: "奖励审批", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))).refreshable { await store.load() }.sheet(item: $editor) { NativeEditor(store: store, spec: $0) }
     }
 }
+struct LedgerRow: View {
+    let row: Record
+    var body: some View {
+        VStack(alignment: .leading, spacing: 7) {
+            HStack { Text(row.text("childName")).font(.headline); Spacer(); Text(row.amount("amount") + (row.text("type") == "cash" ? String(localized: " 元", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)) : row.text("type") == "item" ? String(localized: " 件", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)) : String(localized: " 分", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)))).foregroundStyle(row.number("amount") >= 0 ? .teal : .orange).font(.headline.monospacedDigit()) }
+            Text(row.text("description")); Text("\(row.text("date")) · \(row.text("category"))").font(.caption).foregroundStyle(.secondary)
+            if !row.text("notes").isEmpty { Text(row.text("notes")).font(.caption) }
+                }.padding(.vertical, 4)
+    }
+}
 struct LedgerView: View {
     @ObservedObject var store: FamilyStore
     @State private var filter = ""
@@ -315,11 +360,7 @@ struct LedgerView: View {
         List {
             Section { Text(String(localized: "我的孩子 · 共 \(store.ledgerTotal) 条", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))).foregroundStyle(.secondary) }
             ForEach(store.transactions.filter { filter.isEmpty || ($0.text("childName") + $0.text("description") + $0.text("category")).localizedCaseInsensitiveContains(filter) }) { row in
-                VStack(alignment: .leading, spacing: 7) {
-                    HStack { Text(row.text("childName")).font(.headline); Spacer(); Text(row.amount("amount") + (row.text("type") == "cash" ? String(localized: " 元", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)) : row.text("type") == "item" ? String(localized: " 件", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)) : String(localized: " 分", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)))).foregroundStyle(row.number("amount") >= 0 ? .teal : .orange).font(.headline.monospacedDigit()) }
-                    Text(row.text("description")); Text("\(row.text("date")) · \(row.text("category"))").font(.caption).foregroundStyle(.secondary)
-                    if !row.text("notes").isEmpty { Text(row.text("notes")).font(.caption) }
-                }.padding(.vertical, 4)
+                LedgerRow(row: row)
             }
             if store.transactions.isEmpty { ContentUnavailableView(String(localized: "还没有记录", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), systemImage: "list.bullet.rectangle", description: Text(String(localized: "从孩子详情中记录奖励与扣分。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)))) }
             if store.transactions.count < store.ledgerTotal {

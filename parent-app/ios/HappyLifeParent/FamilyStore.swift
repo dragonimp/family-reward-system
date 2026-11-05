@@ -86,6 +86,9 @@ private actor PhotoPreviewLoader {
     @Published var profile: Record?
     @Published var groups: [Record] = []
     @Published var children: [Record] = []
+    @Published var homeChildren: [Record] = []
+    @Published var growthReports: [Record] = []
+    @Published var growthReportError: String?
     @Published var rules: [Record] = []
     @Published var requests: [Record] = []
     @Published var transactions: [Record] = []
@@ -183,8 +186,9 @@ private actor PhotoPreviewLoader {
     }
     func loadFamily() async throws {
         // Clear old family data before loading the selected scope.
-        children = []; requests = []; transactions = []; growth = []; rules = []; members = []
+        children = []; homeChildren = []; growthReports = []; growthReportError = nil; requests = []; transactions = []; growth = []; rules = []; members = []
         children = try await fetchChildren()
+        homeChildren = try await fetchChildren(ownedOnly: true)
         rules = try Record.list(await call("/api/rules"), key: "rules")
         let approval = try await call("/api/reward-requests?limit=50") as? [String: Any]
         requests = try Record.list(approval?["requests"] as Any)
@@ -194,10 +198,14 @@ private actor PhotoPreviewLoader {
             let stats = try await call("/api/stats/growth?\(scope)") as? [String: Any]
             growth = try Record.list(stats?["children"] as Any)
         }
+        do {
+            growthReports = try Record.list(await call("/api/growth-reports?audience=child&period=weekly&ai=false"), key: "reports")
+        } catch is CancellationError { throw CancellationError() }
+        catch { growthReportError = momentDisplayError(error) }
         lastRefresh = Date()
     }
-    private func fetchChildren(strictCredit: Bool = false) async throws -> [Record] {
-        var result = try Record.list(await call("/api/children?\(scope)"))
+    private func fetchChildren(strictCredit: Bool = false, ownedOnly: Bool = false) async throws -> [Record] {
+        var result = try Record.list(await call(ownedOnly ? "/api/children?ownedOnly=true" : "/api/children?\(scope)"))
         let creditRows: [[String: Any]]
         do {
             let overview = try await call("/api/credit/overview") as? [String: Any]
@@ -221,11 +229,13 @@ private actor PhotoPreviewLoader {
     func refreshBalancesAndLedger() async throws {
         let current = revision
         let updated = try await fetchChildren(strictCredit: true)
+        let updatedHome = try await fetchChildren(strictCredit: true, ownedOnly: true)
         let ledger = try await call("/api/transactions?page=1&pageSize=30") as? [String: Any]
         guard let data = ledger?["data"] as? [String: Any] else { throw APIError.message(String(localized: "无法读取最新积分记录。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) }
         let items = try Record.list(data["items"] as Any)
         guard current == revision else { throw CancellationError() }
         children = updated
+        homeChildren = updatedHome
         transactions = items
         ledgerPage = 1
         ledgerTotal = (data["total"] as? NSNumber)?.intValue ?? 0
@@ -235,6 +245,11 @@ private actor PhotoPreviewLoader {
         guard ready, Date().timeIntervalSince(lastRefresh) > 5 else { return }
         do { try await refreshBalancesAndLedger() }
         catch is CancellationError {} catch { self.error = momentDisplayError(error) }
+    }
+    func refreshRequests() async {
+        do { requests = try Record.list(await call("/api/reward-requests?limit=50"), key: "requests") }
+        catch is CancellationError { }
+        catch { self.error = momentDisplayError(error) }
     }
     func loadLedger(page: Int) async throws {
         let result = try await call("/api/transactions?page=\(page)&pageSize=30") as? [String: Any]
@@ -253,7 +268,7 @@ private actor PhotoPreviewLoader {
         photoSource.logout(token: identity.accessToken)
         photoRequestNotice = nil
         photoTransferProgress = nil
-        revision = UUID(); identity.logout(); profile = nil; groups = []; children = []; rules = []; requests = []; transactions = []; growth = []; members = []; groupID = 0; loading = false
+        revision = UUID(); identity.logout(); profile = nil; groups = []; children = []; homeChildren = []; growthReports = []; growthReportError = nil; rules = []; requests = []; transactions = []; growth = []; members = []; groupID = 0; loading = false
     }
 
     func resumePhotoSharing() { if identity.isAuthenticated { photoSource.start(); Task { await photoSource.importSharedItems(); await notifications.resume() } } }

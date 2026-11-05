@@ -23,6 +23,7 @@
 "提交" = "Submit";
 "修改密码" = "Change password";
 "修改打卡" = "Edit check-in";
+"成长管理菜单" = "Growth management menu";
 "%@%lld" = "%@%lld";
 "给孩子的话" = "A message for your child";
 "新活动名称" = "New activity name";
@@ -31,6 +32,7 @@
 "邀请链接格式不正确" = "The invitation link format is invalid";
 "归档会话" = "Archive chat";
 "女" = "Female";
+"暂无孩子成长报告" = "No child growth reports yet";
 "只想说说" = "Just let me talk";
 "登录由用户中心提供。遇到问题可在“我的”中的“心愿墙与意见墙”提交反馈。" = "Sign-in is provided by User Center. If you need help, submit feedback through Wishes and feedback in My.";
 "%lld 步" = "%lld steps";
@@ -319,6 +321,7 @@
 "分享已删除，本机副本暂未清理；App 会继续重试。" = "The share was deleted, but the local copy could not be removed yet. The app will keep trying.";
 "多选原文件接收进度" = "Original file transfer progress";
 "活动标识无效。" = "The activity ID is invalid.";
+"消息通知，%lld 条待处理或未读" = "Notifications, %lld pending or unread";
 "暂无空间" = "No spaces yet";
 "最近在线：" = "Last online: ";
 "管理%@" = "Manage %@";
@@ -510,6 +513,7 @@
 "分享家庭邀请" = "Share family invitation";
 "请重新生成好友码" = "Create a new friend code";
 "专属测试邀请" = "Your test invitation";
+"明细台账" = "Detailed ledger";
 "暂时无法连接，请检查网络；联网后会自动继续" = "Unable to connect. Check your network. This will resume when you are online.";
 "已选 %lld 项" = "%lld selected";
 "本次登录验证码：%@" = "Verification code for this sign-in: %@";
@@ -548,6 +552,7 @@
 "刷新日常" = "Refresh moments";
 "手表与 iPhone 的照片传输尚未就绪。" = "Photo transfer between the watch and iPhone is not ready yet.";
 "%lld年%lld月" = "%lld/%lld";
+"家庭组与孩子管理" = "Family and child management";
 "%@，%@" = "%@，%@";
 "比上周%@ %lld 条记录" = "%@ %lld records compared with last week";
 "添加孩子" = "Add child";
@@ -592,6 +597,7 @@
 "今天也要开心成长。" = "Keep growing happily today.";
 "手表照片.jpg" = "Watch photo.jpg";
 "活动数据暂时不可用。" = "Activity data is temporarily unavailable.";
+"我的孩子" = "My children";
 "记录" = "Records";
 "修改姓名与备注" = "Change name and notes";
 "运动项目" = "Exercise type";
@@ -679,6 +685,7 @@
 "查看好友与申请" = "View friends and requests";
 "类型" = "Type";
 "数量（大于 0）" = "Quantity (greater than 0)";
+"积分申请通知" = "Points requests";
 "暂无打卡或共享照片。" = "No check-ins or shared photos yet.";
 "复盘" = "Review";
 "孩子资料" = "Child profile";
@@ -818,6 +825,7 @@
 "有效期至 " = "Valid until ";
 "请用右上角“…”新增个人空间。" = "Use the … button at the top right to add a personal space.";
 "照片文件无效或超过 50 MB。" = "The photo file is invalid or exceeds 50 MB.";
+"孩子成长总结" = "Child growth summary";
 "继续注销" = "Continue deletion";
 "孩子成长、奖励审批和积分记录，都在这里。" = "Children’s growth, reward approvals, and point records are all here.";
 "恢复" = "Restore";
@@ -864,6 +872,7 @@
 "还没有分享的照片或视频" = "No shared photos or videos yet";
 "将「%@」移出活动？" = "Remove “%@” from this activity?";
 "会话状态" = "Chat status";
+"成长管理" = "Growth management";
 "净支持 %lld" = "Net support %lld";
 "请家长先配置家庭成员" = "Ask a parent to set up family members first.";
 "已暂停" = "Paused";
