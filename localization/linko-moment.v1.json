@@ -4740,6 +4740,171 @@
       "zh-Hans": "消息通知，%lld 条待处理或未读",
       "en": "Notifications, %lld pending or unread",
       "iosKey": "消息通知，%lld 条待处理或未读"
+    },
+    "moment.exercise.b95a2c01559c": {
+      "zh-Hans": "删除失败，运动记录已保留，请稍后重试。",
+      "en": "Could not delete the workout. It is still saved; try again later.",
+      "iosKey": "删除失败，运动记录已保留，请稍后重试。"
+    },
+    "moment.exercise.3e9902278b32": {
+      "zh-Hans": "正在记录轨迹",
+      "en": "Recording route",
+      "iosKey": "正在记录轨迹"
+    },
+    "moment.exercise.dde28c579e62": {
+      "zh-Hans": "未开启定位，可在系统设置中允许位置访问。计时与计步仍可使用。",
+      "en": "Location is off. Allow location access in Settings. Timer and steps still work.",
+      "iosKey": "未开启定位，可在系统设置中允许位置访问。计时与计步仍可使用。"
+    },
+    "moment.exercise.59457664d704": {
+      "zh-Hans": "定位暂不可用",
+      "en": "Location is unavailable",
+      "iosKey": "定位暂不可用"
+    },
+    "moment.exercise.5331eab0c1d7": {
+      "zh-Hans": "定位精度不足，可在系统设置中开启精确位置。",
+      "en": "Location accuracy is low. Enable Precise Location in Settings.",
+      "iosKey": "定位精度不足，可在系统设置中开启精确位置。"
+    },
+    "moment.exercise.c16bb287c9d1": {
+      "zh-Hans": "本次轨迹已达记录上限，计时与计步继续。",
+      "en": "Route recording limit reached. Timer and steps continue.",
+      "iosKey": "本次轨迹已达记录上限，计时与计步继续。"
+    },
+    "moment.exercise.f97b504bebe2": {
+      "zh-Hans": "正在获取 GPS 信号",
+      "en": "Waiting for GPS signal",
+      "iosKey": "正在获取 GPS 信号"
+    },
+    "moment.exercise.82e558842e3f": {
+      "zh-Hans": "定位暂不可用，请检查系统定位权限。",
+      "en": "Location is unavailable. Check location permissions in Settings.",
+      "iosKey": "定位暂不可用，请检查系统定位权限。"
+    },
+    "moment.exercise.ebf3cfbb2554": {
+      "zh-Hans": "服务器分页无效，请稍后重试。",
+      "en": "Invalid server response. Try again later.",
+      "iosKey": "服务器分页无效，请稍后重试。"
+    },
+    "moment.exercise.7e9d041bbf0b": {
+      "zh-Hans": "已同步到当前账号",
+      "en": "Synced to your account",
+      "iosKey": "已同步到当前账号"
+    },
+    "moment.exercise.95a642666483": {
+      "zh-Hans": "同步未完成，本机记录已保留：%@",
+      "en": "Sync incomplete. Your local records are safe: %@",
+      "iosKey": "同步未完成，本机记录已保留：%@"
+    },
+    "moment.exercise.45d42f74a03e": {
+      "zh-Hans": "部分运动已超过系统数据保留期，步数或距离无法完整获取。",
+      "en": "Some workouts are older than the system retention period. Steps or distance may be incomplete.",
+      "iosKey": "部分运动已超过系统数据保留期，步数或距离无法完整获取。"
+    },
+    "moment.exercise.8b91a131263f": {
+      "zh-Hans": "显示模式",
+      "en": "View",
+      "iosKey": "显示模式"
+    },
+    "moment.exercise.5440f7424f28": {
+      "zh-Hans": "数据",
+      "en": "Stats",
+      "iosKey": "数据"
+    },
+    "moment.exercise.41ab2e0ecbec": {
+      "zh-Hans": "地图",
+      "en": "Map",
+      "iosKey": "地图"
+    },
+    "moment.exercise.00398ed20802": {
+      "zh-Hans": "此设备不支持距离估算",
+      "en": "Distance estimates are unavailable on this device",
+      "iosKey": "此设备不支持距离估算"
+    },
+    "moment.exercise.863cba55dc54": {
+      "zh-Hans": "运动距离，%@",
+      "en": "Workout distance, %@",
+      "iosKey": "运动距离，%@"
+    },
+    "moment.exercise.b8dfe5908614": {
+      "zh-Hans": "距离由系统计步估算。地图模式使用 GPS 记录轨迹，暂停时停止定位。",
+      "en": "Distance is estimated from steps. Map mode records GPS routes and stops location updates while paused.",
+      "iosKey": "距离由系统计步估算。地图模式使用 GPS 记录轨迹，暂停时停止定位。"
+    },
+    "moment.exercise.828073db78ac": {
+      "zh-Hans": "重试读取步数与距离",
+      "en": "Retry steps and distance",
+      "iosKey": "重试读取步数与距离"
+    },
+    "moment.exercise.06108f3dc1eb": {
+      "zh-Hans": "完成一次运动后，时长、步数和公里数会保存在这里。",
+      "en": "Finish a workout to save its duration, steps and distance here.",
+      "iosKey": "完成一次运动后，时长、步数和公里数会保存在这里。"
+    },
+    "moment.exercise.2f9daa828907": {
+      "zh-Hans": "删除",
+      "en": "Delete",
+      "iosKey": "删除"
+    },
+    "moment.exercise.bca7630b81d3": {
+      "zh-Hans": "查看轨迹",
+      "en": "View route",
+      "iosKey": "查看轨迹"
+    },
+    "moment.exercise.2a06ccfd4ebe": {
+      "zh-Hans": "删除这条运动记录？",
+      "en": "Delete this workout?",
+      "iosKey": "删除这条运动记录？"
+    },
+    "moment.exercise.19584d4eefe9": {
+      "zh-Hans": "将删除这条%@记录及轨迹，并同步到其他设备，删除后无法恢复。",
+      "en": "This will permanently delete this %@ workout and its route from your synced devices.",
+      "iosKey": "将删除这条%@记录及轨迹，并同步到其他设备，删除后无法恢复。"
+    },
+    "moment.exercise.22deafd95f30": {
+      "zh-Hans": "完成运动后自动同步",
+      "en": "Syncs automatically after your workout",
+      "iosKey": "完成运动后自动同步"
+    },
+    "moment.exercise.dcfe516d1114": {
+      "zh-Hans": "同步",
+      "en": "Sync",
+      "iosKey": "同步"
+    },
+    "moment.exercise.5491701e1c3a": {
+      "zh-Hans": "起点",
+      "en": "Start",
+      "iosKey": "起点"
+    },
+    "moment.exercise.129b7f6241e0": {
+      "zh-Hans": "终点",
+      "en": "Finish",
+      "iosKey": "终点"
+    },
+    "moment.exercise.4424f4b324c3": {
+      "zh-Hans": "查看完整轨迹",
+      "en": "Show full route",
+      "iosKey": "查看完整轨迹"
+    },
+    "moment.exercise.22a2831ca2c2": {
+      "zh-Hans": "等待 GPS 轨迹",
+      "en": "Waiting for GPS route",
+      "iosKey": "等待 GPS 轨迹"
+    },
+    "moment.exercise.70d269c0ef4b": {
+      "zh-Hans": "开始运动后记录轨迹",
+      "en": "Start a workout to record a route",
+      "iosKey": "开始运动后记录轨迹"
+    },
+    "moment.exercise.81a0a5e4b399": {
+      "zh-Hans": "距离未获取",
+      "en": "Distance unavailable",
+      "iosKey": "距离未获取"
+    },
+    "moment.exercise.4520731d89a8": {
+      "zh-Hans": "%.2f 公里",
+      "en": "%.2f km",
+      "iosKey": "%.2f 公里"
     }
   }
 }

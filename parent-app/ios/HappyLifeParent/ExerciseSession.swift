@@ -3,6 +3,8 @@ import Foundation
 struct ExerciseArchive: Codable {
     var active: ExerciseSession?
     var history: [ExerciseSession] = []
+    var uploaded: [UUID]?
+    var pendingDeletions: [UUID]?
 
     func write(to file: URL) throws {
         try FileManager.default.createDirectory(at: file.deletingLastPathComponent(), withIntermediateDirectories: true)
@@ -14,6 +16,8 @@ struct ExerciseArchive: Codable {
         guard history.contains(where: { $0.id == id }) else { return }
         var updated = self
         updated.history.removeAll { $0.id == id }
+        updated.uploaded?.removeAll { $0 == id }
+        if !(updated.pendingDeletions ?? []).contains(id) { updated.pendingDeletions = (updated.pendingDeletions ?? []) + [id] }
         try updated.write(to: file)
         self = updated
     }
@@ -32,6 +36,16 @@ struct ExerciseSession: Codable, Identifiable {
     var startedAt: Date
     var endedAt: Date?
     var intervals: [ExerciseInterval]
+    var routeEnabled: Bool?
+    var route: [ExerciseRoutePoint]?
+    var routePoints: [ExerciseRoutePoint] { (route ?? []).filter(\.valid) }
+    mutating func appendRoute(_ point: ExerciseRoutePoint) -> Bool {
+        guard running, routeEnabled == true, point.valid, let start = intervals.last?.start,
+              point.recordedAt >= start, (route?.count ?? 0) < 20_000,
+              route?.last.map({ point.recordedAt > $0.recordedAt }) ?? true else { return false }
+        route = (route ?? []) + [point]
+        return true
+    }
     var running: Bool { endedAt == nil && intervals.last?.end == nil }
     var steps: Int? {
         guard intervals.allSatisfy({ $0.steps != nil }) else { return nil }
@@ -61,4 +75,12 @@ struct ExerciseSession: Codable, Identifiable {
         let seconds = max(0, Int(duration))
         return String(format: "%02d:%02d:%02d", seconds / 3600, seconds / 60 % 60, seconds % 60)
     }
+}
+
+struct ExerciseRoutePoint: Codable, Equatable {
+    var latitude: Double
+    var longitude: Double
+    var recordedAt: Date
+    var segment: UUID
+    var valid: Bool { latitude.isFinite && longitude.isFinite && (-90...90).contains(latitude) && (-180...180).contains(longitude) }
 }
