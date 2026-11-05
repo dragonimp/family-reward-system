@@ -43,4 +43,5 @@
     </Content>
   </ItemGroup>
 
+  <ItemGroup><EmbeddedResource Include="../frontend/public/moment-app-icon.png" LogicalName="MomentShareIcon" /><EmbeddedResource Include="../frontend/public/moment-share-default.svg" LogicalName="MomentShareDefaultCover" /></ItemGroup>
 </Project>
