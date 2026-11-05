@@ -159,6 +159,7 @@ struct DiningView: View {
     @State private var showingRecords = false
     @State private var showingCircles = false
     @State private var spinning = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     init(userID: String) { _model = StateObject(wrappedValue: DiningStore(userID: userID)) }
     var body: some View {
         NavigationStack {
@@ -170,7 +171,7 @@ struct DiningView: View {
                         Label(model.archive.circles.first(where: { $0.id == model.circleID })?.name ?? String(localized: "当前位置附近", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), systemImage: "location.circle").font(.subheadline).foregroundStyle(.secondary)
                     }
                     VStack(spacing: 16) {
-                        Text("🍚").font(.system(size: 76)).rotationEffect(.degrees(model.busy && spinning ? 12 : -8)).animation(model.busy ? .easeInOut(duration: 0.3).repeatForever(autoreverses: true) : .default, value: spinning)
+                        Text("🍚").font(.system(size: 76)).rotationEffect(.degrees(model.busy && spinning ? 12 : -8)).animation(model.busy && !reduceMotion ? .easeInOut(duration: 0.3).repeatForever(autoreverses: true) : .default, value: spinning)
                         Button { Task { await model.decide() } } label: {
                             HStack { if model.busy { ProgressView().tint(.white) }; Text(model.busy ? String(localized: "正在安排这顿饭…", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)) : String(localized: "🎲 帮我决定", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))).font(.title3.bold()).frame(maxWidth: .infinity) }.padding(12)
                         }.buttonStyle(.borderedProminent).tint(.orange).disabled(model.busy)

@@ -27,7 +27,11 @@ public sealed class DiningPanel : ContentView
         this.store = store; this.owner = owner;
         file = Path.Combine(FileSystem.AppDataDirectory, "dining-" + Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(DiningAccount.Identity(userId)))) + ".json");
         if (userId.Length == 0) { readable = false; message = "用户身份尚未就绪，请重新登录后重试。"; }
-        else try { if (File.Exists(file)) archive = JsonSerializer.Deserialize<DiningArchive>(File.ReadAllText(file), json) ?? throw new InvalidDataException(); }
+        else try { if (File.Exists(file)) {
+            var loaded = JsonSerializer.Deserialize<DiningArchive>(File.ReadAllText(file), json) ?? throw new InvalidDataException();
+            if (loaded.History is null || loaded.Habits is null || loaded.Favorites is null || loaded.Circles is null || loaded.History.Any(c => c.Place is null)) throw new InvalidDataException();
+            archive = loaded;
+        } }
         catch { readable = false; message = "干饭记录暂时无法读取，原记录已保留，请重试。"; }
         Content = new ScrollView { Content = body }; Render();
     }
@@ -46,7 +50,9 @@ public sealed class DiningPanel : ContentView
     {
         body.Children.Clear();
         var header = new Grid { ColumnDefinitions = new ColumnDefinitionCollection { new(GridLength.Star), new(GridLength.Auto) } };
-        header.Add(MomentStyle.Title("干饭", 30)); header.Add(MomentStyle.Action("⋯", () => _ = Menu()), 1, 0); body.Add(header);
+        header.Add(MomentStyle.Title("干饭", 30));
+        var menu = MomentStyle.Action("⋯", () => _ = Menu()); menu.IsEnabled = !busy;
+        SemanticProperties.SetDescription(menu, "干饭菜单"); header.Add(menu, 1, 0); body.Add(header);
         body.Add(MomentStyle.Title("今天吃啥？", 32)); body.Add(MomentStyle.Caption("别纠结了，这顿我安排！"));
         body.Add(MomentStyle.Caption(archive.Circles.FirstOrDefault(c => c.Id == circleId)?.Name ?? "当前位置附近"));
         var hero = new VerticalStackLayout { Spacing = 16 };
@@ -110,7 +116,7 @@ public sealed class DiningPanel : ContentView
         } catch (OperationCanceledException) { if (current == generation) message = "定位或搜索超时，请重试，或使用已保存的生活圈。"; }
         catch (PermissionException) { message = "请在系统设置中允许位置访问，或选择已保存的生活圈。"; }
         catch (Exception error) { if (current == generation) message = error is FamilyApiException ? error.Message : "附近餐厅暂时无法读取，请稍后重试。"; }
-        finally { if (current == generation) { busy = false; operation = null; Render(); } }
+        finally { if (ReferenceEquals(operation, cancel)) operation = null; if (current == generation) { busy = false; Render(); } }
     }
     private static async Task<Location> Locate(CancellationToken ct)
     {
@@ -134,7 +140,7 @@ public sealed class DiningPanel : ContentView
     private async Task Records()
     {
         var rows = new VerticalStackLayout { Spacing = 16, Padding = 20 };
-        var page = new ContentPage { Title = "干饭记录与收藏", BackgroundColor = MomentStyle.Background, Content = new ScrollView { Content = rows } };
+        var page = new ContentPage { Title = "干饭记录与收藏", SafeAreaEdges = SafeAreaEdges.All, BackgroundColor = MomentStyle.Background, Content = new ScrollView { Content = rows } };
         void Fill() {
             rows.Children.Clear(); rows.Add(MomentStyle.Caption("记录与习惯仅保存在本机，切换账号相互隔离。")); rows.Add(MomentStyle.Title("我的收藏", 22));
             foreach (var place in archive.Favorites) rows.Add(MomentStyle.Card(MomentStyle.Row(place.Name, "导航", () => _ = Navigate(place))));
@@ -156,13 +162,15 @@ public sealed class DiningPanel : ContentView
         if (choice is null or "取消") return;
         if (choice == "当前位置") circleId = null;
         else if (choice is "🏠 将当前位置设为家" or "🏢 将当前位置设为公司") {
-            if (busy) return; busy = true; Render();
+            if (busy) return; busy = true; var current = ++generation; Render();
+            using var cancel = operation = new CancellationTokenSource(TimeSpan.FromSeconds(15));
             try {
-                using var cancel = new CancellationTokenSource(TimeSpan.FromSeconds(15)); var location = await Locate(cancel.Token);
+                var location = await Locate(cancel.Token);
+                if (current != generation) return;
                 var name = choice.Contains("家") ? "家附近" : "公司附近"; var circle = new DiningCircle(Guid.NewGuid(), name, location.Latitude, location.Longitude);
                 if (Update(a => { a.Circles.RemoveAll(c => c.Name == name); a.Circles.Add(circle); })) circleId = circle.Id;
-            } catch { message = "未能保存生活圈，请检查定位权限后重试。"; }
-            finally { busy = false; }
+            } catch { if (current == generation) message = "未能保存生活圈，请检查定位权限后重试。"; }
+            finally { if (ReferenceEquals(operation, cancel)) operation = null; if (current == generation) busy = false; }
         } else circleId = archive.Circles.FirstOrDefault(c => c.Name == choice)?.Id;
         candidates = []; result = null; confirmed = false; Render();
     }
