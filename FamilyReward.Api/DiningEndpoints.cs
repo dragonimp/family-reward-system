@@ -49,6 +49,7 @@ internal static class DiningEndpoints
         var restaurants = new List<DiningRestaurant>(); var seen = new HashSet<string>(StringComparer.Ordinal);
         foreach (var poi in pois.EnumerateArray())
         {
+            if (poi.ValueKind != JsonValueKind.Object) continue;
             var id = Text(poi, "id"); var name = Text(poi, "name");
             if (id.Length == 0 || name.Length == 0 || !seen.Add(id) || !TryCoordinate(Text(poi, "location"), out var lat, out var lon)) continue;
             var info = poi.TryGetProperty("biz_ext", out var business) ? business : default;

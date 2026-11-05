@@ -170,6 +170,7 @@ struct DiningView: View {
                         Text(String(localized: "别纠结了，这顿我安排！", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))).font(.title3).foregroundStyle(.secondary)
                         Label(model.archive.circles.first(where: { $0.id == model.circleID })?.name ?? String(localized: "当前位置附近", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), systemImage: "location.circle").font(.subheadline).foregroundStyle(.secondary)
                     }
+                    if model.result == nil || model.busy {
                     VStack(spacing: 16) {
                         Text("🍚").font(.system(size: 76)).rotationEffect(.degrees(model.busy && spinning ? 12 : -8)).animation(model.busy && !reduceMotion ? .easeInOut(duration: 0.3).repeatForever(autoreverses: true) : .default, value: spinning)
                         Button { Task { await model.decide() } } label: {
@@ -177,6 +178,7 @@ struct DiningView: View {
                         }.buttonStyle(.borderedProminent).tint(.orange).disabled(model.busy)
                         Text(String(localized: "不选条件也可以，一键安排。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) .font(.caption).foregroundStyle(.secondary)
                     }.padding(22).frame(maxWidth: .infinity).background(.orange.opacity(0.08), in: RoundedRectangle(cornerRadius: 26))
+                    }
                     ScrollView(.horizontal, showsIndicators: false) {
                         HStack {
                             ForEach(DiningMood.allCases, id: \.self) { mood in

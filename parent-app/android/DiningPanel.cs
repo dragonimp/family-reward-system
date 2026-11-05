@@ -60,7 +60,7 @@ public sealed class DiningPanel : ContentView
         hero.Add(rice);
         if (busy) { hero.Add(new ActivityIndicator { IsRunning = true, Color = Colors.DarkOrange }); _ = rice.RotateToAsync(12, 250); }
         var decide = MomentStyle.Action(busy ? "正在安排这顿饭…" : "🎲 帮我决定", () => _ = Decide(), true); decide.IsEnabled = !busy; decide.BackgroundColor = Colors.DarkOrange; hero.Add(decide);
-        hero.Add(MomentStyle.Caption("不选条件也可以，一键安排。")); body.Add(MomentStyle.Card(hero));
+        hero.Add(MomentStyle.Caption("不选条件也可以，一键安排。")); if (result is null || busy) body.Add(MomentStyle.Card(hero));
         var moods = new HorizontalStackLayout { Spacing = 8 };
         foreach (var item in Moods) { var button = MomentStyle.Action(item.Title, () => { mood = item.Id; Render(); }, mood == item.Id); button.IsEnabled = !busy; moods.Add(button); }
         body.Add(new ScrollView { Orientation = ScrollOrientation.Horizontal, Content = moods });
