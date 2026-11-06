@@ -2,7 +2,7 @@ using System.Text.Json;
 using LinkoFamily;
 static MomentRecord Row(string json) => new(JsonDocument.Parse(json).RootElement.Clone());
 static void Check(bool ok, string label) { if (!ok) throw new Exception(label); var shareScope = new MomentScope(Guid.NewGuid(), Guid.NewGuid());
-if (shareScope.ShareUrl.AbsolutePath != $"/api/dear/public/activities/{shareScope.Tenant:D}/{shareScope.Activity:D}" ||
+if (shareScope.ShareUrl.AbsolutePath != $"/invite/activity/{shareScope.Tenant:D}/{shareScope.Activity:D}" ||
     shareScope.Web.AbsolutePath != $"/dear/spaces/{shareScope.Tenant:D}/activities/{shareScope.Activity:D}")
     throw new InvalidOperationException("Activity sharing must open the public introduction and preserve the protected navigation route.");
 Console.WriteLine("PASS " + label); }

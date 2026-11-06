@@ -35,10 +35,22 @@ try
         Check(html.Contains("datetime=\"2026-11-01T01:00:00.0000000+00:00\"") && html.Contains("toLocaleString"), "dates converted by browser timezone");
         Check(response.Headers.CacheControl?.NoStore == true && response.Headers.Contains("Content-Security-Policy"), "no-store and document protection");
     }
+    var sharePath = $"/invite/activity/{tenant:D}/{activity.ToString().ToUpperInvariant()}";
+    using (var webPage = await client.GetAsync(sharePath + "?invite=a%2Bb%26c"))
+    {
+        var html = await webPage.Content.ReadAsStringAsync();
+        Check(webPage.StatusCode == HttpStatusCode.OK && webPage.Content.Headers.ContentType?.MediaType == "text/html", "normal invitation route renders directly");
+        Check(html.Contains("href=\"https://happylife.ai.impx.net/moment/?invite=a%2Bb%26c\"") &&
+            html.Contains("src=\"https://happylife.ai.impx.net/api/dear/public/brand/icon.png\""), "cross-origin image and encoded invite destination");
+        Check(!html.Contains("apple-itunes-app") && !html.Contains("href=\"linkofamily:") &&
+            html.Contains("data-app-link=\"linkofamily:") && !html.Contains("property=\"og:url\""), "HTTPS navigation and explicit app action preserve invite");
+    }
+    using (var head = await client.SendAsync(new HttpRequestMessage(HttpMethod.Head, sharePath)))
+        Check(head.IsSuccessStatusCode && head.Content.Headers.ContentType?.MediaType == "text/html", "crawler HEAD response");
     var untitled = await client.GetStringAsync($"/api/dear/public/activities/{tenant}/{Backend.WithoutDescription}");
     Check(untitled.Contains("property=\"og:title\" content=\"活动照片\"") &&
           untitled.Contains("property=\"og:description\" content=\"查看活动介绍与封面。加入活动后，即可浏览和分享活动照片。\""), "empty activity gets readable crawler defaults");
-    Check(untitled.Contains($"property=\"og:url\" content=\"https://happylife.ai.impx.net/api/dear/public/activities/{tenant}/{Backend.WithoutDescription}\""), "plain activity link declares its canonical URL");
+    Check(untitled.Contains($"property=\"og:url\" content=\"https://home.ai.impx.net/invite/activity/{tenant}/{Backend.WithoutDescription}\""), "plain activity link declares its canonical URL");
     using (var icon = await client.GetAsync("/api/dear/public/brand/icon.png"))
         Check(icon.IsSuccessStatusCode && icon.Content.Headers.ContentType?.MediaType == "image/png" && (await icon.Content.ReadAsByteArrayAsync()).Length > 100, "packaged logo is publicly readable");
     using (var fallback = await client.GetAsync("/api/dear/public/brand/default-cover.svg"))

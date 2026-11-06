@@ -578,7 +578,7 @@ struct DearSocialView: View {
     @State private var inviteUsername = ""
     @State private var momentDraft = ""
     @State private var momentRequestID = UUID()
-    @State private var inviteLink = ""
+    @State private var inviteLink: URL?
     @State private var error = ""
     @State private var activityError = ""
     @State private var activityLoading = false
@@ -1195,7 +1195,7 @@ struct DearSocialView: View {
             error = value
         }
         .onDisappear { pendingCheckIn = false }
-        .onChange(of: activityId) { _, _ in photoToDelete = nil; showingActivityManagement = false; selectedPhoto = nil; inviteLink = ""; inviteUsername = ""; momentDraft = ""; momentRequestID = UUID(); photoLocationName = ""; selectingPhotoDownloads = false; selectedPhotoIDs.removeAll(); batchOriginalURLs = [] }
+        .onChange(of: activityId) { _, _ in photoToDelete = nil; showingActivityManagement = false; selectedPhoto = nil; inviteLink = nil; inviteUsername = ""; momentDraft = ""; momentRequestID = UUID(); photoLocationName = ""; selectingPhotoDownloads = false; selectedPhotoIDs.removeAll(); batchOriginalURLs = [] }
         .onChange(of: selectedPhotos) { _, selected in
             guard !selected.isEmpty else { return }
             let targetSpace = activityTenantId, targetActivity = activityId
@@ -1235,8 +1235,8 @@ struct DearSocialView: View {
 
     private var activityActions: some View {
                 Menu {
-                    if let url = URL(string: "https://happylife.ai.impx.net/api/dear/public/activities/\(activityTenantId)/\(activityId)") {
-                        MomentShareLink(url: url, title: selectedActivity?.text("title") ?? "活动", label: "分享活动链接")
+                    if let url = activityShareURL() {
+                        ShareLink(item: url) { Label("分享活动链接", systemImage: "square.and.arrow.up") }
                     }
                     Button {
                         editedActivityName = selectedActivity?.text("title") ?? ""; editedActivityDescription = selectedActivity?.text("description") ?? ""
@@ -1391,8 +1391,13 @@ struct DearSocialView: View {
                                 .disabled(busy || inviteUsername.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                         }
                         Button(String(localized: "生成七天有效的邀请链接", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) { run { try await createInviteLink() } }.disabled(busy)
-                        if let url = URL(string: inviteLink), url.scheme == "https" {
-                            MomentShareLink(url: url, title: selectedActivity?.text("title") ?? "活动", label: String(localized: "分享邀请链接", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)))
+                        if let inviteLink {
+                            ShareLink(item: inviteLink) {
+                                Label(String(localized: "分享邀请链接", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), systemImage: "square.and.arrow.up")
+                            }
+                            Button { UIPasteboard.general.url = inviteLink } label: {
+                                Label(String(localized: "复制链接", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), systemImage: "doc.on.doc")
+                            }
                         }
                         Text(String(localized: "对方确认加入后才能查看这场活动的分享。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)))
                             .font(.caption).foregroundStyle(.secondary)
@@ -1725,8 +1730,22 @@ struct DearSocialView: View {
     private func createInviteLink() async throws {
         let value = try await store.call(base + "tenants/\(activityTenantId)/activities/\(activityId)/invites/link", method: "POST", body: [:])
         guard let token = (value as? [String: Any])?["token"] as? String,
-              let safe = token.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) else { throw APIError.message(String(localized: "邀请链接无效。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) }
-        inviteLink = "https://happylife.ai.impx.net/api/dear/public/activities/\(activityTenantId)/\(activityId)?invite=\(safe)"
+              !token.isEmpty, let url = activityShareURL(invite: token) else { throw APIError.message(String(localized: "邀请链接无效。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) }
+        inviteLink = url
+    }
+
+    private func activityShareURL(invite: String? = nil) -> URL? {
+        guard let tenant = UUID(uuidString: activityTenantId), let activity = UUID(uuidString: activityId) else { return nil }
+        var components = URLComponents()
+        components.scheme = "https"
+        components.host = "home.ai.impx.net"
+        components.path = "/invite/activity/\(tenant.uuidString.lowercased())/\(activity.uuidString.lowercased())"
+        if let invite {
+            components.queryItems = [URLQueryItem(name: "invite", value: invite)]
+            // Form query parsing on the server treats a raw plus as a space.
+            components.percentEncodedQuery = components.percentEncodedQuery?.replacingOccurrences(of: "+", with: "%2B")
+        }
+        return components.url
     }
     private func accept(_ invitation: DearRecord) async throws {
         let me = try await store.call(base + "me") as? [String: Any] ?? [:]
