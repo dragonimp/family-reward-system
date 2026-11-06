@@ -16,6 +16,9 @@ import CryptoKit
     @Published var confirmed = false
     @Published var circleID: UUID?
     @Published var walking: String?
+    @Published private(set) var trip: DiningTrip = .unrestricted
+    private var routeTimes: [String: TimeInterval] = [:]
+    private var cachedDriving = false
     private let file: URL
     private let family: FamilyStore
     private var readable = true
@@ -106,38 +109,59 @@ import CryptoKit
         } catch is CancellationError { } catch { message = error.localizedDescription }
     }
     private func selectSavedCircle(_ circle: DiningCircle) { circleID = circle.id; origin = nil; candidates = []; result = nil; walking = nil }
+    func selectTrip(_ trip: DiningTrip) {
+        guard !busy, !checkingIn, self.trip != trip else { return }
+        if self.trip.driving != trip.driving { routeTimes = [:] }
+        self.trip = trip
+        result = nil; walking = nil; confirmed = false; message = nil
+    }
+
     func decide() async {
         guard !busy, !checkingIn else { return }; busy = true; message = nil; walking = nil
         let current = UUID()
         generation = current
         defer { if current == generation { busy = false } }
         let meal = DiningMeal.current()
+        let trip = self.trip
+        let radius: CLLocationDistance = trip.driving ? 8000 : 3000
         if resultMeal != meal { result = nil; confirmed = false }
         do {
-            if cachedMeal != meal || Date().timeIntervalSince(fetchedAt) > 300 { candidates = [] }
+            if cachedMeal != meal || cachedDriving != trip.driving || Date().timeIntervalSince(fetchedAt) > 300 { candidates = [] }
             if candidates.isEmpty {
                 let location: CLLocation
                 if let circle = archive.circles.first(where: { $0.id == circleID }) { location = CLLocation(latitude: circle.latitude, longitude: circle.longitude) }
                 else { location = try await locate() }
                 guard current == generation else { return }
                 origin = location
+                routeTimes = [:]
                 async let details = mapDetails(near: location)
                 let query = meal == .breakfast ? "breakfast" : meal == .afternoonTea ? "dessert" : "restaurant"
                 let expanded = meal == .breakfast || meal == .afternoonTea
-                var nearby = try await nearbyPlaces(around: location, radius: 3000, query: query, includeCafes: expanded)
+                var nearby = try await nearbyPlaces(around: location, radius: radius, query: query, includeCafes: expanded)
                 let mapDetails = await details
                 if let mapDetails {
                     nearby = mapDetails.applying(to: nearby, latitude: location.coordinate.latitude, longitude: location.coordinate.longitude)
                 }
                 if meal == .afternoonTea, !nearby.contains(where: meal.includes) {
                     guard current == generation else { return }
-                    let tea = try await nearbyPlaces(around: location, radius: 3000, query: "bubble tea", includeCafes: true)
+                    let tea = try await nearbyPlaces(around: location, radius: radius, query: "bubble tea", includeCafes: true)
                     nearby += mapDetails?.applying(to: tea, latitude: location.coordinate.latitude, longitude: location.coordinate.longitude) ?? tea
                 }
                 guard current == generation else { return }
                 candidates = nearby.filter(meal.includes)
                 cachedMeal = meal
+                cachedDriving = trip.driving
                 fetchedAt = Date()
+            }
+            var eligible = candidates
+            if trip.limit != nil {
+                let nearest = Array(candidates.sorted { $0.distanceMeters < $1.distanceMeters }.prefix(6))
+                for place in nearest where routeTimes[place.id] == nil {
+                    let seconds = await routeTime(place, driving: trip.driving)
+                    guard current == generation else { return }
+                    routeTimes[place.id] = seconds
+                }
+                eligible = nearest.filter { trip.includes(routeTimes[$0.id]) }
             }
             try await Task.sleep(for: .milliseconds(450))
             guard current == generation else { return }
@@ -146,18 +170,27 @@ import CryptoKit
                 message = diningText("餐段已切换，请重新推荐。")
                 return
             }
-            guard let next = DiningRecommendation.pick(candidates, mood: mood, archive: archive, excluding: result?.id) else {
+            guard let next = DiningRecommendation.pick(eligible, mood: mood, archive: archive, excluding: result?.id) else {
                 result = nil
-                message = diningText("附近暂时没有适合当前餐段的餐厅。试试其他生活圈，或稍后重新定位。")
+                message = trip.limit != nil && !candidates.isEmpty
+                    ? diningText("暂未找到能确认符合路程上限的餐厅。可以放宽上限后重试。")
+                    : diningText("附近暂时没有适合当前餐段的餐厅。试试其他生活圈，或稍后重新定位。")
                 return
             }
             if let previous = result, !confirmed { _ = update { $0.habits[previous.id, default: DiningHabit()].skipped += 1 } }
             guard current == generation else { return }
             result = next; resultMood = mood; resultMeal = meal; confirmed = false; resultOperation = UUID()
-            if candidates.count == 1 { message = String(localized: "附近暂时只找到这一家，可换个生活圈再试。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)) }
+            if eligible.count == 1 { message = String(localized: "附近暂时只找到这一家，可换个生活圈再试。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)) }
             // The blind box animates only while real location/search work is running.
             busy = false
-            await loadWalking(next, generation: current)
+            if let seconds = routeTimes[next.id], trip.limit != nil {
+                walking = routeLabel(seconds, driving: trip.driving)
+            } else {
+                let seconds = await routeTime(next, driving: false)
+                if let seconds, current == generation, result?.id == next.id {
+                    walking = routeLabel(seconds, driving: false)
+                }
+            }
         } catch is CancellationError { }
         catch { if current == generation { message = (error as? APIError)?.localizedDescription ?? String(localized: "附近餐厅暂时无法读取，请稍后重试。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)) } }
     }
@@ -229,18 +262,29 @@ import CryptoKit
     }
     func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) { finishLocation(.failure(APIError.message(String(localized: "暂时无法定位，请重试或使用已保存的生活圈。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))))) }
     private func finishLocation(_ result: Result<CLLocation, Error>) { timeout?.cancel(); timeout = nil; let continuation = waiting; waiting = nil; continuation?.resume(with: result) }
-    private func loadWalking(_ place: DiningPlace, generation current: UUID) async {
-        guard let origin else { return }
-        let request = MKDirections.Request(); request.transportType = .walking
+    private func routeTime(_ place: DiningPlace, driving: Bool) async -> TimeInterval? {
+        guard let origin else { return nil }
+        let request = MKDirections.Request()
+        request.transportType = driving ? .automobile : .walking
         request.source = MKMapItem(placemark: MKPlacemark(coordinate: origin.coordinate))
         request.destination = MKMapItem(placemark: MKPlacemark(coordinate: CLLocationCoordinate2D(latitude: place.latitude, longitude: place.longitude)))
         let operation = MKDirections(request: request); directions?.cancel(); directions = operation
-        guard let route = try? await operation.calculate().routes.first, current == generation, result?.id == place.id else { return }
-        walking = route.distance.formatted(.number.precision(.fractionLength(0))) + " m · " + String(Int(ceil(route.expectedTravelTime / 60))) + " min"
+        let deadline = Task {
+            do { try await Task.sleep(for: .seconds(3)) } catch { return }
+            operation.cancel()
+        }
+        defer { deadline.cancel() }
+        guard let response = try? await operation.calculateETA(), response.transportType == request.transportType,
+              response.expectedTravelTime.isFinite, response.expectedTravelTime > 0 else { return nil }
+        return response.expectedTravelTime
     }
-    func navigate(_ place: DiningPlace) {
+    private func routeLabel(_ seconds: TimeInterval, driving: Bool) -> String {
+        let minutes = ceil(seconds / 60).formatted()
+        return driving ? diningText("预计开车约 \(minutes) 分钟") : diningText("预计步行约 \(minutes) 分钟")
+    }
+    func navigate(_ place: DiningPlace, driving: Bool = false) {
         let item = MKMapItem(placemark: MKPlacemark(coordinate: CLLocationCoordinate2D(latitude: place.latitude, longitude: place.longitude))); item.name = place.name
-        item.openInMaps(launchOptions: [MKLaunchOptionsDirectionsModeKey: MKLaunchOptionsDirectionsModeWalking])
+        item.openInMaps(launchOptions: [MKLaunchOptionsDirectionsModeKey: driving ? MKLaunchOptionsDirectionsModeDriving : MKLaunchOptionsDirectionsModeWalking])
     }
 }
 
@@ -265,6 +309,9 @@ struct DiningView: View {
                         Text(String(localized: "别纠结了，这顿我安排！", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))).font(.title3).foregroundStyle(.secondary)
                         Label(model.archive.circles.first(where: { $0.id == model.circleID })?.name ?? String(localized: "当前位置附近", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), systemImage: "location.circle").font(.subheadline).foregroundStyle(.secondary)
                     }
+                    Picker(diningText("路程"), selection: Binding(get: { model.trip }, set: model.selectTrip)) {
+                        ForEach(DiningTrip.allCases, id: \.self) { trip in Text(tripTitle(trip)).tag(trip) }
+                    }.pickerStyle(.menu).disabled(model.busy || model.checkingIn)
                     if model.result == nil || model.busy {
                     VStack(spacing: 16) {
                         Text("🍚").font(.system(size: 76)).rotationEffect(.degrees(model.busy && spinning ? 12 : -8)).animation(model.busy && !reduceMotion ? .easeInOut(duration: 0.3).repeatForever(autoreverses: true) : .default, value: spinning)
@@ -310,7 +357,7 @@ struct DiningView: View {
             Text(String(localized: "命运安排好了，走，干饭！", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))).font(.headline).foregroundStyle(.orange)
             Text(place.name).font(.title2.bold()).textSelection(.enabled)
             if !place.address.isEmpty { Label(place.address, systemImage: "mappin.and.ellipse").font(.subheadline) }
-            if let walking = model.walking { Label(walking, systemImage: "figure.walk") }
+            if let walking = model.walking { Label(walking, systemImage: model.trip.driving ? "car" : "figure.walk") }
             else { Text(String(localized: "直线距离估算：", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)) + place.distanceMeters.formatted(.number.precision(.fractionLength(0))) + " m") .font(.subheadline).foregroundStyle(.secondary) }
             Label(cuisineText(place), systemImage: "fork.knife")
                 .font(.subheadline)
@@ -320,7 +367,7 @@ struct DiningView: View {
             Button(model.confirmed ? String(localized: "已选好，走，干饭！", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)) : String(localized: "✅ 就吃这家！", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) { model.confirm(operation: operation) }.buttonStyle(.borderedProminent).tint(.orange).disabled(model.confirmed || model.busy)
             Button(String(localized: "🎲 不行，再来一家！", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) { Task { await model.decide() } }.buttonStyle(.bordered).disabled(model.busy)
             HStack {
-                Button(String(localized: "带我过去！", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), systemImage: "map") { model.navigate(place) }
+                Button(String(localized: "带我过去！", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), systemImage: "map") { model.navigate(place, driving: model.trip.driving) }
                 Spacer()
                 Button { _ = model.update { $0.toggleFavorite(place) } } label: { Image(systemName: model.archive.favorites.contains(where: { $0.id == place.id }) ? "heart.fill" : "heart").accessibilityLabel(String(localized: "收藏餐厅", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) }
             }.disabled(model.busy)
@@ -344,6 +391,15 @@ struct DiningView: View {
         }
         let price = cost.formatted(.currency(code: "CNY").precision(.fractionLength(0...2)).locale(locale))
         return String(localized: "人均约\(price) · 高德地图参考价", bundle: bundle, locale: locale)
+    }
+    private func tripTitle(_ trip: DiningTrip) -> String {
+        switch trip {
+        case .unrestricted: diningText("不限路程")
+        case .walk5: diningText("走路 5 分钟内")
+        case .walk10: diningText("走路 10 分钟内")
+        case .drive10: diningText("开车 10 分钟内")
+        case .drive20: diningText("开车 20 分钟内")
+        }
     }
     private func mealTitle(_ meal: DiningMeal) -> String {
         switch meal {

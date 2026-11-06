@@ -59,6 +59,10 @@ Check(options.Where(p => DiningMeal.Includes(DiningMealPeriod.AfternoonTea, p)).
 foreach (var meal in new[] { DiningMealPeriod.Lunch, DiningMealPeriod.Dinner })
     Check(options.Where(p => DiningMeal.Includes(meal, p)).SequenceEqual([steak]), "lunch and dinner require main meals");
 Check(DiningRecommendation.Pick(new[] { tea }.Where(p => DiningMeal.Includes(DiningMealPeriod.Lunch, p)), "familiar", archive, null) is null, "familiarity cannot bypass the mealtime filter");
+Check(DiningTrip.Walk5.Includes(300) && !DiningTrip.Walk5.Includes(300.1), "walking 5 minutes uses raw inclusive seconds");
+Check(DiningTrip.Walk10.Includes(600) && DiningTrip.Drive10.Includes(600) && !DiningTrip.Drive10.Includes(601), "10 minute limits are inclusive");
+Check(DiningTrip.Drive20.Driving() && !DiningTrip.Walk10.Driving() && DiningTrip.Drive20.Includes(1200) && !DiningTrip.Drive20.Includes(1201), "driving 20 minutes uses the selected transport and limit");
+Check(!DiningTrip.Walk5.Includes(null) && !DiningTrip.Drive20.Includes(double.NaN) && DiningTrip.Unrestricted.Includes(null), "unknown route times never pass an active filter");
 using var data = JsonDocument.Parse("""{"status":"1","pois":[{"id":"A","name":"Real restaurant","location":"121.4,31.2","distance":"200","biz_ext":{"cost":[],"rating":"4.3"}},{"id":"A","name":"Duplicate","location":"121.4,31.2","distance":"100"},{"id":"bad","name":"Bad","location":"999,999","distance":"10"}]}""");
 var parsed = DiningEndpoints.Parse(data.RootElement);
 Check(parsed.Count == 1 && parsed[0].Cost == null && parsed[0].Rating == 4.3 && parsed[0].Longitude == 121.4, "provider parsing preserves absence, deduplicates and validates coordinates");
@@ -73,6 +77,8 @@ try {
  using var client = new HttpClient { BaseAddress = new Uri(app.Services.GetRequiredService<IServer>().Features.Get<IServerAddressesFeature>()!.Addresses.Single()) };
  var body = new StringContent("""{"latitude":31.2,"longitude":121.4}""", System.Text.Encoding.UTF8, "application/json");
  Check((await client.PostAsync("/api/dining/nearby", body)).StatusCode == HttpStatusCode.Unauthorized, "user center auth required before provider access");
+ var routeBody = new StringContent("""{"mode":"walking","origin":{"latitude":31.205,"longitude":121.405},"destinations":[{"latitude":31.2,"longitude":121.4},{"latitude":31.2,"longitude":121.41}]}""", System.Text.Encoding.UTF8, "application/json");
+ Check((await client.PostAsync("/api/dining/route-times", routeBody)).StatusCode == HttpStatusCode.Unauthorized, "route times require authentication");
  client.DefaultRequestHeaders.Add("X-Test-User", "test");
  Check((await client.PostAsync("/api/dining/nearby", body)).StatusCode == HttpStatusCode.ServiceUnavailable, "missing key is explicit 503");
  builder.Configuration["Dining:AmapWebServiceKey"] = "test-key-not-a-credential";
@@ -83,6 +89,10 @@ try {
  var center = payload.RootElement.GetProperty("searchCenter");
  Check(center.GetProperty("latitude").GetDouble() == 31.205 && center.GetProperty("longitude").GetDouble() == 121.405, "cross-provider matching receives the converted search center");
  Check(payload.RootElement.GetProperty("restaurants")[0].GetProperty("cost").GetDouble() == 25, "real per-person price retained");
+ using var routeResponse = await client.PostAsync("/api/dining/route-times", routeBody);
+ using var routePayload = JsonDocument.Parse(await routeResponse.Content.ReadAsStringAsync());
+ var times = routePayload.RootElement.GetProperty("seconds");
+ Check(routeResponse.IsSuccessStatusCode && times[0].GetDouble() == 300 && times[1].ValueKind == JsonValueKind.Null, "route durations preserve destination order and unknown routes");
  Provider.Fail = true;
  Check((await client.PostAsync("/api/dining/nearby", body)).StatusCode == HttpStatusCode.BadGateway, "provider failure is honest, never a fake fallback");
  Console.WriteLine("PASS: dining recommendation, persistence, provider and authenticated HTTP checks");
@@ -97,6 +107,15 @@ sealed class Provider : IHttpClientFactory {
   protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken token) {
    if (Fail) throw new HttpRequestException("provider unavailable");
    if (request.RequestUri!.Host != "restapi.amap.com") throw new Exception("unexpected provider");
+   if (request.RequestUri.AbsolutePath.StartsWith("/v5/direction/", StringComparison.Ordinal)) {
+    var query = Microsoft.AspNetCore.WebUtilities.QueryHelpers.ParseQuery(request.RequestUri.Query);
+    if (request.RequestUri.AbsolutePath != "/v5/direction/walking" || query["origin"] != "121.405000,31.205000" || query["show_fields"] != "cost")
+        throw new Exception("route lookup must send GCJ-02 origin and request walking cost");
+    var content = query["destination"] == "121.400000,31.200000"
+        ? """{"status":"1","route":{"paths":[{"cost":{"duration":"300"}}]}}"""
+        : """{"status":"1","route":{"paths":[{"distance":"400"}]}}""";
+    return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(content) });
+   }
    var convert = request.RequestUri.AbsolutePath.Contains("convert");
    var result = convert ? """{"status":"1","locations":"121.405000,31.205000"}""" : """{"status":"1","pois":[{"id":"A","name":"Real restaurant","location":"121.4,31.2","distance":"200","biz_ext":{"cost":"25","rating":"4.3"}}]}""";
    if (!convert && Microsoft.AspNetCore.WebUtilities.QueryHelpers.ParseQuery(request.RequestUri.Query)["location"] != "121.405000,31.205000") throw new Exception("WGS84 must be converted before search");

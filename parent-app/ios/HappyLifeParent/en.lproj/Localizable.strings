@@ -1,4 +1,13 @@
 "选好餐厅后，记录会保存在这里。" = "Your choices will be saved here.";
+"路程" = "Travel time";
+"不限路程" = "Any travel time";
+"走路 5 分钟内" = "Up to 5 min walk";
+"走路 10 分钟内" = "Up to 10 min walk";
+"开车 10 分钟内" = "Up to 10 min drive";
+"开车 20 分钟内" = "Up to 20 min drive";
+"预计开车约 %@ 分钟" = "About %@ min by car";
+"预计步行约 %@ 分钟" = "About %@ min on foot";
+"暂未找到能确认符合路程上限的餐厅。可以放宽上限后重试。" = "No restaurants could be confirmed within this travel time. Try a longer limit.";
 "早餐推荐" = "Breakfast pick";
 "午餐推荐" = "Lunch pick";
 "下午茶推荐" = "Afternoon tea pick";

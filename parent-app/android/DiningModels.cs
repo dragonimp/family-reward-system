@@ -46,6 +46,22 @@ public sealed class DiningArchive {
         choice.EatenAt = DateTimeOffset.UtcNow; Habit(choice.Place.Id).Eaten++;
     }
 }
+public enum DiningTrip { Unrestricted, Walk5, Walk10, Drive10, Drive20 }
+
+public static class DiningTripRules
+{
+    public static bool Driving(this DiningTrip trip) => trip is DiningTrip.Drive10 or DiningTrip.Drive20;
+
+    public static bool Includes(this DiningTrip trip, double? seconds) => trip switch
+    {
+        DiningTrip.Unrestricted => true,
+        DiningTrip.Walk5 => seconds is > 0 and <= 300,
+        DiningTrip.Walk10 or DiningTrip.Drive10 => seconds is > 0 and <= 600,
+        DiningTrip.Drive20 => seconds is > 0 and <= 1200,
+        _ => false
+    };
+}
+
 public enum DiningMealPeriod { Breakfast, Lunch, AfternoonTea, Dinner }
 
 public static class DiningMeal

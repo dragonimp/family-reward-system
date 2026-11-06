@@ -88,6 +88,25 @@ enum DiningMeal: Equatable {
                                     "restaurant", "diner", "bistro", "noodle", "ramen", "pizza", "burger", "sushi", "grill", "barbecue", "hot pot"]
 }
 
+enum DiningTrip: CaseIterable, Hashable {
+    case unrestricted, walk5, walk10, drive10, drive20
+
+    var driving: Bool { self == .drive10 || self == .drive20 }
+    var limit: TimeInterval? {
+        switch self {
+        case .unrestricted: nil
+        case .walk5: 300
+        case .walk10, .drive10: 600
+        case .drive20: 1200
+        }
+    }
+    func includes(_ seconds: TimeInterval?) -> Bool {
+        guard let limit else { return true }
+        guard let seconds, seconds.isFinite else { return false }
+        return seconds > 0 && seconds <= limit
+    }
+}
+
 enum DiningMood: String, Codable, CaseIterable {
     case automatic, familiar, fresh, budget, treat, spicy
 }

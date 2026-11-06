@@ -25,6 +25,11 @@ public sealed class DiningPanel : ContentView
     private int generation;
     private DateTimeOffset fetchedAt;
     private DiningMealPeriod? cachedMeal, resultMeal;
+    private DiningTrip trip;
+    private bool cachedDriving;
+    private JsonElement routeOrigin;
+    private readonly Dictionary<string, double> routeTimes = new(StringComparer.Ordinal);
+    private static readonly string[] TripTitles = ["不限路程", "走路 5 分钟内", "走路 10 分钟内", "开车 10 分钟内", "开车 20 分钟内"];
     private static readonly (string Id, string Title)[] Moods = [("automatic", "🎲 随便安排"), ("familiar", "❤️ 还是老样子"), ("fresh", "✨ 来点新鲜的"), ("budget", "💰 今天省点钱"), ("treat", "😋 今天吃点好的"), ("spicy", "🌶️ 想吃点刺激的")];
     public DiningPanel(FamilyStore store, ContentPage owner, string userId)
     {
@@ -59,6 +64,18 @@ public sealed class DiningPanel : ContentView
         SemanticProperties.SetDescription(menu, "干饭菜单"); header.Add(menu, 1, 0); body.Add(header);
         body.Add(MomentStyle.Title("今天吃啥？", 32)); body.Add(MomentStyle.Caption("别纠结了，这顿我安排！"));
         body.Add(MomentStyle.Caption(archive.Circles.FirstOrDefault(c => c.Id == circleId)?.Name ?? "当前位置附近"));
+        var tripPicker = new Picker { Title = "路程", ItemsSource = TripTitles, SelectedIndex = (int)trip, IsEnabled = !Working };
+        tripPicker.SelectedIndexChanged += (_, _) =>
+        {
+            if (Working || tripPicker.SelectedIndex < 0 || trip == (DiningTrip)tripPicker.SelectedIndex) return;
+            var next = (DiningTrip)tripPicker.SelectedIndex;
+            if (trip.Driving() != next.Driving()) routeTimes.Clear();
+            trip = next;
+            result = null; confirmed = false; message = null;
+            Render();
+        };
+        SemanticProperties.SetDescription(tripPicker, "路程");
+        body.Add(tripPicker);
         var hero = new VerticalStackLayout { Spacing = 16 };
         var rice = new Label { Text = "🍚", FontSize = 72, HorizontalTextAlignment = TextAlignment.Center };
         hero.Add(rice);
@@ -76,7 +93,12 @@ public sealed class DiningPanel : ContentView
             var card = new VerticalStackLayout { Spacing = 14 };
             card.Add(MomentStyle.Title("命运安排好了，走，干饭！", 18)); card.Add(MomentStyle.Title(place.Name, 25));
             if (place.Address.Length > 0) card.Add(MomentStyle.Caption("📍 " + place.Address));
-            card.Add(MomentStyle.Caption($"地图参考距离约 {place.DistanceMeters:0} 米 · 步行时间以导航为准"));
+            if (trip != DiningTrip.Unrestricted && routeTimes.TryGetValue(place.Id, out var seconds))
+            {
+                var transport = trip.Driving() ? "开车" : "步行";
+                card.Add(MomentStyle.Caption($"预计{transport}约 {Math.Ceiling(seconds / 60):0} 分钟"));
+            }
+            else card.Add(MomentStyle.Caption($"地图参考距离约 {place.DistanceMeters:0} 米 · 步行时间以导航为准"));
             var cuisine = place.Category.Split(';', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries)
                 .LastOrDefault(type => type is not ("餐饮服务" or "餐饮相关场所" or "餐饮相关" or "中餐厅" or "外国餐厅" or "餐厅" or "中餐" or "西餐"));
             card.Add(MomentStyle.Caption(cuisine is null ? "暂无菜系或主打餐品信息。" : $"地图分类显示，这家店属于{cuisine}。"));
@@ -93,7 +115,7 @@ public sealed class DiningPanel : ContentView
             confirm.IsEnabled = !confirmed && !Working;
             card.Add(confirm);
             var another = MomentStyle.Action("🎲 不行，再来一家！", () => _ = Decide()); another.IsEnabled = !Working; card.Add(another);
-            card.Add(MomentStyle.Action("🗺️ 带我过去！", () => _ = Navigate(place)));
+            card.Add(MomentStyle.Action("🗺️ 带我过去！", () => _ = Navigate(place, trip.Driving())));
             card.Add(MomentStyle.Action(archive.Favorites.Any(p => p.Id == place.Id) ? "♥ 已收藏" : "♡ 收藏餐厅", () => { Update(a => { if (a.Favorites.Any(p => p.Id == place.Id)) a.Favorites.RemoveAll(p => p.Id == place.Id); else a.Favorites.Add(place); }); Render(); }));
             body.Add(MomentStyle.Card(card));
         }
@@ -123,18 +145,36 @@ public sealed class DiningPanel : ContentView
     {
         if (Working) return; busy = true; message = null; var current = ++generation;
         var meal = DiningMeal.Current(DateTimeOffset.Now);
+        var driving = trip.Driving();
         if (resultMeal != meal) { result = null; confirmed = false; }
         operation?.Cancel(); using var cancel = operation = new CancellationTokenSource(TimeSpan.FromSeconds(25)); Render();
         try {
-            if (cachedMeal != meal || DateTimeOffset.UtcNow - fetchedAt > TimeSpan.FromMinutes(5)) candidates = [];
+            if (cachedMeal != meal || cachedDriving != driving || DateTimeOffset.UtcNow - fetchedAt > TimeSpan.FromMinutes(5)) candidates = [];
             if (candidates.Count == 0) {
                 var saved = archive.Circles.FirstOrDefault(c => c.Id == circleId);
                 var location = saved is null ? await Locate(cancel.Token) : new Location(saved.Latitude, saved.Longitude);
-                var places = await NearbyPlaces(location, cancel.Token);
+                var response = await SearchNearby(location, driving, cancel.Token);
                 if (current != generation) return;
-                candidates = places.Where(place => DiningMeal.Includes(meal, place)).ToList();
+                candidates = ReadPlaces(response).Where(place => DiningMeal.Includes(meal, place)).ToList();
+                routeOrigin = response.TryGetProperty("searchCenter", out var center) ? center : default;
+                routeTimes.Clear();
+                cachedDriving = driving;
                 cachedMeal = meal;
                 fetchedAt = DateTimeOffset.UtcNow;
+            }
+            var eligible = candidates;
+            if (trip != DiningTrip.Unrestricted)
+            {
+                var nearest = candidates.OrderBy(p => p.DistanceMeters).DistinctBy(p => p.Id).Take(6).ToList();
+                var missing = nearest.Where(p => !routeTimes.ContainsKey(p.Id)).ToList();
+                if (missing.Count > 0)
+                {
+                    var times = await LookupRouteTimes(missing, driving, cancel.Token);
+                    if (current != generation) return;
+                    for (var i = 0; i < missing.Count; i++)
+                        if (times[i] is > 0 and < double.PositiveInfinity) routeTimes[missing[i].Id] = times[i]!.Value;
+                }
+                eligible = nearest.Where(p => routeTimes.TryGetValue(p.Id, out var seconds) && trip.Includes(seconds)).ToList();
             }
             await Task.Delay(450, cancel.Token);
             if (current != generation) return;
@@ -144,11 +184,18 @@ public sealed class DiningPanel : ContentView
                 message = "餐段已切换，请重新推荐。";
                 return;
             }
-            var next = DiningRecommendation.Pick(candidates, mood, archive, result?.Id);
-            if (next is null) { result = null; message = "附近暂时没有适合当前餐段的餐厅。试试其他生活圈，或稍后重新定位。"; return; }
+            var next = DiningRecommendation.Pick(eligible, mood, archive, result?.Id);
+            if (next is null)
+            {
+                result = null;
+                message = trip != DiningTrip.Unrestricted && candidates.Count > 0
+                    ? "暂未找到能确认符合路程上限的餐厅。可以放宽上限后重试。"
+                    : "附近暂时没有适合当前餐段的餐厅。试试其他生活圈，或稍后重新定位。";
+                return;
+            }
             if (result is { } old && !confirmed) Update(a => a.Habit(old.Id).Skipped++);
             result = next; resultMood = mood; resultMeal = meal; confirmed = false; resultOperation = Guid.NewGuid();
-            if (candidates.Count == 1) message = "附近暂时只找到这一家，可换个生活圈再试。";
+            if (eligible.Count == 1) message = "附近暂时只找到这一家，可换个生活圈再试。";
         } catch (OperationCanceledException) { if (current == generation) message = "定位或搜索超时，请重试，或使用已保存的生活圈。"; }
         catch (PermissionException) { message = "请在系统设置中允许位置访问，或选择已保存的生活圈。"; }
         catch (Exception error) { if (current == generation) message = error is FamilyApiException ? error.Message : "附近餐厅暂时无法读取，请稍后重试。"; }
@@ -180,7 +227,7 @@ public sealed class DiningPanel : ContentView
                 return;
             }
 
-            var places = (await NearbyPlaces(location, cancel.Token))
+            var places = ReadPlaces(await SearchNearby(location, false, cancel.Token))
                 .Where(p => !string.IsNullOrWhiteSpace(p.Name) && p.DistanceMeters is >= 0 and <= 500)
                 .OrderBy(p => p.DistanceMeters).DistinctBy(p => p.Id).ToList();
             if (current != generation) return;
@@ -213,11 +260,24 @@ public sealed class DiningPanel : ContentView
         }
     }
 
-    private async Task<List<DiningPlace>> NearbyPlaces(Location location, CancellationToken ct)
+    private Task<JsonElement> SearchNearby(Location location, bool driving, CancellationToken ct) =>
+        store.CallAsync("/api/dining/nearby", HttpMethod.Post,
+            new { latitude = location.Latitude, longitude = location.Longitude, driving }, ct);
+
+    private List<DiningPlace> ReadPlaces(JsonElement response) =>
+        response.GetProperty("restaurants").Deserialize<List<DiningPlace>>(json) ?? throw new InvalidDataException();
+
+    private async Task<double?[]> LookupRouteTimes(List<DiningPlace> places, bool driving, CancellationToken ct)
     {
-        var response = await store.CallAsync("/api/dining/nearby", HttpMethod.Post,
-            new { latitude = location.Latitude, longitude = location.Longitude }, ct);
-        return response.GetProperty("restaurants").Deserialize<List<DiningPlace>>(json) ?? throw new InvalidDataException();
+        if (routeOrigin.ValueKind != JsonValueKind.Object) return new double?[places.Count];
+        var response = await store.CallAsync("/api/dining/route-times", HttpMethod.Post, new
+        {
+            origin = routeOrigin,
+            destinations = places.Select(p => new { latitude = p.Latitude, longitude = p.Longitude }).ToArray(),
+            mode = driving ? "driving" : "walking"
+        }, ct);
+        var times = response.GetProperty("seconds").Deserialize<double?[]>(json);
+        return times?.Length == places.Count ? times : throw new InvalidDataException();
     }
     private static async Task<Location> Locate(CancellationToken ct)
     {
@@ -225,10 +285,10 @@ public sealed class DiningPanel : ContentView
         if (value is null || Math.Abs((DateTimeOffset.UtcNow - value.Timestamp).TotalMinutes) > 2) throw new InvalidOperationException();
         return value;
     }
-    private async Task Navigate(DiningPlace place)
+    private async Task Navigate(DiningPlace place, bool driving = false)
     {
         // GCJ-02 is passed to the provider that owns it; don't hand it to a WGS84 system navigator.
-        var url = "https://uri.amap.com/navigation?to=" + FormattableString.Invariant($"{place.Longitude:F6},{place.Latitude:F6},") + Uri.EscapeDataString(place.Name) + "&mode=walk&coordinate=gaode&src=linkomoment&callnative=1";
+        var url = "https://uri.amap.com/navigation?to=" + FormattableString.Invariant($"{place.Longitude:F6},{place.Latitude:F6},") + Uri.EscapeDataString(place.Name) + (driving ? "&mode=car" : "&mode=walk") + "&coordinate=gaode&src=linkomoment&callnative=1";
         await AgentIdentity.Maui.InAppWebLinks.OpenAsync(new Uri(url), BrowserLaunchMode.SystemPreferred);
     }
     private async Task Menu()
