@@ -286,7 +286,10 @@ struct GenealogyDetailView: View {
                                 Text(String(localized: "链接有效 7 天，仅可使用一次；重新生成会让旧链接失效。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)))
                                     .font(.caption).foregroundStyle(.secondary)
                                 Button(String(localized: "生成邀请链接", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) { Task { await createInvitation(person.id) } }.disabled(busy)
-                                if let invitationURL { ShareLink(String(localized: "分享邀请链接", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), item: invitationURL) }
+                                if let invitationURL {
+                                    let label = String(localized: "分享邀请链接", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))
+                                    MomentShareLink(url: invitationURL, title: label, label: label)
+                                }
                             }
                         }
                     }

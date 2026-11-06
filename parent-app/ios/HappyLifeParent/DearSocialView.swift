@@ -1236,7 +1236,7 @@ struct DearSocialView: View {
     private var activityActions: some View {
                 Menu {
                     if let url = URL(string: "https://happylife.ai.impx.net/api/dear/public/activities/\(activityTenantId)/\(activityId)") {
-                        DearActivityShareLink(url: url, title: selectedActivity?.text("title") ?? "活动", label: "分享活动链接")
+                        MomentShareLink(url: url, title: selectedActivity?.text("title") ?? "活动", label: "分享活动链接")
                     }
                     Button {
                         editedActivityName = selectedActivity?.text("title") ?? ""; editedActivityDescription = selectedActivity?.text("description") ?? ""
@@ -1392,7 +1392,7 @@ struct DearSocialView: View {
                         }
                         Button(String(localized: "生成七天有效的邀请链接", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) { run { try await createInviteLink() } }.disabled(busy)
                         if let url = URL(string: inviteLink), url.scheme == "https" {
-                            DearActivityShareLink(url: url, title: selectedActivity?.text("title") ?? "活动", label: String(localized: "分享邀请链接", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)))
+                            MomentShareLink(url: url, title: selectedActivity?.text("title") ?? "活动", label: String(localized: "分享邀请链接", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)))
                         }
                         Text(String(localized: "对方确认加入后才能查看这场活动的分享。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)))
                             .font(.caption).foregroundStyle(.secondary)
@@ -2482,12 +2482,12 @@ struct MomentNotificationButton: View {
     }
 }
 
-private struct DearActivityShareLink: View {
+struct MomentShareLink: View {
     let url: URL
     let title: String
     let label: String
     var body: some View {
-        ShareLink(item: "\(title)\n\(url.absoluteString)") {
+        ShareLink(item: url, preview: SharePreview(title, image: Image("LoginBrand"), icon: Image("LoginBrand"))) {
             Label(label, systemImage: "square.and.arrow.up")
         }
     }

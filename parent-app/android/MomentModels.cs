@@ -61,5 +61,6 @@ public readonly record struct MomentScope
         Tenant = tenant; Activity = activity;
     }
     public string Api => $"/api/dear/social/tenants/{Tenant:D}/activities/{Activity:D}";
+    public Uri ShareUrl => new($"https://happylife.ai.impx.net/api/dear/public/activities/{Tenant:D}/{Activity:D}");
     public Uri Web => new($"https://happylife.ai.impx.net/dear/spaces/{Tenant:D}/activities/{Activity:D}");
 }

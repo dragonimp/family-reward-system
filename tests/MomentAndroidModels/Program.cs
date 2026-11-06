@@ -1,7 +1,11 @@
 using System.Text.Json;
 using LinkoFamily;
 static MomentRecord Row(string json) => new(JsonDocument.Parse(json).RootElement.Clone());
-static void Check(bool ok, string label) { if (!ok) throw new Exception(label); Console.WriteLine("PASS " + label); }
+static void Check(bool ok, string label) { if (!ok) throw new Exception(label); var shareScope = new MomentScope(Guid.NewGuid(), Guid.NewGuid());
+if (shareScope.ShareUrl.AbsolutePath != $"/api/dear/public/activities/{shareScope.Tenant:D}/{shareScope.Activity:D}" ||
+    shareScope.Web.AbsolutePath != $"/dear/spaces/{shareScope.Tenant:D}/activities/{shareScope.Activity:D}")
+    throw new InvalidOperationException("Activity sharing must open the public introduction and preserve the protected navigation route.");
+Console.WriteLine("PASS " + label); }
 var id = Guid.Parse("D2FD4DAD-93B1-4FAE-A057-61DBE0559213");
 foreach (var value in new[] { id.ToString("D"), id.ToString("D").ToUpperInvariant(), "D2fD4Dad-93B1-4FAe-A057-61dbe0559213" })
     Check(Row($$"""{"id":"{{value}}"}""").Id == id, "GUID case variant has identical identity");

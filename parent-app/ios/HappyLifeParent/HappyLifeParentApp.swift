@@ -700,9 +700,11 @@ private struct MomentTestInvitationView: View {
                                 copied = true
                             } label: { Label(copied ? String(localized: "已复制", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)) : String(localized: "复制链接", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), systemImage: copied ? "checkmark" : "doc.on.doc") }
                                 .buttonStyle(.bordered)
-                            ShareLink(item: invitation.url, subject: Text(String(localized: "\(invitation.title) 测试邀请", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)))) {
-                                Label(String(localized: "分享邀请", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), systemImage: "square.and.arrow.up")
-                            }.buttonStyle(.borderedProminent)
+                            MomentShareLink(
+                                url: invitation.url,
+                                title: String(localized: "\(invitation.title) 测试邀请", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)),
+                                label: String(localized: "分享邀请", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))
+                            ).buttonStyle(.borderedProminent)
                         }
                     }
                     .padding(14).frame(maxWidth: .infinity)
@@ -996,7 +998,10 @@ struct RemoteRecords: View {
                 if mode == .invite {
                     Text(object.text("familyGroupName")).font(.headline)
                     Text(object.text("inviteCode")).font(.title.monospacedDigit()).textSelection(.enabled)
-                    if let url = URL(string: object.text("inviteUrl")), url.scheme == "https" { ShareLink(String(localized: "分享家庭邀请", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), item: url) }
+                    if let url = URL(string: object.text("inviteUrl")), url.scheme == "https" {
+                        let label = String(localized: "分享家庭邀请", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))
+                        MomentShareLink(url: url, title: label, label: label)
+                    }
                 } else if mode == .subscription {
                     Section(String(localized: "当前权益", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) {
                         if let fields = object.fields["subscription"] as? [String: Any] {
