@@ -19,20 +19,18 @@ private struct DearCamera: UIViewControllerRepresentable {
     let completion: (Result<(URL, Bool)?, Error>) -> Void
 
     func makeCoordinator() -> Coordinator { Coordinator(completion: completion) }
-    func makeUIViewController(context: Context) -> UIImagePickerController {
+    func makeUIViewController(context: Context) -> UIViewController {
+        if mode == .photo { return DearPhotoCameraController(completion: completion) }
         let picker = UIImagePickerController()
         picker.sourceType = .camera
-        picker.mediaTypes = [mode == .video ? UTType.movie.identifier : UTType.image.identifier]
-        picker.cameraCaptureMode = mode == .video ? .video : .photo
+        picker.mediaTypes = [UTType.movie.identifier]
+        picker.cameraCaptureMode = .video
         picker.videoQuality = .typeHigh
         picker.videoMaximumDuration = 180
         picker.delegate = context.coordinator
-        if mode == .photo {
-            picker.cameraOverlayView = DearCompositionOverlay(frame: picker.view.bounds)
-        }
         return picker
     }
-    func updateUIViewController(_ controller: UIImagePickerController, context: Context) { }
+    func updateUIViewController(_ controller: UIViewController, context: Context) { }
 
     final class Coordinator: NSObject, UIImagePickerControllerDelegate, UINavigationControllerDelegate {
         let completion: (Result<(URL, Bool)?, Error>) -> Void
@@ -40,101 +38,15 @@ private struct DearCamera: UIViewControllerRepresentable {
         func imagePickerControllerDidCancel(_ picker: UIImagePickerController) { completion(.success(nil)) }
         func imagePickerController(_ picker: UIImagePickerController, didFinishPickingMediaWithInfo info: [UIImagePickerController.InfoKey: Any]) {
             do {
-                let video = info[.mediaType] as? String == UTType.movie.identifier
-                let url = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + (video ? ".mov" : ".jpg"))
-                if video, let source = info[.mediaURL] as? URL {
-                    // The camera's temporary URL is only valid during this callback.
-                    try FileManager.default.copyItem(at: source, to: url)
-                } else if let image = info[.originalImage] as? UIImage, let data = image.jpegData(compressionQuality: 0.95) {
-                    try data.write(to: url, options: .atomic)
-                } else { throw APIError.message("无法读取拍摄内容，请重试。") }
-                completion(.success((url, video)))
+                guard let source = info[.mediaURL] as? URL else {
+                    throw APIError.message(String(localized: "无法读取拍摄内容，请重试。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)))
+                }
+                let url = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".mov")
+                // The camera's temporary URL is only valid during this callback.
+                try FileManager.default.copyItem(at: source, to: url)
+                completion(.success((url, true)))
             } catch { completion(.failure(error)) }
         }
-    }
-}
-
-private final class DearCompositionOverlay: UIView {
-    private let button = UIButton(type: .system)
-    private let tipLabel = UILabel()
-    private let tipCard = UIView()
-
-    override init(frame: CGRect) {
-        super.init(frame: frame)
-        autoresizingMask = [.flexibleWidth, .flexibleHeight]
-
-        let bundle = AgentIdentityLanguage.appBundle()
-        let locale = Locale(identifier: AgentIdentityLanguage.current)
-        let title = String(localized: "构图建议", bundle: bundle, locale: locale)
-        let tips = [
-            (String(localized: "三分构图", bundle: bundle, locale: locale),
-             String(localized: "把画面想成九宫格，让主体靠近交点，视线方向多留一点空间。", bundle: bundle, locale: locale)),
-            (String(localized: "人像", bundle: bundle, locale: locale),
-             String(localized: "让眼睛靠近画面上方三分线，头顶留一点空间，避开杂乱背景。", bundle: bundle, locale: locale)),
-            (String(localized: "合照", bundle: bundle, locale: locale),
-             String(localized: "留出画面两侧的空间，确认每个人的脸都看得见。", bundle: bundle, locale: locale)),
-            (String(localized: "风景", bundle: bundle, locale: locale),
-             String(localized: "先把地平线拍平，放在上方或下方三分线，突出更有看点的一侧。", bundle: bundle, locale: locale))
-        ]
-
-        var configuration = UIButton.Configuration.filled()
-        configuration.title = title
-        configuration.image = UIImage(systemName: "viewfinder")
-        configuration.imagePadding = 6
-        configuration.cornerStyle = .capsule
-        configuration.baseForegroundColor = .white
-        configuration.baseBackgroundColor = UIColor.black.withAlphaComponent(0.75)
-        configuration.contentInsets = NSDirectionalEdgeInsets(top: 10, leading: 14, bottom: 10, trailing: 14)
-        button.configuration = configuration
-        button.showsMenuAsPrimaryAction = true
-        let actions = tips.map { name, tip in
-            UIAction(title: name) { [weak self] _ in self?.showTip(tip) }
-        }
-        let hide = UIAction(title: String(localized: "收起构图提示", bundle: bundle, locale: locale)) { [weak self] _ in
-            self?.tipCard.isHidden = true
-        }
-        button.menu = UIMenu(title: title, children: actions + [hide])
-
-        tipLabel.font = .preferredFont(forTextStyle: .subheadline)
-        tipLabel.adjustsFontForContentSizeCategory = true
-        tipLabel.textColor = .white
-        tipLabel.numberOfLines = 0
-        tipCard.backgroundColor = UIColor.black.withAlphaComponent(0.8)
-        tipCard.layer.cornerRadius = 14
-        tipCard.isHidden = true
-
-        for view in [button, tipCard, tipLabel] { view.translatesAutoresizingMaskIntoConstraints = false }
-        addSubview(button)
-        addSubview(tipCard)
-        tipCard.addSubview(tipLabel)
-        let preferredWidth = tipCard.widthAnchor.constraint(equalTo: safeAreaLayoutGuide.widthAnchor, constant: -32)
-        preferredWidth.priority = .defaultHigh
-        NSLayoutConstraint.activate([
-            button.centerXAnchor.constraint(equalTo: safeAreaLayoutGuide.centerXAnchor),
-            button.topAnchor.constraint(equalTo: safeAreaLayoutGuide.topAnchor, constant: 56),
-            button.heightAnchor.constraint(greaterThanOrEqualToConstant: 44),
-            tipCard.topAnchor.constraint(equalTo: button.bottomAnchor, constant: 8),
-            tipCard.centerXAnchor.constraint(equalTo: button.centerXAnchor),
-            tipCard.widthAnchor.constraint(lessThanOrEqualToConstant: 320),
-            preferredWidth,
-            tipLabel.topAnchor.constraint(equalTo: tipCard.topAnchor, constant: 10),
-            tipLabel.leadingAnchor.constraint(equalTo: tipCard.leadingAnchor, constant: 14),
-            tipLabel.trailingAnchor.constraint(equalTo: tipCard.trailingAnchor, constant: -14),
-            tipLabel.bottomAnchor.constraint(equalTo: tipCard.bottomAnchor, constant: -10)
-        ])
-    }
-
-    required init?(coder: NSCoder) { nil }
-
-    private func showTip(_ tip: String) {
-        tipLabel.text = tip
-        tipCard.isHidden = false
-        UIAccessibility.post(notification: .announcement, argument: tip)
-    }
-
-    override func hitTest(_ point: CGPoint, with event: UIEvent?) -> UIView? {
-        guard !isHidden, isUserInteractionEnabled, alpha > 0.01 else { return nil }
-        return button.hitTest(button.convert(point, from: self), with: event)
     }
 }
 

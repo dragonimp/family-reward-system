@@ -5250,6 +5250,81 @@
       "zh-Hans": "先把地平线拍平，放在上方或下方三分线，突出更有看点的一侧。",
       "en": "Level the horizon and place it on the upper or lower third to give the more interesting side more room.",
       "iosKey": "先把地平线拍平，放在上方或下方三分线，突出更有看点的一侧。"
+    },
+    "moment.camera.looking": {
+      "zh-Hans": "寻找主体中，可参考九宫格构图",
+      "en": "Looking for a subject. Use the grid as a guide.",
+      "iosKey": "寻找主体中，可参考九宫格构图"
+    },
+    "moment.camera.clipped": {
+      "zh-Hans": "主体太靠边，稍退一步或移动镜头",
+      "en": "Subject near the edge. Step back or reframe.",
+      "iosKey": "主体太靠边，稍退一步或移动镜头"
+    },
+    "moment.camera.group_balance": {
+      "zh-Hans": "让大家靠近画面中间，两侧留空",
+      "en": "Center the group and leave room on both sides.",
+      "iosKey": "让大家靠近画面中间，两侧留空"
+    },
+    "moment.camera.portrait_height": {
+      "zh-Hans": "移动镜头，让脸部靠近上方三分线",
+      "en": "Reframe so the face is near the upper third.",
+      "iosKey": "移动镜头，让脸部靠近上方三分线"
+    },
+    "moment.camera.subject_placement": {
+      "zh-Hans": "试着让主体靠近一个九宫格交点",
+      "en": "Try placing the subject near a grid intersection.",
+      "iosKey": "试着让主体靠近一个九宫格交点"
+    },
+    "moment.camera.ready": {
+      "zh-Hans": "构图合适，可以拍摄",
+      "en": "Framing looks good. Ready to shoot.",
+      "iosKey": "构图合适，可以拍摄"
+    },
+    "moment.camera.shutter": {
+      "zh-Hans": "拍照",
+      "en": "Take photo",
+      "iosKey": "拍照"
+    },
+    "moment.camera.flip": {
+      "zh-Hans": "切换相机",
+      "en": "Switch camera",
+      "iosKey": "切换相机"
+    },
+    "moment.camera.retake": {
+      "zh-Hans": "重拍",
+      "en": "Retake",
+      "iosKey": "重拍"
+    },
+    "moment.camera.use_photo": {
+      "zh-Hans": "使用照片",
+      "en": "Use photo",
+      "iosKey": "使用照片"
+    },
+    "moment.camera.capture_error": {
+      "zh-Hans": "无法读取拍摄内容，请重试。",
+      "en": "Could not read the capture. Please try again.",
+      "iosKey": "无法读取拍摄内容，请重试。"
+    },
+    "moment.camera.flash": {
+      "zh-Hans": "闪光灯",
+      "en": "Flash",
+      "iosKey": "闪光灯"
+    },
+    "moment.camera.flash_auto": {
+      "zh-Hans": "自动",
+      "en": "Auto",
+      "iosKey": "自动"
+    },
+    "moment.camera.flash_on": {
+      "zh-Hans": "开启",
+      "en": "On",
+      "iosKey": "开启"
+    },
+    "moment.camera.flash_off": {
+      "zh-Hans": "关闭闪光灯",
+      "en": "Off",
+      "iosKey": "关闭闪光灯"
     }
   }
 }
