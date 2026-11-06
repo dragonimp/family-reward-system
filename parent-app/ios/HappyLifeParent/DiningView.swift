@@ -34,6 +34,9 @@ import CryptoKit
     private var candidates: [DiningPlace] = []
     private var generation = UUID()
     private var fetchedAt = Date.distantPast
+    @Published private(set) var food: DiningFood = .smart
+    private var cachedFood: DiningFood?
+    private var hasRequestedRecommendation = false
     private var cachedMeal: DiningMeal?
     @Published private(set) var resultMeal: DiningMeal?
     private var resultOperation = UUID()
@@ -142,7 +145,18 @@ import CryptoKit
         guard !busy, !checkingIn, self.trip != trip else { return }
         if self.trip.driving != trip.driving { routeTimes = [:] }
         self.trip = trip
+        refreshRecommendationAfterFilterChange()
+    }
+
+    func selectFood(_ food: DiningFood) {
+        guard !busy, !checkingIn, self.food != food else { return }
+        self.food = food
+        refreshRecommendationAfterFilterChange()
+    }
+
+    private func refreshRecommendationAfterFilterChange() {
         result = nil; walking = nil; confirmed = false; message = nil
+        if hasRequestedRecommendation { Task { await decide() } }
     }
 
     func decide() async {
@@ -150,12 +164,15 @@ import CryptoKit
         let current = UUID()
         generation = current
         defer { if current == generation { busy = false } }
+        hasRequestedRecommendation = true
         let meal = DiningMeal.current()
+        let food = self.food
+        let mealKey: DiningMeal? = food == .smart ? meal : nil
         let trip = self.trip
         let radius: CLLocationDistance = trip.driving ? 8000 : 3000
-        if resultMeal != meal { result = nil; confirmed = false }
+        if resultMeal != mealKey { result = nil; confirmed = false }
         do {
-            if cachedMeal != meal || cachedDriving != trip.driving || Date().timeIntervalSince(fetchedAt) > 300 { candidates = [] }
+            if cachedFood != food || cachedMeal != mealKey || cachedDriving != trip.driving || Date().timeIntervalSince(fetchedAt) > 300 { candidates = [] }
             if candidates.isEmpty {
                 let location: CLLocation
                 if let circle = archive.circles.first(where: { $0.id == circleID }) { location = CLLocation(latitude: circle.latitude, longitude: circle.longitude) }
@@ -164,27 +181,28 @@ import CryptoKit
                 origin = location
                 routeTimes = [:]
                 async let details = mapDetails(near: location)
-                let query = meal == .breakfast ? "breakfast" : meal == .afternoonTea ? "dessert" : "restaurant"
-                let expanded = meal == .breakfast || meal == .afternoonTea
+                let query = food == .smart ? (meal == .breakfast ? "breakfast" : meal == .afternoonTea ? "dessert" : "restaurant") : food.searchQuery
+                let expanded = mealKey == .breakfast || mealKey == .afternoonTea || food == .sweets
                 var nearby = try await nearbyPlaces(around: location, radius: radius, query: query, includeCafes: expanded)
                 let mapDetails = await details
                 if let mapDetails {
                     nearby = mapDetails.applying(to: nearby, latitude: location.coordinate.latitude, longitude: location.coordinate.longitude)
                 }
-                if meal == .afternoonTea, !nearby.contains(where: meal.includes) {
+                if mealKey == .afternoonTea, !nearby.contains(where: meal.includes) {
                     guard current == generation else { return }
                     let tea = try await nearbyPlaces(around: location, radius: radius, query: "bubble tea", includeCafes: true)
                     nearby += mapDetails?.applying(to: tea, latitude: location.coordinate.latitude, longitude: location.coordinate.longitude) ?? tea
                 }
                 guard current == generation else { return }
-                candidates = nearby.filter(meal.includes)
-                cachedMeal = meal
+                candidates = nearby.filter { food.includes($0, meal: meal) }
+                cachedFood = food
+                cachedMeal = mealKey
                 cachedDriving = trip.driving
                 fetchedAt = Date()
             }
-            var eligible = candidates
+            var eligible = candidates.filter { trip.includesDistance($0.distanceMeters) }
             if trip.limit != nil {
-                let nearest = Array(candidates.sorted { $0.distanceMeters < $1.distanceMeters }.prefix(6))
+                let nearest = Array(eligible.sorted { $0.distanceMeters < $1.distanceMeters }.prefix(6))
                 for place in nearest where routeTimes[place.id] == nil {
                     let seconds = await routeTime(place, driving: trip.driving)
                     guard current == generation else { return }
@@ -194,21 +212,25 @@ import CryptoKit
             }
             try await Task.sleep(for: .milliseconds(450))
             guard current == generation else { return }
-            guard DiningMeal.current() == meal else {
+            guard mealKey == nil || DiningMeal.current() == meal else {
                 result = nil
                 message = diningText("餐段已切换，请重新推荐。")
                 return
             }
             guard let next = DiningRecommendation.pick(eligible, mood: mood, archive: archive, excluding: result?.id) else {
                 result = nil
-                message = trip.limit != nil && !candidates.isEmpty
-                    ? diningText("暂未找到能确认符合路程上限的餐厅。可以放宽上限后重试。")
-                    : diningText("附近暂时没有适合当前餐段的餐厅。试试其他生活圈，或稍后重新定位。")
+                if !candidates.isEmpty && trip != .unrestricted {
+                    message = diningText("暂未找到能确认符合路程上限的餐厅。可以放宽上限后重试。")
+                } else {
+                    message = food == .smart
+                        ? diningText("附近暂时没有适合当前餐段的餐厅。试试其他生活圈，或稍后重新定位。")
+                        : diningText("附近暂时没有符合所选食物类型的餐厅。")
+                }
                 return
             }
             if let previous = result, !confirmed { _ = update { $0.habits[previous.id, default: DiningHabit()].skipped += 1 } }
             guard current == generation else { return }
-            result = next; resultMood = mood; resultMeal = meal; confirmed = false; resultOperation = UUID()
+            result = next; resultMood = mood; resultMeal = mealKey; confirmed = false; resultOperation = UUID()
             if eligible.count == 1 { message = String(localized: "附近暂时只找到这一家，可换个生活圈再试。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)) }
             // The blind box animates only while real location/search work is running.
             busy = false
@@ -342,9 +364,14 @@ struct DiningView: View {
                         Text(String(localized: "别纠结了，这顿我安排！", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))).font(.title3).foregroundStyle(.secondary)
                         Label(model.archive.circles.first(where: { $0.id == model.circleID })?.name ?? String(localized: "当前位置附近", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), systemImage: "location.circle").font(.subheadline).foregroundStyle(.secondary)
                     }
-                    Picker(diningText("路程"), selection: Binding(get: { model.trip }, set: model.selectTrip)) {
-                        ForEach(DiningTrip.allCases, id: \.self) { trip in Text(tripTitle(trip)).tag(trip) }
-                    }.pickerStyle(.menu).disabled(model.busy || model.checkingIn)
+                    HStack(spacing: 8) {
+                        Picker(diningText("食物类型"), selection: Binding(get: { model.food }, set: model.selectFood)) {
+                            ForEach(DiningFood.allCases, id: \.self) { food in Text(foodTitle(food)).tag(food) }
+                        }.frame(maxWidth: .infinity, alignment: .leading)
+                        Picker(diningText("路程"), selection: Binding(get: { model.trip }, set: model.selectTrip)) {
+                            ForEach(DiningTrip.allCases, id: \.self) { trip in Text(tripTitle(trip)).tag(trip) }
+                        }.frame(maxWidth: .infinity, alignment: .leading)
+                    }.pickerStyle(.menu).labelsHidden().disabled(model.busy || model.checkingIn)
                     if model.result == nil || model.busy {
                     VStack(spacing: 16) {
                         Text("🍚").font(.system(size: 76)).rotationEffect(.degrees(model.busy && spinning ? 12 : -8)).animation(model.busy && !reduceMotion ? .easeInOut(duration: 0.3).repeatForever(autoreverses: true) : .default, value: spinning)
@@ -396,7 +423,7 @@ struct DiningView: View {
                 .font(.subheadline)
             Label(priceText(place), systemImage: "banknote")
                 .font(.subheadline).foregroundStyle(.secondary)
-            Text([model.resultMeal.map(mealTitle), reason(place)].compactMap { $0 }.joined(separator: " · ")).font(.subheadline)
+            Text((model.resultMeal.map(mealTitle) ?? foodTitle(model.food)) + " · " + reason(place)).font(.subheadline)
             Button(model.confirmed ? String(localized: "已选好，走，干饭！", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)) : String(localized: "✅ 就吃这家！", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) { model.confirm(operation: operation) }.buttonStyle(.borderedProminent).tint(.orange).disabled(model.confirmed || model.busy)
             Button(String(localized: "🎲 不行，再来一家！", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) { Task { await model.decide() } }.buttonStyle(.bordered).disabled(model.busy)
             HStack {
@@ -425,6 +452,16 @@ struct DiningView: View {
         let price = cost.formatted(.currency(code: "CNY").precision(.fractionLength(0...2)).locale(locale))
         return String(localized: "人均约\(price) · 高德地图参考价", bundle: bundle, locale: locale)
     }
+    private func foodTitle(_ food: DiningFood) -> String {
+        switch food {
+        case .smart: diningText("智能推荐")
+        case .noodles: diningText("面食")
+        case .rice: diningText("米饭")
+        case .hotPot: diningText("火锅")
+        case .barbecue: diningText("烧烤")
+        case .sweets: diningText("甜品饮品")
+        }
+    }
     private func tripTitle(_ trip: DiningTrip) -> String {
         switch trip {
         case .unrestricted: diningText("不限路程")
@@ -432,6 +469,7 @@ struct DiningView: View {
         case .walk10: diningText("走路 10 分钟内")
         case .drive10: diningText("开车 10 分钟内")
         case .drive20: diningText("开车 20 分钟内")
+        case .nearby2km: diningText("2 公里内")
         }
     }
     private func mealTitle(_ meal: DiningMeal) -> String {

@@ -63,20 +63,48 @@ public sealed class DiningArchive {
         choice.EatenAt = DateTimeOffset.UtcNow; Habit(choice.Place.Id).Eaten++;
     }
 }
-public enum DiningTrip { Unrestricted, Walk5, Walk10, Drive10, Drive20 }
+public enum DiningTrip { Unrestricted, Walk5, Walk10, Drive10, Drive20, Nearby2km }
 
 public static class DiningTripRules
 {
     public static bool Driving(this DiningTrip trip) => trip is DiningTrip.Drive10 or DiningTrip.Drive20;
 
+    public static bool IncludesDistance(this DiningTrip trip, double meters) =>
+        trip != DiningTrip.Nearby2km || meters is >= 0 and <= 2000;
+
+    public static bool HasTimeLimit(this DiningTrip trip) =>
+        trip is not (DiningTrip.Unrestricted or DiningTrip.Nearby2km);
+
     public static bool Includes(this DiningTrip trip, double? seconds) => trip switch
     {
-        DiningTrip.Unrestricted => true,
+        DiningTrip.Unrestricted or DiningTrip.Nearby2km => true,
         DiningTrip.Walk5 => seconds is > 0 and <= 300,
         DiningTrip.Walk10 or DiningTrip.Drive10 => seconds is > 0 and <= 600,
         DiningTrip.Drive20 => seconds is > 0 and <= 1200,
         _ => false
     };
+}
+
+public enum DiningFood { Smart, Noodles, Rice, HotPot, Barbecue, Sweets }
+
+public static class DiningFoodRules
+{
+    private static readonly string[][] Terms =
+    [
+        [],
+        ["面馆", "麵館", "面食", "麵食", "牛肉面", "牛肉麵", "拉面", "拉麵", "刀削面", "拌面", "烩面", "扯面", "担担面", "意面", "面条", "麵條", "饺子", "餃子", "馄饨", "餛飩", "米线", "米線", "noodle", "ramen", "udon", "pasta", "soba"],
+        ["米饭", "盖饭", "盖浇饭", "煲仔饭", "炒饭", "卤肉饭", "便当", "鸡饭", "石锅拌饭", "rice bowl", "fried rice"],
+        ["火锅", "火鍋", "涮肉", "hot pot", "hotpot", "shabu"],
+        ["烧烤", "燒烤", "烤串", "烤肉", "barbecue", "bbq", "yakitori"],
+        ["甜品", "甜点", "奶茶", "茶饮", "糖水", "蛋糕", "冰淇淋", "dessert", "bubble tea", "boba", "cake", "ice cream"]
+    ];
+
+    public static bool Includes(this DiningFood food, DiningPlace place, DiningMealPeriod meal)
+    {
+        if (food == DiningFood.Smart) return DiningMeal.Includes(meal, place);
+        var description = place.Name + ";" + place.Category;
+        return Terms[(int)food].Any(term => description.Contains(term, StringComparison.OrdinalIgnoreCase));
+    }
 }
 
 public enum DiningMealPeriod { Breakfast, Lunch, AfternoonTea, Dinner }

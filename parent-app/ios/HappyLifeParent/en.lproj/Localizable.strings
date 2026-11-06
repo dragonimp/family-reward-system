@@ -1,3 +1,12 @@
+"食物类型" = "Food type";
+"智能推荐" = "Smart recommendation";
+"面食" = "Noodles & dumplings";
+"米饭" = "Rice dishes";
+"火锅" = "Hot pot";
+"烧烤" = "Barbecue";
+"甜品饮品" = "Desserts & drinks";
+"2 公里内" = "Within 2 km";
+"附近暂时没有符合所选食物类型的餐厅。" = "No nearby restaurants match the selected food type.";
 "已获取当前位置" = "Current location acquired";
 "地址（可修改）" = "Address (editable)";
 "已记录定位，暂无地址" = "Location saved · Address unavailable";

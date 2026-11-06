@@ -77,6 +77,13 @@ Check(manualArchive.ManualRestaurant("新店", 31.002, 121)?.Id != manualPlace.I
 manualArchive.History.Clear();
 var decodedManual = JsonSerializer.Deserialize<DiningArchive>(JsonSerializer.Serialize(manualArchive))!;
 Check(decodedManual.ManualRestaurant("新店", 31, 121)?.Id == manualPlace.Id, "manual identity survives storage and history pruning");
+var nearNoodles = old with { Name = "老街面馆", DistanceMeters = 2000 };
+var farNoodles = nearNoodles with { Id = "far", DistanceMeters = 2000.1 };
+DiningPlace[] optionsAtTea = [tea, nearNoodles, farNoodles];
+IEnumerable<DiningPlace> FilterAtTea(DiningFood food) => optionsAtTea.Where(p => food.Includes(p, DiningMealPeriod.AfternoonTea) && DiningTrip.Nearby2km.IncludesDistance(p.DistanceMeters));
+Check(FilterAtTea(DiningFood.Noodles).SequenceEqual([nearNoodles]), "explicit noodles override afternoon tea while keeping the 2 km limit");
+Check(FilterAtTea(DiningFood.Smart).SequenceEqual([tea]), "restoring smart returns afternoon tea with the same distance");
+Check(!DiningTrip.Nearby2km.HasTimeLimit() && !DiningTrip.Nearby2km.IncludesDistance(double.NaN), "distance range does not require a route ETA");
 using var data = JsonDocument.Parse("""{"status":"1","pois":[{"id":"A","name":"Real restaurant","location":"121.4,31.2","distance":"200","biz_ext":{"cost":[],"rating":"4.3"}},{"id":"A","name":"Duplicate","location":"121.4,31.2","distance":"100"},{"id":"bad","name":"Bad","location":"999,999","distance":"10"}]}""");
 var parsed = DiningEndpoints.Parse(data.RootElement);
 Check(parsed.Count == 1 && parsed[0].Cost == null && parsed[0].Rating == 4.3 && parsed[0].Longitude == 121.4, "provider parsing preserves absence, deduplicates and validates coordinates");

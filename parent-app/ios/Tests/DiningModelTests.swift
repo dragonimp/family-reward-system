@@ -108,6 +108,13 @@ import Foundation
         manualArchive.history.removeAll()
         let decodedManual = try JSONDecoder().decode(DiningArchive.self, from: JSONEncoder().encode(manualArchive))
         check(decodedManual.manualRestaurant(name: "新店", latitude: 31, longitude: 121)?.id == manualPlace.id, "manual restaurant identity survives serialization and history pruning")
+        var nearNoodles = known; nearNoodles.name = "老街面馆"; nearNoodles.distanceMeters = 2000
+        var farNoodles = nearNoodles; farNoodles.id = "far"; farNoodles.distanceMeters = 2000.1
+        let optionsAtTea = [tea, nearNoodles, farNoodles]
+        let nearby: (DiningPlace) -> Bool = { DiningTrip.nearby2km.includesDistance($0.distanceMeters) }
+        check(optionsAtTea.filter { DiningFood.noodles.includes($0, meal: .afternoonTea) && nearby($0) } == [nearNoodles], "explicit noodles override afternoon tea but retain the 2 km boundary")
+        check(optionsAtTea.filter { DiningFood.smart.includes($0, meal: .afternoonTea) && nearby($0) } == [tea], "restoring smart selection returns afternoon tea with the same distance")
+        check(!DiningTrip.nearby2km.includesDistance(.nan) && DiningTrip.nearby2km.includes(nil), "distance range does not require a route ETA")
         let root = URL(fileURLWithPath: ProcessInfo.processInfo.environment["ATLAS_BUILD_WORK"]!).appendingPathComponent("dining-persistence-check")
         let file = root.appendingPathComponent("user-a.json")
         try archive.write(to: file)

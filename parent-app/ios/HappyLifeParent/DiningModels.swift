@@ -88,18 +88,49 @@ enum DiningMeal: Equatable {
                                     "restaurant", "diner", "bistro", "noodle", "ramen", "pizza", "burger", "sushi", "grill", "barbecue", "hot pot"]
 }
 
+enum DiningFood: CaseIterable, Hashable {
+    case smart, noodles, rice, hotPot, barbecue, sweets
+
+    var searchQuery: String {
+        switch self {
+        case .smart: "restaurant"
+        case .noodles: "面馆"
+        case .rice: "米饭"
+        case .hotPot: "火锅"
+        case .barbecue: "烧烤"
+        case .sweets: "甜品"
+        }
+    }
+
+    func includes(_ place: DiningPlace, meal: DiningMeal) -> Bool {
+        let terms: [String]
+        switch self {
+        case .smart: return meal.includes(place)
+        case .noodles: terms = ["面馆", "麵館", "面食", "麵食", "牛肉面", "牛肉麵", "拉面", "拉麵", "刀削面", "拌面", "烩面", "扯面", "担担面", "意面", "面条", "麵條", "饺子", "餃子", "馄饨", "餛飩", "米线", "米線", "noodle", "ramen", "udon", "pasta", "soba"]
+        case .rice: terms = ["米饭", "盖饭", "盖浇饭", "煲仔饭", "炒饭", "卤肉饭", "便当", "鸡饭", "石锅拌饭", "rice bowl", "fried rice"]
+        case .hotPot: terms = ["火锅", "火鍋", "涮肉", "hot pot", "hotpot", "shabu"]
+        case .barbecue: terms = ["烧烤", "燒烤", "烤串", "烤肉", "barbecue", "bbq", "yakitori"]
+        case .sweets: terms = ["甜品", "甜点", "奶茶", "茶饮", "糖水", "蛋糕", "冰淇淋", "dessert", "bubble tea", "boba", "cake", "ice cream"]
+        }
+        let description = place.name + ";" + place.category
+        return terms.contains { description.localizedCaseInsensitiveContains($0) }
+    }
+}
+
 enum DiningTrip: CaseIterable, Hashable {
-    case unrestricted, walk5, walk10, drive10, drive20
+    case unrestricted, walk5, walk10, drive10, drive20, nearby2km
 
     var driving: Bool { self == .drive10 || self == .drive20 }
     var limit: TimeInterval? {
         switch self {
-        case .unrestricted: nil
+        case .unrestricted, .nearby2km: nil
         case .walk5: 300
         case .walk10, .drive10: 600
         case .drive20: 1200
         }
     }
+    func includesDistance(_ meters: Double) -> Bool { self != .nearby2km || (0...2000).contains(meters) }
+
     func includes(_ seconds: TimeInterval?) -> Bool {
         guard let limit else { return true }
         guard let seconds, seconds.isFinite else { return false }
