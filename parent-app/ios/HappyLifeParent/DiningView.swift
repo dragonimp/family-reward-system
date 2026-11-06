@@ -10,6 +10,8 @@ import CryptoKit
     @Published var result: DiningPlace?
     @Published var resultMood: DiningMood = .automatic
     @Published var busy = false
+    @Published private(set) var checkingIn = false
+    @Published private(set) var checkInPlaces: [DiningPlace] = []
     @Published var message: String?
     @Published var confirmed = false
     @Published var circleID: UUID?
@@ -26,6 +28,7 @@ import CryptoKit
     private var candidates: [DiningPlace] = []
     private var generation = UUID()
     private var fetchedAt = Date.distantPast
+    private var resultOperation = UUID()
 
     init(userID: String, family: FamilyStore) {
         self.family = family
@@ -45,10 +48,48 @@ import CryptoKit
         do { try next.write(to: file); archive = next; return true }
         catch { message = String(localized: "记录没有保存成功，请重试。原记录已保留。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)); return false }
     }
-    func confirm() {
-        guard let place = result, !confirmed, !busy else { return }
-        if update({ $0.choose(place, mood: resultMood) }) { confirmed = true; message = String(localized: "安排好了！选择已记录，吃过后可在干饭记录中确认。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)) }
+    func confirm(operation: UUID) {
+        guard let place = result, operation == resultOperation, !confirmed, !busy, !checkingIn else { return }
+        confirmed = checkIn(place, mood: resultMood, operation: operation)
     }
+    var confirmationOperation: UUID { resultOperation }
+
+    @discardableResult
+    func checkIn(_ place: DiningPlace, mood: DiningMood? = nil, operation: UUID, restaurantType: String = "") -> Bool {
+        guard update({ $0.checkIn(place, mood: mood, id: operation, restaurantType: restaurantType) }) else { return false }
+        message = diningText("打卡成功，已记入干饭记录。")
+        return true
+    }
+
+    func findCheckInPlaces() async {
+        guard !busy, !checkingIn, !Task.isCancelled else { return }
+        checkingIn = true
+        checkInPlaces = []
+        message = nil
+        let current = UUID()
+        generation = current
+        defer { if current == generation { checkingIn = false } }
+        do {
+            let location = try await locate()
+            guard current == generation, !Task.isCancelled else { return }
+            guard location.horizontalAccuracy <= 500 else {
+                message = diningText("定位精度不足，请开启精确位置后重试。")
+                return
+            }
+            let nearby = try await nearbyPlaces(around: location, radius: 500)
+            guard current == generation, !Task.isCancelled else { return }
+            var seen = Set<String>()
+            checkInPlaces = nearby.sorted { $0.distanceMeters < $1.distanceMeters }
+                .filter { seen.insert($0.id).inserted }
+            if checkInPlaces.isEmpty { message = diningText("当前位置 500 米内未找到餐厅。") }
+        } catch is CancellationError { }
+        catch {
+            if current == generation, !Task.isCancelled {
+                message = diningText("无法读取附近餐厅，请检查定位权限或网络后重试。")
+            }
+        }
+    }
+
     func selectCircle(_ id: UUID?) {
         guard !busy else { return }
         circleID = id; origin = nil; candidates = []; result = nil; walking = nil; confirmed = false
@@ -64,8 +105,9 @@ import CryptoKit
     }
     private func selectSavedCircle(_ circle: DiningCircle) { circleID = circle.id; origin = nil; candidates = []; result = nil; walking = nil }
     func decide() async {
-        guard !busy else { return }; busy = true; message = nil; walking = nil
-        let current = generation
+        guard !busy, !checkingIn else { return }; busy = true; message = nil; walking = nil
+        let current = UUID()
+        generation = current
         defer { if current == generation { busy = false } }
         do {
             if Date().timeIntervalSince(fetchedAt) > 300 { candidates = [] }
@@ -76,26 +118,7 @@ import CryptoKit
                 guard current == generation else { return }
                 origin = location
                 async let details = mapDetails(near: location)
-                let request = MKLocalSearch.Request()
-                request.naturalLanguageQuery = "restaurant"
-                request.region = MKCoordinateRegion(center: location.coordinate, latitudinalMeters: 6000, longitudinalMeters: 6000)
-                request.resultTypes = .pointOfInterest
-                request.pointOfInterestFilter = MKPointOfInterestFilter(including: [.restaurant])
-                let operation = MKLocalSearch(request: request); search = operation
-                let deadline = Task {
-                    do { try await Task.sleep(for: .seconds(12)) } catch { return }
-                    operation.cancel()
-                }
-                defer { deadline.cancel() }
-                let response = try await operation.start()
-                guard current == generation else { return }
-                let nearby: [DiningPlace] = response.mapItems.compactMap { item in
-                    guard let name = item.name, !name.isEmpty, let spot = item.placemark.location, location.distance(from: spot) <= 3000 else { return nil }
-                    let address = [item.placemark.thoroughfare, item.placemark.subThoroughfare, item.placemark.locality].compactMap { $0 }.joined(separator: " ")
-                    let raw = name + "|" + String(format: "%.5f|%.5f", spot.coordinate.latitude, spot.coordinate.longitude)
-                    let id = "mapkit:" + SHA256.hash(data: Data(raw.utf8)).map { String(format: "%02x", $0) }.joined()
-                    return DiningPlace(id: id, name: name, address: address, latitude: spot.coordinate.latitude, longitude: spot.coordinate.longitude, category: "restaurant", provider: "mapkit", distanceMeters: location.distance(from: spot))
-                }
+                let nearby = try await nearbyPlaces(around: location, radius: 3000)
                 let mapDetails = await details
                 guard current == generation else { return }
                 candidates = mapDetails?.applying(to: nearby, latitude: location.coordinate.latitude, longitude: location.coordinate.longitude) ?? nearby
@@ -108,13 +131,39 @@ import CryptoKit
             }
             if let previous = result, !confirmed { _ = update { $0.habits[previous.id, default: DiningHabit()].skipped += 1 } }
             guard current == generation else { return }
-            result = next; resultMood = mood; confirmed = false
+            result = next; resultMood = mood; confirmed = false; resultOperation = UUID()
             if candidates.count == 1 { message = String(localized: "附近暂时只找到这一家，可换个生活圈再试。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)) }
             // The blind box animates only while real location/search work is running.
             busy = false
             await loadWalking(next, generation: current)
         } catch is CancellationError { }
         catch { if current == generation { message = (error as? APIError)?.localizedDescription ?? String(localized: "附近餐厅暂时无法读取，请稍后重试。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)) } }
+    }
+    func closeCheckIn() {
+        if checkingIn { stop() }
+        checkInPlaces = []
+    }
+
+    private func nearbyPlaces(around location: CLLocation, radius: CLLocationDistance) async throws -> [DiningPlace] {
+        let request = MKLocalSearch.Request()
+        request.naturalLanguageQuery = "restaurant"
+        request.region = MKCoordinateRegion(center: location.coordinate, latitudinalMeters: radius * 2, longitudinalMeters: radius * 2)
+        request.resultTypes = .pointOfInterest
+        request.pointOfInterestFilter = MKPointOfInterestFilter(including: [.restaurant])
+        let operation = MKLocalSearch(request: request); search = operation
+        let deadline = Task {
+            do { try await Task.sleep(for: .seconds(12)) } catch { return }
+            operation.cancel()
+        }
+        defer { deadline.cancel() }
+        let response = try await operation.start()
+        return response.mapItems.compactMap { item in
+            guard let name = item.name, !name.isEmpty, let spot = item.placemark.location, location.distance(from: spot) <= radius else { return nil }
+            let address = [item.placemark.thoroughfare, item.placemark.subThoroughfare, item.placemark.locality].compactMap { $0 }.joined(separator: " ")
+            let raw = name + "|" + String(format: "%.5f|%.5f", spot.coordinate.latitude, spot.coordinate.longitude)
+            let id = "mapkit:" + SHA256.hash(data: Data(raw.utf8)).map { String(format: "%02x", $0) }.joined()
+            return DiningPlace(id: id, name: name, address: address, latitude: spot.coordinate.latitude, longitude: spot.coordinate.longitude, category: "restaurant", provider: "mapkit", distanceMeters: location.distance(from: spot))
+        }
     }
     private func mapDetails(near location: CLLocation) async -> DiningMapDetails? {
         let body = ["latitude": location.coordinate.latitude, "longitude": location.coordinate.longitude]
@@ -125,7 +174,7 @@ import CryptoKit
     func refreshLocation() { stop(); circleID = nil; candidates = []; origin = nil; result = nil; walking = nil; confirmed = false }
     func stop() {
         generation = UUID(); search?.cancel(); directions?.cancel(); timeout?.cancel(); locator.stopUpdatingLocation()
-        waiting?.resume(throwing: CancellationError()); waiting = nil; busy = false
+        waiting?.resume(throwing: CancellationError()); waiting = nil; busy = false; checkingIn = false
     }
     private func locate() async throws -> CLLocation {
         guard CLLocationManager.locationServicesEnabled() else { throw APIError.message(String(localized: "系统定位服务未开启，可使用已保存的生活圈。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) }
@@ -167,10 +216,15 @@ import CryptoKit
     }
 }
 
+private func diningText(_ key: String.LocalizationValue) -> String {
+    String(localized: key, bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))
+}
+
 struct DiningView: View {
     @StateObject private var model: DiningStore
     @State private var showingRecords = false
     @State private var showingCircles = false
+    @State private var showingCheckIn = false
     @State private var spinning = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     init(userID: String, family: FamilyStore) { _model = StateObject(wrappedValue: DiningStore(userID: userID, family: family)) }
@@ -199,7 +253,9 @@ struct DiningView: View {
                             }
                         }
                     }
-                    if let place = model.result { resultCard(place) }
+                    Button(diningText("到店打卡"), systemImage: "mappin.circle") { showingCheckIn = true }
+                        .buttonStyle(.bordered).disabled(model.busy || model.checkingIn)
+                    if let place = model.result { resultCard(place, operation: model.confirmationOperation) }
                     if let message = model.message { Text(message).font(.subheadline).foregroundStyle(.secondary).accessibilityAddTraits(.updatesFrequently) }
                     Text(String(localized: "附近餐厅来自 Apple 地图，菜系及人均可由高德地图补充。搜索位置仅用于本次查询，习惯与记录保存在当前账号的本机空间。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) .font(.caption).foregroundStyle(.secondary)
                 }.padding(20).frame(maxWidth: 760).frame(maxWidth: .infinity)
@@ -214,13 +270,14 @@ struct DiningView: View {
                     .disabled(model.busy)
                 }
             }
+            .sheet(isPresented: $showingCheckIn, onDismiss: model.closeCheckIn) { DiningCheckInSheet(model: model) }
             .sheet(isPresented: $showingRecords) { records }
             .sheet(isPresented: $showingCircles) { circles }
             .onChange(of: model.busy) { _, busy in spinning = busy }
             .onDisappear { model.stop() }
         }
     }
-    private func resultCard(_ place: DiningPlace) -> some View {
+    private func resultCard(_ place: DiningPlace, operation: UUID) -> some View {
         VStack(alignment: .leading, spacing: 16) {
             Text(String(localized: "命运安排好了，走，干饭！", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))).font(.headline).foregroundStyle(.orange)
             Text(place.name).font(.title2.bold()).textSelection(.enabled)
@@ -232,7 +289,7 @@ struct DiningView: View {
             Label(priceText(place), systemImage: "banknote")
                 .font(.subheadline).foregroundStyle(.secondary)
             Text(reason(place)).font(.subheadline)
-            Button(model.confirmed ? String(localized: "已选好，走，干饭！", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)) : String(localized: "✅ 就吃这家！", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) { model.confirm() }.buttonStyle(.borderedProminent).tint(.orange).disabled(model.confirmed || model.busy)
+            Button(model.confirmed ? String(localized: "已选好，走，干饭！", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)) : String(localized: "✅ 就吃这家！", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) { model.confirm(operation: operation) }.buttonStyle(.borderedProminent).tint(.orange).disabled(model.confirmed || model.busy)
             Button(String(localized: "🎲 不行，再来一家！", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) { Task { await model.decide() } }.buttonStyle(.bordered).disabled(model.busy)
             HStack {
                 Button(String(localized: "带我过去！", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), systemImage: "map") { model.navigate(place) }
@@ -262,14 +319,14 @@ struct DiningView: View {
     }
     private func reason(_ place: DiningPlace) -> String {
         switch model.resultMood {
-        case .familiar: return (model.archive.habits[place.id]?.selected ?? 0) > 0 ? String(localized: "你以前选择过这里，熟悉的味道值得再试。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)) : String(localized: "还没有常吃记录，先从附近这家开始。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))
-        case .fresh: return (model.archive.habits[place.id]?.selected ?? 0) == 0 ? String(localized: "你的干饭记录里还没有这家，来点新鲜的！", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)) : String(localized: "附近的新选择有限，熟悉的店也保留机会。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))
+        case .familiar: return (model.archive.habits[place.id]?.visits ?? 0) > 0 ? String(localized: "这家店在你的干饭记录里，熟悉的味道值得再试。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)) : String(localized: "还没有常吃记录，先从附近这家开始。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))
+        case .fresh: return (model.archive.habits[place.id]?.visits ?? 0) == 0 ? String(localized: "你的干饭记录里还没有这家，来点新鲜的！", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)) : String(localized: "附近的新选择有限，熟悉的店也保留机会。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))
         case .budget, .treat:
             return place.cost != nil
                 ? String(localized: "按地图提供的人均价格挑选，实际消费以店家为准。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))
                 : String(localized: "按附近距离或以往选择推荐。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))
         case .spicy: return String(localized: "按店名与菜系线索挑选，具体辣度请向店家确认。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))
-        case .automatic: return (model.archive.habits[place.id]?.selected ?? 0) > 0 ? String(localized: "你以前选择过这里，熟悉的味道值得再试。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)) : String(localized: "从附近真实餐厅中，为你挑了这一家。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))
+        case .automatic: return (model.archive.habits[place.id]?.visits ?? 0) > 0 ? String(localized: "这家店在你的干饭记录里，熟悉的味道值得再试。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)) : String(localized: "从附近真实餐厅中，为你挑了这一家。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))
         }
     }
     private func moodTitle(_ mood: DiningMood) -> String {
@@ -296,7 +353,11 @@ struct DiningView: View {
                         VStack(alignment: .leading, spacing: 8) {
                             Text(choice.place.name).font(.headline)
                             Text(choice.selectedAt, format: .dateTime.year().month().day().hour().minute()).font(.caption).foregroundStyle(.secondary)
-                            if choice.eatenAt != nil { Label(String(localized: "吃过了", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), systemImage: "checkmark.circle.fill").foregroundStyle(.orange) }
+                            if choice.checkedIn == true {
+                                let count = model.archive.habits[choice.place.id]?.checkIns ?? 0
+                                Label(diningText("累计打卡 \(count) 次"), systemImage: "checkmark.circle.fill").foregroundStyle(.orange)
+                                if let type = choice.restaurantType { Text(type).font(.subheadline) }
+                            } else if choice.eatenAt != nil { Label(String(localized: "吃过了", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), systemImage: "checkmark.circle.fill").foregroundStyle(.orange) }
                             else { Button(String(localized: "我吃过了", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) { _ = model.update { $0.confirmEaten(choice.id) } } }
                         }
                     }
@@ -326,5 +387,62 @@ struct DiningView: View {
                 if let message = model.message { Text(message).foregroundStyle(.secondary) }
             }.navigationTitle(String(localized: "我的生活圈", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))).toolbar { ToolbarItem(placement: .topBarTrailing) { Button(String(localized: "完成", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) { showingCircles = false } } }
         }
+    }
+}
+
+
+private struct DiningCheckInSheet: View {
+    @ObservedObject var model: DiningStore
+    @Environment(\.dismiss) private var dismiss
+    @State private var selected: DiningPlace?
+    @State private var restaurantType = ""
+    @State private var operation = UUID()
+    @State private var saved = false
+
+    var body: some View {
+        NavigationStack {
+            List {
+                if model.checkingIn {
+                    ProgressView(diningText("正在查找附近餐厅…"))
+                } else if let selected {
+                    Section {
+                        Text(selected.name).font(.headline)
+                        if !selected.address.isEmpty { Text(selected.address).foregroundStyle(.secondary) }
+                        TextField(diningText("餐厅类型（选填）"), text: $restaurantType)
+                        Button(diningText("确认打卡")) {
+                            guard !saved else { return }
+                            saved = model.checkIn(selected, operation: operation, restaurantType: restaurantType)
+                            if saved { dismiss() }
+                        }.disabled(saved)
+                    }
+                    Button(diningText("返回附近餐厅")) { self.selected = nil }
+                } else {
+                    Section(diningText("请选择你所在的餐厅")) {
+                        ForEach(model.checkInPlaces) { place in
+                            Button {
+                                selected = place
+                                restaurantType = ""
+                            } label: {
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text(place.name).font(.headline)
+                                    if !place.address.isEmpty { Text(place.address) }
+                                    let distance = place.distanceMeters.formatted(.number.precision(.fractionLength(0)))
+                                    Text(diningText("约 \(distance) 米"))
+                                }.foregroundStyle(.primary)
+                            }
+                        }
+                    }
+                    Button(diningText("重新查找")) { Task { await model.findCheckInPlaces() } }
+                }
+                if let message = model.message { Text(message).foregroundStyle(.secondary) }
+            }
+            .navigationTitle(diningText("到店打卡"))
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button(diningText("取消")) { dismiss() }
+                }
+            }
+        }
+        .task { await model.findCheckInPlaces() }
     }
 }

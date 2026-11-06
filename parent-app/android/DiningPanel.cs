@@ -17,7 +17,9 @@ public sealed class DiningPanel : ContentView
     private Guid? circleId;
     private string mood = "automatic";
     private string resultMood = "automatic";
-    private bool busy, confirmed, readable = true;
+    private bool busy, checkingIn, confirmed, readable = true;
+    private bool Working => busy || checkingIn;
+    private Guid resultOperation;
     private string? message;
     private CancellationTokenSource? operation;
     private int generation;
@@ -36,7 +38,7 @@ public sealed class DiningPanel : ContentView
         catch { readable = false; message = "干饭记录暂时无法读取，原记录已保留，请重试。"; }
         Content = new ScrollView { Content = body }; Render();
     }
-    public void Suspend() { ++generation; operation?.Cancel(); busy = false; Render(); }
+    public void Suspend() { ++generation; operation?.Cancel(); busy = false; checkingIn = false; Render(); }
     private bool Update(Action<DiningArchive> change)
     {
         if (!readable) { message = "干饭记录暂时无法读取，原记录已保留，请重试。"; return false; }
@@ -52,7 +54,7 @@ public sealed class DiningPanel : ContentView
         body.Children.Clear();
         var header = new Grid { ColumnDefinitions = new ColumnDefinitionCollection { new(GridLength.Star), new(GridLength.Auto) } };
         header.Add(MomentStyle.Title("干饭", 30));
-        var menu = MomentStyle.Action("⋯", () => _ = Menu()); menu.IsEnabled = !busy;
+        var menu = MomentStyle.Action("⋯", () => _ = Menu()); menu.IsEnabled = !Working;
         SemanticProperties.SetDescription(menu, "干饭菜单"); header.Add(menu, 1, 0); body.Add(header);
         body.Add(MomentStyle.Title("今天吃啥？", 32)); body.Add(MomentStyle.Caption("别纠结了，这顿我安排！"));
         body.Add(MomentStyle.Caption(archive.Circles.FirstOrDefault(c => c.Id == circleId)?.Name ?? "当前位置附近"));
@@ -60,11 +62,14 @@ public sealed class DiningPanel : ContentView
         var rice = new Label { Text = "🍚", FontSize = 72, HorizontalTextAlignment = TextAlignment.Center };
         hero.Add(rice);
         if (busy) { hero.Add(new ActivityIndicator { IsRunning = true, Color = Colors.DarkOrange }); _ = rice.RotateToAsync(12, 250); }
-        var decide = MomentStyle.Action(busy ? "正在安排这顿饭…" : "🎲 帮我决定", () => _ = Decide(), true); decide.IsEnabled = !busy; decide.BackgroundColor = Colors.DarkOrange; hero.Add(decide);
+        var decide = MomentStyle.Action(busy ? "正在安排这顿饭…" : "🎲 帮我决定", () => _ = Decide(), true); decide.IsEnabled = !Working; decide.BackgroundColor = Colors.DarkOrange; hero.Add(decide);
         hero.Add(MomentStyle.Caption("不选条件也可以，一键安排。")); if (result is null || busy) body.Add(MomentStyle.Card(hero));
         var moods = new HorizontalStackLayout { Spacing = 8 };
-        foreach (var item in Moods) { var button = MomentStyle.Action(item.Title, () => { mood = item.Id; if (result != null) _ = Decide(); else Render(); }, mood == item.Id); button.IsEnabled = !busy; moods.Add(button); }
+        foreach (var item in Moods) { var button = MomentStyle.Action(item.Title, () => { mood = item.Id; if (result != null) _ = Decide(); else Render(); }, mood == item.Id); button.IsEnabled = !Working; moods.Add(button); }
         body.Add(new ScrollView { Orientation = ScrollOrientation.Horizontal, Content = moods });
+        var checkIn = MomentStyle.Action(checkingIn ? "正在查找附近餐厅…" : "到店打卡", () => _ = CheckInNearby());
+        checkIn.IsEnabled = !Working;
+        body.Add(checkIn);
         if (result is { } place)
         {
             var card = new VerticalStackLayout { Spacing = 14 };
@@ -77,8 +82,16 @@ public sealed class DiningPanel : ContentView
             card.Add(MomentStyle.Caption(place.Cost is > 0 ? $"人均约 ¥{place.Cost:0.##} · 高德地图参考价" : "人均消费暂无数据"));
             if (place.Rating is { } rating) card.Add(MomentStyle.Caption($"地图评分 {rating:0.#} / 5"));
             card.Add(new Label { Text = Reason(place), FontSize = 15 });
-            var confirm = MomentStyle.Action(confirmed ? "已选好，走，干饭！" : "✅ 就吃这家！", () => { if (!confirmed && Update(a => a.Choose(place, resultMood))) { confirmed = true; message = "选择已记录，吃过后可在干饭记录中确认。"; } Render(); }, true); confirm.IsEnabled = !confirmed && !busy; card.Add(confirm);
-            var another = MomentStyle.Action("🎲 不行，再来一家！", () => _ = Decide()); another.IsEnabled = !busy; card.Add(another);
+            var confirmationOperation = resultOperation;
+            var confirm = MomentStyle.Action(confirmed ? "已选好，走，干饭！" : "✅ 就吃这家！", () =>
+            {
+                if (Working || confirmed || confirmationOperation != resultOperation || result?.Id != place.Id) return;
+                confirmed = SaveCheckIn(place, resultMood, confirmationOperation);
+                Render();
+            }, true);
+            confirm.IsEnabled = !confirmed && !Working;
+            card.Add(confirm);
+            var another = MomentStyle.Action("🎲 不行，再来一家！", () => _ = Decide()); another.IsEnabled = !Working; card.Add(another);
             card.Add(MomentStyle.Action("🗺️ 带我过去！", () => _ = Navigate(place)));
             card.Add(MomentStyle.Action(archive.Favorites.Any(p => p.Id == place.Id) ? "♥ 已收藏" : "♡ 收藏餐厅", () => { Update(a => { if (a.Favorites.Any(p => p.Id == place.Id)) a.Favorites.RemoveAll(p => p.Id == place.Id); else a.Favorites.Add(place); }); Render(); }));
             body.Add(MomentStyle.Card(card));
@@ -88,26 +101,25 @@ public sealed class DiningPanel : ContentView
     }
     private string Reason(DiningPlace place)
     {
-        var known = archive.Habits.GetValueOrDefault(place.Id)?.Selected > 0;
+        var known = archive.Habits.GetValueOrDefault(place.Id)?.Visits > 0;
         return resultMood switch {
-            "familiar" => known ? "你以前选择过这里，熟悉的味道值得再试。" : "还没有常吃记录，先从附近这家开始。",
+            "familiar" => known ? "这家店在你的干饭记录里，熟悉的味道值得再试。" : "还没有常吃记录，先从附近这家开始。",
             "fresh" => known ? "附近的新选择有限，熟悉的店也保留机会。" : "你的干饭记录里还没有这家，来点新鲜的！",
             "budget" or "treat" => place.Cost is > 0 ? "参考地图提供的人均价格挑选，实际消费以店家为准。" : "暂未获取可靠的人均价格，点单前记得向店家确认。",
             "spicy" => "按店名与菜系线索挑选，具体辣度请向店家确认。",
-            _ => known ? "你以前选择过这里，熟悉的味道值得再试。" : "从附近真实餐厅中，为你挑了这一家。"
+            _ => known ? "这家店在你的干饭记录里，熟悉的味道值得再试。" : "从附近真实餐厅中，为你挑了这一家。"
         };
     }
     private async Task Decide()
     {
-        if (busy) return; busy = true; message = null; var current = ++generation;
+        if (Working) return; busy = true; message = null; var current = ++generation;
         operation?.Cancel(); using var cancel = operation = new CancellationTokenSource(TimeSpan.FromSeconds(25)); Render();
         try {
             if (DateTimeOffset.UtcNow - fetchedAt > TimeSpan.FromMinutes(5)) candidates = [];
             if (candidates.Count == 0) {
                 var saved = archive.Circles.FirstOrDefault(c => c.Id == circleId);
                 var location = saved is null ? await Locate(cancel.Token) : new Location(saved.Latitude, saved.Longitude);
-                var response = await store.CallAsync("/api/dining/nearby", HttpMethod.Post, new { latitude = location.Latitude, longitude = location.Longitude }, cancel.Token);
-                var places = response.GetProperty("restaurants").Deserialize<List<DiningPlace>>(json) ?? throw new InvalidDataException();
+                var places = await NearbyPlaces(location, cancel.Token);
                 if (current != generation) return; candidates = places; fetchedAt = DateTimeOffset.UtcNow;
             }
             await Task.Delay(450, cancel.Token);
@@ -115,12 +127,77 @@ public sealed class DiningPanel : ContentView
             var next = DiningRecommendation.Pick(candidates, mood, archive, result?.Id);
             if (next is null) { message = "附近暂时没有找到餐厅，换个生活圈或稍后重试。"; return; }
             if (result is { } old && !confirmed) Update(a => a.Habit(old.Id).Skipped++);
-            result = next; resultMood = mood; confirmed = false;
+            result = next; resultMood = mood; confirmed = false; resultOperation = Guid.NewGuid();
             if (candidates.Count == 1) message = "附近暂时只找到这一家，可换个生活圈再试。";
         } catch (OperationCanceledException) { if (current == generation) message = "定位或搜索超时，请重试，或使用已保存的生活圈。"; }
         catch (PermissionException) { message = "请在系统设置中允许位置访问，或选择已保存的生活圈。"; }
         catch (Exception error) { if (current == generation) message = error is FamilyApiException ? error.Message : "附近餐厅暂时无法读取，请稍后重试。"; }
         finally { if (ReferenceEquals(operation, cancel)) operation = null; if (current == generation) { busy = false; Render(); } }
+    }
+    private bool SaveCheckIn(DiningPlace place, string? mood, Guid id, string? restaurantType = null)
+    {
+        if (!Update(a => a.CheckIn(place, mood, id, restaurantType))) return false;
+        message = "打卡成功，已记入干饭记录。";
+        return true;
+    }
+
+    private async Task CheckInNearby()
+    {
+        if (Working) return;
+        checkingIn = true;
+        message = null;
+        var current = ++generation;
+        var id = Guid.NewGuid();
+        using var cancel = operation = new CancellationTokenSource(TimeSpan.FromSeconds(25));
+        Render();
+        try
+        {
+            var location = await Locate(cancel.Token);
+            if (current != generation) return;
+            if (location.Accuracy is > 500)
+            {
+                message = "定位精度不足，请开启精确位置后重试。";
+                return;
+            }
+
+            var places = (await NearbyPlaces(location, cancel.Token))
+                .Where(p => !string.IsNullOrWhiteSpace(p.Name) && p.DistanceMeters is >= 0 and <= 500)
+                .OrderBy(p => p.DistanceMeters).DistinctBy(p => p.Id).ToList();
+            if (current != generation) return;
+            if (places.Count == 0)
+            {
+                message = "当前位置 500 米内未找到餐厅。";
+                return;
+            }
+
+            var labels = places.Select((p, index) => $"{index + 1}. {p.Name} · 约 {p.DistanceMeters:0} 米"
+                + (string.IsNullOrWhiteSpace(p.Address) ? "" : $" · {p.Address}")).ToArray();
+            var choice = await owner.DisplayActionSheetAsync("请选择你所在的餐厅", "取消", null, labels);
+            var index = Array.IndexOf(labels, choice);
+            if (current != generation || index < 0) return;
+            var place = places[index];
+            while (current == generation)
+            {
+                var restaurantType = await owner.DisplayPromptAsync(place.Name, message ?? "餐厅类型（选填）",
+                    accept: "确认打卡", cancel: "取消", placeholder: "餐厅类型（选填）", maxLength: 40);
+                if (restaurantType is null || current != generation || SaveCheckIn(place, null, id, restaurantType)) break;
+            }
+        }
+        catch (OperationCanceledException) { if (current == generation) message = "定位或搜索超时，请重试。"; }
+        catch (PermissionException) { if (current == generation) message = "请在系统设置中允许位置访问后重试。"; }
+        catch (Exception error) { if (current == generation) message = error is FamilyApiException ? error.Message : "无法读取附近餐厅，请检查定位权限或网络后重试。"; }
+        finally
+        {
+            if (ReferenceEquals(operation, cancel)) operation = null;
+            if (current == generation) { checkingIn = false; Render(); }
+        }
+    }
+
+    private async Task<List<DiningPlace>> NearbyPlaces(Location location, CancellationToken ct)
+    {
+        var response = await store.CallAsync("/api/dining/nearby", HttpMethod.Post,
+            new { latitude = location.Latitude, longitude = location.Longitude }, ct);
+        return response.GetProperty("restaurants").Deserialize<List<DiningPlace>>(json) ?? throw new InvalidDataException();
     }
     private static async Task<Location> Locate(CancellationToken ct)
     {
@@ -152,7 +229,13 @@ public sealed class DiningPanel : ContentView
             rows.Add(MomentStyle.Title("干饭记录 · 当地时间", 22));
             foreach (var entry in archive.History) {
                 var row = new VerticalStackLayout { Spacing = 8, Children = { MomentStyle.Title(entry.Place.Name, 18), MomentStyle.Caption(entry.SelectedAt.ToLocalTime().ToString("g")) } };
-                row.Add(entry.EatenAt is not null ? MomentStyle.Caption("✓ 吃过了") : MomentStyle.Action("我吃过了", () => { Update(a => a.ConfirmEaten(entry.Id)); Fill(); })); rows.Add(MomentStyle.Card(row));
+                if (entry.CheckedIn)
+                {
+                    row.Add(MomentStyle.Caption($"累计打卡 {archive.Habits.GetValueOrDefault(entry.Place.Id)?.CheckIns ?? 0} 次"));
+                    if (entry.RestaurantType is { } type) row.Add(MomentStyle.Caption(type));
+                }
+                else row.Add(entry.EatenAt is not null ? MomentStyle.Caption("✓ 吃过了") : MomentStyle.Action("我吃过了", () => { Update(a => a.ConfirmEaten(entry.Id)); Fill(); }));
+                rows.Add(MomentStyle.Card(row));
             }
             if (archive.History.Count == 0) rows.Add(MomentStyle.Caption("选好餐厅后，记录会保存在这里。"));
             if (message is not null) rows.Add(MomentStyle.Caption(message));

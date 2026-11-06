@@ -1,4 +1,17 @@
 "选好餐厅后，记录会保存在这里。" = "Your choices will be saved here.";
+"到店打卡" = "Restaurant check-in";
+"打卡成功，已记入干饭记录。" = "Checked in. Saved to dining history.";
+"定位精度不足，请开启精确位置后重试。" = "Location is too approximate. Enable Precise Location and try again.";
+"当前位置 500 米内未找到餐厅。" = "No restaurants found within 500 meters of your current location.";
+"无法读取附近餐厅，请检查定位权限或网络后重试。" = "Could not find nearby restaurants. Check your location permission and internet connection, then try again.";
+"累计打卡 %lld 次" = "Total check-ins: %lld";
+"正在查找附近餐厅…" = "Finding nearby restaurants…";
+"餐厅类型（选填）" = "Restaurant type (optional)";
+"返回附近餐厅" = "Back to nearby restaurants";
+"请选择你所在的餐厅" = "Choose the restaurant you are at";
+"约 %@ 米" = "About %@ m away";
+"重新查找" = "Search again";
+"这家店在你的干饭记录里，熟悉的味道值得再试。" = "This restaurant is in your dining history. A familiar favorite is worth another visit.";
 "✅ 就吃这家！" = "✅ Let’s eat here!";
 "已选好，走，干饭！" = "Chosen. Let’s eat!";
 "今天吃啥？" = "What should we eat?";
@@ -6,7 +19,6 @@
 "家附近" = "Near home";
 "将当前位置保存为生活圈" = "Save current location as an area";
 "🏢 公司附近" = "🏢 Near work";
-"你以前选择过这里，熟悉的味道值得再试。" = "You chose this place before. A familiar favorite is worth another visit.";
 "干饭记录 · 当地时间" = "Meal history · Local time";
 "系统定位服务未开启，可使用已保存的生活圈。" = "Location services are off. You can use a saved area.";
 "干饭" = "Let’s Eat";
@@ -51,7 +63,6 @@
 "附近暂时没有找到餐厅。试试其他生活圈，或稍后重新定位。" = "No nearby restaurants found. Try another area or refresh your location later.";
 "从附近真实餐厅中，为你挑了这一家。" = "Picked for you from real nearby restaurants.";
 "干饭菜单" = "Meal menu";
-"安排好了！选择已记录，吃过后可在干饭记录中确认。" = "Choice saved! Confirm your visit in meal history after eating.";
 "公司附近" = "Near work";
 "你的干饭记录里还没有这家，来点新鲜的！" = "This place is new to your meal history. Try something different!";
 "附近暂时只找到这一家，可换个生活圈再试。" = "Only one restaurant was found nearby. Try another area for more options.";

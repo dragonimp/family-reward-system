@@ -62,6 +62,8 @@ struct DiningHabit: Codable {
     var selected = 0
     var eaten = 0
     var skipped = 0
+    var checkIns: Int?
+    var visits: Int { selected + (checkIns ?? 0) }
 }
 struct DiningChoice: Codable, Identifiable {
     var id = UUID()
@@ -69,6 +71,8 @@ struct DiningChoice: Codable, Identifiable {
     var mood: DiningMood
     var selectedAt: Date
     var eatenAt: Date?
+    var checkedIn: Bool?
+    var restaurantType: String?
 }
 struct DiningCircle: Codable, Identifiable {
     var id = UUID()
@@ -82,13 +86,18 @@ struct DiningArchive: Codable {
     var favorites: [DiningPlace] = []
     var circles: [DiningCircle] = []
 
-    mutating func choose(_ place: DiningPlace, mood: DiningMood, at date: Date = Date()) {
-        history.insert(DiningChoice(place: place, mood: mood, selectedAt: date), at: 0)
+    mutating func checkIn(_ place: DiningPlace, mood: DiningMood?, id: UUID, restaurantType: String = "", at date: Date = Date()) {
+        guard !history.contains(where: { $0.id == id }) else { return }
+        let type = String(restaurantType.trimmingCharacters(in: .whitespacesAndNewlines).prefix(40))
+        history.insert(DiningChoice(id: id, place: place, mood: mood ?? .automatic, selectedAt: date,
+                                    checkedIn: true, restaurantType: type.isEmpty ? nil : type), at: 0)
         history = Array(history.prefix(300))
-        habits[place.id, default: DiningHabit()].selected += 1
+        var habit = habits[place.id, default: DiningHabit()]
+        habit.checkIns = (habit.checkIns ?? 0) + 1
+        habits[place.id] = habit
     }
     mutating func confirmEaten(_ id: UUID, at date: Date = Date()) {
-        guard let index = history.firstIndex(where: { $0.id == id }), history[index].eatenAt == nil else { return }
+        guard let index = history.firstIndex(where: { $0.id == id }), history[index].checkedIn != true, history[index].eatenAt == nil else { return }
         history[index].eatenAt = date
         habits[history[index].place.id, default: DiningHabit()].eaten += 1
     }
@@ -107,14 +116,14 @@ enum DiningRecommendation {
     static func weight(_ place: DiningPlace, mood: DiningMood, archive: DiningArchive) -> Double {
         let habit = archive.habits[place.id] ?? DiningHabit()
         var value = 1.0 / (1.0 + max(0, place.distanceMeters) / 1500)
-        value *= 1 + min(4, log1p(Double(habit.selected + habit.eaten * 2)))
+        value *= 1 + min(4, log1p(Double(habit.visits + habit.eaten * 2)))
         if archive.favorites.contains(where: { $0.id == place.id }) { value *= 2 }
         value /= 1 + Double(min(habit.skipped, 5)) * 0.12
         if let rating = place.rating, rating.isFinite, (0...5).contains(rating) { value *= 0.7 + rating / 5 }
         switch mood {
         case .automatic: break
-        case .familiar: value *= habit.selected > 0 ? 4 : 1
-        case .fresh: value *= habit.selected == 0 ? 5 : 0.8
+        case .familiar: value *= habit.visits > 0 ? 4 : 1
+        case .fresh: value *= habit.visits == 0 ? 5 : 0.8
         case .budget: if let cost = place.cost, cost > 0 { value *= min(4, max(0.25, 40 / cost)) } else { value /= 1 + max(0, place.distanceMeters) / 500 }
         case .treat: if let cost = place.cost, cost > 0 { value *= min(3, max(0.5, cost / 40)) } else if archive.favorites.contains(where: { $0.id == place.id }) || habit.eaten > 0 { value *= 2 }
         case .spicy:
