@@ -27,10 +27,27 @@ public sealed class DiningArchive {
     public Dictionary<string, DiningHabit> Habits { get; set; } = new(StringComparer.Ordinal);
     public List<DiningPlace> Favorites { get; set; } = [];
     public List<DiningCircle> Circles { get; set; } = [];
+    public List<DiningPlace> ManualRestaurants { get; set; } = [];
+
+    public DiningPlace? ManualRestaurant(string name, double latitude, double longitude)
+    {
+        name = name.Trim();
+        if (name.Length is < 1 or > 100 || !(Math.Abs(latitude) <= 90 && Math.Abs(longitude) <= 180)) return null;
+        var nearby = ManualRestaurants.Where(place =>
+        {
+            if (!string.Equals(place.Name, name, StringComparison.OrdinalIgnoreCase)) return false;
+            var north = (place.Latitude - latitude) * 111_000;
+            var east = Math.IEEERemainder(place.Longitude - longitude, 360) * 111_000 * Math.Cos(latitude * Math.PI / 180);
+            return north * north + east * east <= 75 * 75;
+        }).Take(2).ToList();
+        var id = nearby.Count == 1 ? nearby[0].Id : $"manual:{Guid.NewGuid():D}";
+        return new DiningPlace(id, name, "", latitude, longitude, "", "manual", null, null, 0);
+    }
     public DiningHabit Habit(string id) { if (!Habits.TryGetValue(id, out var habit)) Habits[id] = habit = new(); return habit; }
     public void CheckIn(DiningPlace place, string? mood, Guid id, string? restaurantType = null, DateTimeOffset? at = null)
     {
         if (History.Any(c => c.Id == id)) return;
+        if (place.Provider == "manual" && !ManualRestaurants.Any(p => p.Id == place.Id)) ManualRestaurants.Add(place);
         History.Insert(0, new()
         {
             Id = id, Place = place, Mood = mood ?? "automatic", SelectedAt = at?.ToUniversalTime() ?? DateTimeOffset.UtcNow,

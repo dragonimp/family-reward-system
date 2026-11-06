@@ -137,9 +137,27 @@ struct DiningArchive: Codable {
     var habits: [String: DiningHabit] = [:]
     var favorites: [DiningPlace] = []
     var circles: [DiningCircle] = []
+    var manualRestaurants: [DiningPlace]?
+
+    func manualRestaurant(name: String, latitude: Double, longitude: Double) -> DiningPlace? {
+        let name = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !name.isEmpty, name.count <= 100, abs(latitude) <= 90, abs(longitude) <= 180 else { return nil }
+        let nearby = (manualRestaurants ?? []).filter { place in
+            guard place.name.compare(name, options: [.caseInsensitive, .widthInsensitive]) == .orderedSame else { return false }
+            let north = (place.latitude - latitude) * 111_000
+            let east = (place.longitude - longitude).remainder(dividingBy: 360) * 111_000 * cos(latitude * .pi / 180)
+            return hypot(north, east) <= 75
+        }
+        let id = nearby.count == 1 ? nearby[0].id : "manual:" + UUID().uuidString
+        return DiningPlace(id: id, name: name, address: "", latitude: latitude, longitude: longitude,
+                           category: "", provider: "manual", distanceMeters: 0)
+    }
 
     mutating func checkIn(_ place: DiningPlace, mood: DiningMood?, id: UUID, restaurantType: String = "", at date: Date = Date()) {
         guard !history.contains(where: { $0.id == id }) else { return }
+        if place.provider == "manual", !(manualRestaurants ?? []).contains(where: { $0.id == place.id }) {
+            manualRestaurants = (manualRestaurants ?? []) + [place]
+        }
         let type = String(restaurantType.trimmingCharacters(in: .whitespacesAndNewlines).prefix(40))
         history.insert(DiningChoice(id: id, place: place, mood: mood ?? .automatic, selectedAt: date,
                                     checkedIn: true, restaurantType: type.isEmpty ? nil : type), at: 0)

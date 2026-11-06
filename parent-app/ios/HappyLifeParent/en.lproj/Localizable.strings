@@ -1,4 +1,8 @@
 "选好餐厅后，记录会保存在这里。" = "Your choices will be saved here.";
+"手动填写餐厅" = "Enter a restaurant manually";
+"餐厅名称" = "Restaurant name";
+"正在定位…" = "Finding your location…";
+"无法获取当前位置，请检查定位权限后重试。" = "Could not get your current location. Check location permission and try again.";
 "路程" = "Travel time";
 "不限路程" = "Any travel time";
 "走路 5 分钟内" = "Up to 5 min walk";

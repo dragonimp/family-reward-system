@@ -12,6 +12,7 @@ import CryptoKit
     @Published var busy = false
     @Published private(set) var checkingIn = false
     @Published private(set) var checkInPlaces: [DiningPlace] = []
+    @Published private(set) var manualPosition: CLLocationCoordinate2D?
     @Published var message: String?
     @Published var confirmed = false
     @Published var circleID: UUID?
@@ -66,19 +67,24 @@ import CryptoKit
         return true
     }
 
-    func findCheckInPlaces() async {
+    func findCheckInPlaces(manual: Bool = false) async {
         guard !busy, !checkingIn, !Task.isCancelled else { return }
         checkingIn = true
         checkInPlaces = []
+        manualPosition = nil
         message = nil
         let current = UUID()
         generation = current
         defer { if current == generation { checkingIn = false } }
         do {
-            let location = try await locate()
+            let location = try await locate(accuracy: manual ? kCLLocationAccuracyBest : kCLLocationAccuracyHundredMeters)
             guard current == generation, !Task.isCancelled else { return }
-            guard location.horizontalAccuracy <= 500 else {
+            guard location.horizontalAccuracy <= (manual ? 75 : 500) else {
                 message = diningText("定位精度不足，请开启精确位置后重试。")
+                return
+            }
+            if manual {
+                manualPosition = location.coordinate
                 return
             }
             let nearby = try await nearbyPlaces(around: location, radius: 500)
@@ -90,7 +96,8 @@ import CryptoKit
         } catch is CancellationError { }
         catch {
             if current == generation, !Task.isCancelled {
-                message = diningText("无法读取附近餐厅，请检查定位权限或网络后重试。")
+                message = manual ? diningText("无法获取当前位置，请检查定位权限后重试。")
+                    : diningText("无法读取附近餐厅，请检查定位权限或网络后重试。")
             }
         }
     }
@@ -197,6 +204,7 @@ import CryptoKit
     func closeCheckIn() {
         if checkingIn { stop() }
         checkInPlaces = []
+        manualPosition = nil
     }
 
     private func nearbyPlaces(around location: CLLocation, radius: CLLocationDistance, query: String = "restaurant", includeCafes: Bool = false) async throws -> [DiningPlace] {
@@ -237,8 +245,9 @@ import CryptoKit
         generation = UUID(); search?.cancel(); directions?.cancel(); timeout?.cancel(); locator.stopUpdatingLocation()
         waiting?.resume(throwing: CancellationError()); waiting = nil; busy = false; checkingIn = false
     }
-    private func locate() async throws -> CLLocation {
+    private func locate(accuracy: CLLocationAccuracy = kCLLocationAccuracyHundredMeters) async throws -> CLLocation {
         guard CLLocationManager.locationServicesEnabled() else { throw APIError.message(String(localized: "系统定位服务未开启，可使用已保存的生活圈。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) }
+        locator.desiredAccuracy = accuracy
         return try await withCheckedThrowingContinuation { continuation in
             waiting = continuation
             timeout = Task { [weak self] in
@@ -449,6 +458,10 @@ struct DiningView: View {
                                 let count = model.archive.habits[choice.place.id]?.checkIns ?? 0
                                 Label(diningText("累计打卡 \(count) 次"), systemImage: "checkmark.circle.fill").foregroundStyle(.orange)
                                 if let type = choice.restaurantType { Text(type).font(.subheadline) }
+                                if choice.place.provider == "manual" {
+                                    Text(checkInCoordinates(latitude: choice.place.latitude, longitude: choice.place.longitude))
+                                        .font(.caption).foregroundStyle(.secondary)
+                                }
                             } else if choice.eatenAt != nil { Label(String(localized: "吃过了", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), systemImage: "checkmark.circle.fill").foregroundStyle(.orange) }
                             else { Button(String(localized: "我吃过了", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) { _ = model.update { $0.confirmEaten(choice.id) } } }
                         }
@@ -483,18 +496,52 @@ struct DiningView: View {
 }
 
 
+private func checkInCoordinates(latitude: Double, longitude: Double) -> String {
+    let format = FloatingPointFormatStyle<Double>.number.precision(.fractionLength(5)).grouping(.never)
+    return "\(latitude.formatted(format)), \(longitude.formatted(format))"
+}
+
 private struct DiningCheckInSheet: View {
     @ObservedObject var model: DiningStore
     @Environment(\.dismiss) private var dismiss
     @State private var selected: DiningPlace?
     @State private var restaurantType = ""
+    @State private var manual = false
+    @State private var restaurantName = ""
     @State private var operation = UUID()
     @State private var saved = false
 
     var body: some View {
         NavigationStack {
             List {
-                if model.checkingIn {
+                if manual {
+                    Section {
+                        TextField(diningText("餐厅名称"), text: $restaurantName)
+                            .onChange(of: restaurantName) { _, name in
+                                if name.count > 100 { restaurantName = String(name.prefix(100)) }
+                            }
+                        TextField(diningText("餐厅类型（选填）"), text: $restaurantType)
+                        if let position = model.manualPosition {
+                            Label(checkInCoordinates(latitude: position.latitude, longitude: position.longitude), systemImage: "location.fill")
+                        }
+                        Button(model.manualPosition == nil ? diningText("获取当前位置") : diningText("重新定位")) {
+                            Task { await model.findCheckInPlaces(manual: true) }
+                        }.disabled(model.checkingIn)
+                        if model.checkingIn { ProgressView(diningText("正在定位…")) }
+                        Button(diningText("确认打卡")) {
+                            guard !saved, let position = model.manualPosition,
+                                  let place = model.archive.manualRestaurant(name: restaurantName, latitude: position.latitude, longitude: position.longitude) else { return }
+                            saved = model.checkIn(place, operation: operation, restaurantType: restaurantType)
+                            if saved { dismiss() }
+                        }.disabled(saved || model.manualPosition == nil || !validName)
+                    }
+                    Button(diningText("返回附近餐厅")) {
+                        model.closeCheckIn()
+                        manual = false
+                        Task { await model.findCheckInPlaces() }
+                    }
+                } else if model.checkingIn {
+                    manualEntry
                     ProgressView(diningText("正在查找附近餐厅…"))
                 } else if let selected {
                     Section {
@@ -509,6 +556,7 @@ private struct DiningCheckInSheet: View {
                     }
                     Button(diningText("返回附近餐厅")) { self.selected = nil }
                 } else {
+                    manualEntry
                     Section(diningText("请选择你所在的餐厅")) {
                         ForEach(model.checkInPlaces) { place in
                             Button {
@@ -535,6 +583,20 @@ private struct DiningCheckInSheet: View {
                 }
             }
         }
-        .task { await model.findCheckInPlaces() }
+        .task { if !manual { await model.findCheckInPlaces() } }
+    }
+
+    private var validName: Bool {
+        let name = restaurantName.trimmingCharacters(in: .whitespacesAndNewlines)
+        return (1...100).contains(name.count)
+    }
+
+    private var manualEntry: some View {
+        Button(diningText("手动填写餐厅"), systemImage: "pencil.and.list.clipboard") {
+            model.closeCheckIn()
+            model.message = nil
+            restaurantType = ""
+            manual = true
+        }
     }
 }

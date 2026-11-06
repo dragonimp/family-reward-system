@@ -38,7 +38,7 @@ public sealed class DiningPanel : ContentView
         if (userId.Length == 0) { readable = false; message = "用户身份尚未就绪，请重新登录后重试。"; }
         else try { if (File.Exists(file)) {
             var loaded = JsonSerializer.Deserialize<DiningArchive>(File.ReadAllText(file), json) ?? throw new InvalidDataException();
-            if (loaded.History is null || loaded.Habits is null || loaded.Favorites is null || loaded.Circles is null || loaded.History.Any(c => c.Place is null)) throw new InvalidDataException();
+            if (loaded.History is null || loaded.Habits is null || loaded.Favorites is null || loaded.Circles is null || loaded.ManualRestaurants is null || loaded.History.Any(c => c.Place is null)) throw new InvalidDataException();
             archive = loaded;
         } }
         catch { readable = false; message = "干饭记录暂时无法读取，原记录已保留，请重试。"; }
@@ -215,10 +215,20 @@ public sealed class DiningPanel : ContentView
         message = null;
         var current = ++generation;
         var id = Guid.NewGuid();
-        using var cancel = operation = new CancellationTokenSource(TimeSpan.FromSeconds(25));
+        using var cancel = operation = new CancellationTokenSource();
         Render();
         try
         {
+            const string manual = "手动填写餐厅";
+            const string nearby = "查找附近餐厅";
+            var source = await owner.DisplayActionSheetAsync("到店打卡", "取消", null, nearby, manual);
+            if (current != generation || source is not (manual or nearby)) return;
+            if (source == manual)
+            {
+                await CheckInManual(current, id, cancel.Token);
+                return;
+            }
+            cancel.CancelAfter(TimeSpan.FromSeconds(25));
             var location = await Locate(cancel.Token);
             if (current != generation) return;
             if (location.Accuracy is > 500)
@@ -260,6 +270,44 @@ public sealed class DiningPanel : ContentView
         }
     }
 
+    private async Task CheckInManual(int current, Guid id, CancellationToken ct)
+    {
+        var name = "";
+        while (current == generation)
+        {
+            var input = await owner.DisplayPromptAsync("手动填写餐厅", "输入餐厅名称，再获取当前位置。",
+                accept: "获取当前位置", cancel: "取消", initialValue: name, maxLength: 100);
+            if (input is null || current != generation) return;
+            name = input.Trim();
+            if (name.Length != 0) break;
+            await owner.DisplayAlertAsync("请填写餐厅名称", "填写后即可继续定位。", "好");
+        }
+        if (current != generation) return;
+        var location = await Locate(ct, GeolocationAccuracy.Best);
+        if (current != generation) return;
+        if (location.Accuracy is null or > 75)
+        {
+            message = "定位精度不足，请开启精确位置后重试。";
+            return;
+        }
+        var place = archive.ManualRestaurant(name, location.Latitude, location.Longitude);
+        if (place is null)
+        {
+            message = "无法获取当前位置，请检查定位权限后重试。";
+            return;
+        }
+        var coordinates = CheckInCoordinates(place);
+        while (current == generation)
+        {
+            var restaurantType = await owner.DisplayPromptAsync(place.Name, message ?? $"确认当前位置：{coordinates}",
+                accept: "确认打卡", cancel: "取消", placeholder: "餐厅类型（选填）", maxLength: 40);
+            if (restaurantType is null || current != generation || SaveCheckIn(place, null, id, restaurantType)) return;
+        }
+    }
+
+    private static string CheckInCoordinates(DiningPlace place) =>
+        FormattableString.Invariant($"{place.Latitude:F5}, {place.Longitude:F5}");
+
     private Task<JsonElement> SearchNearby(Location location, bool driving, CancellationToken ct) =>
         store.CallAsync("/api/dining/nearby", HttpMethod.Post,
             new { latitude = location.Latitude, longitude = location.Longitude, driving }, ct);
@@ -279,9 +327,9 @@ public sealed class DiningPanel : ContentView
         var times = response.GetProperty("seconds").Deserialize<double?[]>(json);
         return times?.Length == places.Count ? times : throw new InvalidDataException();
     }
-    private static async Task<Location> Locate(CancellationToken ct)
+    private static async Task<Location> Locate(CancellationToken ct, GeolocationAccuracy accuracy = GeolocationAccuracy.Medium)
     {
-        var value = await Geolocation.Default.GetLocationAsync(new GeolocationRequest(GeolocationAccuracy.Medium, TimeSpan.FromSeconds(15)), ct);
+        var value = await Geolocation.Default.GetLocationAsync(new GeolocationRequest(accuracy, TimeSpan.FromSeconds(15)), ct);
         if (value is null || Math.Abs((DateTimeOffset.UtcNow - value.Timestamp).TotalMinutes) > 2) throw new InvalidOperationException();
         return value;
     }
@@ -313,6 +361,7 @@ public sealed class DiningPanel : ContentView
                 {
                     row.Add(MomentStyle.Caption($"累计打卡 {archive.Habits.GetValueOrDefault(entry.Place.Id)?.CheckIns ?? 0} 次"));
                     if (entry.RestaurantType is { } type) row.Add(MomentStyle.Caption(type));
+                    if (entry.Place.Provider == "manual") row.Add(MomentStyle.Caption(CheckInCoordinates(entry.Place)));
                 }
                 else row.Add(entry.EatenAt is not null ? MomentStyle.Caption("✓ 吃过了") : MomentStyle.Action("我吃过了", () => { Update(a => a.ConfirmEaten(entry.Id)); Fill(); }));
                 rows.Add(MomentStyle.Card(row));
