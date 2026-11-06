@@ -690,11 +690,11 @@ private struct MomentTestInvitationView: View {
                                 copied = true
                             } label: { Label(copied ? String(localized: "已复制", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)) : String(localized: "复制链接", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), systemImage: copied ? "checkmark" : "doc.on.doc") }
                                 .buttonStyle(.bordered)
-                            MomentShareLink(
-                                url: invitation.url,
-                                title: String(localized: "\(invitation.title) 测试邀请", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)),
-                                label: String(localized: "分享邀请", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))
-                            ).buttonStyle(.borderedProminent)
+                            ShareLink(item: invitation.url, subject: Text(String(localized: "\(invitation.title) 测试邀请", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)))) {
+                                Label(String(localized: "分享邀请", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), systemImage: "square.and.arrow.up")
+                                    .frame(maxWidth: .infinity)
+                            }
+                            .buttonStyle(.borderedProminent)
                         }
                     }
                     .padding(14).frame(maxWidth: .infinity)
