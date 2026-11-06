@@ -12,6 +12,49 @@ struct DiningPlace: Codable, Identifiable, Equatable {
     var rating: Double?
     var distanceMeters: Double
 }
+// Match details across providers without passing GCJ-02 coordinates to Apple Maps.
+struct DiningMapDetails: Decodable {
+    struct Center: Decodable {
+        let latitude: Double
+        let longitude: Double
+    }
+    let restaurants: [DiningPlace]
+    let searchCenter: Center
+
+    func applying(to places: [DiningPlace], latitude: Double, longitude: Double) -> [DiningPlace] {
+        let northOffset = searchCenter.latitude - latitude
+        let eastOffset = searchCenter.longitude - longitude
+        let metersPerLongitude = 111_000 * cos(latitude * .pi / 180)
+        return places.map { place in
+            let nearby = restaurants.filter { candidate in
+                guard candidate.provider == "amap",
+                      candidate.name.compare(place.name, options: [.caseInsensitive, .widthInsensitive]) == .orderedSame else { return false }
+                let north = (candidate.latitude - place.latitude - northOffset) * 111_000
+                let east = (candidate.longitude - place.longitude - eastOffset) * metersPerLongitude
+                return hypot(north, east) <= 60
+            }
+            guard nearby.count == 1, let match = nearby.first else { return place }
+            var enriched = place
+            enriched.category = match.category
+            enriched.cost = match.cost
+            enriched.rating = match.rating
+            return enriched
+        }
+    }
+}
+
+extension DiningPlace {
+    var cuisine: String? {
+        let generic = ["restaurant", "food", "餐饮服务", "餐饮相关场所", "餐饮相关", "中餐厅", "外国餐厅", "餐厅", "中餐", "西餐"]
+        if let type = category.split(separator: ";").map({ $0.trimmingCharacters(in: .whitespacesAndNewlines) })
+            .last(where: { !$0.isEmpty && !generic.contains($0) }) { return type }
+        let dishes = ["牛肉面", "螺蛳粉", "麻辣烫", "小龙虾", "烤肉", "烧烤", "烤鱼", "火锅", "饺子", "馄饨", "小笼包",
+                      "砂锅", "卤肉饭", "煲仔饭", "米线", "拉面", "寿司", "披萨", "汉堡", "炸鸡", "粤菜", "川菜", "湘菜", "日料",
+                      "pizza", "ramen", "sushi", "burgers", "barbecue", "hot pot"]
+        return dishes.first(where: { name.localizedCaseInsensitiveContains($0) })
+    }
+}
+
 enum DiningMood: String, Codable, CaseIterable {
     case automatic, familiar, fresh, budget, treat, spicy
 }

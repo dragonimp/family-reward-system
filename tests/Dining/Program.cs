@@ -50,6 +50,10 @@ try {
  Check((await client.PostAsync("/api/dining/nearby", new StringContent("""{"latitude":91,"longitude":0}""", System.Text.Encoding.UTF8,"application/json"))).StatusCode == HttpStatusCode.BadRequest, "invalid location rejected");
  using var response = await client.PostAsync("/api/dining/nearby", body); var text = await response.Content.ReadAsStringAsync();
  Check(response.IsSuccessStatusCode && text.Contains("amap:A") && text.Contains("gcj02") && !text.Contains("test-key"), "real provider contract and coordinate system; key never returned");
+ using var payload = JsonDocument.Parse(text);
+ var center = payload.RootElement.GetProperty("searchCenter");
+ Check(center.GetProperty("latitude").GetDouble() == 31.205 && center.GetProperty("longitude").GetDouble() == 121.405, "cross-provider matching receives the converted search center");
+ Check(payload.RootElement.GetProperty("restaurants")[0].GetProperty("cost").GetDouble() == 25, "real per-person price retained");
  Provider.Fail = true;
  Check((await client.PostAsync("/api/dining/nearby", body)).StatusCode == HttpStatusCode.BadGateway, "provider failure is honest, never a fake fallback");
  Console.WriteLine("PASS: dining recommendation, persistence, provider and authenticated HTTP checks");

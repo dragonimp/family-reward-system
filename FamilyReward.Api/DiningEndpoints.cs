@@ -29,14 +29,14 @@ internal static class DiningEndpoints
                 using var coordinates = await JsonDocument.ParseAsync(await conversion.Content.ReadAsStreamAsync(context.RequestAborted), cancellationToken: context.RequestAborted);
                 if (Text(coordinates.RootElement, "status") != "1") throw new InvalidDataException();
                 var location = Text(coordinates.RootElement, "locations");
-                if (!TryCoordinate(location, out _, out _)) throw new InvalidDataException();
+                if (!TryCoordinate(location, out var centerLatitude, out var centerLongitude)) throw new InvalidDataException();
                 var url = QueryHelpers.AddQueryString("https://restapi.amap.com/v3/place/around", new Dictionary<string, string?> {
                     ["key"] = key, ["location"] = location, ["types"] = "050000", ["radius"] = "3000", ["sortrule"] = "distance", ["offset"] = "25", ["page"] = "1", ["extensions"] = "all", ["output"] = "JSON"
                 });
                 using var response = await client.GetAsync(url, context.RequestAborted);
                 response.EnsureSuccessStatusCode();
                 using var data = await JsonDocument.ParseAsync(await response.Content.ReadAsStreamAsync(context.RequestAborted), cancellationToken: context.RequestAborted);
-                return Results.Ok(new { restaurants = Parse(data.RootElement), attribution = "高德地图", coordinateSystem = "gcj02", distanceKind = "provider" });
+                return Results.Ok(new { restaurants = Parse(data.RootElement), attribution = "高德地图", coordinateSystem = "gcj02", distanceKind = "provider", searchCenter = new { latitude = centerLatitude, longitude = centerLongitude } });
             }
             catch (OperationCanceledException) when (context.RequestAborted.IsCancellationRequested) { throw; }
             catch (Exception error) when (error is HttpRequestException or JsonException or InvalidDataException or OperationCanceledException)

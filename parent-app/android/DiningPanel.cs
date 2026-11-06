@@ -71,7 +71,10 @@ public sealed class DiningPanel : ContentView
             card.Add(MomentStyle.Title("命运安排好了，走，干饭！", 18)); card.Add(MomentStyle.Title(place.Name, 25));
             if (place.Address.Length > 0) card.Add(MomentStyle.Caption("📍 " + place.Address));
             card.Add(MomentStyle.Caption($"地图参考距离约 {place.DistanceMeters:0} 米 · 步行时间以导航为准"));
-            card.Add(MomentStyle.Caption(place.Cost is > 0 ? $"人均参考 ¥{place.Cost:0.##}" : "人均暂无可靠数据"));
+            var cuisine = place.Category.Split(';', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries)
+                .LastOrDefault(type => type is not ("餐饮服务" or "餐饮相关场所" or "餐饮相关" or "中餐厅" or "外国餐厅" or "餐厅" or "中餐" or "西餐"));
+            card.Add(MomentStyle.Caption(cuisine is null ? "暂无菜系或主打餐品信息。" : $"地图分类显示，这家店属于{cuisine}。"));
+            card.Add(MomentStyle.Caption(place.Cost is > 0 ? $"人均约 ¥{place.Cost:0.##} · 高德地图参考价" : "人均消费暂无数据"));
             if (place.Rating is { } rating) card.Add(MomentStyle.Caption($"地图评分 {rating:0.#} / 5"));
             card.Add(new Label { Text = Reason(place), FontSize = 15 });
             var confirm = MomentStyle.Action(confirmed ? "已选好，走，干饭！" : "✅ 就吃这家！", () => { if (!confirmed && Update(a => a.Choose(place, resultMood))) { confirmed = true; message = "选择已记录，吃过后可在干饭记录中确认。"; } Render(); }, true); confirm.IsEnabled = !confirmed && !busy; card.Add(confirm);

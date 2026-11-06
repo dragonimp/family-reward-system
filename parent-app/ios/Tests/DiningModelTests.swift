@@ -20,6 +20,28 @@ import Foundation
         check(DiningRecommendation.weight(known, mood: .budget, archive: archive) > DiningRecommendation.weight(costly, mood: .budget, archive: archive), "price used only when known")
         var unknown = known; unknown.cost = nil; unknown.rating = nil
         check(DiningRecommendation.weight(unknown, mood: .budget, archive: archive).isFinite, "unknown price and rating remain absent")
+        var mapPlace = unknown
+        mapPlace.name = "老王牛肉面"
+        mapPlace.category = "restaurant"
+        check(mapPlace.cuisine == "牛肉面", "explicit specialty from name")
+        check(unknown.cuisine == nil, "generic category is not a cuisine")
+        var match = mapPlace
+        match.provider = "amap"
+        match.latitude += 0.004
+        match.longitude += 0.005
+        match.cost = 25.5
+        match.category = "餐饮服务;中餐厅;面馆"
+        let center = DiningMapDetails.Center(latitude: 31.204, longitude: 121.405)
+        let details = DiningMapDetails(restaurants: [match], searchCenter: center)
+        let enriched = details.applying(to: [mapPlace], latitude: 31.2, longitude: 121.4)[0]
+        check(enriched.cost == 25.5 && enriched.cuisine == "面馆", "same branch gets price and category")
+        check(enriched.id == mapPlace.id && enriched.latitude == mapPlace.latitude && enriched.longitude == mapPlace.longitude, "Apple navigation and history keep their original identity")
+        var otherBranch = match
+        otherBranch.latitude += 0.01
+        let distant = DiningMapDetails(restaurants: [otherBranch], searchCenter: center)
+        check(distant.applying(to: [mapPlace], latitude: 31.2, longitude: 121.4) == [mapPlace], "distant branches are not matched")
+        let ambiguous = DiningMapDetails(restaurants: [match, match], searchCenter: center)
+        check(ambiguous.applying(to: [mapPlace], latitude: 31.2, longitude: 121.4) == [mapPlace], "ambiguous matches do not contribute prices")
         let id = archive.history[0].id
         archive.confirmEaten(UUID(uuidString: id.uuidString.lowercased())!); archive.confirmEaten(UUID(uuidString: id.uuidString.uppercased())!)
         check(archive.habits[known.id]?.eaten == 1, "typed UUID eaten confirmation is idempotent")

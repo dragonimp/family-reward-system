@@ -115,12 +115,12 @@ private actor PhotoPreviewLoader {
     var ready: Bool { profile?.text("role") == "parent" && profile?.flag("needsRole") == false }
     var selectedFamily: String { groups.first(where: { $0.id == groupID })?.text("name") ?? String(localized: "我的群组", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)) }
 
-    func call(_ path: String, method: String = "GET", body: [String: Any]? = nil) async throws -> Any {
+    func call(_ path: String, method: String = "GET", body: [String: Any]? = nil, timeout: TimeInterval = 30) async throws -> Any {
         guard let token = try await identity.validAccessToken() else { throw APIError.message(String(localized: "请先登录用户中心。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) }
         let current = revision
         var request = URLRequest(url: URL(string: path, relativeTo: base)!.absoluteURL)
         request.setValue(AgentIdentityLanguage.current, forHTTPHeaderField: "Accept-Language")
-        request.httpMethod = method; request.timeoutInterval = 30
+        request.httpMethod = method; request.timeoutInterval = timeout
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         request.setValue("application/json", forHTTPHeaderField: "Accept")
         if let body { request.httpBody = try JSONSerialization.data(withJSONObject: body); request.setValue("application/json", forHTTPHeaderField: "Content-Type") }
