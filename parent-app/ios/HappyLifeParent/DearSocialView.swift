@@ -2506,7 +2506,7 @@ struct MomentShareLink: View {
     let title: String
     let label: String
     var body: some View {
-        ShareLink(item: url, preview: SharePreview(title, image: Image("LoginBrand"), icon: Image("LoginBrand"))) {
+        ShareLink(item: url, subject: Text(title)) {
             Label(label, systemImage: "square.and.arrow.up")
         }
     }
