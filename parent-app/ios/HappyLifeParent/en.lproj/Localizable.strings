@@ -1,3 +1,14 @@
+"推荐" = "For you";
+"附近" = "Nearby";
+"常去" = "Usuals";
+"随机" = "Random";
+"筛选" = "Filters";
+"口味偏好" = "Preferences";
+"就吃这家" = "Choose this place";
+"换一家" = "Try another";
+"带我过去" = "Directions";
+"优先挑选符合当前条件的近处餐厅。" = "Picked a nearby restaurant that fits your filters.";
+"从符合当前条件的餐厅中随机挑选。" = "Randomly picked from restaurants that fit your filters.";
 "食物类型" = "Food type";
 "智能推荐" = "Smart recommendation";
 "面食" = "Noodles & dumplings";

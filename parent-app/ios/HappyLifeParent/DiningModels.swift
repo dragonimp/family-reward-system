@@ -138,6 +138,8 @@ enum DiningTrip: CaseIterable, Hashable {
     }
 }
 
+enum DiningSelection { case recommended, nearby, random }
+
 enum DiningMood: String, Codable, CaseIterable {
     case automatic, familiar, fresh, budget, treat, spicy
 }
@@ -232,12 +234,13 @@ enum DiningRecommendation {
         }
         return max(0.01, value)
     }
-    static func pick(_ places: [DiningPlace], mood: DiningMood, archive: DiningArchive, excluding: String?, draw: Double = Double.random(in: 0..<1)) -> DiningPlace? {
+    static func pick(_ places: [DiningPlace], mood: DiningMood, archive: DiningArchive, excluding: String?, selection: DiningSelection = .recommended, draw: Double = Double.random(in: 0..<1)) -> DiningPlace? {
         var seen = Set<String>()
         let unique = places.filter { !$0.name.isEmpty && $0.latitude.isFinite && $0.longitude.isFinite && abs($0.latitude) <= 90 && abs($0.longitude) <= 180 && seen.insert($0.id).inserted }
         let alternatives = unique.filter { $0.id != excluding }
         let candidates = alternatives.isEmpty ? unique : alternatives
-        let weights = candidates.map { weight($0, mood: mood, archive: archive) }
+        if selection == .nearby { return candidates.min { $0.distanceMeters < $1.distanceMeters } }
+        let weights = candidates.map { selection == .random ? 1 : weight($0, mood: mood, archive: archive) }
         var target = min(0.999999, max(0, draw)) * weights.reduce(0, +)
         for (place, weight) in zip(candidates, weights) { target -= weight; if target < 0 { return place } }
         return candidates.last

@@ -159,6 +159,7 @@ import CryptoKit
         if hasRequestedRecommendation { Task { await decide() } }
     }
 
+    @Published var selection: DiningSelection = .recommended
     func decide() async {
         guard !busy, !checkingIn else { return }; busy = true; message = nil; walking = nil
         let current = UUID()
@@ -217,7 +218,7 @@ import CryptoKit
                 message = diningText("餐段已切换，请重新推荐。")
                 return
             }
-            guard let next = DiningRecommendation.pick(eligible, mood: mood, archive: archive, excluding: result?.id) else {
+            guard let next = DiningRecommendation.pick(eligible, mood: mood, archive: archive, excluding: result?.id, selection: selection) else {
                 result = nil
                 if !candidates.isEmpty && trip != .unrestricted {
                     message = diningText("暂未找到能确认符合路程上限的餐厅。可以放宽上限后重试。")
@@ -347,50 +348,78 @@ private func diningText(_ key: String.LocalizationValue) -> String {
     String(localized: key, bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))
 }
 
+private struct DiningBowl: Shape {
+    func path(in rect: CGRect) -> Path {
+        let x = rect.width, y = rect.height
+        return Path { path in
+            path.move(to: CGPoint(x: x * 0.09, y: y * 0.49))
+            path.addQuadCurve(to: CGPoint(x: x * 0.92, y: y * 0.47), control: CGPoint(x: x * 0.50, y: y * 0.57))
+            path.addQuadCurve(to: CGPoint(x: x * 0.52, y: y * 0.92), control: CGPoint(x: x * 0.83, y: y * 0.92))
+            path.addQuadCurve(to: CGPoint(x: x * 0.09, y: y * 0.49), control: CGPoint(x: x * 0.21, y: y * 0.92))
+            for offset in [0.34, 0.53, 0.72] {
+                path.move(to: CGPoint(x: x * offset, y: y * 0.33))
+                path.addCurve(to: CGPoint(x: x * (offset + 0.01), y: y * 0.07),
+                              control1: CGPoint(x: x * (offset + 0.14), y: y * 0.20),
+                              control2: CGPoint(x: x * (offset - 0.09), y: y * 0.16))
+            }
+        }
+    }
+}
+
 struct DiningView: View {
     @StateObject private var model: DiningStore
     @State private var showingRecords = false
     @State private var showingCircles = false
     @State private var showingCheckIn = false
+    @State private var showingFilters = false
     @State private var spinning = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     init(userID: String, family: FamilyStore) { _model = StateObject(wrappedValue: DiningStore(userID: userID, family: family)) }
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(alignment: .leading, spacing: 24) {
-                    VStack(alignment: .leading, spacing: 10) {
-                        Text(String(localized: "今天吃啥？", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))).font(.largeTitle.bold())
-                        Text(String(localized: "别纠结了，这顿我安排！", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))).font(.title3).foregroundStyle(.secondary)
-                        Label(model.archive.circles.first(where: { $0.id == model.circleID })?.name ?? String(localized: "当前位置附近", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), systemImage: "location.circle").font(.subheadline).foregroundStyle(.secondary)
+                VStack(alignment: .leading, spacing: 16) {
+                    HStack(spacing: 4) {
+                        shortcut("推荐", icon: "sparkles", selection: .recommended)
+                        shortcut("附近", icon: "location", selection: .nearby)
+                        shortcut("常去", icon: "heart", selection: .recommended, mood: .familiar)
+                        shortcut("随机", icon: "dice", selection: .random)
                     }
+                    .padding(4)
+                    .background(.background, in: RoundedRectangle(cornerRadius: 18))
+                    .disabled(model.busy || model.checkingIn)
+
                     HStack(spacing: 8) {
-                        Picker(diningText("食物类型"), selection: Binding(get: { model.food }, set: model.selectFood)) {
-                            ForEach(DiningFood.allCases, id: \.self) { food in Text(foodTitle(food)).tag(food) }
-                        }.frame(maxWidth: .infinity, alignment: .leading)
-                        Picker(diningText("路程"), selection: Binding(get: { model.trip }, set: model.selectTrip)) {
-                            ForEach(DiningTrip.allCases, id: \.self) { trip in Text(tripTitle(trip)).tag(trip) }
-                        }.frame(maxWidth: .infinity, alignment: .leading)
-                    }.pickerStyle(.menu).labelsHidden().disabled(model.busy || model.checkingIn)
-                    if model.result == nil || model.busy {
-                    VStack(spacing: 16) {
-                        Text("🍚").font(.system(size: 76)).rotationEffect(.degrees(model.busy && spinning ? 12 : -8)).animation(model.busy && !reduceMotion ? .easeInOut(duration: 0.3).repeatForever(autoreverses: true) : .default, value: spinning)
-                        Button { Task { await model.decide() } } label: {
-                            HStack { if model.busy { ProgressView().tint(.white) }; Text(model.busy ? String(localized: "正在安排这顿饭…", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)) : String(localized: "🎲 帮我决定", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))).font(.title3.bold()).frame(maxWidth: .infinity) }.padding(12)
-                        }.buttonStyle(.borderedProminent).tint(.orange).disabled(model.busy)
-                        Text(String(localized: "不选条件也可以，一键安排。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) .font(.caption).foregroundStyle(.secondary)
-                    }.padding(22).frame(maxWidth: .infinity).background(.orange.opacity(0.08), in: RoundedRectangle(cornerRadius: 26))
+                        Label(model.archive.circles.first(where: { $0.id == model.circleID })?.name ?? diningText("当前位置附近"), systemImage: "location.circle")
+                            .foregroundStyle(.secondary)
+                        Spacer(minLength: 4)
+                        Button(diningText("筛选"), systemImage: "slider.horizontal.3") { showingFilters = true }
+                            .disabled(model.busy || model.checkingIn)
+                    }.font(.subheadline)
+
+                    if let place = model.result {
+                        resultCard(place, operation: model.confirmationOperation)
+                    } else {
+                        VStack(spacing: 12) {
+                            DiningBowl()
+                                .stroke(.orange, style: StrokeStyle(lineWidth: 2.5, lineCap: .round, lineJoin: .round))
+                                .frame(width: 72, height: 60)
+                                .rotationEffect(.degrees(spinning && !reduceMotion ? 8 : -8))
+                                .animation(.easeInOut(duration: 0.25), value: spinning)
+                                .foregroundStyle(.orange)
+                                .accessibilityHidden(true)
+                            Text(diningText("今天吃啥？")).font(.title.bold())
+                            Button { Task { await model.decide() } } label: {
+                                HStack {
+                                    if model.busy { ProgressView().tint(.white) }
+                                    Text(model.busy ? diningText("正在安排这顿饭…") : diningText("🎲 帮我决定"))
+                                }.frame(maxWidth: .infinity)
+                            }.buttonStyle(.borderedProminent).controlSize(.large).tint(.orange)
+                                .disabled(model.busy || model.checkingIn)
+                        }.padding(24).frame(maxWidth: .infinity)
+                            .background(.orange.opacity(0.09), in: RoundedRectangle(cornerRadius: 26))
                     }
-                    ScrollView(.horizontal, showsIndicators: false) {
-                        HStack {
-                            ForEach(DiningMood.allCases, id: \.self) { mood in
-                                Button(moodTitle(mood)) { model.mood = mood; if model.result != nil { Task { await model.decide() } } }.buttonStyle(.bordered).tint(model.mood == mood ? .orange : .gray).disabled(model.busy)
-                            }
-                        }
-                    }
-                    Button(diningText("到店打卡"), systemImage: "mappin.circle") { showingCheckIn = true }
-                        .buttonStyle(.bordered).disabled(model.busy || model.checkingIn)
-                    if let place = model.result { resultCard(place, operation: model.confirmationOperation) }
+                    if model.busy && model.result != nil { ProgressView(diningText("正在安排这顿饭…")).font(.footnote) }
                     if let message = model.message { Text(message).font(.subheadline).foregroundStyle(.secondary).accessibilityAddTraits(.updatesFrequently) }
                     Text(String(localized: "附近餐厅来自 Apple 地图，菜系及人均可由高德地图补充。搜索位置仅用于本次查询，习惯与记录保存在当前账号的本机空间。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) .font(.caption).foregroundStyle(.secondary)
                 }.padding(20).frame(maxWidth: 760).frame(maxWidth: .infinity)
@@ -398,6 +427,7 @@ struct DiningView: View {
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Menu {
+                        Button(diningText("到店打卡"), systemImage: "mappin.circle") { showingCheckIn = true }
                         Button(String(localized: "干饭记录与收藏", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), systemImage: "clock") { showingRecords = true }
                         Button(String(localized: "我的生活圈", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), systemImage: "location.circle") { showingCircles = true }
                         Button(String(localized: "重新定位", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), systemImage: "location") { model.refreshLocation() }
@@ -406,32 +436,93 @@ struct DiningView: View {
                 }
             }
             .sheet(isPresented: $showingCheckIn, onDismiss: model.closeCheckIn) { DiningCheckInSheet(model: model) }
+            .sheet(isPresented: $showingFilters) { filters }
             .sheet(isPresented: $showingRecords) { records }
             .sheet(isPresented: $showingCircles) { circles }
             .onChange(of: model.busy) { _, busy in spinning = busy }
             .onDisappear { model.stop() }
         }
     }
-    private func resultCard(_ place: DiningPlace, operation: UUID) -> some View {
-        VStack(alignment: .leading, spacing: 16) {
-            Text(String(localized: "命运安排好了，走，干饭！", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))).font(.headline).foregroundStyle(.orange)
-            Text(place.name).font(.title2.bold()).textSelection(.enabled)
-            if !place.address.isEmpty { Label(place.address, systemImage: "mappin.and.ellipse").font(.subheadline) }
-            if let walking = model.walking { Label(walking, systemImage: model.trip.driving ? "car" : "figure.walk") }
-            else { Text(String(localized: "直线距离估算：", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)) + place.distanceMeters.formatted(.number.precision(.fractionLength(0))) + " m") .font(.subheadline).foregroundStyle(.secondary) }
-            Label(cuisineText(place), systemImage: "fork.knife")
-                .font(.subheadline)
-            Label(priceText(place), systemImage: "banknote")
-                .font(.subheadline).foregroundStyle(.secondary)
-            Text((model.resultMeal.map(mealTitle) ?? foodTitle(model.food)) + " · " + reason(place)).font(.subheadline)
-            Button(model.confirmed ? String(localized: "已选好，走，干饭！", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)) : String(localized: "✅ 就吃这家！", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) { model.confirm(operation: operation) }.buttonStyle(.borderedProminent).tint(.orange).disabled(model.confirmed || model.busy)
-            Button(String(localized: "🎲 不行，再来一家！", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) { Task { await model.decide() } }.buttonStyle(.bordered).disabled(model.busy)
-            HStack {
-                Button(String(localized: "带我过去！", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), systemImage: "map") { model.navigate(place, driving: model.trip.driving) }
-                Spacer()
-                Button { _ = model.update { $0.toggleFavorite(place) } } label: { Image(systemName: model.archive.favorites.contains(where: { $0.id == place.id }) ? "heart.fill" : "heart").accessibilityLabel(String(localized: "收藏餐厅", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) }
+    private func shortcut(_ title: String.LocalizationValue, icon: String, selection: DiningSelection, mood: DiningMood = .automatic) -> some View {
+        let selected = model.selection == selection && (selection != .recommended || (model.mood == .familiar) == (mood == .familiar))
+        return Button {
+            model.selection = selection
+            model.mood = mood
+            Task { await model.decide() }
+        } label: {
+            VStack(spacing: 5) {
+                Image(systemName: icon).font(.subheadline)
+                Text(diningText(title)).font(.caption.weight(.semibold))
+            }.frame(maxWidth: .infinity, minHeight: 44)
+                .background(selected ? Color.orange.opacity(0.13) : .clear, in: RoundedRectangle(cornerRadius: 14))
+        }.buttonStyle(.plain).accessibilityAddTraits(selected ? .isSelected : [])
+    }
+
+    private var filters: some View {
+        NavigationStack {
+            Form {
+                Picker(diningText("食物类型"), selection: Binding(get: { model.food }, set: model.selectFood)) {
+                    ForEach(DiningFood.allCases, id: \.self) { Text(foodTitle($0)).tag($0) }
+                }
+                Picker(diningText("路程"), selection: Binding(get: { model.trip }, set: model.selectTrip)) {
+                    ForEach(DiningTrip.allCases, id: \.self) { Text(tripTitle($0)).tag($0) }
+                }
+                Picker(diningText("口味偏好"), selection: $model.mood) {
+                    ForEach(DiningMood.allCases, id: \.self) { Text(moodTitle($0)).tag($0) }
+                }.onChange(of: model.mood) { _, _ in
+                    model.selection = .recommended
+                    if model.result != nil { Task { await model.decide() } }
+                }
             }.disabled(model.busy)
-        }.padding(20).frame(maxWidth: .infinity, alignment: .leading).background(.background, in: RoundedRectangle(cornerRadius: 24))
+                .navigationTitle(diningText("筛选"))
+                .toolbar { Button(diningText("完成")) { showingFilters = false } }
+        }
+    }
+
+    private func resultCard(_ place: DiningPlace, operation: UUID) -> some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack {
+                Text(model.resultMeal.map(mealTitle) ?? foodTitle(model.food))
+                    .font(.caption.weight(.semibold)).foregroundStyle(.orange)
+                Spacer()
+                Button { _ = model.update { $0.toggleFavorite(place) } } label: {
+                    Image(systemName: model.archive.favorites.contains(where: { $0.id == place.id }) ? "heart.fill" : "heart")
+                        .frame(minWidth: 44, minHeight: 44)
+                        .accessibilityLabel(diningText("收藏餐厅"))
+                }.buttonStyle(.plain)
+            }
+            Text(place.name).font(.title.bold()).textSelection(.enabled)
+                .accessibilityAddTraits(.isHeader)
+            Label(model.walking ?? (diningText("直线距离估算：") + place.distanceMeters.formatted(.number.precision(.fractionLength(0))) + " m"),
+                  systemImage: model.walking == nil ? "location" : model.trip.driving ? "car" : "figure.walk")
+                .font(.subheadline.weight(.semibold))
+            Text(reason(place)).font(.subheadline)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(12).background(.orange.opacity(0.08), in: RoundedRectangle(cornerRadius: 12))
+            if !place.address.isEmpty { Text(place.address).font(.caption).foregroundStyle(.secondary) }
+            if place.cuisine != nil || (place.cost ?? 0) > 0 {
+                VStack(alignment: .leading, spacing: 4) {
+                    if place.cuisine != nil { Text(cuisineText(place)) }
+                    if let cost = place.cost, cost.isFinite, cost > 0 { Text(priceText(place)) }
+                }.font(.caption).foregroundStyle(.secondary)
+            }
+            Button {
+                model.confirm(operation: operation)
+            } label: {
+                Text(model.confirmed ? diningText("已选好，走，干饭！") : diningText("就吃这家"))
+                    .frame(maxWidth: .infinity)
+            }.buttonStyle(.borderedProminent).controlSize(.large).tint(.orange).disabled(model.confirmed)
+            HStack(spacing: 8) {
+                Button { Task { await model.decide() } } label: {
+                    Label(diningText("换一家"), systemImage: "arrow.clockwise").frame(maxWidth: .infinity)
+                }
+                Button { model.navigate(place, driving: model.trip.driving) } label: {
+                    Label(diningText("带我过去"), systemImage: "map").frame(maxWidth: .infinity)
+                }
+            }.buttonStyle(.bordered).controlSize(.large)
+        }.padding(18).frame(maxWidth: .infinity, alignment: .leading)
+            .background(.background, in: RoundedRectangle(cornerRadius: 24))
+            .disabled(model.busy)
     }
     private func cuisineText(_ place: DiningPlace) -> String {
         let bundle = AgentIdentityLanguage.appBundle()
@@ -481,6 +572,8 @@ struct DiningView: View {
         }
     }
     private func reason(_ place: DiningPlace) -> String {
+        if model.selection == .nearby { return diningText("优先挑选符合当前条件的近处餐厅。") }
+        if model.selection == .random { return diningText("从符合当前条件的餐厅中随机挑选。") }
         switch model.resultMood {
         case .familiar: return (model.archive.habits[place.id]?.visits ?? 0) > 0 ? String(localized: "这家店在你的干饭记录里，熟悉的味道值得再试。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)) : String(localized: "还没有常吃记录，先从附近这家开始。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))
         case .fresh: return (model.archive.habits[place.id]?.visits ?? 0) == 0 ? String(localized: "你的干饭记录里还没有这家，来点新鲜的！", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)) : String(localized: "附近的新选择有限，熟悉的店也保留机会。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))
