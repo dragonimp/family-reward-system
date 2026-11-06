@@ -285,28 +285,61 @@ public sealed class DiningPanel : ContentView
         if (current != generation) return;
         var location = await Locate(ct, GeolocationAccuracy.Best);
         if (current != generation) return;
-        if (location.Accuracy is null or > 75)
-        {
-            message = "定位精度不足，请开启精确位置后重试。";
-            return;
-        }
         var place = archive.ManualRestaurant(name, location.Latitude, location.Longitude);
         if (place is null)
         {
             message = "无法获取当前位置，请检查定位权限后重试。";
             return;
         }
-        var coordinates = CheckInCoordinates(place);
-        while (current == generation)
+        var resolvedAddress = await ResolveCheckInAddress(location, ct);
+        if (current != generation) return;
+
+        var address = new Entry { Placeholder = "地址（可修改）", Text = resolvedAddress, MaxLength = 200 };
+        var type = new Entry { Placeholder = "餐厅类型（选填）", MaxLength = 40 };
+        var status = MomentStyle.Caption("");
+        var confirm = new Button { Text = "确认打卡" };
+        var cancelButton = new Button { Text = "取消" };
+        var form = new VerticalStackLayout { Padding = 20, Spacing = 12, Children =
         {
-            var restaurantType = await owner.DisplayPromptAsync(place.Name, message ?? $"确认当前位置：{coordinates}",
-                accept: "确认打卡", cancel: "取消", placeholder: "餐厅类型（选填）", maxLength: 40);
-            if (restaurantType is null || current != generation || SaveCheckIn(place, null, id, restaurantType)) return;
-        }
+            MomentStyle.Title(place.Name, 24), MomentStyle.Caption("已获取当前位置"), address, type, status, confirm, cancelButton
+        } };
+        var page = new ContentPage { Title = "到店打卡", SafeAreaEdges = SafeAreaEdges.All, Content = new ScrollView { Content = form } };
+        confirm.Clicked += async (_, _) =>
+        {
+            if (!confirm.IsEnabled) return;
+            if (current != generation)
+            {
+                status.Text = "定位已失效，请返回后重新定位。";
+                return;
+            }
+            confirm.IsEnabled = false;
+            if (!SaveCheckIn(place with { Address = address.Text?.Trim() ?? "" }, null, id, type.Text))
+            {
+                status.Text = message;
+                confirm.IsEnabled = true;
+                return;
+            }
+            Render();
+            await page.Navigation.PopModalAsync();
+        };
+        cancelButton.Clicked += async (_, _) => await page.Navigation.PopModalAsync();
+        await owner.Navigation.PushModalAsync(page);
     }
 
-    private static string CheckInCoordinates(DiningPlace place) =>
-        FormattableString.Invariant($"{place.Latitude:F5}, {place.Longitude:F5}");
+    private static async Task<string> ResolveCheckInAddress(Location location, CancellationToken ct)
+    {
+        if (!global::Android.Locations.Geocoder.IsPresent) return "";
+        try
+        {
+            var geocoder = new global::Android.Locations.Geocoder(global::Android.App.Application.Context,
+                Java.Util.Locale.ForLanguageTag("zh-CN")!);
+            var results = await geocoder.GetFromLocationAsync(location.Latitude, location.Longitude, 1)
+                .WaitAsync(TimeSpan.FromSeconds(4), ct);
+            return results?.FirstOrDefault()?.GetAddressLine(0) ?? "";
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested) { throw; }
+        catch (Exception error) when (error is TimeoutException or Java.Lang.Exception or IOException) { return ""; }
+    }
 
     private Task<JsonElement> SearchNearby(Location location, bool driving, CancellationToken ct) =>
         store.CallAsync("/api/dining/nearby", HttpMethod.Post,
@@ -361,7 +394,8 @@ public sealed class DiningPanel : ContentView
                 {
                     row.Add(MomentStyle.Caption($"累计打卡 {archive.Habits.GetValueOrDefault(entry.Place.Id)?.CheckIns ?? 0} 次"));
                     if (entry.RestaurantType is { } type) row.Add(MomentStyle.Caption(type));
-                    if (entry.Place.Provider == "manual") row.Add(MomentStyle.Caption(CheckInCoordinates(entry.Place)));
+                    if (entry.Place.Provider == "manual")
+                        row.Add(MomentStyle.Caption(entry.Place.Address.Length == 0 ? "已记录定位，暂无地址" : entry.Place.Address));
                 }
                 else row.Add(entry.EatenAt is not null ? MomentStyle.Caption("✓ 吃过了") : MomentStyle.Action("我吃过了", () => { Update(a => a.ConfirmEaten(entry.Id)); Fill(); }));
                 rows.Add(MomentStyle.Card(row));

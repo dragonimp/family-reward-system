@@ -13,6 +13,8 @@ import CryptoKit
     @Published private(set) var checkingIn = false
     @Published private(set) var checkInPlaces: [DiningPlace] = []
     @Published private(set) var manualPosition: CLLocationCoordinate2D?
+    @Published private(set) var manualAddress = ""
+    private let checkInGeocoder = CLGeocoder()
     @Published var message: String?
     @Published var confirmed = false
     @Published var circleID: UUID?
@@ -71,7 +73,9 @@ import CryptoKit
         guard !busy, !checkingIn, !Task.isCancelled else { return }
         checkingIn = true
         checkInPlaces = []
+        checkInGeocoder.cancelGeocode()
         manualPosition = nil
+        manualAddress = ""
         message = nil
         let current = UUID()
         generation = current
@@ -79,12 +83,17 @@ import CryptoKit
         do {
             let location = try await locate(accuracy: manual ? kCLLocationAccuracyBest : kCLLocationAccuracyHundredMeters)
             guard current == generation, !Task.isCancelled else { return }
-            guard location.horizontalAccuracy <= (manual ? 75 : 500) else {
-                message = diningText("定位精度不足，请开启精确位置后重试。")
+            if manual {
+                guard CLLocationCoordinate2DIsValid(location.coordinate) else {
+                    message = diningText("无法获取当前位置，请检查定位权限后重试。")
+                    return
+                }
+                manualPosition = location.coordinate
+                Task { await resolveCheckInAddress(location, generation: current) }
                 return
             }
-            if manual {
-                manualPosition = location.coordinate
+            guard location.horizontalAccuracy <= 500 else {
+                message = diningText("定位精度不足，请开启精确位置后重试。")
                 return
             }
             let nearby = try await nearbyPlaces(around: location, radius: 500)
@@ -100,6 +109,19 @@ import CryptoKit
                     : diningText("无法读取附近餐厅，请检查定位权限或网络后重试。")
             }
         }
+    }
+
+    private func resolveCheckInAddress(_ location: CLLocation, generation current: UUID) async {
+        guard current == generation, manualPosition != nil else { return }
+        let places = try? await checkInGeocoder.reverseGeocodeLocation(location, preferredLocale: Locale(identifier: "zh-Hans-CN"))
+        guard current == generation, manualPosition != nil, let place = places?.first else { return }
+        let street = [place.thoroughfare, place.subThoroughfare].compactMap { $0 }.joined()
+        let parts = [place.administrativeArea, place.locality, place.subLocality, street.isEmpty ? place.name : street]
+        var address: [String] = []
+        for part in parts.compactMap({ $0?.trimmingCharacters(in: .whitespacesAndNewlines) }) where !part.isEmpty && !address.contains(part) {
+            address.append(part)
+        }
+        manualAddress = address.joined()
     }
 
     func selectCircle(_ id: UUID?) {
@@ -203,8 +225,10 @@ import CryptoKit
     }
     func closeCheckIn() {
         if checkingIn { stop() }
+        checkInGeocoder.cancelGeocode()
         checkInPlaces = []
         manualPosition = nil
+        manualAddress = ""
     }
 
     private func nearbyPlaces(around location: CLLocation, radius: CLLocationDistance, query: String = "restaurant", includeCafes: Bool = false) async throws -> [DiningPlace] {
@@ -459,7 +483,7 @@ struct DiningView: View {
                                 Label(diningText("累计打卡 \(count) 次"), systemImage: "checkmark.circle.fill").foregroundStyle(.orange)
                                 if let type = choice.restaurantType { Text(type).font(.subheadline) }
                                 if choice.place.provider == "manual" {
-                                    Text(checkInCoordinates(latitude: choice.place.latitude, longitude: choice.place.longitude))
+                                    Text(choice.place.address.isEmpty ? diningText("已记录定位，暂无地址") : choice.place.address)
                                         .font(.caption).foregroundStyle(.secondary)
                                 }
                             } else if choice.eatenAt != nil { Label(String(localized: "吃过了", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), systemImage: "checkmark.circle.fill").foregroundStyle(.orange) }
@@ -496,11 +520,6 @@ struct DiningView: View {
 }
 
 
-private func checkInCoordinates(latitude: Double, longitude: Double) -> String {
-    let format = FloatingPointFormatStyle<Double>.number.precision(.fractionLength(5)).grouping(.never)
-    return "\(latitude.formatted(format)), \(longitude.formatted(format))"
-}
-
 private struct DiningCheckInSheet: View {
     @ObservedObject var model: DiningStore
     @Environment(\.dismiss) private var dismiss
@@ -508,6 +527,7 @@ private struct DiningCheckInSheet: View {
     @State private var restaurantType = ""
     @State private var manual = false
     @State private var restaurantName = ""
+    @State private var restaurantAddress = ""
     @State private var operation = UUID()
     @State private var saved = false
 
@@ -521,19 +541,16 @@ private struct DiningCheckInSheet: View {
                                 if name.count > 100 { restaurantName = String(name.prefix(100)) }
                             }
                         TextField(diningText("餐厅类型（选填）"), text: $restaurantType)
-                        if let position = model.manualPosition {
-                            Label(checkInCoordinates(latitude: position.latitude, longitude: position.longitude), systemImage: "location.fill")
+                        if model.manualPosition != nil {
+                            Label(diningText("已获取当前位置"), systemImage: "location.fill")
+                            TextField(diningText("地址（可修改）"), text: $restaurantAddress)
                         }
                         Button(model.manualPosition == nil ? diningText("获取当前位置") : diningText("重新定位")) {
+                            restaurantAddress = ""
                             Task { await model.findCheckInPlaces(manual: true) }
                         }.disabled(model.checkingIn)
                         if model.checkingIn { ProgressView(diningText("正在定位…")) }
-                        Button(diningText("确认打卡")) {
-                            guard !saved, let position = model.manualPosition,
-                                  let place = model.archive.manualRestaurant(name: restaurantName, latitude: position.latitude, longitude: position.longitude) else { return }
-                            saved = model.checkIn(place, operation: operation, restaurantType: restaurantType)
-                            if saved { dismiss() }
-                        }.disabled(saved || model.manualPosition == nil || !validName)
+
                     }
                     Button(diningText("返回附近餐厅")) {
                         model.closeCheckIn()
@@ -576,6 +593,25 @@ private struct DiningCheckInSheet: View {
                 }
                 if let message = model.message { Text(message).foregroundStyle(.secondary) }
             }
+            .onChange(of: model.manualAddress) { _, address in
+                if manual && restaurantAddress.isEmpty { restaurantAddress = address }
+            }
+            .safeAreaInset(edge: .bottom) {
+                if manual {
+                    Button {
+                        guard !saved, let position = model.manualPosition,
+                              let place = model.archive.manualRestaurant(name: restaurantName, latitude: position.latitude,
+                                  longitude: position.longitude, address: restaurantAddress) else { return }
+                        saved = model.checkIn(place, operation: operation, restaurantType: restaurantType)
+                        if saved { dismiss() }
+                    } label: {
+                        Text(diningText("确认打卡")).frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .disabled(saved || model.manualPosition == nil || !validName)
+                    .padding().background(.bar)
+                }
+            }
             .navigationTitle(diningText("到店打卡"))
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
@@ -596,6 +632,7 @@ private struct DiningCheckInSheet: View {
             model.closeCheckIn()
             model.message = nil
             restaurantType = ""
+            restaurantAddress = ""
             manual = true
         }
     }

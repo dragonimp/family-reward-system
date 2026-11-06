@@ -65,7 +65,8 @@ Check(DiningTrip.Drive20.Driving() && !DiningTrip.Walk10.Driving() && DiningTrip
 Check(!DiningTrip.Walk5.Includes(null) && !DiningTrip.Drive20.Includes(double.NaN) && DiningTrip.Unrestricted.Includes(null), "unknown route times never pass an active filter");
 var manualArchive = new DiningArchive();
 Check(manualArchive.ManualRestaurant(" ", 31, 121) is null && manualArchive.ManualRestaurant("新店", double.NaN, 121) is null, "manual entry requires name and valid coordinates");
-var manualPlace = manualArchive.ManualRestaurant("  新店  ", 31, 121)!;
+var manualPlace = manualArchive.ManualRestaurant("  新店  ", 31, 121, "  上海市黄浦区  ")!;
+Check(manualPlace.Address == "上海市黄浦区", "manual check-in keeps display address and location");
 manualArchive.CheckIn(manualPlace, null, manualId, "川菜");
 manualArchive.CheckIn(manualPlace, null, manualId);
 var relocated = manualArchive.ManualRestaurant("新店", 31.0002, 121)!;

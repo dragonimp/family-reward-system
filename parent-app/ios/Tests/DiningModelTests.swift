@@ -95,7 +95,8 @@ import Foundation
         var manualArchive = DiningArchive()
         check(manualArchive.manualRestaurant(name: "  ", latitude: 31, longitude: 121) == nil, "blank manual name is rejected")
         check(manualArchive.manualRestaurant(name: "新店", latitude: .nan, longitude: 121) == nil, "invalid manual position is rejected")
-        let manualPlace = manualArchive.manualRestaurant(name: "  新店  ", latitude: 31, longitude: 121)!
+        let manualPlace = manualArchive.manualRestaurant(name: "  新店  ", latitude: 31, longitude: 121, address: "  上海市黄浦区  ")!
+        check(manualPlace.address == "上海市黄浦区", "manual check-in retains a display address with the coordinates")
         let manualVisit = UUID()
         manualArchive.checkIn(manualPlace, mood: nil, id: manualVisit, restaurantType: "川菜")
         manualArchive.checkIn(manualPlace, mood: nil, id: manualVisit)

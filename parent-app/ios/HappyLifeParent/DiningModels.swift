@@ -139,7 +139,7 @@ struct DiningArchive: Codable {
     var circles: [DiningCircle] = []
     var manualRestaurants: [DiningPlace]?
 
-    func manualRestaurant(name: String, latitude: Double, longitude: Double) -> DiningPlace? {
+    func manualRestaurant(name: String, latitude: Double, longitude: Double, address: String = "") -> DiningPlace? {
         let name = name.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !name.isEmpty, name.count <= 100, abs(latitude) <= 90, abs(longitude) <= 180 else { return nil }
         let nearby = (manualRestaurants ?? []).filter { place in
@@ -149,7 +149,7 @@ struct DiningArchive: Codable {
             return hypot(north, east) <= 75
         }
         let id = nearby.count == 1 ? nearby[0].id : "manual:" + UUID().uuidString
-        return DiningPlace(id: id, name: name, address: "", latitude: latitude, longitude: longitude,
+        return DiningPlace(id: id, name: name, address: address.trimmingCharacters(in: .whitespacesAndNewlines), latitude: latitude, longitude: longitude,
                            category: "", provider: "manual", distanceMeters: 0)
     }
 

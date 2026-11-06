@@ -29,7 +29,7 @@ public sealed class DiningArchive {
     public List<DiningCircle> Circles { get; set; } = [];
     public List<DiningPlace> ManualRestaurants { get; set; } = [];
 
-    public DiningPlace? ManualRestaurant(string name, double latitude, double longitude)
+    public DiningPlace? ManualRestaurant(string name, double latitude, double longitude, string address = "")
     {
         name = name.Trim();
         if (name.Length is < 1 or > 100 || !(Math.Abs(latitude) <= 90 && Math.Abs(longitude) <= 180)) return null;
@@ -41,7 +41,7 @@ public sealed class DiningArchive {
             return north * north + east * east <= 75 * 75;
         }).Take(2).ToList();
         var id = nearby.Count == 1 ? nearby[0].Id : $"manual:{Guid.NewGuid():D}";
-        return new DiningPlace(id, name, "", latitude, longitude, "", "manual", null, null, 0);
+        return new DiningPlace(id, name, address.Trim(), latitude, longitude, "", "manual", null, null, 0);
     }
     public DiningHabit Habit(string id) { if (!Habits.TryGetValue(id, out var habit)) Habits[id] = habit = new(); return habit; }
     public void CheckIn(DiningPlace place, string? mood, Guid id, string? restaurantType = null, DateTimeOffset? at = null)
