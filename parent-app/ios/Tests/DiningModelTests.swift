@@ -78,7 +78,7 @@ import Foundation
         check(mealAt(10, 29) == .breakfast && mealAt(10, 30) == .lunch, "lunch starts at 10:30")
         check(mealAt(13, 59) == .lunch && mealAt(14, 0) == .afternoonTea, "tea starts at 14:00")
         check(mealAt(16, 29) == .afternoonTea && mealAt(16, 30) == .dinner, "dinner starts at 16:30")
-        let instant = china.date(from: DateComponents(year: 2026, month: 11, day: 6, hour: 8))!
+        let instant = china.date(from: DateComponents(year: 2026, month: 11, day: 6, hour: 9))!
         check(DiningMeal.current(at: instant, calendar: china) == .breakfast && DiningMeal.current(at: instant, calendar: pacific) == .dinner, "same instant uses the user's timezone")
         var breakfast = known; breakfast.name = "阿婆早餐"; breakfast.category = "中餐厅"
         var tea = fresh; tea.name = "珍珠奶茶"; tea.category = "餐饮服务;快餐厅"

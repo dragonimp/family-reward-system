@@ -49,7 +49,7 @@ foreach (var mood in new[] { "automatic", "familiar" })
     Check(DiningRecommendation.Weight(fresh, mood, archive) > DiningRecommendation.Weight(fresh with { Id = "c" }, mood, archive), "check-ins improve recommendation weight");
 Check(DiningMeal.Current(localTime.AddHours(-15)) == DiningMealPeriod.Breakfast && DiningMeal.Current(localTime.AddHours(-10).AddMinutes(30)) == DiningMealPeriod.Lunch, "meal transitions use local time");
 Check(DiningMeal.Current(localTime.AddHours(-6)) == DiningMealPeriod.AfternoonTea && DiningMeal.Current(localTime.AddHours(-3).AddMinutes(-30)) == DiningMealPeriod.Dinner, "afternoon tea and dinner boundaries");
-Check(DiningMeal.Current(localTime.AddHours(-12)) == DiningMealPeriod.Breakfast && DiningMeal.Current(localTime.AddHours(-12).ToOffset(TimeSpan.FromHours(-8))) == DiningMealPeriod.Dinner, "same instant in different time zones");
+Check(DiningMeal.Current(localTime.AddHours(-11)) == DiningMealPeriod.Breakfast && DiningMeal.Current(localTime.AddHours(-11).ToOffset(TimeSpan.FromHours(-8))) == DiningMealPeriod.Dinner, "same instant in different time zones");
 var breakfast = old with { Name = "阿婆早餐", Category = "中餐厅" };
 var tea = fresh with { Name = "珍珠奶茶", Category = "餐饮服务;快餐厅" };
 var steak = old with { Id = "c", Name = "Steak House", Category = "restaurant" };
