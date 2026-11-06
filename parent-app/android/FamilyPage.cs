@@ -349,14 +349,9 @@ public sealed class FamilyPage : ContentPage
             MomentStyle.Row("隐私政策", action: () => _ = Navigation.PushModalAsync(new PrivacyPolicyPage())),
             MomentStyle.Row("用户协议", action: () => _ = Navigation.PushAsync(new AtlasInformationPage(false, "termsUrl"))),
             MomentStyle.Row("使用手册", action: () => _ = Navigation.PushAsync(new AtlasInformationPage(false, "userManualUrl"))),
-            MomentStyle.Row("版本升级", AppInfo.Current.VersionString, () => _ = Navigation.PushAsync(new MomentVersionPage())),
+            MomentStyle.Row("关于我们", AppInfo.Current.VersionString, () => _ = Navigation.PushAsync(new MomentAboutPage(store))),
             MomentStyle.Row("账号注销", action: () => _ = DeleteAccount()));
-        Section("邀请与反馈",
-            MomentStyle.Row("意见反馈", action: () => _ = Navigation.PushAsync(new FeedbackWallPage(store))),
-            MomentStyle.Row("同行共创", action: () => _ = Navigation.PushAsync(new AtlasInformationPage(true))),
-            MomentStyle.Row("测试邀请", action: () => _ = Navigation.PushAsync(new TestInvitationPage())));
-        content.Add(new Label { Text = $"Linko Moment {AppInfo.Current.VersionString} ({AppInfo.Current.BuildString})",
-            TextColor = Colors.DimGray, FontSize = 12, HorizontalTextAlignment = TextAlignment.Center });
+
     }
 
     private async Task Logout()

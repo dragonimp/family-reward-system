@@ -608,25 +608,15 @@ struct AccountView: View {
                         Text(resourceError).font(.footnote).foregroundStyle(.red)
                         Button(String(localized: "重试读取应用资料", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) { Task { await loadResources() } }
                     }
-                    NavigationLink { MomentVersionView() } label: {
-                        Label(String(localized: "版本升级", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), systemImage: "arrow.up.circle")
+                    NavigationLink { MomentAboutView(store: store) } label: {
+                        HStack {
+                            Label(String(localized: "关于我们", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), systemImage: "info.circle")
+                            Spacer()
+                            Text(MomentAboutView.version).foregroundStyle(.secondary)
+                        }
                     }
                 }
-                Section(String(localized: "邀请与反馈", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) {
-                    NavigationLink { MomentTeamMembersView() } label: {
-                        Label(String(localized: "同行共创", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), systemImage: "person.3")
-                    }
-                    NavigationLink { MomentTestInvitationView() } label: {
-                        Label(String(localized: "测试邀请", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), systemImage: "square.and.arrow.up")
-                    }
-                    NavigationLink {
-                        FeedbackWallView(identity: store.identity)
-                    } label: {
-                        Label(String(localized: "意见反馈", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), systemImage: "bubble.left.and.bubble.right")
-                    }
-                }
-                Text(String(localized: "Linko Moment \(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? String(localized: "未知", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) (\(Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? String(localized: "未知", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))))", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)))
-                    .font(.caption2).foregroundStyle(.secondary).frame(maxWidth: .infinity)
+
             }.readablePage().navigationTitle(String(localized: "我的", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)))
                 .task { await loadResources() }
                 .task(id: store.identity.isAuthenticated) {
@@ -1247,6 +1237,43 @@ struct FamilyConnectionDetail: View {
             _ = try await store.call("/api/family-connections/\(current.id)/\(endpoint)", method: "POST", body: body)
             done(); await loadLocal(); await reload()
         } catch { self.error = momentDisplayError(error) }
+    }
+}
+
+private struct MomentAboutView: View {
+    @ObservedObject var store: FamilyStore
+    static var version: String { Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "" }
+    private var build: String { Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "" }
+
+    var body: some View {
+        List {
+            Section(String(localized: "应用介绍", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) {
+                Text(String(localized: "Linko Moment 帮助家庭记录生活、分享照片与活动，并一起管理孩子的成长和日常事务。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)))
+            }
+            Section(String(localized: "版本信息", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) {
+                LabeledContent(String(localized: "当前版本", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), value: Self.version)
+                LabeledContent(String(localized: "构建号", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), value: build)
+                NavigationLink { MomentVersionView() } label: {
+                    Label(String(localized: "版本升级", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), systemImage: "arrow.up.circle")
+                }
+            }
+            Section(String(localized: "APP 备案号", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) {
+                Link(destination: URL(string: "https://beian.miit.gov.cn/")!) { Text(verbatim: "\u{95FD}ICP\u{5907}2024055146\u{53F7}-4A") }
+            }
+            Section {
+                NavigationLink { MomentTeamMembersView() } label: {
+                    Label(String(localized: "同行共创", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), systemImage: "person.3")
+                }
+                NavigationLink { MomentTestInvitationView() } label: {
+                    Label(String(localized: "测试邀请", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), systemImage: "square.and.arrow.up")
+                }
+                NavigationLink {
+                    FeedbackWallView(identity: store.identity)
+                } label: {
+                    Label(String(localized: "意见反馈", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), systemImage: "bubble.left.and.bubble.right")
+                }
+            }
+        }.navigationTitle(String(localized: "关于我们", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)))
     }
 }
 

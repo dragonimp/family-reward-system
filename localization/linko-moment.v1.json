@@ -5325,6 +5325,36 @@
       "zh-Hans": "关闭闪光灯",
       "en": "Off",
       "iosKey": "关闭闪光灯"
+    },
+    "moment.about.0": {
+      "zh-Hans": "关于我们",
+      "en": "About us",
+      "iosKey": "关于我们"
+    },
+    "moment.about.1": {
+      "zh-Hans": "应用介绍",
+      "en": "About the app",
+      "iosKey": "应用介绍"
+    },
+    "moment.about.2": {
+      "zh-Hans": "版本信息",
+      "en": "Version information",
+      "iosKey": "版本信息"
+    },
+    "moment.about.4": {
+      "zh-Hans": "构建号",
+      "en": "Build number",
+      "iosKey": "构建号"
+    },
+    "moment.about.5": {
+      "zh-Hans": "APP 备案号",
+      "en": "APP filing number",
+      "iosKey": "APP 备案号"
+    },
+    "moment.about.6": {
+      "zh-Hans": "Linko Moment 帮助家庭记录生活、分享照片与活动，并一起管理孩子的成长和日常事务。",
+      "en": "Linko Moment helps families capture everyday life, share photos and activities, and manage children’s growth and daily routines together.",
+      "iosKey": "Linko Moment 帮助家庭记录生活、分享照片与活动，并一起管理孩子的成长和日常事务。"
     }
   }
 }
