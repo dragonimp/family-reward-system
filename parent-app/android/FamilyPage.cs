@@ -61,9 +61,9 @@ public sealed class FamilyPage : ContentPage
     private void RenderNavigation()
     {
         bottom.Children.Clear();
-        var selected = tab is "审批" or "记录" or "规则" or "管理" ? "成长" : tab;
+        var selected = tab is "审批" or "记录" or "规则" or "管理" ? "带娃" : tab;
         var column = 0;
-        foreach (var name in new[] { "干饭", "成长", "活动", "运动", "我的" })
+        foreach (var name in new[] { "干饭", "带娃", "活动", "运动", "我的" })
         {
             var active = selected == name;
             var view = new VerticalStackLayout { Spacing = 3, Padding = new Thickness(4, 3), MinimumHeightRequest = 52 };
@@ -77,7 +77,7 @@ public sealed class FamilyPage : ContentPage
     protected override bool OnBackButtonPressed()
     {
         if (childId != null) { childId = null; Render(); return true; }
-        if (tab is "审批" or "记录" or "规则" or "管理") { SelectTab("成长"); return true; }
+        if (tab is "审批" or "记录" or "规则" or "管理") { SelectTab("带娃"); return true; }
         if (tab == "活动" && activities?.Back() == true) return true;
         return base.OnBackButtonPressed();
     }
@@ -119,13 +119,13 @@ public sealed class FamilyPage : ContentPage
                 _ = activities.ShowAsync(); break;
             case "管理": FamilyManagementContent(); break;
             case "审批":
-                content.Add(Button("‹ 成长", () => SelectTab("成长")));
+                content.Add(Button("‹ 带娃", () => SelectTab("带娃")));
                 ApprovalContent(); break;
             case "记录":
-                content.Add(Button("‹ 成长", () => SelectTab("成长")));
+                content.Add(Button("‹ 带娃", () => SelectTab("带娃")));
                 LedgerContent(); break;
             case "规则":
-                content.Add(Button("‹ 成长", () => SelectTab("成长")));
+                content.Add(Button("‹ 带娃", () => SelectTab("带娃")));
                 content.Add(Heading("奖励与行为规则", 28));
                 foreach (var rule in store.Rules)
                     content.Add(Card(new VerticalStackLayout { Spacing = 6, Children = { Heading(rule.Text("name"), 18), MomentStyle.Caption($"{rule.Number("points")} 分 · {rule.Text("category")}") } }));
@@ -182,7 +182,7 @@ public sealed class FamilyPage : ContentPage
     private void FamilyContent()
     {
         var header = new Grid { ColumnDefinitions = new ColumnDefinitionCollection { new(GridLength.Star), new(GridLength.Auto), new(GridLength.Auto) }, ColumnSpacing = 8 };
-        header.Add(Heading("成长", 32));
+        header.Add(Heading("带娃", 32));
         var menu = Button("⋯", () => _ = GrowthMenuAsync());
         SemanticProperties.SetDescription(menu, "成长管理菜单"); header.Add(menu, 1, 0);
         var pending = store.Requests.Count(r => r.Text("status") == "pending");
@@ -238,8 +238,8 @@ public sealed class FamilyPage : ContentPage
 
     private void FamilyManagementContent()
     {
-        content.Add(Button("‹ 成长", () => SelectTab("成长")));
-        content.Add(Heading(store.Groups.FirstOrDefault(g => g.Id == store.GroupId).Text("name") is { Length: > 0 } familyName ? familyName : "成长", 32));
+        content.Add(Button("‹ 带娃", () => SelectTab("带娃")));
+        content.Add(Heading(store.Groups.FirstOrDefault(g => g.Id == store.GroupId).Text("name") is { Length: > 0 } familyName ? familyName : "带娃", 32));
         content.Add(Card(new VerticalStackLayout { Spacing = 8, Children = { Heading("一起照顾每一天", 22), MomentStyle.Caption("孩子成长、奖励审批和积分记录，都在这里。") } }));
         content.Add(MomentStyle.Caption("虚拟群组 · 一起成长"));
         var picker = new Picker { Title = "选择家庭" };

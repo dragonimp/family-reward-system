@@ -169,7 +169,7 @@ struct FamilyRoot: View {
     private var main: some View {
         TabView(selection: $selectedTab) {
             DiningView(userID: identity.accountIdentifier ?? "", family: store).id(identity.accountIdentifier ?? "").tabItem { Label(String(localized: "干饭", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), systemImage: "fork.knife") }.tag(0)
-            Group { if store.ready { FamilyHome(store: store) } else { growthUnavailable } }.tabItem { Label(String(localized: "成长", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), systemImage: "person.3.fill") }
+            Group { if store.ready { FamilyHome(store: store) } else { growthUnavailable } }.tabItem { Label(String(localized: "带娃", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), systemImage: "person.3.fill") }
                 .badge(store.requests.filter { $0.text("status") == "pending" }.count).tag(1)
             DearSocialView(store: store).tabItem { Label(String(localized: "活动", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), systemImage: "photo.on.rectangle.angled") }.tag(2)
             Group { if store.ready { ExerciseView(userID: store.profile?.text("unifiedUserId") ?? "").id(store.profile?.text("unifiedUserId") ?? "") } else { growthUnavailable } }.tabItem { Label(String(localized: "运动", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), systemImage: "figure.walk") }.tag(3)
@@ -221,7 +221,7 @@ struct FamilyHome: View {
                 if store.loading { ProgressView() }
             }
             .listStyle(.insetGrouped).readablePage()
-            .navigationTitle(String(localized: "成长", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)))
+            .navigationTitle(String(localized: "带娃", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)))
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Menu {
@@ -230,7 +230,7 @@ struct FamilyHome: View {
                         NavigationLink { GrowthView(store: store) } label: { Label(String(localized: "成长足迹", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), systemImage: "chart.xyaxis.line") }
                         NavigationLink { FamilyConnectionsView(store: store) } label: { Label(String(localized: "亲子互动", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), systemImage: "heart.text.square") }
                         Button { Task { await store.load() } } label: { Label(String(localized: "刷新", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), systemImage: "arrow.clockwise") }
-                    } label: { Image(systemName: "ellipsis.circle").accessibilityLabel(String(localized: "成长管理菜单", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) }
+                    } label: { Image(systemName: "ellipsis.circle").accessibilityLabel(String(localized: "带娃管理菜单", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) }
                 }
                 ToolbarItem(placement: .topBarTrailing) {
                     MomentNotificationButton(notifications: store.notifications, pendingRequests: pendingRequests)
@@ -275,7 +275,7 @@ struct FamilyManagement: View {
             }
             if store.groupID != 0 { Section(String(localized: "群组协作", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) { NavigationLink { RemoteRecords(store: store, title: String(localized: "群组邀请码", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), path: "/api/family-groups/\(store.groupID)/invite", mode: .invite) } label: { Label(String(localized: "邀请组员", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), systemImage: "qrcode") } } }
             if store.loading { ProgressView(String(localized: "正在更新…", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) }
-            }.listStyle(.insetGrouped).readablePage().navigationTitle(String(localized: "成长管理", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))).refreshable { await store.load() }
+            }.listStyle(.insetGrouped).readablePage().navigationTitle(String(localized: "带娃管理", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))).refreshable { await store.load() }
             .sheet(item: $editor) { NativeEditor(store: store, spec: $0) }
     }
 }
