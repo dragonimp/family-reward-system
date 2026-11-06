@@ -35,7 +35,7 @@ struct DiningMapDetails: Decodable {
             }
             guard nearby.count == 1, let match = nearby.first else { return place }
             var enriched = place
-            enriched.category = match.category
+            if !match.category.isEmpty { enriched.category += ";" + match.category }
             enriched.cost = match.cost
             enriched.rating = match.rating
             return enriched
@@ -53,6 +53,39 @@ extension DiningPlace {
                       "pizza", "ramen", "sushi", "burgers", "barbecue", "hot pot"]
         return dishes.first(where: { name.localizedCaseInsensitiveContains($0) })
     }
+}
+
+enum DiningMeal: Equatable {
+    case breakfast, lunch, afternoonTea, dinner
+
+    static func current(at date: Date = Date(), calendar: Calendar = .autoupdatingCurrent) -> Self {
+        let parts = calendar.dateComponents([.hour, .minute], from: date)
+        switch (parts.hour ?? 0) * 60 + (parts.minute ?? 0) {
+        case 300..<630: return .breakfast
+        case 630..<840: return .lunch
+        case 840..<990: return .afternoonTea
+        default: return .dinner
+        }
+    }
+
+    func includes(_ place: DiningPlace) -> Bool {
+        let description = place.name + ";" + place.category
+        if Self.contains(description, Self.breakfastTerms) { return self == .breakfast }
+        if Self.contains(description, Self.teaTerms) { return self == .afternoonTea }
+        if Self.contains(description, Self.bakeryTerms) { return self == .breakfast || self == .afternoonTea }
+        return (self == .lunch || self == .dinner) && Self.contains(description, Self.mealTerms)
+    }
+
+    private static func contains(_ text: String, _ terms: [String]) -> Bool {
+        terms.contains { text.localizedCaseInsensitiveContains($0) }
+    }
+
+    private static let breakfastTerms = ["早餐", "早点", "早茶", "早午餐", "豆浆", "油条", "包子", "粥铺", "煎饼", "肠粉", "breakfast", "brunch", "congee"]
+    private static let teaTerms = ["下午茶", "甜品", "甜点", "奶茶", "茶饮", "饮品", "冰淇淋", "冰激凌", "糖水", "蛋糕", "咖啡", "果汁",
+                                   "dessert", "bubble tea", "boba", "milk tea", "ice cream", "coffee", "café", "cafe"]
+    private static let bakeryTerms = ["烘焙", "面包", "糕饼", "bakery", "bakeshop"]
+    private static let mealTerms = ["中餐", "西餐", "餐厅", "餐馆", "饭店", "快餐", "食堂", "正餐", "火锅", "烧烤", "烤肉", "面馆", "米线", "拉面", "牛肉面", "饺子", "寿司", "日料",
+                                    "restaurant", "diner", "bistro", "noodle", "ramen", "pizza", "burger", "sushi", "grill", "barbecue", "hot pot"]
 }
 
 enum DiningMood: String, Codable, CaseIterable {

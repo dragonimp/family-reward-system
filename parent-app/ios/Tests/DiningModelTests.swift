@@ -65,6 +65,29 @@ import Foundation
         for mood in [DiningMood.automatic, .familiar] {
             check(DiningRecommendation.weight(fresh, mood: mood, archive: archive) > DiningRecommendation.weight(unvisited, mood: mood, archive: archive), "check-ins benefit automatic and familiar choices")
         }
+        var china = Calendar(identifier: .gregorian)
+        china.timeZone = TimeZone(identifier: "Asia/Shanghai")!
+        var pacific = china
+        pacific.timeZone = TimeZone(identifier: "America/Los_Angeles")!
+        let day = DateComponents(year: 2026, month: 11, day: 6)
+        func mealAt(_ hour: Int, _ minute: Int) -> DiningMeal {
+            var local = day; local.hour = hour; local.minute = minute
+            return DiningMeal.current(at: china.date(from: local)!, calendar: china)
+        }
+        check(mealAt(4, 59) == .dinner && mealAt(5, 0) == .breakfast, "breakfast starts at 05:00")
+        check(mealAt(10, 29) == .breakfast && mealAt(10, 30) == .lunch, "lunch starts at 10:30")
+        check(mealAt(13, 59) == .lunch && mealAt(14, 0) == .afternoonTea, "tea starts at 14:00")
+        check(mealAt(16, 29) == .afternoonTea && mealAt(16, 30) == .dinner, "dinner starts at 16:30")
+        let instant = china.date(from: DateComponents(year: 2026, month: 11, day: 6, hour: 8))!
+        check(DiningMeal.current(at: instant, calendar: china) == .breakfast && DiningMeal.current(at: instant, calendar: pacific) == .dinner, "same instant uses the user's timezone")
+        var breakfast = known; breakfast.name = "阿婆早餐"; breakfast.category = "中餐厅"
+        var tea = fresh; tea.name = "珍珠奶茶"; tea.category = "餐饮服务;快餐厅"
+        var dinner = unvisited; dinner.name = "Steak House"; dinner.category = "restaurant"
+        let options = [breakfast, tea, dinner]
+        check(options.filter(DiningMeal.breakfast.includes) == [breakfast], "breakfast filters out tea and regular restaurants")
+        check(options.filter(DiningMeal.afternoonTea.includes) == [tea], "tea filters out main meals")
+        check(options.filter(DiningMeal.lunch.includes) == [dinner] && options.filter(DiningMeal.dinner.includes) == [dinner], "meal time requires main meals")
+        check(DiningRecommendation.pick([tea].filter(DiningMeal.lunch.includes), mood: .familiar, archive: archive, excluding: nil) == nil, "familiarity cannot bypass the meal filter or supply a wrong fallback")
         let root = URL(fileURLWithPath: ProcessInfo.processInfo.environment["ATLAS_BUILD_WORK"]!).appendingPathComponent("dining-persistence-check")
         let file = root.appendingPathComponent("user-a.json")
         try archive.write(to: file)

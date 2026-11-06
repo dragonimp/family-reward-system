@@ -24,6 +24,7 @@ public sealed class DiningPanel : ContentView
     private CancellationTokenSource? operation;
     private int generation;
     private DateTimeOffset fetchedAt;
+    private DiningMealPeriod? cachedMeal, resultMeal;
     private static readonly (string Id, string Title)[] Moods = [("automatic", "🎲 随便安排"), ("familiar", "❤️ 还是老样子"), ("fresh", "✨ 来点新鲜的"), ("budget", "💰 今天省点钱"), ("treat", "😋 今天吃点好的"), ("spicy", "🌶️ 想吃点刺激的")];
     public DiningPanel(FamilyStore store, ContentPage owner, string userId)
     {
@@ -81,7 +82,7 @@ public sealed class DiningPanel : ContentView
             card.Add(MomentStyle.Caption(cuisine is null ? "暂无菜系或主打餐品信息。" : $"地图分类显示，这家店属于{cuisine}。"));
             card.Add(MomentStyle.Caption(place.Cost is > 0 ? $"人均约 ¥{place.Cost:0.##} · 高德地图参考价" : "人均消费暂无数据"));
             if (place.Rating is { } rating) card.Add(MomentStyle.Caption($"地图评分 {rating:0.#} / 5"));
-            card.Add(new Label { Text = Reason(place), FontSize = 15 });
+            card.Add(new Label { Text = $"{MealTitle(resultMeal)} · {Reason(place)}", FontSize = 15 });
             var confirmationOperation = resultOperation;
             var confirm = MomentStyle.Action(confirmed ? "已选好，走，干饭！" : "✅ 就吃这家！", () =>
             {
@@ -99,6 +100,14 @@ public sealed class DiningPanel : ContentView
         if (message is { Length: > 0 }) body.Add(new Label { Text = message, FontSize = 14, TextColor = Colors.DarkOrange });
         body.Add(MomentStyle.Caption("附近餐厅来自高德地图。位置仅用于本次搜索，习惯与记录保存在当前账号的本机空间。价格、评分缺失时不作推测。"));
     }
+    private static string MealTitle(DiningMealPeriod? meal) => meal switch
+    {
+        DiningMealPeriod.Breakfast => "早餐推荐",
+        DiningMealPeriod.Lunch => "午餐推荐",
+        DiningMealPeriod.AfternoonTea => "下午茶推荐",
+        _ => "晚餐推荐"
+    };
+
     private string Reason(DiningPlace place)
     {
         var known = archive.Habits.GetValueOrDefault(place.Id)?.Visits > 0;
@@ -113,21 +122,32 @@ public sealed class DiningPanel : ContentView
     private async Task Decide()
     {
         if (Working) return; busy = true; message = null; var current = ++generation;
+        var meal = DiningMeal.Current(DateTimeOffset.Now);
+        if (resultMeal != meal) { result = null; confirmed = false; }
         operation?.Cancel(); using var cancel = operation = new CancellationTokenSource(TimeSpan.FromSeconds(25)); Render();
         try {
-            if (DateTimeOffset.UtcNow - fetchedAt > TimeSpan.FromMinutes(5)) candidates = [];
+            if (cachedMeal != meal || DateTimeOffset.UtcNow - fetchedAt > TimeSpan.FromMinutes(5)) candidates = [];
             if (candidates.Count == 0) {
                 var saved = archive.Circles.FirstOrDefault(c => c.Id == circleId);
                 var location = saved is null ? await Locate(cancel.Token) : new Location(saved.Latitude, saved.Longitude);
                 var places = await NearbyPlaces(location, cancel.Token);
-                if (current != generation) return; candidates = places; fetchedAt = DateTimeOffset.UtcNow;
+                if (current != generation) return;
+                candidates = places.Where(place => DiningMeal.Includes(meal, place)).ToList();
+                cachedMeal = meal;
+                fetchedAt = DateTimeOffset.UtcNow;
             }
             await Task.Delay(450, cancel.Token);
             if (current != generation) return;
+            if (DiningMeal.Current(DateTimeOffset.Now) != meal)
+            {
+                result = null;
+                message = "餐段已切换，请重新推荐。";
+                return;
+            }
             var next = DiningRecommendation.Pick(candidates, mood, archive, result?.Id);
-            if (next is null) { message = "附近暂时没有找到餐厅，换个生活圈或稍后重试。"; return; }
+            if (next is null) { result = null; message = "附近暂时没有适合当前餐段的餐厅。试试其他生活圈，或稍后重新定位。"; return; }
             if (result is { } old && !confirmed) Update(a => a.Habit(old.Id).Skipped++);
-            result = next; resultMood = mood; confirmed = false; resultOperation = Guid.NewGuid();
+            result = next; resultMood = mood; resultMeal = meal; confirmed = false; resultOperation = Guid.NewGuid();
             if (candidates.Count == 1) message = "附近暂时只找到这一家，可换个生活圈再试。";
         } catch (OperationCanceledException) { if (current == generation) message = "定位或搜索超时，请重试，或使用已保存的生活圈。"; }
         catch (PermissionException) { message = "请在系统设置中允许位置访问，或选择已保存的生活圈。"; }

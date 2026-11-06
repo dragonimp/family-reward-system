@@ -1,4 +1,10 @@
 "选好餐厅后，记录会保存在这里。" = "Your choices will be saved here.";
+"早餐推荐" = "Breakfast pick";
+"午餐推荐" = "Lunch pick";
+"下午茶推荐" = "Afternoon tea pick";
+"晚餐推荐" = "Dinner pick";
+"餐段已切换，请重新推荐。" = "It is a different mealtime now. Ask for a new pick.";
+"附近暂时没有适合当前餐段的餐厅。试试其他生活圈，或稍后重新定位。" = "No nearby places match this mealtime. Try another area or refresh your location later.";
 "到店打卡" = "Restaurant check-in";
 "打卡成功，已记入干饭记录。" = "Checked in. Saved to dining history.";
 "定位精度不足，请开启精确位置后重试。" = "Location is too approximate. Enable Precise Location and try again.";

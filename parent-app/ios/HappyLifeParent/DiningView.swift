@@ -28,6 +28,8 @@ import CryptoKit
     private var candidates: [DiningPlace] = []
     private var generation = UUID()
     private var fetchedAt = Date.distantPast
+    private var cachedMeal: DiningMeal?
+    @Published private(set) var resultMeal: DiningMeal?
     private var resultOperation = UUID()
 
     init(userID: String, family: FamilyStore) {
@@ -109,8 +111,10 @@ import CryptoKit
         let current = UUID()
         generation = current
         defer { if current == generation { busy = false } }
+        let meal = DiningMeal.current()
+        if resultMeal != meal { result = nil; confirmed = false }
         do {
-            if Date().timeIntervalSince(fetchedAt) > 300 { candidates = [] }
+            if cachedMeal != meal || Date().timeIntervalSince(fetchedAt) > 300 { candidates = [] }
             if candidates.isEmpty {
                 let location: CLLocation
                 if let circle = archive.circles.first(where: { $0.id == circleID }) { location = CLLocation(latitude: circle.latitude, longitude: circle.longitude) }
@@ -118,20 +122,38 @@ import CryptoKit
                 guard current == generation else { return }
                 origin = location
                 async let details = mapDetails(near: location)
-                let nearby = try await nearbyPlaces(around: location, radius: 3000)
+                let query = meal == .breakfast ? "breakfast" : meal == .afternoonTea ? "dessert" : "restaurant"
+                let expanded = meal == .breakfast || meal == .afternoonTea
+                var nearby = try await nearbyPlaces(around: location, radius: 3000, query: query, includeCafes: expanded)
                 let mapDetails = await details
+                if let mapDetails {
+                    nearby = mapDetails.applying(to: nearby, latitude: location.coordinate.latitude, longitude: location.coordinate.longitude)
+                }
+                if meal == .afternoonTea, !nearby.contains(where: meal.includes) {
+                    guard current == generation else { return }
+                    let tea = try await nearbyPlaces(around: location, radius: 3000, query: "bubble tea", includeCafes: true)
+                    nearby += mapDetails?.applying(to: tea, latitude: location.coordinate.latitude, longitude: location.coordinate.longitude) ?? tea
+                }
                 guard current == generation else { return }
-                candidates = mapDetails?.applying(to: nearby, latitude: location.coordinate.latitude, longitude: location.coordinate.longitude) ?? nearby
+                candidates = nearby.filter(meal.includes)
+                cachedMeal = meal
                 fetchedAt = Date()
             }
             try await Task.sleep(for: .milliseconds(450))
             guard current == generation else { return }
+            guard DiningMeal.current() == meal else {
+                result = nil
+                message = diningText("餐段已切换，请重新推荐。")
+                return
+            }
             guard let next = DiningRecommendation.pick(candidates, mood: mood, archive: archive, excluding: result?.id) else {
-                message = String(localized: "附近暂时没有找到餐厅。试试其他生活圈，或稍后重新定位。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)); return
+                result = nil
+                message = diningText("附近暂时没有适合当前餐段的餐厅。试试其他生活圈，或稍后重新定位。")
+                return
             }
             if let previous = result, !confirmed { _ = update { $0.habits[previous.id, default: DiningHabit()].skipped += 1 } }
             guard current == generation else { return }
-            result = next; resultMood = mood; confirmed = false; resultOperation = UUID()
+            result = next; resultMood = mood; resultMeal = meal; confirmed = false; resultOperation = UUID()
             if candidates.count == 1 { message = String(localized: "附近暂时只找到这一家，可换个生活圈再试。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)) }
             // The blind box animates only while real location/search work is running.
             busy = false
@@ -144,12 +166,12 @@ import CryptoKit
         checkInPlaces = []
     }
 
-    private func nearbyPlaces(around location: CLLocation, radius: CLLocationDistance) async throws -> [DiningPlace] {
+    private func nearbyPlaces(around location: CLLocation, radius: CLLocationDistance, query: String = "restaurant", includeCafes: Bool = false) async throws -> [DiningPlace] {
         let request = MKLocalSearch.Request()
-        request.naturalLanguageQuery = "restaurant"
+        request.naturalLanguageQuery = query
         request.region = MKCoordinateRegion(center: location.coordinate, latitudinalMeters: radius * 2, longitudinalMeters: radius * 2)
         request.resultTypes = .pointOfInterest
-        request.pointOfInterestFilter = MKPointOfInterestFilter(including: [.restaurant])
+        request.pointOfInterestFilter = MKPointOfInterestFilter(including: includeCafes ? [.restaurant, .cafe, .bakery] : [.restaurant])
         let operation = MKLocalSearch(request: request); search = operation
         let deadline = Task {
             do { try await Task.sleep(for: .seconds(12)) } catch { return }
@@ -162,7 +184,13 @@ import CryptoKit
             let address = [item.placemark.thoroughfare, item.placemark.subThoroughfare, item.placemark.locality].compactMap { $0 }.joined(separator: " ")
             let raw = name + "|" + String(format: "%.5f|%.5f", spot.coordinate.latitude, spot.coordinate.longitude)
             let id = "mapkit:" + SHA256.hash(data: Data(raw.utf8)).map { String(format: "%02x", $0) }.joined()
-            return DiningPlace(id: id, name: name, address: address, latitude: spot.coordinate.latitude, longitude: spot.coordinate.longitude, category: "restaurant", provider: "mapkit", distanceMeters: location.distance(from: spot))
+            let category = switch item.pointOfInterestCategory {
+            case .cafe: "咖啡馆"
+            case .bakery: "面包店"
+            case .restaurant: "restaurant"
+            default: ""
+            }
+            return DiningPlace(id: id, name: name, address: address, latitude: spot.coordinate.latitude, longitude: spot.coordinate.longitude, category: category, provider: "mapkit", distanceMeters: location.distance(from: spot))
         }
     }
     private func mapDetails(near location: CLLocation) async -> DiningMapDetails? {
@@ -288,7 +316,7 @@ struct DiningView: View {
                 .font(.subheadline)
             Label(priceText(place), systemImage: "banknote")
                 .font(.subheadline).foregroundStyle(.secondary)
-            Text(reason(place)).font(.subheadline)
+            Text([model.resultMeal.map(mealTitle), reason(place)].compactMap { $0 }.joined(separator: " · ")).font(.subheadline)
             Button(model.confirmed ? String(localized: "已选好，走，干饭！", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)) : String(localized: "✅ 就吃这家！", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) { model.confirm(operation: operation) }.buttonStyle(.borderedProminent).tint(.orange).disabled(model.confirmed || model.busy)
             Button(String(localized: "🎲 不行，再来一家！", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) { Task { await model.decide() } }.buttonStyle(.bordered).disabled(model.busy)
             HStack {
@@ -316,6 +344,14 @@ struct DiningView: View {
         }
         let price = cost.formatted(.currency(code: "CNY").precision(.fractionLength(0...2)).locale(locale))
         return String(localized: "人均约\(price) · 高德地图参考价", bundle: bundle, locale: locale)
+    }
+    private func mealTitle(_ meal: DiningMeal) -> String {
+        switch meal {
+        case .breakfast: diningText("早餐推荐")
+        case .lunch: diningText("午餐推荐")
+        case .afternoonTea: diningText("下午茶推荐")
+        case .dinner: diningText("晚餐推荐")
+        }
     }
     private func reason(_ place: DiningPlace) -> String {
         switch model.resultMood {

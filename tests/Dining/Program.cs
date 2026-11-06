@@ -47,6 +47,18 @@ var legacy = JsonSerializer.Deserialize<DiningArchive>("""{"Habits":{"a":{"Selec
 Check(legacy.Habit("a").Visits == 1 && legacy.Habit("a").CheckIns == 0, "old preference records are retained and not counted as check-ins");
 foreach (var mood in new[] { "automatic", "familiar" })
     Check(DiningRecommendation.Weight(fresh, mood, archive) > DiningRecommendation.Weight(fresh with { Id = "c" }, mood, archive), "check-ins improve recommendation weight");
+Check(DiningMeal.Current(localTime.AddHours(-15)) == DiningMealPeriod.Breakfast && DiningMeal.Current(localTime.AddHours(-10).AddMinutes(30)) == DiningMealPeriod.Lunch, "meal transitions use local time");
+Check(DiningMeal.Current(localTime.AddHours(-6)) == DiningMealPeriod.AfternoonTea && DiningMeal.Current(localTime.AddHours(-3).AddMinutes(-30)) == DiningMealPeriod.Dinner, "afternoon tea and dinner boundaries");
+Check(DiningMeal.Current(localTime.AddHours(-12)) == DiningMealPeriod.Breakfast && DiningMeal.Current(localTime.AddHours(-12).ToOffset(TimeSpan.FromHours(-8))) == DiningMealPeriod.Dinner, "same instant in different time zones");
+var breakfast = old with { Name = "阿婆早餐", Category = "中餐厅" };
+var tea = fresh with { Name = "珍珠奶茶", Category = "餐饮服务;快餐厅" };
+var steak = old with { Id = "c", Name = "Steak House", Category = "restaurant" };
+DiningPlace[] options = [breakfast, tea, steak];
+Check(options.Where(p => DiningMeal.Includes(DiningMealPeriod.Breakfast, p)).SequenceEqual([breakfast]), "breakfast filters tea and main meals");
+Check(options.Where(p => DiningMeal.Includes(DiningMealPeriod.AfternoonTea, p)).SequenceEqual([tea]), "tea filters out main meals");
+foreach (var meal in new[] { DiningMealPeriod.Lunch, DiningMealPeriod.Dinner })
+    Check(options.Where(p => DiningMeal.Includes(meal, p)).SequenceEqual([steak]), "lunch and dinner require main meals");
+Check(DiningRecommendation.Pick(new[] { tea }.Where(p => DiningMeal.Includes(DiningMealPeriod.Lunch, p)), "familiar", archive, null) is null, "familiarity cannot bypass the mealtime filter");
 using var data = JsonDocument.Parse("""{"status":"1","pois":[{"id":"A","name":"Real restaurant","location":"121.4,31.2","distance":"200","biz_ext":{"cost":[],"rating":"4.3"}},{"id":"A","name":"Duplicate","location":"121.4,31.2","distance":"100"},{"id":"bad","name":"Bad","location":"999,999","distance":"10"}]}""");
 var parsed = DiningEndpoints.Parse(data.RootElement);
 Check(parsed.Count == 1 && parsed[0].Cost == null && parsed[0].Rating == 4.3 && parsed[0].Longitude == 121.4, "provider parsing preserves absence, deduplicates and validates coordinates");

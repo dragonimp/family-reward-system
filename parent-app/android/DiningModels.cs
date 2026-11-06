@@ -46,6 +46,38 @@ public sealed class DiningArchive {
         choice.EatenAt = DateTimeOffset.UtcNow; Habit(choice.Place.Id).Eaten++;
     }
 }
+public enum DiningMealPeriod { Breakfast, Lunch, AfternoonTea, Dinner }
+
+public static class DiningMeal
+{
+    public static DiningMealPeriod Current(DateTimeOffset localTime) => (localTime.Hour * 60 + localTime.Minute) switch
+    {
+        >= 300 and < 630 => DiningMealPeriod.Breakfast,
+        >= 630 and < 840 => DiningMealPeriod.Lunch,
+        >= 840 and < 990 => DiningMealPeriod.AfternoonTea,
+        _ => DiningMealPeriod.Dinner
+    };
+
+    public static bool Includes(DiningMealPeriod meal, DiningPlace place)
+    {
+        var description = place.Name + ";" + place.Category;
+        if (Contains(description, BreakfastTerms)) return meal == DiningMealPeriod.Breakfast;
+        if (Contains(description, TeaTerms)) return meal == DiningMealPeriod.AfternoonTea;
+        if (Contains(description, BakeryTerms)) return meal is DiningMealPeriod.Breakfast or DiningMealPeriod.AfternoonTea;
+        return (meal is DiningMealPeriod.Lunch or DiningMealPeriod.Dinner) && Contains(description, MealTerms);
+    }
+
+    private static bool Contains(string description, string[] terms) =>
+        terms.Any(term => description.Contains(term, StringComparison.OrdinalIgnoreCase));
+
+    private static readonly string[] BreakfastTerms = ["早餐", "早点", "早茶", "早午餐", "豆浆", "油条", "包子", "粥铺", "煎饼", "肠粉", "breakfast", "brunch", "congee"];
+    private static readonly string[] TeaTerms = ["下午茶", "甜品", "甜点", "奶茶", "茶饮", "饮品", "冰淇淋", "冰激凌", "糖水", "蛋糕", "咖啡", "果汁",
+                                                 "dessert", "bubble tea", "boba", "milk tea", "ice cream", "coffee", "café", "cafe"];
+    private static readonly string[] BakeryTerms = ["烘焙", "面包", "糕饼", "bakery", "bakeshop"];
+    private static readonly string[] MealTerms = ["中餐", "西餐", "餐厅", "餐馆", "饭店", "快餐", "食堂", "正餐", "火锅", "烧烤", "烤肉", "面馆", "米线", "拉面", "牛肉面", "饺子", "寿司", "日料",
+                                                  "restaurant", "diner", "bistro", "noodle", "ramen", "pizza", "burger", "sushi", "grill", "barbecue", "hot pot"];
+}
+
 public static class DiningRecommendation {
     public static double Weight(DiningPlace place, string mood, DiningArchive archive) {
         var habit = archive.Habits.GetValueOrDefault(place.Id) ?? new();
