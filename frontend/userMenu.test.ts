@@ -5,8 +5,8 @@ import { readFile } from 'node:fs/promises';
 import { getUserCenterUrl } from './src/auth.ts';
 
 test('account actions use same-origin AgentIdentity SDK routes', () => {
-  assert.equal(getUserCenterUrl('info'), '/auth/user-center?section=info');
-  assert.equal(getUserCenterUrl('password'), '/auth/user-center?section=password');
+  assert.equal(getUserCenterUrl('info'), '/auth/user-center?section=info&ui_locales=en');
+  assert.equal(getUserCenterUrl('password'), '/auth/user-center?section=password&ui_locales=en');
 });
 
 test('all account actions live inside the username menu', async () => {

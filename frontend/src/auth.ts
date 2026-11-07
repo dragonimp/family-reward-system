@@ -1,4 +1,5 @@
 import type { AppUserProfile, AuthUser } from './types';
+import { createAuthClient } from '@aihome/agentidentity-web-sdk';
 
 let cachedUser: AuthUser | null = null;
 let cachedAppProfile: AppUserProfile | null = null;
@@ -67,11 +68,11 @@ function getCurrentReturnUrl() {
 }
 
 export function getAuthLoginUrl(returnUrl = getCurrentReturnUrl()) {
-  return `/auth/login?returnUrl=${encodeURIComponent(returnUrl)}`;
+  return createAuthClient().getLoginUrl(returnUrl);
 }
 
 export function getUserCenterUrl(section: 'info' | 'password') {
-  return `/auth/user-center?section=${section}`;
+  return createAuthClient().getUserCenterUrl(section);
 }
 
 export function redirectToAuth(returnUrl = getCurrentReturnUrl()) {
