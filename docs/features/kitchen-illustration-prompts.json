@@ -1,0 +1,521 @@
+[
+  {
+    "recipeId": "b3fcce06-1d3c-5b2f-822b-0419beae6ed4",
+    "name": "番茄鸡蛋盖饭",
+    "version": 1,
+    "steps": [
+      {
+        "number": 1,
+        "action": "煮饭",
+        "ingredients": [
+          "大米",
+          "水"
+        ],
+        "utensils": [
+          "电饭煲"
+        ],
+        "instruction": "大米加水放入电饭煲，按煮饭程序完成；若包装要求不同水量，按包装调整。",
+        "illustrationUrl": null
+      },
+      {
+        "number": 2,
+        "action": "炒蛋",
+        "ingredients": [
+          "鸡蛋",
+          "食用油"
+        ],
+        "utensils": [
+          "炒锅",
+          "锅铲"
+        ],
+        "instruction": "热锅放一半油，倒入蛋液，用中火炒至凝固后盛出。",
+        "illustrationUrl": null
+      },
+      {
+        "number": 3,
+        "action": "煮番茄",
+        "ingredients": [
+          "番茄",
+          "食用油",
+          "盐"
+        ],
+        "utensils": [
+          "炒锅"
+        ],
+        "instruction": "加入余下的油，番茄炒软出汁，再加入鸡蛋翻炒；鸡蛋料理中心温度达到71°C。",
+        "illustrationUrl": null
+      },
+      {
+        "number": 4,
+        "action": "装盘",
+        "ingredients": [
+          "米饭",
+          "番茄鸡蛋"
+        ],
+        "utensils": [
+          "碗"
+        ],
+        "instruction": "把熟米饭和炒好的番茄鸡蛋装碗，趁热食用。",
+        "illustrationUrl": null
+      }
+    ]
+  },
+  {
+    "recipeId": "a98b4985-c220-54c7-bda6-26ac76ecbdfb",
+    "name": "香菇青菜饭",
+    "version": 1,
+    "steps": [
+      {
+        "number": 1,
+        "action": "煮饭",
+        "ingredients": [
+          "大米",
+          "水",
+          "香菇"
+        ],
+        "utensils": [
+          "电饭煲"
+        ],
+        "instruction": "米、水和香菇放入电饭煲，按正常煮饭程序煮熟。",
+        "illustrationUrl": null
+      },
+      {
+        "number": 2,
+        "action": "炒青菜",
+        "ingredients": [
+          "青菜",
+          "食用油",
+          "盐"
+        ],
+        "utensils": [
+          "炒锅",
+          "锅铲"
+        ],
+        "instruction": "锅中加油，中火放青菜翻炒3至5分钟至熟软，加入盐。",
+        "illustrationUrl": null
+      },
+      {
+        "number": 3,
+        "action": "拌饭",
+        "ingredients": [
+          "香菇饭",
+          "青菜"
+        ],
+        "utensils": [
+          "饭勺"
+        ],
+        "instruction": "确认米饭熟透，拌入炒熟的青菜后即食。",
+        "illustrationUrl": null
+      }
+    ]
+  },
+  {
+    "recipeId": "edf416d6-0f51-5da2-9885-8b9038d427be",
+    "name": "胡萝卜土豆焖饭",
+    "version": 1,
+    "steps": [
+      {
+        "number": 1,
+        "action": "装锅",
+        "ingredients": [
+          "大米",
+          "水",
+          "土豆",
+          "胡萝卜",
+          "食用油",
+          "盐"
+        ],
+        "utensils": [
+          "电饭煲"
+        ],
+        "instruction": "把全部食材放入电饭煲，轻轻拌匀。",
+        "illustrationUrl": null
+      },
+      {
+        "number": 2,
+        "action": "焖煮",
+        "ingredients": [
+          "米和蔬菜"
+        ],
+        "utensils": [
+          "电饭煲"
+        ],
+        "instruction": "使用煮饭程序煮至完成，保温焖5分钟。",
+        "illustrationUrl": null
+      },
+      {
+        "number": 3,
+        "action": "检查",
+        "ingredients": [
+          "焖饭"
+        ],
+        "utensils": [
+          "筷子",
+          "饭勺"
+        ],
+        "instruction": "检查米粒无硬芯，土豆可被筷子轻松穿透，再拌松盛出。",
+        "illustrationUrl": null
+      }
+    ]
+  },
+  {
+    "recipeId": "85dad715-8586-5b82-9b8e-3ffbfcc5094d",
+    "name": "番茄鸡蛋面",
+    "version": 1,
+    "steps": [
+      {
+        "number": 1,
+        "action": "准备汤底",
+        "ingredients": [
+          "番茄",
+          "食用油"
+        ],
+        "utensils": [
+          "汤锅",
+          "锅铲"
+        ],
+        "instruction": "锅中加油，中火翻炒蔬菜2分钟，加入水煮开。",
+        "illustrationUrl": null
+      },
+      {
+        "number": 2,
+        "action": "煮熟配料",
+        "ingredients": [
+          "鸡蛋",
+          "汤底"
+        ],
+        "utensils": [
+          "汤锅"
+        ],
+        "instruction": "加入配料，煮沸后保持小火5分钟。鸡蛋需完全凝固，鸡蛋料理中心温度达到71°C。",
+        "illustrationUrl": null
+      },
+      {
+        "number": 3,
+        "action": "煮面",
+        "ingredients": [
+          "干面条"
+        ],
+        "utensils": [
+          "另一个煮锅",
+          "漏勺"
+        ],
+        "instruction": "另锅水烧开，放入面条，按包装时间煮至没有硬芯，捞出。",
+        "illustrationUrl": null
+      },
+      {
+        "number": 4,
+        "action": "合碗",
+        "ingredients": [
+          "面条",
+          "配料汤",
+          "盐"
+        ],
+        "utensils": [
+          "面碗"
+        ],
+        "instruction": "把面和煮沸的汤装碗，加盐调味，趁热食用。",
+        "illustrationUrl": null
+      }
+    ]
+  },
+  {
+    "recipeId": "3a62bb52-f598-5ce9-a87a-2fec51b871ff",
+    "name": "香菇青菜面",
+    "version": 1,
+    "steps": [
+      {
+        "number": 1,
+        "action": "准备汤底",
+        "ingredients": [
+          "鲜香菇",
+          "食用油"
+        ],
+        "utensils": [
+          "汤锅",
+          "锅铲"
+        ],
+        "instruction": "锅中加油，中火翻炒蔬菜2分钟，加入水煮开。",
+        "illustrationUrl": null
+      },
+      {
+        "number": 2,
+        "action": "煮熟配料",
+        "ingredients": [
+          "青菜",
+          "汤底"
+        ],
+        "utensils": [
+          "汤锅"
+        ],
+        "instruction": "加入配料，煮沸后保持小火5分钟，至蔬菜和豆腐熟透。",
+        "illustrationUrl": null
+      },
+      {
+        "number": 3,
+        "action": "煮面",
+        "ingredients": [
+          "干面条"
+        ],
+        "utensils": [
+          "另一个煮锅",
+          "漏勺"
+        ],
+        "instruction": "另锅水烧开，放入面条，按包装时间煮至没有硬芯，捞出。",
+        "illustrationUrl": null
+      },
+      {
+        "number": 4,
+        "action": "合碗",
+        "ingredients": [
+          "面条",
+          "配料汤",
+          "盐"
+        ],
+        "utensils": [
+          "面碗"
+        ],
+        "instruction": "把面和煮沸的汤装碗，加盐调味，趁热食用。",
+        "illustrationUrl": null
+      }
+    ]
+  },
+  {
+    "recipeId": "6cb40e4a-3ed2-5bc1-880d-4070dd5ed305",
+    "name": "胡萝卜豆腐面",
+    "version": 1,
+    "steps": [
+      {
+        "number": 1,
+        "action": "准备汤底",
+        "ingredients": [
+          "胡萝卜",
+          "食用油"
+        ],
+        "utensils": [
+          "汤锅",
+          "锅铲"
+        ],
+        "instruction": "锅中加油，中火翻炒蔬菜2分钟，加入水煮开。",
+        "illustrationUrl": null
+      },
+      {
+        "number": 2,
+        "action": "煮熟配料",
+        "ingredients": [
+          "豆腐",
+          "汤底"
+        ],
+        "utensils": [
+          "汤锅"
+        ],
+        "instruction": "加入配料，煮沸后保持小火5分钟，至蔬菜和豆腐熟透。",
+        "illustrationUrl": null
+      },
+      {
+        "number": 3,
+        "action": "煮面",
+        "ingredients": [
+          "干面条"
+        ],
+        "utensils": [
+          "另一个煮锅",
+          "漏勺"
+        ],
+        "instruction": "另锅水烧开，放入面条，按包装时间煮至没有硬芯，捞出。",
+        "illustrationUrl": null
+      },
+      {
+        "number": 4,
+        "action": "合碗",
+        "ingredients": [
+          "面条",
+          "配料汤",
+          "盐"
+        ],
+        "utensils": [
+          "面碗"
+        ],
+        "instruction": "把面和煮沸的汤装碗，加盐调味，趁热食用。",
+        "illustrationUrl": null
+      }
+    ]
+  },
+  {
+    "recipeId": "937fdec9-f486-58e7-b845-11d63770f1c6",
+    "name": "南瓜小米粥",
+    "version": 1,
+    "steps": [
+      {
+        "number": 1,
+        "action": "煮开",
+        "ingredients": [
+          "小米",
+          "南瓜",
+          "水"
+        ],
+        "utensils": [
+          "汤锅",
+          "长柄勺"
+        ],
+        "instruction": "水烧开，放入谷物和蔬菜，搅拌后转小火。",
+        "illustrationUrl": null
+      },
+      {
+        "number": 2,
+        "action": "慢煮",
+        "ingredients": [
+          "粥"
+        ],
+        "utensils": [
+          "汤锅",
+          "长柄勺"
+        ],
+        "instruction": "锅盖留缝，小火煮25至35分钟，期间搅拌并留意防溢。燕麦片若包装要求更短时间，先煮软蔬菜再按包装时间加入。",
+        "illustrationUrl": null
+      },
+      {
+        "number": 3,
+        "action": "检查熟度",
+        "ingredients": [
+          "粥"
+        ],
+        "utensils": [
+          "勺子"
+        ],
+        "instruction": "确认谷物无硬芯、蔬菜可轻松压碎；过稠时加少量开水再煮沸。",
+        "illustrationUrl": null
+      },
+      {
+        "number": 4,
+        "action": "盛出",
+        "ingredients": [
+          "粥"
+        ],
+        "utensils": [
+          "碗"
+        ],
+        "instruction": "关火后盛出，放至适口温度再吃，小心烫伤。",
+        "illustrationUrl": null
+      }
+    ]
+  },
+  {
+    "recipeId": "a2889d17-bdd6-5904-88c7-040ff866a566",
+    "name": "红薯大米粥",
+    "version": 1,
+    "steps": [
+      {
+        "number": 1,
+        "action": "煮开",
+        "ingredients": [
+          "大米",
+          "红薯",
+          "水"
+        ],
+        "utensils": [
+          "汤锅",
+          "长柄勺"
+        ],
+        "instruction": "水烧开，放入谷物和蔬菜，搅拌后转小火。",
+        "illustrationUrl": null
+      },
+      {
+        "number": 2,
+        "action": "慢煮",
+        "ingredients": [
+          "粥"
+        ],
+        "utensils": [
+          "汤锅",
+          "长柄勺"
+        ],
+        "instruction": "锅盖留缝，小火煮25至35分钟，期间搅拌并留意防溢。燕麦片若包装要求更短时间，先煮软蔬菜再按包装时间加入。",
+        "illustrationUrl": null
+      },
+      {
+        "number": 3,
+        "action": "检查熟度",
+        "ingredients": [
+          "粥"
+        ],
+        "utensils": [
+          "勺子"
+        ],
+        "instruction": "确认谷物无硬芯、蔬菜可轻松压碎；过稠时加少量开水再煮沸。",
+        "illustrationUrl": null
+      },
+      {
+        "number": 4,
+        "action": "盛出",
+        "ingredients": [
+          "粥"
+        ],
+        "utensils": [
+          "碗"
+        ],
+        "instruction": "关火后盛出，放至适口温度再吃，小心烫伤。",
+        "illustrationUrl": null
+      }
+    ]
+  },
+  {
+    "recipeId": "f3be4543-ac91-506a-900d-9c343a43424d",
+    "name": "胡萝卜燕麦粥",
+    "version": 1,
+    "steps": [
+      {
+        "number": 1,
+        "action": "煮开",
+        "ingredients": [
+          "燕麦片",
+          "胡萝卜",
+          "水"
+        ],
+        "utensils": [
+          "汤锅",
+          "长柄勺"
+        ],
+        "instruction": "水烧开，放入谷物和蔬菜，搅拌后转小火。",
+        "illustrationUrl": null
+      },
+      {
+        "number": 2,
+        "action": "慢煮",
+        "ingredients": [
+          "粥"
+        ],
+        "utensils": [
+          "汤锅",
+          "长柄勺"
+        ],
+        "instruction": "锅盖留缝，小火煮25至35分钟，期间搅拌并留意防溢。燕麦片若包装要求更短时间，先煮软蔬菜再按包装时间加入。",
+        "illustrationUrl": null
+      },
+      {
+        "number": 3,
+        "action": "检查熟度",
+        "ingredients": [
+          "粥"
+        ],
+        "utensils": [
+          "勺子"
+        ],
+        "instruction": "确认谷物无硬芯、蔬菜可轻松压碎；过稠时加少量开水再煮沸。",
+        "illustrationUrl": null
+      },
+      {
+        "number": 4,
+        "action": "盛出",
+        "ingredients": [
+          "粥"
+        ],
+        "utensils": [
+          "碗"
+        ],
+        "instruction": "关火后盛出，放至适口温度再吃，小心烫伤。",
+        "illustrationUrl": null
+      }
+    ]
+  }
+]

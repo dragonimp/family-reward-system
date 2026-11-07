@@ -1,4 +1,5 @@
 <Project Sdk="Microsoft.NET.Sdk.Web">
   <PropertyGroup><TargetFramework>net10.0</TargetFramework><Nullable>enable</Nullable><ImplicitUsings>enable</ImplicitUsings></PropertyGroup>
   <ItemGroup><PackageReference Include="Npgsql" Version="10.0.3" /><Compile Include="../../FamilyReward.Api/RecipeEndpoints.cs" Link="RecipeEndpoints.cs" /></ItemGroup>
+  <ItemGroup><Content Include="../../FamilyReward.Api/recipe-illustrations/**/*.jpg" Link="recipe-illustrations/%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" /></ItemGroup>
 </Project>

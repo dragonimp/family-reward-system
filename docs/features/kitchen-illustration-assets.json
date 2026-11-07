@@ -1,0 +1,342 @@
+[
+  {
+    "recipeId": "b3fcce06-1d3c-5b2f-822b-0419beae6ed4",
+    "recipeVersion": 1,
+    "step": 1,
+    "asset": "FamilyReward.Api/recipe-illustrations/b3fcce06-1d3c-5b2f-822b-0419beae6ed4/v1/step-1.jpg",
+    "tool": "built-in image_gen",
+    "prompt": "Use case: scientific-educational. Asset type: native app cooking step illustration. 菜谱：番茄鸡蛋盖饭，第1步，煮饭。严格只画这一已确定步骤：大米加水放入电饭煲，按煮饭程序完成；若包装要求不同水量，按包装调整。食材：大米、水；厨具：电饭煲。画清楚将洗净大米与清水放入打开的电饭煲内锅的动作；不要加入番茄鸡蛋或其他食材，不要暗示生米即食。温暖简洁的手绘食谱插画，柔和水彩配细腻铅笔线稿，奶白浅色背景，青绿色电饭煲，俯视偏侧视清晰近景，四周留白。单幅1024x1024构图，不是多格，不含文字数字标签水印或UI。说明将由原生界面展示，插画不能编造后续步骤。",
+    "sha256": "42c81afb1028455555dedd7b86c4c51763d4f196bd7a0e03c8590694fd72a951",
+    "bytes": 446356
+  },
+  {
+    "recipeId": "b3fcce06-1d3c-5b2f-822b-0419beae6ed4",
+    "recipeVersion": 1,
+    "step": 2,
+    "asset": "FamilyReward.Api/recipe-illustrations/b3fcce06-1d3c-5b2f-822b-0419beae6ed4/v1/step-2.jpg",
+    "tool": "built-in image_gen",
+    "prompt": "Use case: scientific-educational. Asset type: native app cooking-step illustration.\n菜谱：番茄鸡蛋盖饭，第2步，炒蛋。\n只表现此已确定步骤，禁止自行编排其他做法：热锅放一半油，倒入蛋液，用中火炒至凝固后盛出。\n涉及食材与状态：鸡蛋、食用油。厨具：炒锅、锅铲。必须让操作动作和食材清楚可辨，食材不得凭空增加，不能用示意图代替文字中的熟度或温度判断。\n统一风格：温暖、简洁、柔和水彩加细腻铅笔线稿，奶白浅色背景，青绿色/奶油色厨具，俯视偏侧视的清晰近景。画中食材应与菜名一致，即使本步骤简写为米饭/蔬菜/面条/粥也要保留本菜谱原有食材。只画食物、器具和必要的干净手部，远离火焰直接接触，不出现生食即食暗示。留白克制。\n单幅方形构图，不是多格，不画文字数字标签、商标、水印或UI。步骤说明由原生界面展示。",
+    "sha256": "ffd0eed23916c3799dab80cbb20ab2fef8959fac10b1b8dc2be5ffcda7029647",
+    "bytes": 480028
+  },
+  {
+    "recipeId": "b3fcce06-1d3c-5b2f-822b-0419beae6ed4",
+    "recipeVersion": 1,
+    "step": 3,
+    "asset": "FamilyReward.Api/recipe-illustrations/b3fcce06-1d3c-5b2f-822b-0419beae6ed4/v1/step-3.jpg",
+    "tool": "built-in image_gen",
+    "prompt": "Use case: scientific-educational. Asset type: native app cooking-step illustration.\n菜谱：番茄鸡蛋盖饭，第3步，煮番茄。\n只表现此已确定步骤，禁止自行编排其他做法：加入余下的油，番茄炒软出汁，再加入鸡蛋翻炒；鸡蛋料理中心温度达到71°C。\n涉及食材与状态：番茄、食用油、盐。厨具：炒锅。必须让操作动作和食材清楚可辨，食材不得凭空增加，不能用示意图代替文字中的熟度或温度判断。\n统一风格：温暖、简洁、柔和水彩加细腻铅笔线稿，奶白浅色背景，青绿色/奶油色厨具，俯视偏侧视的清晰近景。画中食材应与菜名一致，即使本步骤简写为米饭/蔬菜/面条/粥也要保留本菜谱原有食材。只画食物、器具和必要的干净手部，远离火焰直接接触，不出现生食即食暗示。留白克制。\n单幅方形构图，不是多格，不画文字数字标签、商标、水印或UI。步骤说明由原生界面展示。",
+    "sha256": "816c9a1432d28f3b73d82709a5465589bd7a69eeff2db59f6465ce120aabcd90",
+    "bytes": 528384
+  },
+  {
+    "recipeId": "edf416d6-0f51-5da2-9885-8b9038d427be",
+    "recipeVersion": 1,
+    "step": 1,
+    "asset": "FamilyReward.Api/recipe-illustrations/edf416d6-0f51-5da2-9885-8b9038d427be/v1/step-1.jpg",
+    "tool": "built-in image_gen",
+    "prompt": "Use case: scientific-educational. Asset type: native app cooking-step illustration.\n菜谱：胡萝卜土豆焖饭，第1步，装锅。\n只表现此已确定步骤，禁止自行编排其他做法：把全部食材放入电饭煲，轻轻拌匀。\n涉及食材与状态：大米、水、土豆、胡萝卜、食用油、盐。厨具：电饭煲。必须让操作动作和食材清楚可辨，食材不得凭空增加，不能用示意图代替文字中的熟度或温度判断。\n统一风格：温暖、简洁、柔和水彩加细腻铅笔线稿，奶白浅色背景，青绿色/奶油色厨具，俯视偏侧视的清晰近景。画中食材应与菜名一致，即使本步骤简写为米饭/蔬菜/面条/粥也要保留本菜谱原有食材。只画食物、器具和必要的干净手部，远离火焰直接接触，不出现生食即食暗示。留白克制。\n单幅方形构图，不是多格，不画文字数字标签、商标、水印或UI。步骤说明由原生界面展示。",
+    "sha256": "4281ede03f3c910baf6b5cb4547273c153d0dfbc8b1e1b1e78c285ba5ae9b33d",
+    "bytes": 493237
+  },
+  {
+    "recipeId": "b3fcce06-1d3c-5b2f-822b-0419beae6ed4",
+    "recipeVersion": 1,
+    "step": 4,
+    "asset": "FamilyReward.Api/recipe-illustrations/b3fcce06-1d3c-5b2f-822b-0419beae6ed4/v1/step-4.jpg",
+    "tool": "built-in image_gen",
+    "prompt": "Use case: scientific-educational. Asset type: native app cooking-step illustration.\n菜谱：番茄鸡蛋盖饭，第4步，装盘。\n只表现此已确定步骤，禁止自行编排其他做法：把熟米饭和炒好的番茄鸡蛋装碗，趁热食用。\n涉及食材与状态：米饭、番茄鸡蛋。厨具：碗。必须让操作动作和食材清楚可辨，食材不得凭空增加，不能用示意图代替文字中的熟度或温度判断。\n统一风格：温暖、简洁、柔和水彩加细腻铅笔线稿，奶白浅色背景，青绿色/奶油色厨具，俯视偏侧视的清晰近景。画中食材应与菜名一致，即使本步骤简写为米饭/蔬菜/面条/粥也要保留本菜谱原有食材。只画食物、器具和必要的干净手部，远离火焰直接接触，不出现生食即食暗示。留白克制。\n单幅方形构图，不是多格，不画文字数字标签、商标、水印或UI。步骤说明由原生界面展示。",
+    "sha256": "a24520f5fafaf57df70cdf97ac0f50759078bf7e3b690050ead6107a2c0d0207",
+    "bytes": 506383
+  },
+  {
+    "recipeId": "edf416d6-0f51-5da2-9885-8b9038d427be",
+    "recipeVersion": 1,
+    "step": 2,
+    "asset": "FamilyReward.Api/recipe-illustrations/edf416d6-0f51-5da2-9885-8b9038d427be/v1/step-2.jpg",
+    "tool": "built-in image_gen",
+    "prompt": "Use case: scientific-educational. Asset type: native app cooking-step illustration.\n菜谱：胡萝卜土豆焖饭，第2步，焖煮。\n只表现此已确定步骤，禁止自行编排其他做法：使用煮饭程序煮至完成，保温焖5分钟。\n涉及食材与状态：米和蔬菜。厨具：电饭煲。必须让操作动作和食材清楚可辨，食材不得凭空增加，不能用示意图代替文字中的熟度或温度判断。\n统一风格：温暖、简洁、柔和水彩加细腻铅笔线稿，奶白浅色背景，青绿色/奶油色厨具，俯视偏侧视的清晰近景。画中食材应与菜名一致，即使本步骤简写为米饭/蔬菜/面条/粥也要保留本菜谱原有食材。只画食物、器具和必要的干净手部，远离火焰直接接触，不出现生食即食暗示。留白克制。\n单幅方形构图，不是多格，不画文字数字标签、商标、水印或UI。步骤说明由原生界面展示。",
+    "sha256": "46b7b46c864244fdf3f8ee0a0651fbdb1936ec710f9e50803d18b3b72353d872",
+    "bytes": 438887
+  },
+  {
+    "recipeId": "a98b4985-c220-54c7-bda6-26ac76ecbdfb",
+    "recipeVersion": 1,
+    "step": 2,
+    "asset": "FamilyReward.Api/recipe-illustrations/a98b4985-c220-54c7-bda6-26ac76ecbdfb/v1/step-2.jpg",
+    "tool": "built-in image_gen",
+    "prompt": "Use case: scientific-educational. Asset type: native app cooking-step illustration.\n菜谱：香菇青菜饭，第2步，炒青菜。\n只表现此已确定步骤，禁止自行编排其他做法：锅中加油，中火放青菜翻炒3至5分钟至熟软，加入盐。\n涉及食材与状态：青菜、食用油、盐。厨具：炒锅、锅铲。必须让操作动作和食材清楚可辨，食材不得凭空增加，不能用示意图代替文字中的熟度或温度判断。\n统一风格：温暖、简洁、柔和水彩加细腻铅笔线稿，奶白浅色背景，青绿色/奶油色厨具，俯视偏侧视的清晰近景。画中食材应与菜名一致，即使本步骤简写为米饭/蔬菜/面条/粥也要保留本菜谱原有食材。只画食物、器具和必要的干净手部，远离火焰直接接触，不出现生食即食暗示。留白克制。\n单幅方形构图，不是多格，不画文字数字标签、商标、水印或UI。步骤说明由原生界面展示。",
+    "sha256": "bfddfce68251a1b8bbb71d9babc51c827596155837baf6a433de3d38c273bd26",
+    "bytes": 538022
+  },
+  {
+    "recipeId": "edf416d6-0f51-5da2-9885-8b9038d427be",
+    "recipeVersion": 1,
+    "step": 3,
+    "asset": "FamilyReward.Api/recipe-illustrations/edf416d6-0f51-5da2-9885-8b9038d427be/v1/step-3.jpg",
+    "tool": "built-in image_gen",
+    "prompt": "Use case: scientific-educational. Asset type: native app cooking-step illustration.\n菜谱：胡萝卜土豆焖饭，第3步，检查。\n只表现此已确定步骤，禁止自行编排其他做法：检查米粒无硬芯，土豆可被筷子轻松穿透，再拌松盛出。\n涉及食材与状态：焖饭。厨具：筷子、饭勺。必须让操作动作和食材清楚可辨，食材不得凭空增加，不能用示意图代替文字中的熟度或温度判断。\n统一风格：温暖、简洁、柔和水彩加细腻铅笔线稿，奶白浅色背景，青绿色/奶油色厨具，俯视偏侧视的清晰近景。画中食材应与菜名一致，即使本步骤简写为米饭/蔬菜/面条/粥也要保留本菜谱原有食材。只画食物、器具和必要的干净手部，远离火焰直接接触，不出现生食即食暗示。留白克制。\n单幅方形构图，不是多格，不画文字数字标签、商标、水印或UI。步骤说明由原生界面展示。",
+    "sha256": "450c4b064da63f337b6165a002a36810df618308a86ca6d87c6aa5a04b59a9ed",
+    "bytes": 535282
+  },
+  {
+    "recipeId": "a98b4985-c220-54c7-bda6-26ac76ecbdfb",
+    "recipeVersion": 1,
+    "step": 1,
+    "asset": "FamilyReward.Api/recipe-illustrations/a98b4985-c220-54c7-bda6-26ac76ecbdfb/v1/step-1.jpg",
+    "tool": "built-in image_gen",
+    "prompt": "Use case: scientific-educational. Asset type: native app cooking-step illustration.\n菜谱：香菇青菜饭，第1步，煮饭。\n只表现此已确定步骤，禁止自行编排其他做法：米、水和香菇放入电饭煲，按正常煮饭程序煮熟。\n涉及食材与状态：大米、水、香菇。厨具：电饭煲。必须让操作动作和食材清楚可辨，食材不得凭空增加，不能用示意图代替文字中的熟度或温度判断。\n统一风格：温暖、简洁、柔和水彩加细腻铅笔线稿，奶白浅色背景，青绿色/奶油色厨具，俯视偏侧视的清晰近景。画中食材应与菜名一致，即使本步骤简写为米饭/蔬菜/面条/粥也要保留本菜谱原有食材。只画食物、器具和必要的干净手部，远离火焰直接接触，不出现生食即食暗示。留白克制。\n单幅方形构图，不是多格，不画文字数字标签、商标、水印或UI。步骤说明由原生界面展示。",
+    "sha256": "9596ff78be2c1f92a38a8c820297aa203b77259c5ca56892cecc2c0f2e38acf2",
+    "bytes": 488795
+  },
+  {
+    "recipeId": "85dad715-8586-5b82-9b8e-3ffbfcc5094d",
+    "recipeVersion": 1,
+    "step": 3,
+    "asset": "FamilyReward.Api/recipe-illustrations/85dad715-8586-5b82-9b8e-3ffbfcc5094d/v1/step-3.jpg",
+    "tool": "built-in image_gen",
+    "prompt": "Use case: scientific-educational. Asset type: native app cooking-step illustration.\n菜谱：番茄鸡蛋面，第3步，煮面。\n只表现此已确定步骤，禁止自行编排其他做法：另锅水烧开，放入面条，按包装时间煮至没有硬芯，捞出。\n涉及食材与状态：干面条。厨具：另一个煮锅、漏勺。必须让操作动作和食材清楚可辨，食材不得凭空增加，不能用示意图代替文字中的熟度或温度判断。\n统一风格：温暖、简洁、柔和水彩加细腻铅笔线稿，奶白浅色背景，青绿色/奶油色厨具，俯视偏侧视的清晰近景。画中食材应与菜名一致，即使本步骤简写为米饭/蔬菜/面条/粥也要保留本菜谱原有食材。只画食物、器具和必要的干净手部，远离火焰直接接触，不出现生食即食暗示。留白克制。\n单幅方形构图，不是多格，不画文字数字标签、商标、水印或UI。步骤说明由原生界面展示。",
+    "sha256": "ba030f8cfdf08b9ee1108df8ac82a9a193a1883ed8171ef4fc7216b1f6598a24",
+    "bytes": 481094
+  },
+  {
+    "recipeId": "85dad715-8586-5b82-9b8e-3ffbfcc5094d",
+    "recipeVersion": 1,
+    "step": 1,
+    "asset": "FamilyReward.Api/recipe-illustrations/85dad715-8586-5b82-9b8e-3ffbfcc5094d/v1/step-1.jpg",
+    "tool": "built-in image_gen",
+    "prompt": "Use case: scientific-educational. Asset type: native app cooking-step illustration.\n菜谱：番茄鸡蛋面，第1步，准备汤底。\n只表现此已确定步骤，禁止自行编排其他做法：锅中加油，中火翻炒蔬菜2分钟，加入水煮开。\n涉及食材与状态：番茄、食用油。厨具：汤锅、锅铲。必须让操作动作和食材清楚可辨，食材不得凭空增加，不能用示意图代替文字中的熟度或温度判断。\n统一风格：温暖、简洁、柔和水彩加细腻铅笔线稿，奶白浅色背景，青绿色/奶油色厨具，俯视偏侧视的清晰近景。画中食材应与菜名一致，即使本步骤简写为米饭/蔬菜/面条/粥也要保留本菜谱原有食材。只画食物、器具和必要的干净手部，远离火焰直接接触，不出现生食即食暗示。留白克制。\n单幅方形构图，不是多格，不画文字数字标签、商标、水印或UI。步骤说明由原生界面展示。",
+    "sha256": "e4f61ad343ed8970f94acf778de2f1488e02d768c6125e9c8cd1fe4ed8475423",
+    "bytes": 482205
+  },
+  {
+    "recipeId": "a98b4985-c220-54c7-bda6-26ac76ecbdfb",
+    "recipeVersion": 1,
+    "step": 3,
+    "asset": "FamilyReward.Api/recipe-illustrations/a98b4985-c220-54c7-bda6-26ac76ecbdfb/v1/step-3.jpg",
+    "tool": "built-in image_gen",
+    "prompt": "Use case: scientific-educational. Asset type: native app cooking-step illustration.\n菜谱：香菇青菜饭，第3步，拌饭。\n只表现此已确定步骤，禁止自行编排其他做法：确认米饭熟透，拌入炒熟的青菜后即食。\n涉及食材与状态：香菇饭、青菜。厨具：饭勺。必须让操作动作和食材清楚可辨，食材不得凭空增加，不能用示意图代替文字中的熟度或温度判断。\n统一风格：温暖、简洁、柔和水彩加细腻铅笔线稿，奶白浅色背景，青绿色/奶油色厨具，俯视偏侧视的清晰近景。画中食材应与菜名一致，即使本步骤简写为米饭/蔬菜/面条/粥也要保留本菜谱原有食材。只画食物、器具和必要的干净手部，远离火焰直接接触，不出现生食即食暗示。留白克制。\n单幅方形构图，不是多格，不画文字数字标签、商标、水印或UI。步骤说明由原生界面展示。",
+    "sha256": "f181dce42201635f7c0f3134ac8e92ea82dc6b4cf9fcc3b04e7fa2d6aba6a020",
+    "bytes": 565838
+  },
+  {
+    "recipeId": "85dad715-8586-5b82-9b8e-3ffbfcc5094d",
+    "recipeVersion": 1,
+    "step": 4,
+    "asset": "FamilyReward.Api/recipe-illustrations/85dad715-8586-5b82-9b8e-3ffbfcc5094d/v1/step-4.jpg",
+    "tool": "built-in image_gen",
+    "prompt": "Use case: scientific-educational. Asset type: native app cooking-step illustration.\n菜谱：番茄鸡蛋面，第4步，合碗。\n只表现此已确定步骤，禁止自行编排其他做法：把面和煮沸的汤装碗，加盐调味，趁热食用。\n涉及食材与状态：面条、配料汤、盐。厨具：面碗。必须让操作动作和食材清楚可辨，食材不得凭空增加，不能用示意图代替文字中的熟度或温度判断。\n统一风格：温暖、简洁、柔和水彩加细腻铅笔线稿，奶白浅色背景，青绿色/奶油色厨具，俯视偏侧视的清晰近景。画中食材应与菜名一致，即使本步骤简写为米饭/蔬菜/面条/粥也要保留本菜谱原有食材。只画食物、器具和必要的干净手部，远离火焰直接接触，不出现生食即食暗示。留白克制。\n单幅方形构图，不是多格，不画文字数字标签、商标、水印或UI。步骤说明由原生界面展示。",
+    "sha256": "d870931036676e38f40518eb9f583b44f12281a519301b7422748323dcb1342a",
+    "bytes": 493811
+  },
+  {
+    "recipeId": "3a62bb52-f598-5ce9-a87a-2fec51b871ff",
+    "recipeVersion": 1,
+    "step": 1,
+    "asset": "FamilyReward.Api/recipe-illustrations/3a62bb52-f598-5ce9-a87a-2fec51b871ff/v1/step-1.jpg",
+    "tool": "built-in image_gen",
+    "prompt": "Use case: scientific-educational. Asset type: native app cooking-step illustration.\n菜谱：香菇青菜面，第1步，准备汤底。\n只表现此已确定步骤，禁止自行编排其他做法：锅中加油，中火翻炒蔬菜2分钟，加入水煮开。\n涉及食材与状态：鲜香菇、食用油。厨具：汤锅、锅铲。必须让操作动作和食材清楚可辨，食材不得凭空增加，不能用示意图代替文字中的熟度或温度判断。\n统一风格：温暖、简洁、柔和水彩加细腻铅笔线稿，奶白浅色背景，青绿色/奶油色厨具，俯视偏侧视的清晰近景。画中食材应与菜名一致，即使本步骤简写为米饭/蔬菜/面条/粥也要保留本菜谱原有食材。只画食物、器具和必要的干净手部，远离火焰直接接触，不出现生食即食暗示。留白克制。\n单幅方形构图，不是多格，不画文字数字标签、商标、水印或UI。步骤说明由原生界面展示。",
+    "sha256": "06ac66105a2cfaa1c28e674507b3265dff2f85b806168bcafd7df8129e5cbc28",
+    "bytes": 506305
+  },
+  {
+    "recipeId": "3a62bb52-f598-5ce9-a87a-2fec51b871ff",
+    "recipeVersion": 1,
+    "step": 3,
+    "asset": "FamilyReward.Api/recipe-illustrations/3a62bb52-f598-5ce9-a87a-2fec51b871ff/v1/step-3.jpg",
+    "tool": "built-in image_gen",
+    "prompt": "Use case: scientific-educational. Asset type: native app cooking-step illustration.\n菜谱：香菇青菜面，第3步，煮面。\n只表现此已确定步骤，禁止自行编排其他做法：另锅水烧开，放入面条，按包装时间煮至没有硬芯，捞出。\n涉及食材与状态：干面条。厨具：另一个煮锅、漏勺。必须让操作动作和食材清楚可辨，食材不得凭空增加，不能用示意图代替文字中的熟度或温度判断。\n统一风格：温暖、简洁、柔和水彩加细腻铅笔线稿，奶白浅色背景，青绿色/奶油色厨具，俯视偏侧视的清晰近景。画中食材应与菜名一致，即使本步骤简写为米饭/蔬菜/面条/粥也要保留本菜谱原有食材。只画食物、器具和必要的干净手部，远离火焰直接接触，不出现生食即食暗示。留白克制。\n单幅方形构图，不是多格，不画文字数字标签、商标、水印或UI。步骤说明由原生界面展示。",
+    "sha256": "bfb9e48eeb155b41e745f4d691b6a00f12c1eaaea9561347f474f8c444262365",
+    "bytes": 492112
+  },
+  {
+    "recipeId": "85dad715-8586-5b82-9b8e-3ffbfcc5094d",
+    "recipeVersion": 1,
+    "step": 2,
+    "asset": "FamilyReward.Api/recipe-illustrations/85dad715-8586-5b82-9b8e-3ffbfcc5094d/v1/step-2.jpg",
+    "tool": "built-in image_gen",
+    "prompt": "Use case: scientific-educational. Asset type: native app cooking-step illustration.\n菜谱：番茄鸡蛋面，第2步，煮熟配料。\n只表现此已确定步骤，禁止自行编排其他做法：加入配料，煮沸后保持小火5分钟。鸡蛋需完全凝固，鸡蛋料理中心温度达到71°C。\n涉及食材与状态：鸡蛋、汤底。厨具：汤锅。必须让操作动作和食材清楚可辨，食材不得凭空增加，不能用示意图代替文字中的熟度或温度判断。\n统一风格：温暖、简洁、柔和水彩加细腻铅笔线稿，奶白浅色背景，青绿色/奶油色厨具，俯视偏侧视的清晰近景。画中食材应与菜名一致，即使本步骤简写为米饭/蔬菜/面条/粥也要保留本菜谱原有食材。只画食物、器具和必要的干净手部，远离火焰直接接触，不出现生食即食暗示。留白克制。\n单幅方形构图，不是多格，不画文字数字标签、商标、水印或UI。步骤说明由原生界面展示。",
+    "sha256": "03f775abcf3db553339562afefdde1c9c2d529a08581bb0e51bece940bf12f90",
+    "bytes": 454714
+  },
+  {
+    "recipeId": "6cb40e4a-3ed2-5bc1-880d-4070dd5ed305",
+    "recipeVersion": 1,
+    "step": 2,
+    "asset": "FamilyReward.Api/recipe-illustrations/6cb40e4a-3ed2-5bc1-880d-4070dd5ed305/v1/step-2.jpg",
+    "tool": "built-in image_gen",
+    "prompt": "Use case: scientific-educational. Asset type: native app cooking-step illustration.\n菜谱：胡萝卜豆腐面，第2步，煮熟配料。\n只表现此已确定步骤，禁止自行编排其他做法：加入配料，煮沸后保持小火5分钟，至蔬菜和豆腐熟透。\n涉及食材与状态：豆腐、汤底。厨具：汤锅。必须让操作动作和食材清楚可辨，食材不得凭空增加，不能用示意图代替文字中的熟度或温度判断。\n统一风格：温暖、简洁、柔和水彩加细腻铅笔线稿，奶白浅色背景，青绿色/奶油色厨具，俯视偏侧视的清晰近景。画中食材应与菜名一致，即使本步骤简写为米饭/蔬菜/面条/粥也要保留本菜谱原有食材。只画食物、器具和必要的干净手部，远离火焰直接接触，不出现生食即食暗示。留白克制。\n单幅方形构图，不是多格，不画文字数字标签、商标、水印或UI。步骤说明由原生界面展示。",
+    "sha256": "f26b9dc0f5d121037ed4a37c3664970632a42f698c12d3eb247a572428ca490c",
+    "bytes": 457013
+  },
+  {
+    "recipeId": "6cb40e4a-3ed2-5bc1-880d-4070dd5ed305",
+    "recipeVersion": 1,
+    "step": 3,
+    "asset": "FamilyReward.Api/recipe-illustrations/6cb40e4a-3ed2-5bc1-880d-4070dd5ed305/v1/step-3.jpg",
+    "tool": "built-in image_gen",
+    "prompt": "Use case: scientific-educational. Asset type: native app cooking-step illustration.\n菜谱：胡萝卜豆腐面，第3步，煮面。\n只表现此已确定步骤，禁止自行编排其他做法：另锅水烧开，放入面条，按包装时间煮至没有硬芯，捞出。\n涉及食材与状态：干面条。厨具：另一个煮锅、漏勺。必须让操作动作和食材清楚可辨，食材不得凭空增加，不能用示意图代替文字中的熟度或温度判断。\n统一风格：温暖、简洁、柔和水彩加细腻铅笔线稿，奶白浅色背景，青绿色/奶油色厨具，俯视偏侧视的清晰近景。画中食材应与菜名一致，即使本步骤简写为米饭/蔬菜/面条/粥也要保留本菜谱原有食材。只画食物、器具和必要的干净手部，远离火焰直接接触，不出现生食即食暗示。留白克制。\n单幅方形构图，不是多格，不画文字数字标签、商标、水印或UI。步骤说明由原生界面展示。",
+    "sha256": "2e3563a44af1aa2b478421ccfbd5b3ac15fc7beb997f506ee49a46dd2d23373e",
+    "bytes": 447933
+  },
+  {
+    "recipeId": "3a62bb52-f598-5ce9-a87a-2fec51b871ff",
+    "recipeVersion": 1,
+    "step": 4,
+    "asset": "FamilyReward.Api/recipe-illustrations/3a62bb52-f598-5ce9-a87a-2fec51b871ff/v1/step-4.jpg",
+    "tool": "built-in image_gen",
+    "prompt": "Use case: scientific-educational. Asset type: native app cooking-step illustration.\n菜谱：香菇青菜面，第4步，合碗。\n只表现此已确定步骤，禁止自行编排其他做法：把面和煮沸的汤装碗，加盐调味，趁热食用。\n涉及食材与状态：面条、配料汤、盐。厨具：面碗。必须让操作动作和食材清楚可辨，食材不得凭空增加，不能用示意图代替文字中的熟度或温度判断。\n统一风格：温暖、简洁、柔和水彩加细腻铅笔线稿，奶白浅色背景，青绿色/奶油色厨具，俯视偏侧视的清晰近景。画中食材应与菜名一致，即使本步骤简写为米饭/蔬菜/面条/粥也要保留本菜谱原有食材。只画食物、器具和必要的干净手部，远离火焰直接接触，不出现生食即食暗示。留白克制。\n单幅方形构图，不是多格，不画文字数字标签、商标、水印或UI。步骤说明由原生界面展示。",
+    "sha256": "c33865f5c74e14c6c8faaae56ff42ab3e89c494857e66f739091c02c4d48aee3",
+    "bytes": 437799
+  },
+  {
+    "recipeId": "3a62bb52-f598-5ce9-a87a-2fec51b871ff",
+    "recipeVersion": 1,
+    "step": 2,
+    "asset": "FamilyReward.Api/recipe-illustrations/3a62bb52-f598-5ce9-a87a-2fec51b871ff/v1/step-2.jpg",
+    "tool": "built-in image_gen",
+    "prompt": "Use case: scientific-educational. Asset type: native app cooking-step illustration.\n菜谱：香菇青菜面，第2步，煮熟配料。\n只表现此已确定步骤，禁止自行编排其他做法：加入配料，煮沸后保持小火5分钟，至蔬菜和豆腐熟透。\n涉及食材与状态：青菜、汤底。厨具：汤锅。必须让操作动作和食材清楚可辨，食材不得凭空增加，不能用示意图代替文字中的熟度或温度判断。\n统一风格：温暖、简洁、柔和水彩加细腻铅笔线稿，奶白浅色背景，青绿色/奶油色厨具，俯视偏侧视的清晰近景。画中食材应与菜名一致，即使本步骤简写为米饭/蔬菜/面条/粥也要保留本菜谱原有食材。只画食物、器具和必要的干净手部，远离火焰直接接触，不出现生食即食暗示。留白克制。\n单幅方形构图，不是多格，不画文字数字标签、商标、水印或UI。步骤说明由原生界面展示。",
+    "sha256": "0334302cb02761a944fb4b91b108bc21ab624ad036aadc0dd0dae7c5984490f5",
+    "bytes": 508984
+  },
+  {
+    "recipeId": "6cb40e4a-3ed2-5bc1-880d-4070dd5ed305",
+    "recipeVersion": 1,
+    "step": 4,
+    "asset": "FamilyReward.Api/recipe-illustrations/6cb40e4a-3ed2-5bc1-880d-4070dd5ed305/v1/step-4.jpg",
+    "tool": "built-in image_gen",
+    "prompt": "Use case: scientific-educational. Asset type: native app cooking-step illustration.\n菜谱：胡萝卜豆腐面，第4步，合碗。\n只表现此已确定步骤，禁止自行编排其他做法：把面和煮沸的汤装碗，加盐调味，趁热食用。\n涉及食材与状态：面条、配料汤、盐。厨具：面碗。必须让操作动作和食材清楚可辨，食材不得凭空增加，不能用示意图代替文字中的熟度或温度判断。\n统一风格：温暖、简洁、柔和水彩加细腻铅笔线稿，奶白浅色背景，青绿色/奶油色厨具，俯视偏侧视的清晰近景。画中食材应与菜名一致，即使本步骤简写为米饭/蔬菜/面条/粥也要保留本菜谱原有食材。只画食物、器具和必要的干净手部，远离火焰直接接触，不出现生食即食暗示。留白克制。\n单幅方形构图，不是多格，不画文字数字标签、商标、水印或UI。步骤说明由原生界面展示。",
+    "sha256": "86b0b1e525cbb233d832f5cf0380a4ac2b693bd54fc868bcdbff0518ac902247",
+    "bytes": 470719
+  },
+  {
+    "recipeId": "6cb40e4a-3ed2-5bc1-880d-4070dd5ed305",
+    "recipeVersion": 1,
+    "step": 1,
+    "asset": "FamilyReward.Api/recipe-illustrations/6cb40e4a-3ed2-5bc1-880d-4070dd5ed305/v1/step-1.jpg",
+    "tool": "built-in image_gen",
+    "prompt": "Use case: scientific-educational. Asset type: native app cooking-step illustration.\n菜谱：胡萝卜豆腐面，第1步，准备汤底。\n只表现此已确定步骤，禁止自行编排其他做法：锅中加油，中火翻炒蔬菜2分钟，加入水煮开。\n涉及食材与状态：胡萝卜、食用油。厨具：汤锅、锅铲。必须让操作动作和食材清楚可辨，食材不得凭空增加，不能用示意图代替文字中的熟度或温度判断。\n统一风格：温暖、简洁、柔和水彩加细腻铅笔线稿，奶白浅色背景，青绿色/奶油色厨具，俯视偏侧视的清晰近景。画中食材应与菜名一致，即使本步骤简写为米饭/蔬菜/面条/粥也要保留本菜谱原有食材。只画食物、器具和必要的干净手部，远离火焰直接接触，不出现生食即食暗示。留白克制。\n单幅方形构图，不是多格，不画文字数字标签、商标、水印或UI。步骤说明由原生界面展示。",
+    "sha256": "11538a8361354c3972704dfb0e6098dc56ca98314294e479d200694bf3894d1f",
+    "bytes": 483831
+  },
+  {
+    "recipeId": "937fdec9-f486-58e7-b845-11d63770f1c6",
+    "recipeVersion": 1,
+    "step": 1,
+    "asset": "FamilyReward.Api/recipe-illustrations/937fdec9-f486-58e7-b845-11d63770f1c6/v1/step-1.jpg",
+    "tool": "built-in image_gen",
+    "prompt": "Use case: scientific-educational. Asset type: native app cooking-step illustration.\n菜谱：南瓜小米粥，第1步，煮开。\n只表现此已确定步骤，禁止自行编排其他做法：水烧开，放入谷物和蔬菜，搅拌后转小火。\n涉及食材与状态：小米、南瓜、水。厨具：汤锅、长柄勺。必须让操作动作和食材清楚可辨，食材不得凭空增加，不能用示意图代替文字中的熟度或温度判断。\n统一风格：温暖、简洁、柔和水彩加细腻铅笔线稿，奶白浅色背景，青绿色/奶油色厨具，俯视偏侧视的清晰近景。画中食材应与菜名一致，即使本步骤简写为米饭/蔬菜/面条/粥也要保留本菜谱原有食材。只画食物、器具和必要的干净手部，远离火焰直接接触，不出现生食即食暗示。留白克制。\n单幅方形构图，不是多格，不画文字数字标签、商标、水印或UI。步骤说明由原生界面展示。",
+    "sha256": "f305e3c8456e0c47a1efca6102cfbc3c298cb9c1a4e8cff3b86beea409563d2f",
+    "bytes": 479156
+  },
+  {
+    "recipeId": "937fdec9-f486-58e7-b845-11d63770f1c6",
+    "recipeVersion": 1,
+    "step": 2,
+    "asset": "FamilyReward.Api/recipe-illustrations/937fdec9-f486-58e7-b845-11d63770f1c6/v1/step-2.jpg",
+    "tool": "built-in image_gen",
+    "prompt": "Use case: scientific-educational. Asset type: native app cooking-step illustration.\n菜谱：南瓜小米粥，第2步，慢煮。\n只表现此已确定步骤，禁止自行编排其他做法：锅盖留缝，小火煮25至35分钟，期间搅拌并留意防溢。燕麦片若包装要求更短时间，先煮软蔬菜再按包装时间加入。\n涉及食材与状态：粥。厨具：汤锅、长柄勺。必须让操作动作和食材清楚可辨，食材不得凭空增加，不能用示意图代替文字中的熟度或温度判断。\n统一风格：温暖、简洁、柔和水彩加细腻铅笔线稿，奶白浅色背景，青绿色/奶油色厨具，俯视偏侧视的清晰近景。画中食材应与菜名一致，即使本步骤简写为米饭/蔬菜/面条/粥也要保留本菜谱原有食材。只画食物、器具和必要的干净手部，远离火焰直接接触，不出现生食即食暗示。留白克制。\n单幅方形构图，不是多格，不画文字数字标签、商标、水印或UI。步骤说明由原生界面展示。",
+    "sha256": "fe756b474ba3ef1fb17b1b2ecbba9f7eb8c33789852834a185192251c988045a",
+    "bytes": 455761
+  },
+  {
+    "recipeId": "937fdec9-f486-58e7-b845-11d63770f1c6",
+    "recipeVersion": 1,
+    "step": 3,
+    "asset": "FamilyReward.Api/recipe-illustrations/937fdec9-f486-58e7-b845-11d63770f1c6/v1/step-3.jpg",
+    "tool": "built-in image_gen",
+    "prompt": "Use case: scientific-educational. Single original warm hand-drawn cooking illustration for 南瓜小米粥, step3 检查熟度. 柔和水彩、铅笔细线、奶白背景、青绿色汤锅，俯侧视。食材严格符合菜名。已核对文字步骤：确认谷物无硬芯、蔬菜可轻松压碎；过稠时加少量开水再煮沸。清楚画出用两把勺子在干净小碟上压开一小块已煮软的食材，检查内部软透。一只勺子托起食物，另一把勺子轻轻压开。手只握在凉的勺柄上，绝不能用手指碰热粥、热勺头或沸水。画面旁边放着有软烂粥的汤锅，不画加水或倒水动作。单幅方形，不含文字、数字、标签、商标或水印。图片辅助理解，文字教程负责熟度要求。",
+    "sha256": "a9dd047f0fc8ec74ea572d55351f129c6fea988b07630c8f9eadb3199314ccfe",
+    "bytes": 402977
+  },
+  {
+    "recipeId": "a2889d17-bdd6-5904-88c7-040ff866a566",
+    "recipeVersion": 1,
+    "step": 4,
+    "asset": "FamilyReward.Api/recipe-illustrations/a2889d17-bdd6-5904-88c7-040ff866a566/v1/step-4.jpg",
+    "tool": "built-in image_gen",
+    "prompt": "Use case: scientific-educational. Asset type: native app cooking-step illustration.\n菜谱：红薯大米粥，第4步，盛出。\n只表现此已确定步骤，禁止自行编排其他做法：关火后盛出，放至适口温度再吃，小心烫伤。\n涉及食材与状态：粥。厨具：碗。必须让操作动作和食材清楚可辨，食材不得凭空增加，不能用示意图代替文字中的熟度或温度判断。\n统一风格：温暖、简洁、柔和水彩加细腻铅笔线稿，奶白浅色背景，青绿色/奶油色厨具，俯视偏侧视的清晰近景。画中食材应与菜名一致，即使本步骤简写为米饭/蔬菜/面条/粥也要保留本菜谱原有食材。只画食物、器具和必要的干净手部，远离火焰直接接触，不出现生食即食暗示。留白克制。\n单幅方形构图，不是多格，不画文字数字标签、商标、水印或UI。步骤说明由原生界面展示。",
+    "sha256": "21a581ab91d513d854c4e412ee6330284c19a32ecd32bfde106ea01ccd46fd76",
+    "bytes": 398321
+  },
+  {
+    "recipeId": "f3be4543-ac91-506a-900d-9c343a43424d",
+    "recipeVersion": 1,
+    "step": 1,
+    "asset": "FamilyReward.Api/recipe-illustrations/f3be4543-ac91-506a-900d-9c343a43424d/v1/step-1.jpg",
+    "tool": "built-in image_gen",
+    "prompt": "Use case: scientific-educational. Asset type: native app cooking-step illustration.\n菜谱：胡萝卜燕麦粥，第1步，煮开。\n只表现此已确定步骤，禁止自行编排其他做法：水烧开，放入谷物和蔬菜，搅拌后转小火。\n涉及食材与状态：燕麦片、胡萝卜、水。厨具：汤锅、长柄勺。必须让操作动作和食材清楚可辨，食材不得凭空增加，不能用示意图代替文字中的熟度或温度判断。\n统一风格：温暖、简洁、柔和水彩加细腻铅笔线稿，奶白浅色背景，青绿色/奶油色厨具，俯视偏侧视的清晰近景。画中食材应与菜名一致，即使本步骤简写为米饭/蔬菜/面条/粥也要保留本菜谱原有食材。只画食物、器具和必要的干净手部，远离火焰直接接触，不出现生食即食暗示。留白克制。\n单幅方形构图，不是多格，不画文字数字标签、商标、水印或UI。步骤说明由原生界面展示。",
+    "sha256": "db4c0a1a12bf23991b65098a99b9e06a7ca8622aed69c8aaac65cfdefd61cc0a",
+    "bytes": 445250
+  },
+  {
+    "recipeId": "937fdec9-f486-58e7-b845-11d63770f1c6",
+    "recipeVersion": 1,
+    "step": 4,
+    "asset": "FamilyReward.Api/recipe-illustrations/937fdec9-f486-58e7-b845-11d63770f1c6/v1/step-4.jpg",
+    "tool": "built-in image_gen",
+    "prompt": "Use case: scientific-educational. Asset type: native app cooking-step illustration.\n菜谱：南瓜小米粥，第4步，盛出。\n只表现此已确定步骤，禁止自行编排其他做法：关火后盛出，放至适口温度再吃，小心烫伤。\n涉及食材与状态：粥。厨具：碗。必须让操作动作和食材清楚可辨，食材不得凭空增加，不能用示意图代替文字中的熟度或温度判断。\n统一风格：温暖、简洁、柔和水彩加细腻铅笔线稿，奶白浅色背景，青绿色/奶油色厨具，俯视偏侧视的清晰近景。画中食材应与菜名一致，即使本步骤简写为米饭/蔬菜/面条/粥也要保留本菜谱原有食材。只画食物、器具和必要的干净手部，远离火焰直接接触，不出现生食即食暗示。留白克制。\n单幅方形构图，不是多格，不画文字数字标签、商标、水印或UI。步骤说明由原生界面展示。",
+    "sha256": "36b779623b4601cf9eb48161b861a8e16dc2a101bb3a411595682999d8398bc4",
+    "bytes": 357823
+  },
+  {
+    "recipeId": "f3be4543-ac91-506a-900d-9c343a43424d",
+    "recipeVersion": 1,
+    "step": 2,
+    "asset": "FamilyReward.Api/recipe-illustrations/f3be4543-ac91-506a-900d-9c343a43424d/v1/step-2.jpg",
+    "tool": "built-in image_gen",
+    "prompt": "Use case: scientific-educational. Asset type: native app cooking-step illustration.\n菜谱：胡萝卜燕麦粥，第2步，慢煮。\n只表现此已确定步骤，禁止自行编排其他做法：锅盖留缝，小火煮25至35分钟，期间搅拌并留意防溢。燕麦片若包装要求更短时间，先煮软蔬菜再按包装时间加入。\n涉及食材与状态：粥。厨具：汤锅、长柄勺。必须让操作动作和食材清楚可辨，食材不得凭空增加，不能用示意图代替文字中的熟度或温度判断。\n统一风格：温暖、简洁、柔和水彩加细腻铅笔线稿，奶白浅色背景，青绿色/奶油色厨具，俯视偏侧视的清晰近景。画中食材应与菜名一致，即使本步骤简写为米饭/蔬菜/面条/粥也要保留本菜谱原有食材。只画食物、器具和必要的干净手部，远离火焰直接接触，不出现生食即食暗示。留白克制。\n单幅方形构图，不是多格，不画文字数字标签、商标、水印或UI。步骤说明由原生界面展示。",
+    "sha256": "86ec66743183b7b4cfa1371dbbf6655e9e84e327202ea2fa3a42eeeb709032de",
+    "bytes": 476593
+  },
+  {
+    "recipeId": "a2889d17-bdd6-5904-88c7-040ff866a566",
+    "recipeVersion": 1,
+    "step": 1,
+    "asset": "FamilyReward.Api/recipe-illustrations/a2889d17-bdd6-5904-88c7-040ff866a566/v1/step-1.jpg",
+    "tool": "built-in image_gen",
+    "prompt": "Use case: scientific-educational. Asset type: native app cooking-step illustration.\n菜谱：红薯大米粥，第1步，煮开。\n只表现此已确定步骤，禁止自行编排其他做法：水烧开，放入谷物和蔬菜，搅拌后转小火。\n涉及食材与状态：大米、红薯、水。厨具：汤锅、长柄勺。必须让操作动作和食材清楚可辨，食材不得凭空增加，不能用示意图代替文字中的熟度或温度判断。\n统一风格：温暖、简洁、柔和水彩加细腻铅笔线稿，奶白浅色背景，青绿色/奶油色厨具，俯视偏侧视的清晰近景。画中食材应与菜名一致，即使本步骤简写为米饭/蔬菜/面条/粥也要保留本菜谱原有食材。只画食物、器具和必要的干净手部，远离火焰直接接触，不出现生食即食暗示。留白克制。\n单幅方形构图，不是多格，不画文字数字标签、商标、水印或UI。步骤说明由原生界面展示。",
+    "sha256": "58b4693fc9da879b5d300f78b19309da68acc25b64804dd880a45095d4850df1",
+    "bytes": 451760
+  },
+  {
+    "recipeId": "f3be4543-ac91-506a-900d-9c343a43424d",
+    "recipeVersion": 1,
+    "step": 4,
+    "asset": "FamilyReward.Api/recipe-illustrations/f3be4543-ac91-506a-900d-9c343a43424d/v1/step-4.jpg",
+    "tool": "built-in image_gen",
+    "prompt": "Use case: scientific-educational. Asset type: native app cooking-step illustration.\n菜谱：胡萝卜燕麦粥，第4步，盛出。\n只表现此已确定步骤，禁止自行编排其他做法：关火后盛出，放至适口温度再吃，小心烫伤。\n涉及食材与状态：粥。厨具：碗。必须让操作动作和食材清楚可辨，食材不得凭空增加，不能用示意图代替文字中的熟度或温度判断。\n统一风格：温暖、简洁、柔和水彩加细腻铅笔线稿，奶白浅色背景，青绿色/奶油色厨具，俯视偏侧视的清晰近景。画中食材应与菜名一致，即使本步骤简写为米饭/蔬菜/面条/粥也要保留本菜谱原有食材。只画食物、器具和必要的干净手部，远离火焰直接接触，不出现生食即食暗示。留白克制。\n单幅方形构图，不是多格，不画文字数字标签、商标、水印或UI。步骤说明由原生界面展示。",
+    "sha256": "9143d5563495550ee2475e8d7ae93992f6c734ccbce79b8b717556354974d5b6",
+    "bytes": 427440
+  },
+  {
+    "recipeId": "a2889d17-bdd6-5904-88c7-040ff866a566",
+    "recipeVersion": 1,
+    "step": 2,
+    "asset": "FamilyReward.Api/recipe-illustrations/a2889d17-bdd6-5904-88c7-040ff866a566/v1/step-2.jpg",
+    "tool": "built-in image_gen",
+    "prompt": "Use case: scientific-educational. Asset type: native app cooking-step illustration.\n菜谱：红薯大米粥，第2步，慢煮。\n只表现此已确定步骤，禁止自行编排其他做法：锅盖留缝，小火煮25至35分钟，期间搅拌并留意防溢。燕麦片若包装要求更短时间，先煮软蔬菜再按包装时间加入。\n涉及食材与状态：粥。厨具：汤锅、长柄勺。必须让操作动作和食材清楚可辨，食材不得凭空增加，不能用示意图代替文字中的熟度或温度判断。\n统一风格：温暖、简洁、柔和水彩加细腻铅笔线稿，奶白浅色背景，青绿色/奶油色厨具，俯视偏侧视的清晰近景。画中食材应与菜名一致，即使本步骤简写为米饭/蔬菜/面条/粥也要保留本菜谱原有食材。只画食物、器具和必要的干净手部，远离火焰直接接触，不出现生食即食暗示。留白克制。\n单幅方形构图，不是多格，不画文字数字标签、商标、水印或UI。步骤说明由原生界面展示。",
+    "sha256": "c55aca75d4a7ea9f68d5ce01c8f5ae271301271843eefea7c0c2e9a0a456b9a4",
+    "bytes": 435432
+  },
+  {
+    "recipeId": "f3be4543-ac91-506a-900d-9c343a43424d",
+    "recipeVersion": 1,
+    "step": 3,
+    "asset": "FamilyReward.Api/recipe-illustrations/f3be4543-ac91-506a-900d-9c343a43424d/v1/step-3.jpg",
+    "tool": "built-in image_gen",
+    "prompt": "Use case: scientific-educational. Single original warm hand-drawn cooking illustration for 胡萝卜燕麦粥, step3 检查熟度. 柔和水彩、铅笔细线、奶白背景、青绿色汤锅，俯侧视。食材严格符合菜名。已核对文字步骤：确认谷物无硬芯、蔬菜可轻松压碎；过稠时加少量开水再煮沸。清楚画出用两把勺子在干净小碟上压开一小块已煮软的食材，检查内部软透。一只勺子托起食物，另一把勺子轻轻压开。手只握在凉的勺柄上，绝不能用手指碰热粥、热勺头或沸水。画面旁边放着有软烂粥的汤锅，不画加水或倒水动作。单幅方形，不含文字、数字、标签、商标或水印。图片辅助理解，文字教程负责熟度要求。",
+    "sha256": "0dbd86be132ea90dd2eac344396ed023b478d8bb4dc03c0e5bf32c461f3faf3c",
+    "bytes": 471268
+  },
+  {
+    "recipeId": "a2889d17-bdd6-5904-88c7-040ff866a566",
+    "recipeVersion": 1,
+    "step": 3,
+    "asset": "FamilyReward.Api/recipe-illustrations/a2889d17-bdd6-5904-88c7-040ff866a566/v1/step-3.jpg",
+    "tool": "built-in image_gen",
+    "prompt": "Use case: scientific-educational. Single original warm hand-drawn cooking illustration for 红薯大米粥, step3 检查熟度. 柔和水彩、铅笔细线、奶白背景、青绿色汤锅，俯侧视。食材严格符合菜名。已核对文字步骤：确认谷物无硬芯、蔬菜可轻松压碎；过稠时加少量开水再煮沸。清楚画出用两把勺子在干净小碟上压开一小块已煮软的食材，检查内部软透。一只勺子托起食物，另一把勺子轻轻压开。手只握在凉的勺柄上，绝不能用手指碰热粥、热勺头或沸水。画面旁边放着有软烂粥的汤锅，不画加水或倒水动作。单幅方形，不含文字、数字、标签、商标或水印。图片辅助理解，文字教程负责熟度要求。",
+    "sha256": "fd9cd06e0d64908989078865f0f464fde1eea821ee3b4ef52517b9179a9382da",
+    "bytes": 372855
+  }
+]

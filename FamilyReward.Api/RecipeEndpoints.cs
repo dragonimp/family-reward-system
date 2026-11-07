@@ -1,4 +1,6 @@
 using System.Text.Json;
+using System.Security.Cryptography;
+using Microsoft.Net.Http.Headers;
 using Npgsql;
 
 internal sealed record RecipeCategory(string Id, string Name, string Icon);
@@ -32,6 +34,21 @@ internal static class RecipeEndpoints
 
     public static void MapRecipeEndpoints(this WebApplication app, string connectionString)
     {
+        // These are original, public recipe assets, not user uploads. Native image
+        // loaders do not attach the app's Bearer token. Typed route values constrain
+        // the path; recipe versions are immutable and new drawings use a new version.
+        app.MapGet("/api/recipe-illustrations/{id:guid}/v{version:int}/steps/{number:int}.jpg",
+            IResult (Guid id, int version, int number, HttpResponse response) =>
+            {
+                if (version < 1 || number is < 1 or > 64) return Results.NotFound();
+                var path = Path.Combine(AppContext.BaseDirectory, "recipe-illustrations", id.ToString("D"),
+                    "v" + version, "step-" + number + ".jpg");
+                if (!File.Exists(path)) return Results.NotFound();
+                using var stream = File.OpenRead(path);
+                var hash = Convert.ToHexString(SHA256.HashData(stream)).ToLowerInvariant();
+                response.Headers.CacheControl = "public, max-age=31536000, immutable";
+                return Results.File(path, "image/jpeg", entityTag: new EntityTagHeaderValue("\"" + hash + "\""));
+            }).AllowAnonymous();
         var group = app.MapGroup("/api/recipes").RequireAuthorization();
         group.MapGet("/categories", async (HttpResponse response, CancellationToken ct) =>
         {

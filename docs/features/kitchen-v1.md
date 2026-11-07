@@ -1,6 +1,6 @@
 # 下厨房交付边界
 
-当前完成双模式客户端、数据库分类和九道原创文字菜谱、按分类随机选择、随机去重、设备当地餐段加权、完整食材和步骤阅读。模式切换保留原组件状态。
+当前完成双模式客户端、数据库分类和九道原创文字菜谱、按分类随机选择、随机去重、设备当地餐段加权、完整食材和步骤阅读。模式切换保留原组件状态。本次另补齐现有九道菜谱的 34 张原创 AI 手绘步骤图，按不可变版本保存并复用；运行期按需生成与重新生成仍未接通。
 
 接口使用现有应用认证和 PostgreSQL，JSON 为 camelCase。
 
@@ -8,6 +8,7 @@
 - GET /api/recipes/random?category=&exclude=&meal=
 - GET /api/recipes/{id}
 - POST /api/recipes/{id}/illustrations 当前明确返回 503 / recipe_illustrations_unavailable，不伪造任务。
+- GET /api/recipe-illustrations/{id}/v{version}/steps/{number}.jpg：公开的原创菜谱图片，原生图片组件无需额外 Bearer；限定 UUID、版本和步骤，返回 JPEG、SHA256 ETag 和 immutable 缓存，未知版本返回 404。
 
 ## 数据库
 
@@ -23,7 +24,11 @@ https://www.foodsafety.gov/food-safety-charts/safe-minimum-internal-temperatures
 
 Orbit 当前 Goldfish.WebAppSdk 提供会话、运行和聊天流，未发现可复用的正式图片生成与图片制品入库接口。未引入第三方模型直连或复制公共智能体服务。
 
-尚无后台图像 worker、持久任务和查询接口、并发去重、失败重试、对象存储、图像版本校验、费用预算或轮询。当前不需要配置模型密钥。成品图与步骤图为空。客户端支持已有 HTTPS 图片字段；Android 使用 UriImageSource 缓存，iOS 使用 AsyncImage，尚无专用磁盘缓存。
+尚无后台图像 worker、持久任务和查询接口、并发去重、失败重试、对象存储、费用预算或轮询。当前不需要配置模型密钥。成品图仍为空；现有 34 张步骤图随服务端版本发布，菜谱版本变化后不得复用旧图，修改图片须使用新的不可变版本。客户端支持已有 HTTPS 图片字段；Android 使用 UriImageSource 缓存，iOS 使用 AsyncImage，尚无专用磁盘缓存。
+
+步骤图采用内置 image_gen 工具逐步生成，先读取结构化文字步骤，再约束食材、动作、厨具和温暖水彩/铅笔风格；无图中文字。逐图检查后修正粥类熟度检查动作，采用两把勺子而不是手指触碰热食。最终 JPEG 仅作传输编码优化，文字步骤及食品安全说明不变。提示词、资产路径和 SHA256 见 `kitchen-illustration-assets.json`，结构化步骤输入见 `kitchen-illustration-prompts.json`。资产位于 `FamilyReward.Api/recipe-illustrations/`，不放进手机安装包。
+
+`20261107-kitchen-illustrations-v1.sql` 是独立一次性迁移：先逐道核对 recipeVersion 和原始步骤，全部匹配才绑定图片 URL 并将 illustrationStatus 置为 ready。任一道步骤变更均失败并回滚，不覆盖维护过的菜谱。版本及实际 JPEG 随 API 制品一起交付。
 
 九道文字菜谱不等于约 100 道完整菜谱建设。热门菜谱插画预生成和图片人工审核未完成。第二阶段需先补齐 Orbit 正式受控图片任务和制品接口。生成须读取已核对的菜谱结构及版本。
 
