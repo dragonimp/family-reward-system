@@ -20,5 +20,8 @@ psql "$FAMILY_REWARD_DB_DSN" -X -v ON_ERROR_STOP=1 -c "UPDATE kitchen_recipes SE
 bash scripts/run-db-migrations.sh "$ATLAS_BUILD_WORK/migrations"
 bash scripts/run-db-migrations.sh "$ATLAS_BUILD_WORK/migrations"
 export KITCHEN_TEST_DSN="Host=/tmp;Database=$db;Username=$(id -un)"
+cp scripts/migrations/20261107-kitchen-dessert-catalog-v1.sql "$ATLAS_BUILD_WORK/migrations/"
+bash scripts/run-db-migrations.sh "$ATLAS_BUILD_WORK/migrations"
+bash scripts/run-db-migrations.sh "$ATLAS_BUILD_WORK/migrations"
 dotnet run --project tests/Kitchen/Kitchen.csproj --artifacts-path "$ATLAS_BUILD_WORK/dotnet"
 echo 'Kitchen PostgreSQL migration replay and HTTP tests passed' > "$ATLAS_BUILD_OUTPUT/kitchen-checks.txt"

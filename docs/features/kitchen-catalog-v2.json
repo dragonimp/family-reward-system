@@ -1,0 +1,2000 @@
+[
+  {
+    "recipeId": "b984c313-ceb8-5fad-ab72-0254b3ad7f20",
+    "name": "香菇南瓜饭",
+    "category": "rice",
+    "description": "两人份的香菇南瓜饭，用常见食材制作。",
+    "servings": 2,
+    "duration": 35,
+    "difficulty": "简单",
+    "ingredients": [
+      {
+        "name": "大米",
+        "quantity": 150,
+        "unit": "克"
+      },
+      {
+        "name": "水",
+        "quantity": 220,
+        "unit": "毫升"
+      },
+      {
+        "name": "南瓜",
+        "quantity": 180,
+        "unit": "克"
+      },
+      {
+        "name": "鲜香菇",
+        "quantity": 100,
+        "unit": "克"
+      },
+      {
+        "name": "盐",
+        "quantity": 2,
+        "unit": "克"
+      }
+    ],
+    "preparation": [
+      "大米淘洗沥水，南瓜去皮去籽切小丁，香菇洗净切片。"
+    ],
+    "steps": [
+      {
+        "number": 1,
+        "action": "装入内锅",
+        "ingredients": [
+          "大米",
+          "水",
+          "南瓜",
+          "鲜香菇",
+          "盐"
+        ],
+        "utensils": [
+          "电饭煲",
+          "量杯"
+        ],
+        "instruction": "米、水、南瓜丁和香菇片放入电饭煲，轻轻拌匀；米的用水量优先按包装及电饭煲说明调整。",
+        "illustrationUrl": null
+      },
+      {
+        "number": 2,
+        "action": "煮熟焖透",
+        "ingredients": [
+          "米饭",
+          "南瓜",
+          "鲜香菇"
+        ],
+        "utensils": [
+          "电饭煲"
+        ],
+        "instruction": "启动正常煮饭程序。结束后确认米无硬芯、南瓜软透、香菇完全熟透，再按说明焖5分钟。",
+        "illustrationUrl": null
+      },
+      {
+        "number": 3,
+        "action": "翻松盛饭",
+        "ingredients": [
+          "香菇南瓜饭"
+        ],
+        "utensils": [
+          "饭勺",
+          "碗"
+        ],
+        "instruction": "用饭勺翻松熟饭，均匀混合后盛入两只碗，趁热食用。",
+        "illustrationUrl": null
+      }
+    ],
+    "notes": [
+      "处理食材前后洗手；生熟食材和器具分开。",
+      "用量为两人份参考，火力、锅具和食材大小会影响实际时间；以熟度说明为准。",
+      "食用前核对鸡蛋、乳制品、芝麻、小麦等过敏原；有过敏史时不要使用相关食材。"
+    ],
+    "coverImage": null,
+    "illustrationStatus": "unavailable",
+    "recipeVersion": 1,
+    "source": "Linko Moment 原创文字试行菜谱 v2；规则校验，尚待人工烹饪复核。",
+    "mealPreferences": [
+      "lunch",
+      "dinner"
+    ]
+  },
+  {
+    "recipeId": "823d0fd0-925c-5e4b-a2b9-bb5c49a7c5ab",
+    "name": "豌豆玉米饭",
+    "category": "rice",
+    "description": "两人份的豌豆玉米饭，用常见食材制作。",
+    "servings": 2,
+    "duration": 35,
+    "difficulty": "简单",
+    "ingredients": [
+      {
+        "name": "大米",
+        "quantity": 150,
+        "unit": "克"
+      },
+      {
+        "name": "水",
+        "quantity": 220,
+        "unit": "毫升"
+      },
+      {
+        "name": "冷冻豌豆",
+        "quantity": 100,
+        "unit": "克"
+      },
+      {
+        "name": "甜玉米粒",
+        "quantity": 100,
+        "unit": "克"
+      },
+      {
+        "name": "盐",
+        "quantity": 2,
+        "unit": "克"
+      }
+    ],
+    "preparation": [
+      "大米淘洗，豌豆和玉米粒清洗，去除坏粒。"
+    ],
+    "steps": [
+      {
+        "number": 1,
+        "action": "拌入配料",
+        "ingredients": [
+          "大米",
+          "水",
+          "冷冻豌豆",
+          "甜玉米粒",
+          "盐"
+        ],
+        "utensils": [
+          "电饭煲",
+          "量杯"
+        ],
+        "instruction": "米加水放内锅，加入豌豆、玉米及盐；水量以米包装和电饭煲要求为准。",
+        "illustrationUrl": null
+      },
+      {
+        "number": 2,
+        "action": "煮饭",
+        "ingredients": [
+          "米饭",
+          "豌豆",
+          "玉米"
+        ],
+        "utensils": [
+          "电饭煲"
+        ],
+        "instruction": "启动正常煮饭程序，结束后检查米饭无硬芯、豌豆和玉米熟透；未熟时补少量开水续煮。",
+        "illustrationUrl": null
+      },
+      {
+        "number": 3,
+        "action": "翻松装碗",
+        "ingredients": [
+          "豌豆玉米饭"
+        ],
+        "utensils": [
+          "饭勺",
+          "碗"
+        ],
+        "instruction": "稍焖后翻松，把配料与米饭混合均匀，分成两份。",
+        "illustrationUrl": null
+      }
+    ],
+    "notes": [
+      "处理食材前后洗手；生熟食材和器具分开。",
+      "用量为两人份参考，火力、锅具和食材大小会影响实际时间；以熟度说明为准。",
+      "食用前核对鸡蛋、乳制品、芝麻、小麦等过敏原；有过敏史时不要使用相关食材。"
+    ],
+    "coverImage": null,
+    "illustrationStatus": "unavailable",
+    "recipeVersion": 1,
+    "source": "Linko Moment 原创文字试行菜谱 v2；规则校验，尚待人工烹饪复核。",
+    "mealPreferences": [
+      "lunch",
+      "dinner"
+    ]
+  },
+  {
+    "recipeId": "007c2a18-89fa-5ccd-8c2a-cbe2e7b72dfd",
+    "name": "番茄豆腐盖饭",
+    "category": "rice",
+    "description": "两人份的番茄豆腐盖饭，用常见食材制作。",
+    "servings": 2,
+    "duration": 20,
+    "difficulty": "简单",
+    "ingredients": [
+      {
+        "name": "熟米饭",
+        "quantity": 300,
+        "unit": "克"
+      },
+      {
+        "name": "番茄",
+        "quantity": 300,
+        "unit": "克"
+      },
+      {
+        "name": "北豆腐",
+        "quantity": 200,
+        "unit": "克"
+      },
+      {
+        "name": "食用油",
+        "quantity": 10,
+        "unit": "毫升"
+      },
+      {
+        "name": "水",
+        "quantity": 100,
+        "unit": "毫升"
+      },
+      {
+        "name": "盐",
+        "quantity": 2,
+        "unit": "克"
+      }
+    ],
+    "preparation": [
+      "番茄洗净切块，豆腐切2厘米块；准备现煮熟米饭，冷藏米饭须充分加热至中心滚烫。"
+    ],
+    "steps": [
+      {
+        "number": 1,
+        "action": "炒软番茄",
+        "ingredients": [
+          "番茄",
+          "食用油"
+        ],
+        "utensils": [
+          "炒锅",
+          "锅铲"
+        ],
+        "instruction": "中火热锅加油，放番茄炒约3分钟，直到明显变软出汁。",
+        "illustrationUrl": null
+      },
+      {
+        "number": 2,
+        "action": "炖豆腐",
+        "ingredients": [
+          "番茄",
+          "北豆腐",
+          "水",
+          "盐"
+        ],
+        "utensils": [
+          "炒锅",
+          "锅铲"
+        ],
+        "instruction": "加入豆腐、水和盐，煮沸后小火炖6至8分钟，轻推防碎，确认豆腐中心热透。",
+        "illustrationUrl": null
+      },
+      {
+        "number": 3,
+        "action": "盖在饭上",
+        "ingredients": [
+          "熟米饭",
+          "番茄豆腐"
+        ],
+        "utensils": [
+          "碗",
+          "勺子"
+        ],
+        "instruction": "将热透的米饭分两碗，把番茄豆腐及汤汁浇在饭上。",
+        "illustrationUrl": null
+      }
+    ],
+    "notes": [
+      "处理食材前后洗手；生熟食材和器具分开。",
+      "用量为两人份参考，火力、锅具和食材大小会影响实际时间；以熟度说明为准。",
+      "食用前核对鸡蛋、乳制品、芝麻、小麦等过敏原；有过敏史时不要使用相关食材。"
+    ],
+    "coverImage": null,
+    "illustrationStatus": "unavailable",
+    "recipeVersion": 1,
+    "source": "Linko Moment 原创文字试行菜谱 v2；规则校验，尚待人工烹饪复核。",
+    "mealPreferences": [
+      "lunch",
+      "dinner"
+    ]
+  },
+  {
+    "recipeId": "7dae4874-fbba-50cc-990f-b9fda8a17852",
+    "name": "西兰花鸡蛋盖饭",
+    "category": "rice",
+    "description": "两人份的西兰花鸡蛋盖饭，用常见食材制作。",
+    "servings": 2,
+    "duration": 20,
+    "difficulty": "简单",
+    "ingredients": [
+      {
+        "name": "熟米饭",
+        "quantity": 300,
+        "unit": "克"
+      },
+      {
+        "name": "西兰花",
+        "quantity": 250,
+        "unit": "克"
+      },
+      {
+        "name": "鸡蛋",
+        "quantity": 2,
+        "unit": "个"
+      },
+      {
+        "name": "食用油",
+        "quantity": 10,
+        "unit": "毫升"
+      },
+      {
+        "name": "盐",
+        "quantity": 2,
+        "unit": "克"
+      },
+      {
+        "name": "水",
+        "quantity": 800,
+        "unit": "毫升"
+      }
+    ],
+    "preparation": [
+      "西兰花切小朵洗净，鸡蛋打散；准备现煮熟饭，冷藏饭须先充分热透。"
+    ],
+    "steps": [
+      {
+        "number": 1,
+        "action": "焯西兰花",
+        "ingredients": [
+          "西兰花",
+          "水"
+        ],
+        "utensils": [
+          "汤锅",
+          "漏勺"
+        ],
+        "instruction": "水烧开，西兰花下锅煮3至5分钟，至菜梗软嫩，捞出充分沥水。",
+        "illustrationUrl": null
+      },
+      {
+        "number": 2,
+        "action": "炒熟鸡蛋",
+        "ingredients": [
+          "鸡蛋",
+          "食用油",
+          "盐",
+          "西兰花"
+        ],
+        "utensils": [
+          "炒锅",
+          "锅铲"
+        ],
+        "instruction": "中火热锅加油，倒蛋液翻炒至完全凝固，再加西兰花和盐拌炒；鸡蛋料理中心温度达到71°C。",
+        "illustrationUrl": null
+      },
+      {
+        "number": 3,
+        "action": "装碗",
+        "ingredients": [
+          "熟米饭",
+          "西兰花鸡蛋"
+        ],
+        "utensils": [
+          "碗",
+          "勺子"
+        ],
+        "instruction": "熟饭分两碗，盛入炒好的西兰花和鸡蛋，趁热吃。",
+        "illustrationUrl": null
+      }
+    ],
+    "notes": [
+      "处理食材前后洗手；生熟食材和器具分开。",
+      "用量为两人份参考，火力、锅具和食材大小会影响实际时间；以熟度说明为准。",
+      "食用前核对鸡蛋、乳制品、芝麻、小麦等过敏原；有过敏史时不要使用相关食材。"
+    ],
+    "coverImage": null,
+    "illustrationStatus": "unavailable",
+    "recipeVersion": 1,
+    "source": "Linko Moment 原创文字试行菜谱 v2；规则校验，尚待人工烹饪复核。",
+    "mealPreferences": [
+      "lunch",
+      "dinner"
+    ]
+  },
+  {
+    "recipeId": "1aec04b6-23b9-5d45-aa4b-7d0b7b691494",
+    "name": "土豆咖喱饭",
+    "category": "rice",
+    "description": "两人份的土豆咖喱饭，用常见食材制作。",
+    "servings": 2,
+    "duration": 30,
+    "difficulty": "简单",
+    "ingredients": [
+      {
+        "name": "熟米饭",
+        "quantity": 300,
+        "unit": "克"
+      },
+      {
+        "name": "土豆",
+        "quantity": 200,
+        "unit": "克"
+      },
+      {
+        "name": "胡萝卜",
+        "quantity": 120,
+        "unit": "克"
+      },
+      {
+        "name": "洋葱",
+        "quantity": 100,
+        "unit": "克"
+      },
+      {
+        "name": "咖喱块",
+        "quantity": 30,
+        "unit": "克"
+      },
+      {
+        "name": "水",
+        "quantity": 400,
+        "unit": "毫升"
+      },
+      {
+        "name": "食用油",
+        "quantity": 10,
+        "unit": "毫升"
+      }
+    ],
+    "preparation": [
+      "土豆和胡萝卜去皮切1.5厘米丁，洋葱切丁；准备热透的熟米饭，核对咖喱块过敏原。"
+    ],
+    "steps": [
+      {
+        "number": 1,
+        "action": "炒配菜",
+        "ingredients": [
+          "土豆",
+          "胡萝卜",
+          "洋葱",
+          "食用油"
+        ],
+        "utensils": [
+          "炒锅",
+          "锅铲"
+        ],
+        "instruction": "热锅加油，先炒洋葱至变软，再加入土豆和胡萝卜翻炒2分钟。",
+        "illustrationUrl": null
+      },
+      {
+        "number": 2,
+        "action": "煮软调味",
+        "ingredients": [
+          "蔬菜",
+          "水",
+          "咖喱块"
+        ],
+        "utensils": [
+          "汤锅",
+          "勺子"
+        ],
+        "instruction": "加水煮沸，转小火煮15至20分钟至蔬菜可轻松压碎，暂关火拌化咖喱块，再小火煮至浓稠，注意搅拌防糊。",
+        "illustrationUrl": null
+      },
+      {
+        "number": 3,
+        "action": "搭配米饭",
+        "ingredients": [
+          "熟米饭",
+          "蔬菜咖喱"
+        ],
+        "utensils": [
+          "碗",
+          "汤勺"
+        ],
+        "instruction": "热米饭装两碗，浇上熟透的蔬菜咖喱；不额外加盐，按咖喱块咸度调整。",
+        "illustrationUrl": null
+      }
+    ],
+    "notes": [
+      "处理食材前后洗手；生熟食材和器具分开。",
+      "用量为两人份参考，火力、锅具和食材大小会影响实际时间；以熟度说明为准。",
+      "食用前核对鸡蛋、乳制品、芝麻、小麦等过敏原；有过敏史时不要使用相关食材。"
+    ],
+    "coverImage": null,
+    "illustrationStatus": "unavailable",
+    "recipeVersion": 1,
+    "source": "Linko Moment 原创文字试行菜谱 v2；规则校验，尚待人工烹饪复核。",
+    "mealPreferences": [
+      "lunch",
+      "dinner"
+    ]
+  },
+  {
+    "recipeId": "f893116b-294d-5dd7-9c9d-d25f8edc6bf3",
+    "name": "芝麻拌面",
+    "category": "noodles",
+    "description": "两人份的芝麻拌面，用常见食材制作。",
+    "servings": 2,
+    "duration": 15,
+    "difficulty": "简单",
+    "ingredients": [
+      {
+        "name": "干面条",
+        "quantity": 160,
+        "unit": "克"
+      },
+      {
+        "name": "芝麻酱",
+        "quantity": 30,
+        "unit": "克"
+      },
+      {
+        "name": "黄瓜",
+        "quantity": 150,
+        "unit": "克"
+      },
+      {
+        "name": "生抽",
+        "quantity": 10,
+        "unit": "毫升"
+      },
+      {
+        "name": "温开水",
+        "quantity": 30,
+        "unit": "毫升"
+      },
+      {
+        "name": "煮面水",
+        "quantity": 1500,
+        "unit": "毫升"
+      }
+    ],
+    "preparation": [
+      "黄瓜洗净切细丝；芝麻酱和生抽用温开水慢慢调匀，芝麻过敏者不做此菜。"
+    ],
+    "steps": [
+      {
+        "number": 1,
+        "action": "煮熟面条",
+        "ingredients": [
+          "干面条",
+          "煮面水"
+        ],
+        "utensils": [
+          "汤锅",
+          "筷子"
+        ],
+        "instruction": "水烧开再下面，按包装时间煮至无硬芯，期间用筷子轻轻拨散。",
+        "illustrationUrl": null
+      },
+      {
+        "number": 2,
+        "action": "捞出沥水",
+        "ingredients": [
+          "熟面条"
+        ],
+        "utensils": [
+          "漏勺",
+          "碗"
+        ],
+        "instruction": "熟面条捞出沥水，分别放两只碗；不用未经煮沸的水直接冲面。",
+        "illustrationUrl": null
+      },
+      {
+        "number": 3,
+        "action": "拌酱摆黄瓜",
+        "ingredients": [
+          "熟面条",
+          "芝麻酱",
+          "生抽",
+          "黄瓜"
+        ],
+        "utensils": [
+          "碗",
+          "筷子"
+        ],
+        "instruction": "淋调好的芝麻酱，放上黄瓜丝，用筷子充分拌匀后立即食用。",
+        "illustrationUrl": null
+      }
+    ],
+    "notes": [
+      "处理食材前后洗手；生熟食材和器具分开。",
+      "用量为两人份参考，火力、锅具和食材大小会影响实际时间；以熟度说明为准。",
+      "食用前核对鸡蛋、乳制品、芝麻、小麦等过敏原；有过敏史时不要使用相关食材。"
+    ],
+    "coverImage": null,
+    "illustrationStatus": "unavailable",
+    "recipeVersion": 1,
+    "source": "Linko Moment 原创文字试行菜谱 v2；规则校验，尚待人工烹饪复核。",
+    "mealPreferences": [
+      "lunch",
+      "dinner"
+    ]
+  },
+  {
+    "recipeId": "fa4833cb-c15d-5ea8-8202-d2da33ff04d8",
+    "name": "葱油拌面",
+    "category": "noodles",
+    "description": "两人份的葱油拌面，用常见食材制作。",
+    "servings": 2,
+    "duration": 20,
+    "difficulty": "简单",
+    "ingredients": [
+      {
+        "name": "干面条",
+        "quantity": 160,
+        "unit": "克"
+      },
+      {
+        "name": "小葱",
+        "quantity": 40,
+        "unit": "克"
+      },
+      {
+        "name": "食用油",
+        "quantity": 20,
+        "unit": "毫升"
+      },
+      {
+        "name": "生抽",
+        "quantity": 15,
+        "unit": "毫升"
+      },
+      {
+        "name": "白糖",
+        "quantity": 3,
+        "unit": "克"
+      },
+      {
+        "name": "水",
+        "quantity": 1500,
+        "unit": "毫升"
+      }
+    ],
+    "preparation": [
+      "小葱洗净后充分擦干，切成段；生抽和糖混合；油锅操作注意防溅。"
+    ],
+    "steps": [
+      {
+        "number": 1,
+        "action": "熬葱油",
+        "ingredients": [
+          "小葱",
+          "食用油",
+          "生抽",
+          "白糖"
+        ],
+        "utensils": [
+          "小炒锅",
+          "锅铲"
+        ],
+        "instruction": "冷锅放油和干燥葱段，用小火慢慢加热至葱段金黄，不烧黑；关火离火，葱油完全放凉后再加入调味汁拌匀；不要把含水调味汁倒入热油。",
+        "illustrationUrl": null
+      },
+      {
+        "number": 2,
+        "action": "煮面捞面",
+        "ingredients": [
+          "干面条",
+          "水"
+        ],
+        "utensils": [
+          "汤锅",
+          "漏勺"
+        ],
+        "instruction": "另锅水沸后煮面，按包装时间煮至无硬芯，捞出沥水。",
+        "illustrationUrl": null
+      },
+      {
+        "number": 3,
+        "action": "拌匀",
+        "ingredients": [
+          "熟面条",
+          "葱油汁"
+        ],
+        "utensils": [
+          "碗",
+          "筷子"
+        ],
+        "instruction": "熟面分两碗，少量多次加入葱油汁并拌匀，按口味使用，不必倒入全部油汁。",
+        "illustrationUrl": null
+      }
+    ],
+    "notes": [
+      "处理食材前后洗手；生熟食材和器具分开。",
+      "用量为两人份参考，火力、锅具和食材大小会影响实际时间；以熟度说明为准。",
+      "食用前核对鸡蛋、乳制品、芝麻、小麦等过敏原；有过敏史时不要使用相关食材。"
+    ],
+    "coverImage": null,
+    "illustrationStatus": "unavailable",
+    "recipeVersion": 1,
+    "source": "Linko Moment 原创文字试行菜谱 v2；规则校验，尚待人工烹饪复核。",
+    "mealPreferences": [
+      "lunch",
+      "dinner"
+    ]
+  },
+  {
+    "recipeId": "cf0ac08f-1f1e-574f-9faa-bbdd799dd3c8",
+    "name": "紫菜鸡蛋汤面",
+    "category": "noodles",
+    "description": "两人份的紫菜鸡蛋汤面，用常见食材制作。",
+    "servings": 2,
+    "duration": 15,
+    "difficulty": "简单",
+    "ingredients": [
+      {
+        "name": "干面条",
+        "quantity": 160,
+        "unit": "克"
+      },
+      {
+        "name": "即食干紫菜",
+        "quantity": 5,
+        "unit": "克"
+      },
+      {
+        "name": "鸡蛋",
+        "quantity": 2,
+        "unit": "个"
+      },
+      {
+        "name": "水",
+        "quantity": 1500,
+        "unit": "毫升"
+      },
+      {
+        "name": "盐",
+        "quantity": 2,
+        "unit": "克"
+      }
+    ],
+    "preparation": [
+      "鸡蛋打散，紫菜按包装要求处理；备两只大碗。"
+    ],
+    "steps": [
+      {
+        "number": 1,
+        "action": "煮面",
+        "ingredients": [
+          "干面条",
+          "水"
+        ],
+        "utensils": [
+          "汤锅",
+          "筷子"
+        ],
+        "instruction": "水沸后下面条，按包装时间煮至接近熟透，用筷子拨散防粘。",
+        "illustrationUrl": null
+      },
+      {
+        "number": 2,
+        "action": "煮蛋花紫菜",
+        "ingredients": [
+          "熟面条",
+          "鸡蛋",
+          "即食干紫菜",
+          "盐"
+        ],
+        "utensils": [
+          "汤锅",
+          "勺子"
+        ],
+        "instruction": "保持汤滚，缓缓淋入蛋液，煮至完全凝固，再放紫菜和盐，继续煮沸；鸡蛋料理中心温度达到71°C，面条无硬芯。",
+        "illustrationUrl": null
+      },
+      {
+        "number": 3,
+        "action": "盛出汤面",
+        "ingredients": [
+          "紫菜鸡蛋汤面"
+        ],
+        "utensils": [
+          "大碗",
+          "汤勺"
+        ],
+        "instruction": "把面条和蛋花紫菜汤分两碗，放至适口温度再吃。",
+        "illustrationUrl": null
+      }
+    ],
+    "notes": [
+      "处理食材前后洗手；生熟食材和器具分开。",
+      "用量为两人份参考，火力、锅具和食材大小会影响实际时间；以熟度说明为准。",
+      "食用前核对鸡蛋、乳制品、芝麻、小麦等过敏原；有过敏史时不要使用相关食材。"
+    ],
+    "coverImage": null,
+    "illustrationStatus": "unavailable",
+    "recipeVersion": 1,
+    "source": "Linko Moment 原创文字试行菜谱 v2；规则校验，尚待人工烹饪复核。",
+    "mealPreferences": [
+      "lunch",
+      "dinner"
+    ]
+  },
+  {
+    "recipeId": "e8e4a6d6-4e47-58b8-bdae-dc458203b92d",
+    "name": "番茄豆腐面",
+    "category": "noodles",
+    "description": "两人份的番茄豆腐面，用常见食材制作。",
+    "servings": 2,
+    "duration": 20,
+    "difficulty": "简单",
+    "ingredients": [
+      {
+        "name": "干面条",
+        "quantity": 160,
+        "unit": "克"
+      },
+      {
+        "name": "番茄",
+        "quantity": 300,
+        "unit": "克"
+      },
+      {
+        "name": "北豆腐",
+        "quantity": 150,
+        "unit": "克"
+      },
+      {
+        "name": "食用油",
+        "quantity": 10,
+        "unit": "毫升"
+      },
+      {
+        "name": "盐",
+        "quantity": 2,
+        "unit": "克"
+      },
+      {
+        "name": "水",
+        "quantity": 1800,
+        "unit": "毫升"
+      }
+    ],
+    "preparation": [
+      "番茄洗净切块，豆腐切小丁；水分为汤底约300毫升和煮面约1500毫升。"
+    ],
+    "steps": [
+      {
+        "number": 1,
+        "action": "煮番茄豆腐汤",
+        "ingredients": [
+          "番茄",
+          "北豆腐",
+          "食用油",
+          "盐",
+          "水"
+        ],
+        "utensils": [
+          "汤锅",
+          "锅铲"
+        ],
+        "instruction": "锅中放油炒软番茄，加300毫升水和豆腐，煮沸后小火炖6至8分钟，确认豆腐热透，加盐调味。",
+        "illustrationUrl": null
+      },
+      {
+        "number": 2,
+        "action": "另锅煮面",
+        "ingredients": [
+          "干面条",
+          "水"
+        ],
+        "utensils": [
+          "汤锅",
+          "漏勺"
+        ],
+        "instruction": "另用1500毫升水煮面，按包装时间煮至无硬芯，捞出。",
+        "illustrationUrl": null
+      },
+      {
+        "number": 3,
+        "action": "浇汤",
+        "ingredients": [
+          "熟面条",
+          "番茄豆腐汤"
+        ],
+        "utensils": [
+          "碗",
+          "汤勺"
+        ],
+        "instruction": "熟面分两碗，浇上滚热的番茄豆腐汤，拌匀后食用。",
+        "illustrationUrl": null
+      }
+    ],
+    "notes": [
+      "处理食材前后洗手；生熟食材和器具分开。",
+      "用量为两人份参考，火力、锅具和食材大小会影响实际时间；以熟度说明为准。",
+      "食用前核对鸡蛋、乳制品、芝麻、小麦等过敏原；有过敏史时不要使用相关食材。"
+    ],
+    "coverImage": null,
+    "illustrationStatus": "unavailable",
+    "recipeVersion": 1,
+    "source": "Linko Moment 原创文字试行菜谱 v2；规则校验，尚待人工烹饪复核。",
+    "mealPreferences": [
+      "lunch",
+      "dinner"
+    ]
+  },
+  {
+    "recipeId": "7f602a5a-ad70-5994-b4c4-6a4e93ecd424",
+    "name": "黄瓜鸡蛋拌面",
+    "category": "noodles",
+    "description": "两人份的黄瓜鸡蛋拌面，用常见食材制作。",
+    "servings": 2,
+    "duration": 20,
+    "difficulty": "简单",
+    "ingredients": [
+      {
+        "name": "干面条",
+        "quantity": 160,
+        "unit": "克"
+      },
+      {
+        "name": "黄瓜",
+        "quantity": 150,
+        "unit": "克"
+      },
+      {
+        "name": "鸡蛋",
+        "quantity": 2,
+        "unit": "个"
+      },
+      {
+        "name": "食用油",
+        "quantity": 8,
+        "unit": "毫升"
+      },
+      {
+        "name": "生抽",
+        "quantity": 12,
+        "unit": "毫升"
+      },
+      {
+        "name": "水",
+        "quantity": 1500,
+        "unit": "毫升"
+      }
+    ],
+    "preparation": [
+      "黄瓜洗净切丝，鸡蛋打散；生吃的黄瓜与生蛋使用不同案板和器具。"
+    ],
+    "steps": [
+      {
+        "number": 1,
+        "action": "炒熟鸡蛋",
+        "ingredients": [
+          "鸡蛋",
+          "食用油"
+        ],
+        "utensils": [
+          "炒锅",
+          "锅铲"
+        ],
+        "instruction": "热锅加油，中火炒蛋至完全凝固，中心温度达到71°C，再盛入干净盘中。",
+        "illustrationUrl": null
+      },
+      {
+        "number": 2,
+        "action": "煮面沥水",
+        "ingredients": [
+          "干面条",
+          "水"
+        ],
+        "utensils": [
+          "汤锅",
+          "漏勺"
+        ],
+        "instruction": "另锅水沸下面，按包装时间煮至无硬芯，捞出沥水。",
+        "illustrationUrl": null
+      },
+      {
+        "number": 3,
+        "action": "拌面",
+        "ingredients": [
+          "熟面条",
+          "熟鸡蛋",
+          "黄瓜",
+          "生抽"
+        ],
+        "utensils": [
+          "碗",
+          "筷子"
+        ],
+        "instruction": "热面分两碗，放熟鸡蛋与黄瓜丝，淋生抽拌匀，立即吃完。",
+        "illustrationUrl": null
+      }
+    ],
+    "notes": [
+      "处理食材前后洗手；生熟食材和器具分开。",
+      "用量为两人份参考，火力、锅具和食材大小会影响实际时间；以熟度说明为准。",
+      "食用前核对鸡蛋、乳制品、芝麻、小麦等过敏原；有过敏史时不要使用相关食材。"
+    ],
+    "coverImage": null,
+    "illustrationStatus": "unavailable",
+    "recipeVersion": 1,
+    "source": "Linko Moment 原创文字试行菜谱 v2；规则校验，尚待人工烹饪复核。",
+    "mealPreferences": [
+      "lunch",
+      "dinner"
+    ]
+  },
+  {
+    "recipeId": "3021e40a-a72b-5fed-a4e5-00a388904e73",
+    "name": "山药大米粥",
+    "category": "congee",
+    "description": "两人份的山药大米粥，用常见食材制作。",
+    "servings": 2,
+    "duration": 40,
+    "difficulty": "简单",
+    "ingredients": [
+      {
+        "name": "大米",
+        "quantity": 90,
+        "unit": "克"
+      },
+      {
+        "name": "山药",
+        "quantity": 200,
+        "unit": "克"
+      },
+      {
+        "name": "水",
+        "quantity": 1000,
+        "unit": "毫升"
+      }
+    ],
+    "preparation": [
+      "大米淘洗；山药洗净，戴手套去皮后切小丁，避免皮肤接触汁液。"
+    ],
+    "steps": [
+      {
+        "number": 1,
+        "action": "下锅煮开",
+        "ingredients": [
+          "大米",
+          "山药",
+          "水"
+        ],
+        "utensils": [
+          "汤锅",
+          "长柄勺"
+        ],
+        "instruction": "水烧开后放入大米和山药，搅匀转小火。",
+        "illustrationUrl": null
+      },
+      {
+        "number": 2,
+        "action": "慢煮至熟",
+        "ingredients": [
+          "大米",
+          "山药",
+          "粥"
+        ],
+        "utensils": [
+          "汤锅",
+          "长柄勺"
+        ],
+        "instruction": "锅盖留缝，小火慢煮并定时搅拌防溢防糊，至大米无硬芯、山药软透；实际时间以食材熟度为准。",
+        "illustrationUrl": null
+      },
+      {
+        "number": 3,
+        "action": "检查后盛出",
+        "ingredients": [
+          "熟粥"
+        ],
+        "utensils": [
+          "勺子",
+          "碗"
+        ],
+        "instruction": "用勺子取少量粥检查，谷物无硬芯、块状食材可用另一把勺子轻松压碎；勿用手碰热粥。关火盛碗，稍凉后食用。",
+        "illustrationUrl": null
+      }
+    ],
+    "notes": [
+      "处理食材前后洗手；生熟食材和器具分开。",
+      "用量为两人份参考，火力、锅具和食材大小会影响实际时间；以熟度说明为准。",
+      "食用前核对鸡蛋、乳制品、芝麻、小麦等过敏原；有过敏史时不要使用相关食材。"
+    ],
+    "coverImage": null,
+    "illustrationStatus": "unavailable",
+    "recipeVersion": 1,
+    "source": "Linko Moment 原创文字试行菜谱 v2；规则校验，尚待人工烹饪复核。",
+    "mealPreferences": [
+      "breakfast",
+      "dinner"
+    ]
+  },
+  {
+    "recipeId": "8fcf5538-06b4-5a82-82a6-7523be692194",
+    "name": "玉米小米粥",
+    "category": "congee",
+    "description": "两人份的玉米小米粥，用常见食材制作。",
+    "servings": 2,
+    "duration": 35,
+    "difficulty": "简单",
+    "ingredients": [
+      {
+        "name": "小米",
+        "quantity": 80,
+        "unit": "克"
+      },
+      {
+        "name": "甜玉米粒",
+        "quantity": 150,
+        "unit": "克"
+      },
+      {
+        "name": "水",
+        "quantity": 1000,
+        "unit": "毫升"
+      }
+    ],
+    "preparation": [
+      "小米淘洗，甜玉米粒洗净沥水。"
+    ],
+    "steps": [
+      {
+        "number": 1,
+        "action": "下锅煮开",
+        "ingredients": [
+          "小米",
+          "甜玉米粒",
+          "水"
+        ],
+        "utensils": [
+          "汤锅",
+          "长柄勺"
+        ],
+        "instruction": "水烧开后放入小米和甜玉米粒，搅匀转小火。",
+        "illustrationUrl": null
+      },
+      {
+        "number": 2,
+        "action": "慢煮至熟",
+        "ingredients": [
+          "小米",
+          "甜玉米粒",
+          "粥"
+        ],
+        "utensils": [
+          "汤锅",
+          "长柄勺"
+        ],
+        "instruction": "锅盖留缝，小火慢煮并定时搅拌防溢防糊，至小米无硬芯、甜玉米粒软透；实际时间以食材熟度为准。",
+        "illustrationUrl": null
+      },
+      {
+        "number": 3,
+        "action": "检查后盛出",
+        "ingredients": [
+          "熟粥"
+        ],
+        "utensils": [
+          "勺子",
+          "碗"
+        ],
+        "instruction": "用勺子取少量粥检查，谷物无硬芯、块状食材可用另一把勺子轻松压碎；勿用手碰热粥。关火盛碗，稍凉后食用。",
+        "illustrationUrl": null
+      }
+    ],
+    "notes": [
+      "处理食材前后洗手；生熟食材和器具分开。",
+      "用量为两人份参考，火力、锅具和食材大小会影响实际时间；以熟度说明为准。",
+      "食用前核对鸡蛋、乳制品、芝麻、小麦等过敏原；有过敏史时不要使用相关食材。"
+    ],
+    "coverImage": null,
+    "illustrationStatus": "unavailable",
+    "recipeVersion": 1,
+    "source": "Linko Moment 原创文字试行菜谱 v2；规则校验，尚待人工烹饪复核。",
+    "mealPreferences": [
+      "breakfast",
+      "dinner"
+    ]
+  },
+  {
+    "recipeId": "1e3119b5-362d-5c1f-908e-868022cf33dd",
+    "name": "香菇青菜粥",
+    "category": "congee",
+    "description": "两人份的香菇青菜粥，用常见食材制作。",
+    "servings": 2,
+    "duration": 40,
+    "difficulty": "简单",
+    "ingredients": [
+      {
+        "name": "大米",
+        "quantity": 90,
+        "unit": "克"
+      },
+      {
+        "name": "鲜香菇",
+        "quantity": 100,
+        "unit": "克"
+      },
+      {
+        "name": "水",
+        "quantity": 1000,
+        "unit": "毫升"
+      },
+      {
+        "name": "小青菜",
+        "quantity": 100,
+        "unit": "克"
+      },
+      {
+        "name": "盐",
+        "quantity": 1,
+        "unit": "克"
+      }
+    ],
+    "preparation": [
+      "大米按包装准备；鲜香菇洗净并切成小块。青菜洗净切碎，留到最后加入。"
+    ],
+    "steps": [
+      {
+        "number": 1,
+        "action": "下锅煮开",
+        "ingredients": [
+          "大米",
+          "鲜香菇",
+          "水"
+        ],
+        "utensils": [
+          "汤锅",
+          "长柄勺"
+        ],
+        "instruction": "水烧开后放入大米和鲜香菇，搅匀转小火。",
+        "illustrationUrl": null
+      },
+      {
+        "number": 2,
+        "action": "慢煮至熟",
+        "ingredients": [
+          "大米",
+          "鲜香菇",
+          "粥",
+          "小青菜",
+          "盐"
+        ],
+        "utensils": [
+          "汤锅",
+          "长柄勺"
+        ],
+        "instruction": "锅盖留缝，小火慢煮并定时搅拌防溢防糊，至大米无硬芯、鲜香菇软透；实际时间以食材熟度为准。米粥软烂且香菇完全熟透后加入青菜和盐，再煮3至5分钟至菜熟。",
+        "illustrationUrl": null
+      },
+      {
+        "number": 3,
+        "action": "检查后盛出",
+        "ingredients": [
+          "熟粥"
+        ],
+        "utensils": [
+          "勺子",
+          "碗"
+        ],
+        "instruction": "用勺子取少量粥检查，谷物无硬芯、块状食材可用另一把勺子轻松压碎；勿用手碰热粥。关火盛碗，稍凉后食用。",
+        "illustrationUrl": null
+      }
+    ],
+    "notes": [
+      "处理食材前后洗手；生熟食材和器具分开。",
+      "用量为两人份参考，火力、锅具和食材大小会影响实际时间；以熟度说明为准。",
+      "食用前核对鸡蛋、乳制品、芝麻、小麦等过敏原；有过敏史时不要使用相关食材。"
+    ],
+    "coverImage": null,
+    "illustrationStatus": "unavailable",
+    "recipeVersion": 1,
+    "source": "Linko Moment 原创文字试行菜谱 v2；规则校验，尚待人工烹饪复核。",
+    "mealPreferences": [
+      "breakfast",
+      "dinner"
+    ]
+  },
+  {
+    "recipeId": "77619f45-6da6-5172-9931-16ad80b2c213",
+    "name": "南瓜燕麦粥",
+    "category": "congee",
+    "description": "两人份的南瓜燕麦粥，用常见食材制作。",
+    "servings": 2,
+    "duration": 25,
+    "difficulty": "简单",
+    "ingredients": [
+      {
+        "name": "燕麦片",
+        "quantity": 80,
+        "unit": "克"
+      },
+      {
+        "name": "南瓜",
+        "quantity": 200,
+        "unit": "克"
+      },
+      {
+        "name": "水",
+        "quantity": 1000,
+        "unit": "毫升"
+      }
+    ],
+    "preparation": [
+      "燕麦片按包装准备；南瓜去皮去籽，切成1厘米小丁。"
+    ],
+    "steps": [
+      {
+        "number": 1,
+        "action": "下锅煮开",
+        "ingredients": [
+          "燕麦片",
+          "南瓜",
+          "水"
+        ],
+        "utensils": [
+          "汤锅",
+          "长柄勺"
+        ],
+        "instruction": "先把南瓜丁放入沸水中，小火煮约15分钟至软，再按燕麦片包装所需时间加入燕麦。",
+        "illustrationUrl": null
+      },
+      {
+        "number": 2,
+        "action": "慢煮至熟",
+        "ingredients": [
+          "燕麦片",
+          "南瓜",
+          "粥"
+        ],
+        "utensils": [
+          "汤锅",
+          "长柄勺"
+        ],
+        "instruction": "锅盖留缝，小火慢煮并定时搅拌防溢防糊，至燕麦片无硬芯、南瓜软透；实际时间以食材熟度为准。",
+        "illustrationUrl": null
+      },
+      {
+        "number": 3,
+        "action": "检查后盛出",
+        "ingredients": [
+          "熟粥"
+        ],
+        "utensils": [
+          "勺子",
+          "碗"
+        ],
+        "instruction": "用勺子取少量粥检查，谷物无硬芯、块状食材可用另一把勺子轻松压碎；勿用手碰热粥。关火盛碗，稍凉后食用。",
+        "illustrationUrl": null
+      }
+    ],
+    "notes": [
+      "处理食材前后洗手；生熟食材和器具分开。",
+      "用量为两人份参考，火力、锅具和食材大小会影响实际时间；以熟度说明为准。",
+      "食用前核对鸡蛋、乳制品、芝麻、小麦等过敏原；有过敏史时不要使用相关食材。"
+    ],
+    "coverImage": null,
+    "illustrationStatus": "unavailable",
+    "recipeVersion": 1,
+    "source": "Linko Moment 原创文字试行菜谱 v2；规则校验，尚待人工烹饪复核。",
+    "mealPreferences": [
+      "breakfast",
+      "dinner"
+    ]
+  },
+  {
+    "recipeId": "c6b3c486-b347-5184-87e3-c4d745e20dee",
+    "name": "紫薯大米粥",
+    "category": "congee",
+    "description": "两人份的紫薯大米粥，用常见食材制作。",
+    "servings": 2,
+    "duration": 40,
+    "difficulty": "简单",
+    "ingredients": [
+      {
+        "name": "大米",
+        "quantity": 90,
+        "unit": "克"
+      },
+      {
+        "name": "紫薯",
+        "quantity": 200,
+        "unit": "克"
+      },
+      {
+        "name": "水",
+        "quantity": 1000,
+        "unit": "毫升"
+      }
+    ],
+    "preparation": [
+      "大米淘洗；紫薯洗净去皮，切成1厘米小丁。"
+    ],
+    "steps": [
+      {
+        "number": 1,
+        "action": "下锅煮开",
+        "ingredients": [
+          "大米",
+          "紫薯",
+          "水"
+        ],
+        "utensils": [
+          "汤锅",
+          "长柄勺"
+        ],
+        "instruction": "水烧开后放入大米和紫薯，搅匀转小火。",
+        "illustrationUrl": null
+      },
+      {
+        "number": 2,
+        "action": "慢煮至熟",
+        "ingredients": [
+          "大米",
+          "紫薯",
+          "粥"
+        ],
+        "utensils": [
+          "汤锅",
+          "长柄勺"
+        ],
+        "instruction": "锅盖留缝，小火慢煮并定时搅拌防溢防糊，至大米无硬芯、紫薯软透；实际时间以食材熟度为准。",
+        "illustrationUrl": null
+      },
+      {
+        "number": 3,
+        "action": "检查后盛出",
+        "ingredients": [
+          "熟粥"
+        ],
+        "utensils": [
+          "勺子",
+          "碗"
+        ],
+        "instruction": "用勺子取少量粥检查，谷物无硬芯、块状食材可用另一把勺子轻松压碎；勿用手碰热粥。关火盛碗，稍凉后食用。",
+        "illustrationUrl": null
+      }
+    ],
+    "notes": [
+      "处理食材前后洗手；生熟食材和器具分开。",
+      "用量为两人份参考，火力、锅具和食材大小会影响实际时间；以熟度说明为准。",
+      "食用前核对鸡蛋、乳制品、芝麻、小麦等过敏原；有过敏史时不要使用相关食材。"
+    ],
+    "coverImage": null,
+    "illustrationStatus": "unavailable",
+    "recipeVersion": 1,
+    "source": "Linko Moment 原创文字试行菜谱 v2；规则校验，尚待人工烹饪复核。",
+    "mealPreferences": [
+      "breakfast",
+      "dinner"
+    ]
+  },
+  {
+    "recipeId": "d608ec52-4e98-55dc-bc9e-608ae57911e6",
+    "name": "蒸红薯",
+    "category": "dessert",
+    "description": "两人份的蒸红薯，用常见食材制作。",
+    "servings": 2,
+    "duration": 35,
+    "difficulty": "简单",
+    "ingredients": [
+      {
+        "name": "红薯",
+        "quantity": 400,
+        "unit": "克"
+      },
+      {
+        "name": "水",
+        "quantity": 800,
+        "unit": "毫升"
+      }
+    ],
+    "preparation": [
+      "红薯刷洗干净，较大的纵向切成两半；用水量需符合蒸锅最低要求，不让锅烧干。"
+    ],
+    "steps": [
+      {
+        "number": 1,
+        "action": "摆入蒸屉",
+        "ingredients": [
+          "红薯",
+          "水"
+        ],
+        "utensils": [
+          "蒸锅",
+          "蒸屉"
+        ],
+        "instruction": "锅中加水，红薯放蒸屉，彼此留出蒸汽流通间隙，不直接泡在水里。",
+        "illustrationUrl": null
+      },
+      {
+        "number": 2,
+        "action": "蒸至熟透",
+        "ingredients": [
+          "红薯"
+        ],
+        "utensils": [
+          "蒸锅",
+          "筷子"
+        ],
+        "instruction": "水沸上汽后蒸20至30分钟，按大小延长，直到筷子可轻松插透最厚处，没有硬芯。留意水位，避免干烧。",
+        "illustrationUrl": null
+      },
+      {
+        "number": 3,
+        "action": "取出放凉",
+        "ingredients": [
+          "熟红薯"
+        ],
+        "utensils": [
+          "夹子",
+          "盘子"
+        ],
+        "instruction": "关火后用夹子取出，蒸汽朝远离面部方向释放，放至适口温度再剥皮食用。",
+        "illustrationUrl": null
+      }
+    ],
+    "notes": [
+      "处理食材前后洗手；生熟食材和器具分开。",
+      "用量为两人份参考，火力、锅具和食材大小会影响实际时间；以熟度说明为准。",
+      "食用前核对鸡蛋、乳制品、芝麻、小麦等过敏原；有过敏史时不要使用相关食材。"
+    ],
+    "coverImage": null,
+    "illustrationStatus": "unavailable",
+    "recipeVersion": 1,
+    "source": "Linko Moment 原创文字试行菜谱 v2；规则校验，尚待人工烹饪复核。",
+    "mealPreferences": [
+      "afternoonTea"
+    ]
+  },
+  {
+    "recipeId": "2723b104-0038-5a6d-9f5c-ef6a5218a0f7",
+    "name": "香蕉燕麦松饼",
+    "category": "dessert",
+    "description": "两人份的香蕉燕麦松饼，用常见食材制作。",
+    "servings": 2,
+    "duration": 20,
+    "difficulty": "简单",
+    "ingredients": [
+      {
+        "name": "香蕉",
+        "quantity": 120,
+        "unit": "克"
+      },
+      {
+        "name": "鸡蛋",
+        "quantity": 2,
+        "unit": "个"
+      },
+      {
+        "name": "燕麦粉",
+        "quantity": 60,
+        "unit": "克"
+      },
+      {
+        "name": "牛奶",
+        "quantity": 50,
+        "unit": "毫升"
+      },
+      {
+        "name": "食用油",
+        "quantity": 5,
+        "unit": "毫升"
+      }
+    ],
+    "preparation": [
+      "香蕉去皮压泥，鸡蛋打散，燕麦粉用正规食品包装产品，避免生食面糊。"
+    ],
+    "steps": [
+      {
+        "number": 1,
+        "action": "拌面糊",
+        "ingredients": [
+          "香蕉",
+          "鸡蛋",
+          "燕麦粉",
+          "牛奶"
+        ],
+        "utensils": [
+          "碗",
+          "打蛋器"
+        ],
+        "instruction": "将香蕉泥、蛋液、燕麦粉和牛奶搅成均匀面糊，不尝生面糊。",
+        "illustrationUrl": null
+      },
+      {
+        "number": 2,
+        "action": "两面煎熟",
+        "ingredients": [
+          "面糊",
+          "食用油"
+        ],
+        "utensils": [
+          "不粘平底锅",
+          "锅铲"
+        ],
+        "instruction": "平底锅薄涂油，小火摊成直径约8厘米的薄饼，一面定型再翻面；两面金黄、内部无湿面糊，中心温度达到71°C。过厚时延长加热。",
+        "illustrationUrl": null
+      },
+      {
+        "number": 3,
+        "action": "装盘",
+        "ingredients": [
+          "熟松饼"
+        ],
+        "utensils": [
+          "盘子",
+          "锅铲"
+        ],
+        "instruction": "用干净锅铲盛盘，稍放凉再吃；不淋生蛋液或未加热面糊。",
+        "illustrationUrl": null
+      }
+    ],
+    "notes": [
+      "处理食材前后洗手；生熟食材和器具分开。",
+      "用量为两人份参考，火力、锅具和食材大小会影响实际时间；以熟度说明为准。",
+      "食用前核对鸡蛋、乳制品、芝麻、小麦等过敏原；有过敏史时不要使用相关食材。"
+    ],
+    "coverImage": null,
+    "illustrationStatus": "unavailable",
+    "recipeVersion": 1,
+    "source": "Linko Moment 原创文字试行菜谱 v2；规则校验，尚待人工烹饪复核。",
+    "mealPreferences": [
+      "afternoonTea"
+    ]
+  },
+  {
+    "recipeId": "eb508681-02bc-5536-b4ce-c914af29e7d5",
+    "name": "牛奶炖蛋",
+    "category": "dessert",
+    "description": "两人份的牛奶炖蛋，用常见食材制作。",
+    "servings": 2,
+    "duration": 25,
+    "difficulty": "简单",
+    "ingredients": [
+      {
+        "name": "鸡蛋",
+        "quantity": 2,
+        "unit": "个"
+      },
+      {
+        "name": "牛奶",
+        "quantity": 200,
+        "unit": "毫升"
+      },
+      {
+        "name": "白糖",
+        "quantity": 8,
+        "unit": "克"
+      },
+      {
+        "name": "蒸锅水",
+        "quantity": 800,
+        "unit": "毫升"
+      }
+    ],
+    "preparation": [
+      "鸡蛋打散，牛奶使用巴氏杀菌或常温纯牛奶；准备耐热蒸碗和符合蒸锅要求的水量。"
+    ],
+    "steps": [
+      {
+        "number": 1,
+        "action": "调蛋奶液",
+        "ingredients": [
+          "鸡蛋",
+          "牛奶",
+          "白糖"
+        ],
+        "utensils": [
+          "碗",
+          "打蛋器",
+          "筛网"
+        ],
+        "instruction": "蛋液、牛奶和糖充分搅匀，过筛倒入两个耐热小碗，不尝生蛋奶液。",
+        "illustrationUrl": null
+      },
+      {
+        "number": 2,
+        "action": "隔水蒸熟",
+        "ingredients": [
+          "蛋奶液",
+          "蒸锅水"
+        ],
+        "utensils": [
+          "蒸锅",
+          "耐热碗",
+          "耐热碗盖"
+        ],
+        "instruction": "水沸后放蒸碗，盖耐热碗盖防滴水，中小火蒸约15至20分钟，直到完全凝固且中心温度达到71°C；碗大小不同须调整。",
+        "illustrationUrl": null
+      },
+      {
+        "number": 3,
+        "action": "取出温食",
+        "ingredients": [
+          "熟炖蛋"
+        ],
+        "utensils": [
+          "夹子",
+          "勺子"
+        ],
+        "instruction": "关火后用夹子取碗，放至适口温度后食用；剩余及时冷藏，不长时间放在室温。",
+        "illustrationUrl": null
+      }
+    ],
+    "notes": [
+      "处理食材前后洗手；生熟食材和器具分开。",
+      "用量为两人份参考，火力、锅具和食材大小会影响实际时间；以熟度说明为准。",
+      "食用前核对鸡蛋、乳制品、芝麻、小麦等过敏原；有过敏史时不要使用相关食材。"
+    ],
+    "coverImage": null,
+    "illustrationStatus": "unavailable",
+    "recipeVersion": 1,
+    "source": "Linko Moment 原创文字试行菜谱 v2；规则校验，尚待人工烹饪复核。",
+    "mealPreferences": [
+      "afternoonTea"
+    ]
+  },
+  {
+    "recipeId": "86f86c2d-5675-57aa-9078-a00dd32b67b6",
+    "name": "酸奶水果杯",
+    "category": "dessert",
+    "description": "两人份的酸奶水果杯，用常见食材制作。",
+    "servings": 2,
+    "duration": 10,
+    "difficulty": "简单",
+    "ingredients": [
+      {
+        "name": "原味酸奶",
+        "quantity": 250,
+        "unit": "克"
+      },
+      {
+        "name": "香蕉",
+        "quantity": 120,
+        "unit": "克"
+      },
+      {
+        "name": "草莓",
+        "quantity": 150,
+        "unit": "克"
+      }
+    ],
+    "preparation": [
+      "酸奶按标签冷藏保存并确认在保质期内；草莓用流动清水洗净再去蒂，香蕉去皮。"
+    ],
+    "steps": [
+      {
+        "number": 1,
+        "action": "切水果",
+        "ingredients": [
+          "香蕉",
+          "草莓"
+        ],
+        "utensils": [
+          "水果刀",
+          "干净案板"
+        ],
+        "instruction": "在与生肉、生蛋分开的干净案板上，把香蕉切片、草莓切小块。",
+        "illustrationUrl": null
+      },
+      {
+        "number": 2,
+        "action": "分层装杯",
+        "ingredients": [
+          "原味酸奶",
+          "香蕉",
+          "草莓"
+        ],
+        "utensils": [
+          "杯子",
+          "勺子"
+        ],
+        "instruction": "在两只干净杯中交替放酸奶和水果，不加入未清洗水果。",
+        "illustrationUrl": null
+      },
+      {
+        "number": 3,
+        "action": "及时食用",
+        "ingredients": [
+          "水果酸奶"
+        ],
+        "utensils": [
+          "杯子",
+          "勺子"
+        ],
+        "instruction": "装好后立即食用；暂不吃时立即盖好冷藏，按酸奶标签要求保存，避免久放室温。",
+        "illustrationUrl": null
+      }
+    ],
+    "notes": [
+      "处理食材前后洗手；生熟食材和器具分开。",
+      "用量为两人份参考，火力、锅具和食材大小会影响实际时间；以熟度说明为准。",
+      "食用前核对鸡蛋、乳制品、芝麻、小麦等过敏原；有过敏史时不要使用相关食材。"
+    ],
+    "coverImage": null,
+    "illustrationStatus": "unavailable",
+    "recipeVersion": 1,
+    "source": "Linko Moment 原创文字试行菜谱 v2；规则校验，尚待人工烹饪复核。",
+    "mealPreferences": [
+      "afternoonTea"
+    ]
+  },
+  {
+    "recipeId": "2051d729-2bf5-5ed4-8aac-02513210eb20",
+    "name": "苹果肉桂烤燕麦",
+    "category": "dessert",
+    "description": "两人份的苹果肉桂烤燕麦，用常见食材制作。",
+    "servings": 2,
+    "duration": 35,
+    "difficulty": "简单",
+    "ingredients": [
+      {
+        "name": "燕麦片",
+        "quantity": 80,
+        "unit": "克"
+      },
+      {
+        "name": "苹果",
+        "quantity": 200,
+        "unit": "克"
+      },
+      {
+        "name": "牛奶",
+        "quantity": 180,
+        "unit": "毫升"
+      },
+      {
+        "name": "肉桂粉",
+        "quantity": 1,
+        "unit": "克"
+      }
+    ],
+    "preparation": [
+      "苹果洗净去核切小丁；准备可进烤箱的耐热烤碗，按设备说明预热至180°C。"
+    ],
+    "steps": [
+      {
+        "number": 1,
+        "action": "拌入烤碗",
+        "ingredients": [
+          "燕麦片",
+          "苹果",
+          "牛奶",
+          "肉桂粉"
+        ],
+        "utensils": [
+          "耐热烤碗",
+          "勺子"
+        ],
+        "instruction": "把燕麦、苹果丁、牛奶和肉桂粉拌匀，分入两个耐热烤碗，不装太满。",
+        "illustrationUrl": null
+      },
+      {
+        "number": 2,
+        "action": "烤熟",
+        "ingredients": [
+          "苹果燕麦混合物"
+        ],
+        "utensils": [
+          "烤箱",
+          "烤碗"
+        ],
+        "instruction": "放入预热至180°C的烤箱，烤约25至30分钟，直到苹果软透、燕麦充分吸液熟透；按燕麦包装和烤箱实际情况调整。",
+        "illustrationUrl": null
+      },
+      {
+        "number": 3,
+        "action": "放凉后食用",
+        "ingredients": [
+          "烤燕麦"
+        ],
+        "utensils": [
+          "隔热手套",
+          "勺子"
+        ],
+        "instruction": "用隔热手套取出烤碗，放至适口温度；烤碗仍会烫手，不直接徒手端。",
+        "illustrationUrl": null
+      }
+    ],
+    "notes": [
+      "处理食材前后洗手；生熟食材和器具分开。",
+      "用量为两人份参考，火力、锅具和食材大小会影响实际时间；以熟度说明为准。",
+      "食用前核对鸡蛋、乳制品、芝麻、小麦等过敏原；有过敏史时不要使用相关食材。"
+    ],
+    "coverImage": null,
+    "illustrationStatus": "unavailable",
+    "recipeVersion": 1,
+    "source": "Linko Moment 原创文字试行菜谱 v2；规则校验，尚待人工烹饪复核。",
+    "mealPreferences": [
+      "afternoonTea"
+    ]
+  },
+  {
+    "recipeId": "a89e0366-4116-5af2-9dcf-f049c387b349",
+    "name": "红豆牛奶小圆子",
+    "category": "dessert",
+    "description": "两人份的红豆牛奶小圆子，用常见食材制作。",
+    "servings": 2,
+    "duration": 20,
+    "difficulty": "简单",
+    "ingredients": [
+      {
+        "name": "即食熟红豆",
+        "quantity": 150,
+        "unit": "克"
+      },
+      {
+        "name": "冷冻小圆子",
+        "quantity": 120,
+        "unit": "克"
+      },
+      {
+        "name": "牛奶",
+        "quantity": 250,
+        "unit": "毫升"
+      },
+      {
+        "name": "水",
+        "quantity": 1000,
+        "unit": "毫升"
+      }
+    ],
+    "preparation": [
+      "红豆使用正规包装即食熟红豆，不以生红豆替代；小圆子保持冷冻并核对包装煮制要求。"
+    ],
+    "steps": [
+      {
+        "number": 1,
+        "action": "煮熟小圆子",
+        "ingredients": [
+          "冷冻小圆子",
+          "水"
+        ],
+        "utensils": [
+          "汤锅",
+          "勺子"
+        ],
+        "instruction": "水沸后放入小圆子，轻推防粘，按包装时间煮熟；不能只凭浮起判断，应确认内部无硬芯或生粉。",
+        "illustrationUrl": null
+      },
+      {
+        "number": 2,
+        "action": "温热红豆牛奶",
+        "ingredients": [
+          "即食熟红豆",
+          "牛奶"
+        ],
+        "utensils": [
+          "小汤锅",
+          "勺子"
+        ],
+        "instruction": "另锅把熟红豆和牛奶用小火加热至整体热透，搅拌避免糊底，勿长时间大火滚煮。",
+        "illustrationUrl": null
+      },
+      {
+        "number": 3,
+        "action": "合碗",
+        "ingredients": [
+          "熟小圆子",
+          "红豆牛奶"
+        ],
+        "utensils": [
+          "漏勺",
+          "碗"
+        ],
+        "instruction": "煮熟小圆子沥水后放两碗，加入热红豆牛奶，放至适口温度再吃；糯米食物细嚼慢咽，避免烫口。",
+        "illustrationUrl": null
+      }
+    ],
+    "notes": [
+      "处理食材前后洗手；生熟食材和器具分开。",
+      "用量为两人份参考，火力、锅具和食材大小会影响实际时间；以熟度说明为准。",
+      "食用前核对鸡蛋、乳制品、芝麻、小麦等过敏原；有过敏史时不要使用相关食材。"
+    ],
+    "coverImage": null,
+    "illustrationStatus": "unavailable",
+    "recipeVersion": 1,
+    "source": "Linko Moment 原创文字试行菜谱 v2；规则校验，尚待人工烹饪复核。",
+    "mealPreferences": [
+      "afternoonTea"
+    ]
+  }
+]

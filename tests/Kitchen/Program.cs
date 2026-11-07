@@ -28,7 +28,7 @@ await using (var connection = new NpgsqlConnection(connectionString))
             Check(File.Exists(Path.Combine(AppContext.BaseDirectory, "recipe-illustrations", recipe.RecipeId.ToString("D"), "v" + recipe.RecipeVersion, "step-" + step.Number + ".jpg")), "all published step assets are packaged");
         count++;
     }
-    Check(count == 9, "initial original catalog count");
+    Check(count == 30, "expanded original catalog count");
 }
 var builder = WebApplication.CreateBuilder();
 builder.WebHost.UseUrls("http://127.0.0.1:0");
@@ -56,6 +56,16 @@ try
     client.DefaultRequestHeaders.Add("X-Test-User", "test");
     using var categories = JsonDocument.Parse(await client.GetStringAsync("/api/recipes/categories"));
     Check(categories.RootElement.GetProperty("categories").GetArrayLength() == 4, "categories come from database");
+    var categoryItems = categories.RootElement.GetProperty("categories").EnumerateArray().ToArray();
+    Check(categoryItems.Any(c => c.GetProperty("id").GetString() == "dessert" && c.GetProperty("name").GetString() == "甜品")
+        && categoryItems.All(c => c.GetProperty("id").GetString() != "all"), "dessert replaces the explicit anything category");
+    foreach (var path in new[] { "/api/recipes/random", "/api/recipes/random?category=", "/api/recipes/random?category=all" })
+    {
+        var any = JsonSerializer.Deserialize<KitchenRecipe>(await client.GetStringAsync(path), RecipeEndpoints.Json)!;
+        Check(RecipeEndpoints.Valid(any), "unselected and legacy-anything requests return a complete recipe");
+    }
+    var dessert = JsonSerializer.Deserialize<KitchenRecipe>(await client.GetStringAsync("/api/recipes/random?category=dessert&meal=lunch"), RecipeEndpoints.Json)!;
+    Check(dessert.Category == "dessert", "explicit dessert choice survives lunch preference");
     var first = JsonSerializer.Deserialize<KitchenRecipe>(await client.GetStringAsync("/api/recipes/random?category=noodles&meal=afternoonTea"), RecipeEndpoints.Json)!;
     Check(first.Category == "noodles", "explicit category survives mealtime preference");
     var next = JsonSerializer.Deserialize<KitchenRecipe>(await client.GetStringAsync("/api/recipes/random?category=noodles&exclude=" + first.RecipeId), RecipeEndpoints.Json)!;

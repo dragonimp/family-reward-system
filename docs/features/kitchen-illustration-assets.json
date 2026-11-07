@@ -338,5 +338,635 @@
     "prompt": "Use case: scientific-educational. Single original warm hand-drawn cooking illustration for 红薯大米粥, step3 检查熟度. 柔和水彩、铅笔细线、奶白背景、青绿色汤锅，俯侧视。食材严格符合菜名。已核对文字步骤：确认谷物无硬芯、蔬菜可轻松压碎；过稠时加少量开水再煮沸。清楚画出用两把勺子在干净小碟上压开一小块已煮软的食材，检查内部软透。一只勺子托起食物，另一把勺子轻轻压开。手只握在凉的勺柄上，绝不能用手指碰热粥、热勺头或沸水。画面旁边放着有软烂粥的汤锅，不画加水或倒水动作。单幅方形，不含文字、数字、标签、商标或水印。图片辅助理解，文字教程负责熟度要求。",
     "sha256": "fd9cd06e0d64908989078865f0f464fde1eea821ee3b4ef52517b9179a9382da",
     "bytes": 372855
+  },
+  {
+    "recipeId": "b984c313-ceb8-5fad-ab72-0254b3ad7f20",
+    "recipeVersion": 1,
+    "step": 1,
+    "asset": "FamilyReward.Api/recipe-illustrations/b984c313-ceb8-5fad-ab72-0254b3ad7f20/v1/step-1.jpg",
+    "tool": "built-in image_gen",
+    "prompt": "Use case: scientific-educational. Asset type: one cooking-step illustration for a native recipe app.\n菜名：香菇南瓜饭；第1步：装入内锅。\n严格表现此核对后的步骤，不编造新做法：米、水、南瓜丁和香菇片放入电饭煲，轻轻拌匀；米的用水量优先按包装及电饭煲说明调整。\n本菜食材：大米、水、南瓜、鲜香菇、盐。当前涉及：大米、水、南瓜、鲜香菇、盐。厨具：电饭煲、量杯。当前食材状态与操作动作必须清晰。\n统一风格：温暖简洁的柔和水彩配细腻铅笔线，奶白浅色背景，青绿色/奶油色厨具，俯侧视近景，克制留白。单幅方形构图，不要多格，不含文字、数字、标签、水印、品牌或UI。\n安全约束：手只握凉柄或戴隔热手套，不触碰热锅、热粥、热蒸汽；检查软度使用两把勺子在小碟上压开食材，绝不用手指碰热食。不能画品尝生蛋/生面糊。蒸锅取物使用夹子且蒸汽远离脸；热油里不能倒含水调味汁。说明和温度要求由App原生文字展示，插画仅辅助理解。",
+    "sha256": "e367a0dbf2faa83722cf202f0ebb94e7879b44c49500ec261eb3bdb57525ea99",
+    "bytes": 578610
+  },
+  {
+    "recipeId": "b984c313-ceb8-5fad-ab72-0254b3ad7f20",
+    "recipeVersion": 1,
+    "step": 2,
+    "asset": "FamilyReward.Api/recipe-illustrations/b984c313-ceb8-5fad-ab72-0254b3ad7f20/v1/step-2.jpg",
+    "tool": "built-in image_gen",
+    "prompt": "Use case: scientific-educational. Asset type: one cooking-step illustration for a native recipe app.\n菜名：香菇南瓜饭；第2步：煮熟焖透。\n严格表现此核对后的步骤，不编造新做法：启动正常煮饭程序。结束后确认米无硬芯、南瓜软透、香菇完全熟透，再按说明焖5分钟。\n本菜食材：大米、水、南瓜、鲜香菇、盐。当前涉及：米饭、南瓜、鲜香菇。厨具：电饭煲。当前食材状态与操作动作必须清晰。\n统一风格：温暖简洁的柔和水彩配细腻铅笔线，奶白浅色背景，青绿色/奶油色厨具，俯侧视近景，克制留白。单幅方形构图，不要多格，不含文字、数字、标签、水印、品牌或UI。\n安全约束：手只握凉柄或戴隔热手套，不触碰热锅、热粥、热蒸汽；检查软度使用两把勺子在小碟上压开食材，绝不用手指碰热食。不能画品尝生蛋/生面糊。蒸锅取物使用夹子且蒸汽远离脸；热油里不能倒含水调味汁。说明和温度要求由App原生文字展示，插画仅辅助理解。",
+    "sha256": "923d9d43aa64dce05b915c730642ee5eedb2cc99012364dc78db200509d5f8ef",
+    "bytes": 535952
+  },
+  {
+    "recipeId": "007c2a18-89fa-5ccd-8c2a-cbe2e7b72dfd",
+    "recipeVersion": 1,
+    "step": 1,
+    "asset": "FamilyReward.Api/recipe-illustrations/007c2a18-89fa-5ccd-8c2a-cbe2e7b72dfd/v1/step-1.jpg",
+    "tool": "built-in image_gen",
+    "prompt": "Use case: scientific-educational. Asset type: one cooking-step illustration for a native recipe app.\n菜名：番茄豆腐盖饭；第1步：炒软番茄。\n严格表现此核对后的步骤，不编造新做法：中火热锅加油，放番茄炒约3分钟，直到明显变软出汁。\n本菜食材：熟米饭、番茄、北豆腐、食用油、水、盐。当前涉及：番茄、食用油。厨具：炒锅、锅铲。当前食材状态与操作动作必须清晰。\n统一风格：温暖简洁的柔和水彩配细腻铅笔线，奶白浅色背景，青绿色/奶油色厨具，俯侧视近景，克制留白。单幅方形构图，不要多格，不含文字、数字、标签、水印、品牌或UI。\n安全约束：手只握凉柄或戴隔热手套，不触碰热锅、热粥、热蒸汽；检查软度使用两把勺子在小碟上压开食材，绝不用手指碰热食。不能画品尝生蛋/生面糊。蒸锅取物使用夹子且蒸汽远离脸；热油里不能倒含水调味汁。说明和温度要求由App原生文字展示，插画仅辅助理解。",
+    "sha256": "03ebb110dbecc780d8ebc4dfaad095cc75ac4e56214d6a958ffc7c8eedc1e35e",
+    "bytes": 503958
+  },
+  {
+    "recipeId": "007c2a18-89fa-5ccd-8c2a-cbe2e7b72dfd",
+    "recipeVersion": 1,
+    "step": 2,
+    "asset": "FamilyReward.Api/recipe-illustrations/007c2a18-89fa-5ccd-8c2a-cbe2e7b72dfd/v1/step-2.jpg",
+    "tool": "built-in image_gen",
+    "prompt": "Use case: scientific-educational. Asset type: one cooking-step illustration for a native recipe app.\n菜名：番茄豆腐盖饭；第2步：炖豆腐。\n严格表现此核对后的步骤，不编造新做法：加入豆腐、水和盐，煮沸后小火炖6至8分钟，轻推防碎，确认豆腐中心热透。\n本菜食材：熟米饭、番茄、北豆腐、食用油、水、盐。当前涉及：番茄、北豆腐、水、盐。厨具：炒锅、锅铲。当前食材状态与操作动作必须清晰。\n统一风格：温暖简洁的柔和水彩配细腻铅笔线，奶白浅色背景，青绿色/奶油色厨具，俯侧视近景，克制留白。单幅方形构图，不要多格，不含文字、数字、标签、水印、品牌或UI。\n安全约束：手只握凉柄或戴隔热手套，不触碰热锅、热粥、热蒸汽；检查软度使用两把勺子在小碟上压开食材，绝不用手指碰热食。不能画品尝生蛋/生面糊。蒸锅取物使用夹子且蒸汽远离脸；热油里不能倒含水调味汁。说明和温度要求由App原生文字展示，插画仅辅助理解。",
+    "sha256": "cb81e735fb22aee432ab638422602421c50bd5fb24393360e63cfd8657830a70",
+    "bytes": 551555
+  },
+  {
+    "recipeId": "b984c313-ceb8-5fad-ab72-0254b3ad7f20",
+    "recipeVersion": 1,
+    "step": 3,
+    "asset": "FamilyReward.Api/recipe-illustrations/b984c313-ceb8-5fad-ab72-0254b3ad7f20/v1/step-3.jpg",
+    "tool": "built-in image_gen",
+    "prompt": "Use case: scientific-educational. Asset type: one cooking-step illustration for a native recipe app.\n菜名：香菇南瓜饭；第3步：翻松盛饭。\n严格表现此核对后的步骤，不编造新做法：用饭勺翻松熟饭，均匀混合后盛入两只碗，趁热食用。\n本菜食材：大米、水、南瓜、鲜香菇、盐。当前涉及：香菇南瓜饭。厨具：饭勺、碗。当前食材状态与操作动作必须清晰。\n统一风格：温暖简洁的柔和水彩配细腻铅笔线，奶白浅色背景，青绿色/奶油色厨具，俯侧视近景，克制留白。单幅方形构图，不要多格，不含文字、数字、标签、水印、品牌或UI。\n安全约束：手只握凉柄或戴隔热手套，不触碰热锅、热粥、热蒸汽；检查软度使用两把勺子在小碟上压开食材，绝不用手指碰热食。不能画品尝生蛋/生面糊。蒸锅取物使用夹子且蒸汽远离脸；热油里不能倒含水调味汁。说明和温度要求由App原生文字展示，插画仅辅助理解。",
+    "sha256": "56c3587b4dab66e4cf293698b13df0c2026c019db57ebfa3aa0d0e6a150609a2",
+    "bytes": 556110
+  },
+  {
+    "recipeId": "007c2a18-89fa-5ccd-8c2a-cbe2e7b72dfd",
+    "recipeVersion": 1,
+    "step": 3,
+    "asset": "FamilyReward.Api/recipe-illustrations/007c2a18-89fa-5ccd-8c2a-cbe2e7b72dfd/v1/step-3.jpg",
+    "tool": "built-in image_gen",
+    "prompt": "Use case: scientific-educational. Asset type: one cooking-step illustration for a native recipe app.\n菜名：番茄豆腐盖饭；第3步：盖在饭上。\n严格表现此核对后的步骤，不编造新做法：将热透的米饭分两碗，把番茄豆腐及汤汁浇在饭上。\n本菜食材：熟米饭、番茄、北豆腐、食用油、水、盐。当前涉及：熟米饭、番茄豆腐。厨具：碗、勺子。当前食材状态与操作动作必须清晰。\n统一风格：温暖简洁的柔和水彩配细腻铅笔线，奶白浅色背景，青绿色/奶油色厨具，俯侧视近景，克制留白。单幅方形构图，不要多格，不含文字、数字、标签、水印、品牌或UI。\n安全约束：手只握凉柄或戴隔热手套，不触碰热锅、热粥、热蒸汽；检查软度使用两把勺子在小碟上压开食材，绝不用手指碰热食。不能画品尝生蛋/生面糊。蒸锅取物使用夹子且蒸汽远离脸；热油里不能倒含水调味汁。说明和温度要求由App原生文字展示，插画仅辅助理解。",
+    "sha256": "e103d092be4487812681f37da244fe39bd837ca73dc4b62255ab6dfb6b5cd0eb",
+    "bytes": 453241
+  },
+  {
+    "recipeId": "7dae4874-fbba-50cc-990f-b9fda8a17852",
+    "recipeVersion": 1,
+    "step": 1,
+    "asset": "FamilyReward.Api/recipe-illustrations/7dae4874-fbba-50cc-990f-b9fda8a17852/v1/step-1.jpg",
+    "tool": "built-in image_gen",
+    "prompt": "Use case: scientific-educational. Asset type: one cooking-step illustration for a native recipe app.\n菜名：西兰花鸡蛋盖饭；第1步：焯西兰花。\n严格表现此核对后的步骤，不编造新做法：水烧开，西兰花下锅煮3至5分钟，至菜梗软嫩，捞出充分沥水。\n本菜食材：熟米饭、西兰花、鸡蛋、食用油、盐、水。当前涉及：西兰花、水。厨具：汤锅、漏勺。当前食材状态与操作动作必须清晰。\n统一风格：温暖简洁的柔和水彩配细腻铅笔线，奶白浅色背景，青绿色/奶油色厨具，俯侧视近景，克制留白。单幅方形构图，不要多格，不含文字、数字、标签、水印、品牌或UI。\n安全约束：手只握凉柄或戴隔热手套，不触碰热锅、热粥、热蒸汽；检查软度使用两把勺子在小碟上压开食材，绝不用手指碰热食。不能画品尝生蛋/生面糊。蒸锅取物使用夹子且蒸汽远离脸；热油里不能倒含水调味汁。说明和温度要求由App原生文字展示，插画仅辅助理解。",
+    "sha256": "244361a583a2727b6e16ec055e0be7a5bbbdda6e15db0e7d7ae74c3b136e3d7a",
+    "bytes": 551348
+  },
+  {
+    "recipeId": "823d0fd0-925c-5e4b-a2b9-bb5c49a7c5ab",
+    "recipeVersion": 1,
+    "step": 1,
+    "asset": "FamilyReward.Api/recipe-illustrations/823d0fd0-925c-5e4b-a2b9-bb5c49a7c5ab/v1/step-1.jpg",
+    "tool": "built-in image_gen",
+    "prompt": "Use case: scientific-educational. Asset type: one cooking-step illustration for a native recipe app.\n菜名：豌豆玉米饭；第1步：拌入配料。\n严格表现此核对后的步骤，不编造新做法：米加水放内锅，加入豌豆、玉米及盐；水量以米包装和电饭煲要求为准。\n本菜食材：大米、水、冷冻豌豆、甜玉米粒、盐。当前涉及：大米、水、冷冻豌豆、甜玉米粒、盐。厨具：电饭煲、量杯。当前食材状态与操作动作必须清晰。\n统一风格：温暖简洁的柔和水彩配细腻铅笔线，奶白浅色背景，青绿色/奶油色厨具，俯侧视近景，克制留白。单幅方形构图，不要多格，不含文字、数字、标签、水印、品牌或UI。\n安全约束：手只握凉柄或戴隔热手套，不触碰热锅、热粥、热蒸汽；检查软度使用两把勺子在小碟上压开食材，绝不用手指碰热食。不能画品尝生蛋/生面糊。蒸锅取物使用夹子且蒸汽远离脸；热油里不能倒含水调味汁。说明和温度要求由App原生文字展示，插画仅辅助理解。",
+    "sha256": "87c7cc474203f5c614a33b943b8b742416f3c4393f818a502ef6c5c8f177712b",
+    "bytes": 514383
+  },
+  {
+    "recipeId": "7dae4874-fbba-50cc-990f-b9fda8a17852",
+    "recipeVersion": 1,
+    "step": 3,
+    "asset": "FamilyReward.Api/recipe-illustrations/7dae4874-fbba-50cc-990f-b9fda8a17852/v1/step-3.jpg",
+    "tool": "built-in image_gen",
+    "prompt": "Use case: scientific-educational. Asset type: one cooking-step illustration for a native recipe app.\n菜名：西兰花鸡蛋盖饭；第3步：装碗。\n严格表现此核对后的步骤，不编造新做法：熟饭分两碗，盛入炒好的西兰花和鸡蛋，趁热吃。\n本菜食材：熟米饭、西兰花、鸡蛋、食用油、盐、水。当前涉及：熟米饭、西兰花鸡蛋。厨具：碗、勺子。当前食材状态与操作动作必须清晰。\n统一风格：温暖简洁的柔和水彩配细腻铅笔线，奶白浅色背景，青绿色/奶油色厨具，俯侧视近景，克制留白。单幅方形构图，不要多格，不含文字、数字、标签、水印、品牌或UI。\n安全约束：手只握凉柄或戴隔热手套，不触碰热锅、热粥、热蒸汽；检查软度使用两把勺子在小碟上压开食材，绝不用手指碰热食。不能画品尝生蛋/生面糊。蒸锅取物使用夹子且蒸汽远离脸；热油里不能倒含水调味汁。说明和温度要求由App原生文字展示，插画仅辅助理解。",
+    "sha256": "632febd5592d44cd69b7288ff319c98c69c49eead3126cf09870ebf4477dc5c4",
+    "bytes": 470978
+  },
+  {
+    "recipeId": "7dae4874-fbba-50cc-990f-b9fda8a17852",
+    "recipeVersion": 1,
+    "step": 2,
+    "asset": "FamilyReward.Api/recipe-illustrations/7dae4874-fbba-50cc-990f-b9fda8a17852/v1/step-2.jpg",
+    "tool": "built-in image_gen",
+    "prompt": "Use case: scientific-educational. Asset type: one cooking-step illustration for a native recipe app.\n菜名：西兰花鸡蛋盖饭；第2步：炒熟鸡蛋。\n严格表现此核对后的步骤，不编造新做法：中火热锅加油，倒蛋液翻炒至完全凝固，再加西兰花和盐拌炒；鸡蛋料理中心温度达到71°C。\n本菜食材：熟米饭、西兰花、鸡蛋、食用油、盐、水。当前涉及：鸡蛋、食用油、盐、西兰花。厨具：炒锅、锅铲。当前食材状态与操作动作必须清晰。\n统一风格：温暖简洁的柔和水彩配细腻铅笔线，奶白浅色背景，青绿色/奶油色厨具，俯侧视近景，克制留白。单幅方形构图，不要多格，不含文字、数字、标签、水印、品牌或UI。\n安全约束：手只握凉柄或戴隔热手套，不触碰热锅、热粥、热蒸汽；检查软度使用两把勺子在小碟上压开食材，绝不用手指碰热食。不能画品尝生蛋/生面糊。蒸锅取物使用夹子且蒸汽远离脸；热油里不能倒含水调味汁。说明和温度要求由App原生文字展示，插画仅辅助理解。",
+    "sha256": "e756ce0a12d2d7446333c6692916f1602820406468303bd6d0feffb103de40b9",
+    "bytes": 590542
+  },
+  {
+    "recipeId": "1aec04b6-23b9-5d45-aa4b-7d0b7b691494",
+    "recipeVersion": 1,
+    "step": 1,
+    "asset": "FamilyReward.Api/recipe-illustrations/1aec04b6-23b9-5d45-aa4b-7d0b7b691494/v1/step-1.jpg",
+    "tool": "built-in image_gen",
+    "prompt": "Use case: scientific-educational. Asset type: one cooking-step illustration for a native recipe app.\n菜名：土豆咖喱饭；第1步：炒配菜。\n严格表现此核对后的步骤，不编造新做法：热锅加油，先炒洋葱至变软，再加入土豆和胡萝卜翻炒2分钟。\n本菜食材：熟米饭、土豆、胡萝卜、洋葱、咖喱块、水、食用油。当前涉及：土豆、胡萝卜、洋葱、食用油。厨具：炒锅、锅铲。当前食材状态与操作动作必须清晰。\n统一风格：温暖简洁的柔和水彩配细腻铅笔线，奶白浅色背景，青绿色/奶油色厨具，俯侧视近景，克制留白。单幅方形构图，不要多格，不含文字、数字、标签、水印、品牌或UI。\n安全约束：手只握凉柄或戴隔热手套，不触碰热锅、热粥、热蒸汽；检查软度使用两把勺子在小碟上压开食材，绝不用手指碰热食。不能画品尝生蛋/生面糊。蒸锅取物使用夹子且蒸汽远离脸；热油里不能倒含水调味汁。说明和温度要求由App原生文字展示，插画仅辅助理解。",
+    "sha256": "a7e3362410a0324443e43f82fc5d3d7018fa45f0b4b5444d595a2eed4e06e492",
+    "bytes": 531352
+  },
+  {
+    "recipeId": "823d0fd0-925c-5e4b-a2b9-bb5c49a7c5ab",
+    "recipeVersion": 1,
+    "step": 2,
+    "asset": "FamilyReward.Api/recipe-illustrations/823d0fd0-925c-5e4b-a2b9-bb5c49a7c5ab/v1/step-2.jpg",
+    "tool": "built-in image_gen",
+    "prompt": "Use case: scientific-educational. Asset type: one cooking-step illustration for a native recipe app.\n菜名：豌豆玉米饭；第2步：煮饭。\n严格表现此核对后的步骤，不编造新做法：启动正常煮饭程序，结束后检查米饭无硬芯、豌豆和玉米熟透；未熟时补少量开水续煮。\n本菜食材：大米、水、冷冻豌豆、甜玉米粒、盐。当前涉及：米饭、豌豆、玉米。厨具：电饭煲。当前食材状态与操作动作必须清晰。\n统一风格：温暖简洁的柔和水彩配细腻铅笔线，奶白浅色背景，青绿色/奶油色厨具，俯侧视近景，克制留白。单幅方形构图，不要多格，不含文字、数字、标签、水印、品牌或UI。\n安全约束：手只握凉柄或戴隔热手套，不触碰热锅、热粥、热蒸汽；检查软度使用两把勺子在小碟上压开食材，绝不用手指碰热食。不能画品尝生蛋/生面糊。蒸锅取物使用夹子且蒸汽远离脸；热油里不能倒含水调味汁。说明和温度要求由App原生文字展示，插画仅辅助理解。",
+    "sha256": "c680e5c657d26019431f2dc40d1f5b0c1d69267c963b42ffc456755b8ec0b55a",
+    "bytes": 517320
+  },
+  {
+    "recipeId": "f893116b-294d-5dd7-9c9d-d25f8edc6bf3",
+    "recipeVersion": 1,
+    "step": 1,
+    "asset": "FamilyReward.Api/recipe-illustrations/f893116b-294d-5dd7-9c9d-d25f8edc6bf3/v1/step-1.jpg",
+    "tool": "built-in image_gen",
+    "prompt": "Use case: scientific-educational. Asset type: one cooking-step illustration for a native recipe app.\n菜名：芝麻拌面；第1步：煮熟面条。\n严格表现此核对后的步骤，不编造新做法：水烧开再下面，按包装时间煮至无硬芯，期间用筷子轻轻拨散。\n本菜食材：干面条、芝麻酱、黄瓜、生抽、温开水、煮面水。当前涉及：干面条、煮面水。厨具：汤锅、筷子。当前食材状态与操作动作必须清晰。\n统一风格：温暖简洁的柔和水彩配细腻铅笔线，奶白浅色背景，青绿色/奶油色厨具，俯侧视近景，克制留白。单幅方形构图，不要多格，不含文字、数字、标签、水印、品牌或UI。\n安全约束：手只握凉柄或戴隔热手套，不触碰热锅、热粥、热蒸汽；检查软度使用两把勺子在小碟上压开食材，绝不用手指碰热食。不能画品尝生蛋/生面糊。蒸锅取物使用夹子且蒸汽远离脸；热油里不能倒含水调味汁。说明和温度要求由App原生文字展示，插画仅辅助理解。",
+    "sha256": "99d52a9943074311ed8594f0ff2f300910003a3987bb464530cfa122e3e7ba5e",
+    "bytes": 464486
+  },
+  {
+    "recipeId": "1aec04b6-23b9-5d45-aa4b-7d0b7b691494",
+    "recipeVersion": 1,
+    "step": 2,
+    "asset": "FamilyReward.Api/recipe-illustrations/1aec04b6-23b9-5d45-aa4b-7d0b7b691494/v1/step-2.jpg",
+    "tool": "built-in image_gen",
+    "prompt": "Use case: scientific-educational. Asset type: one cooking-step illustration for a native recipe app.\n菜名：土豆咖喱饭；第2步：煮软调味。\n严格表现此核对后的步骤，不编造新做法：加水煮沸，转小火煮15至20分钟至蔬菜可轻松压碎，暂关火拌化咖喱块，再小火煮至浓稠，注意搅拌防糊。\n本菜食材：熟米饭、土豆、胡萝卜、洋葱、咖喱块、水、食用油。当前涉及：蔬菜、水、咖喱块。厨具：汤锅、勺子。当前食材状态与操作动作必须清晰。\n统一风格：温暖简洁的柔和水彩配细腻铅笔线，奶白浅色背景，青绿色/奶油色厨具，俯侧视近景，克制留白。单幅方形构图，不要多格，不含文字、数字、标签、水印、品牌或UI。\n安全约束：手只握凉柄或戴隔热手套，不触碰热锅、热粥、热蒸汽；检查软度使用两把勺子在小碟上压开食材，绝不用手指碰热食。不能画品尝生蛋/生面糊。蒸锅取物使用夹子且蒸汽远离脸；热油里不能倒含水调味汁。说明和温度要求由App原生文字展示，插画仅辅助理解。",
+    "sha256": "7abf8560fd870bfbdeefb88aa9c9fec0116cf4daeaf987a2913f404023df67a7",
+    "bytes": 503657
+  },
+  {
+    "recipeId": "f893116b-294d-5dd7-9c9d-d25f8edc6bf3",
+    "recipeVersion": 1,
+    "step": 2,
+    "asset": "FamilyReward.Api/recipe-illustrations/f893116b-294d-5dd7-9c9d-d25f8edc6bf3/v1/step-2.jpg",
+    "tool": "built-in image_gen",
+    "prompt": "Use case: scientific-educational. Asset type: one cooking-step illustration for a native recipe app.\n菜名：芝麻拌面；第2步：捞出沥水。\n严格表现此核对后的步骤，不编造新做法：熟面条捞出沥水，分别放两只碗；不用未经煮沸的水直接冲面。\n本菜食材：干面条、芝麻酱、黄瓜、生抽、温开水、煮面水。当前涉及：熟面条。厨具：漏勺、碗。当前食材状态与操作动作必须清晰。\n统一风格：温暖简洁的柔和水彩配细腻铅笔线，奶白浅色背景，青绿色/奶油色厨具，俯侧视近景，克制留白。单幅方形构图，不要多格，不含文字、数字、标签、水印、品牌或UI。\n安全约束：手只握凉柄或戴隔热手套，不触碰热锅、热粥、热蒸汽；检查软度使用两把勺子在小碟上压开食材，绝不用手指碰热食。不能画品尝生蛋/生面糊。蒸锅取物使用夹子且蒸汽远离脸；热油里不能倒含水调味汁。说明和温度要求由App原生文字展示，插画仅辅助理解。",
+    "sha256": "66050a85063e5a3cf21f5a8e13484a4a8eebc5c825fa0e0a56c6fa3a957a3129",
+    "bytes": 447139
+  },
+  {
+    "recipeId": "823d0fd0-925c-5e4b-a2b9-bb5c49a7c5ab",
+    "recipeVersion": 1,
+    "step": 3,
+    "asset": "FamilyReward.Api/recipe-illustrations/823d0fd0-925c-5e4b-a2b9-bb5c49a7c5ab/v1/step-3.jpg",
+    "tool": "built-in image_gen",
+    "prompt": "Use case: scientific-educational. Asset type: one cooking-step illustration for a native recipe app.\n菜名：豌豆玉米饭；第3步：翻松装碗。\n严格表现此核对后的步骤，不编造新做法：稍焖后翻松，把配料与米饭混合均匀，分成两份。\n本菜食材：大米、水、冷冻豌豆、甜玉米粒、盐。当前涉及：豌豆玉米饭。厨具：饭勺、碗。当前食材状态与操作动作必须清晰。\n统一风格：温暖简洁的柔和水彩配细腻铅笔线，奶白浅色背景，青绿色/奶油色厨具，俯侧视近景，克制留白。单幅方形构图，不要多格，不含文字、数字、标签、水印、品牌或UI。\n安全约束：手只握凉柄或戴隔热手套，不触碰热锅、热粥、热蒸汽；检查软度使用两把勺子在小碟上压开食材，绝不用手指碰热食。不能画品尝生蛋/生面糊。蒸锅取物使用夹子且蒸汽远离脸；热油里不能倒含水调味汁。说明和温度要求由App原生文字展示，插画仅辅助理解。",
+    "sha256": "3ae66ed8f4ad573b63e1aba4aaf4bede15cbaadba62fc67ed7af6994828a00e9",
+    "bytes": 514271
+  },
+  {
+    "recipeId": "1aec04b6-23b9-5d45-aa4b-7d0b7b691494",
+    "recipeVersion": 1,
+    "step": 3,
+    "asset": "FamilyReward.Api/recipe-illustrations/1aec04b6-23b9-5d45-aa4b-7d0b7b691494/v1/step-3.jpg",
+    "tool": "built-in image_gen",
+    "prompt": "Use case: scientific-educational. Asset type: one cooking-step illustration for a native recipe app.\n菜名：土豆咖喱饭；第3步：搭配米饭。\n严格表现此核对后的步骤，不编造新做法：热米饭装两碗，浇上熟透的蔬菜咖喱；不额外加盐，按咖喱块咸度调整。\n本菜食材：熟米饭、土豆、胡萝卜、洋葱、咖喱块、水、食用油。当前涉及：熟米饭、蔬菜咖喱。厨具：碗、汤勺。当前食材状态与操作动作必须清晰。\n统一风格：温暖简洁的柔和水彩配细腻铅笔线，奶白浅色背景，青绿色/奶油色厨具，俯侧视近景，克制留白。单幅方形构图，不要多格，不含文字、数字、标签、水印、品牌或UI。\n安全约束：手只握凉柄或戴隔热手套，不触碰热锅、热粥、热蒸汽；检查软度使用两把勺子在小碟上压开食材，绝不用手指碰热食。不能画品尝生蛋/生面糊。蒸锅取物使用夹子且蒸汽远离脸；热油里不能倒含水调味汁。说明和温度要求由App原生文字展示，插画仅辅助理解。",
+    "sha256": "745356ba000142df8d50d93757c1dfcd1237ba7d9bda8ed5aea544f52ab8f82d",
+    "bytes": 500936
+  },
+  {
+    "recipeId": "f893116b-294d-5dd7-9c9d-d25f8edc6bf3",
+    "recipeVersion": 1,
+    "step": 3,
+    "asset": "FamilyReward.Api/recipe-illustrations/f893116b-294d-5dd7-9c9d-d25f8edc6bf3/v1/step-3.jpg",
+    "tool": "built-in image_gen",
+    "prompt": "Use case: scientific-educational. Asset type: one cooking-step illustration for a native recipe app.\n菜名：芝麻拌面；第3步：拌酱摆黄瓜。\n严格表现此核对后的步骤，不编造新做法：淋调好的芝麻酱，放上黄瓜丝，用筷子充分拌匀后立即食用。\n本菜食材：干面条、芝麻酱、黄瓜、生抽、温开水、煮面水。当前涉及：熟面条、芝麻酱、生抽、黄瓜。厨具：碗、筷子。当前食材状态与操作动作必须清晰。\n统一风格：温暖简洁的柔和水彩配细腻铅笔线，奶白浅色背景，青绿色/奶油色厨具，俯侧视近景，克制留白。单幅方形构图，不要多格，不含文字、数字、标签、水印、品牌或UI。\n安全约束：手只握凉柄或戴隔热手套，不触碰热锅、热粥、热蒸汽；检查软度使用两把勺子在小碟上压开食材，绝不用手指碰热食。不能画品尝生蛋/生面糊。蒸锅取物使用夹子且蒸汽远离脸；热油里不能倒含水调味汁。说明和温度要求由App原生文字展示，插画仅辅助理解。",
+    "sha256": "fa1107635bf2ca826945339c79e32219df6573ec74234eed83c9f5990663b5c0",
+    "bytes": 523552
+  },
+  {
+    "recipeId": "fa4833cb-c15d-5ea8-8202-d2da33ff04d8",
+    "recipeVersion": 1,
+    "step": 1,
+    "asset": "FamilyReward.Api/recipe-illustrations/fa4833cb-c15d-5ea8-8202-d2da33ff04d8/v1/step-1.jpg",
+    "tool": "built-in image_gen",
+    "prompt": "Use case: scientific-educational. Asset type: one cooking-step illustration for a native recipe app.\n菜名：葱油拌面；第1步：熬葱油。\n严格表现此核对后的步骤，不编造新做法：冷锅放油和干燥葱段，用小火慢慢加热至葱段金黄，不烧黑；关火离火，葱油完全放凉后再加入调味汁拌匀；不要把含水调味汁倒入热油。\n本菜食材：干面条、小葱、食用油、生抽、白糖、水。当前涉及：小葱、食用油、生抽、白糖。厨具：小炒锅、锅铲。当前食材状态与操作动作必须清晰。\n统一风格：温暖简洁的柔和水彩配细腻铅笔线，奶白浅色背景，青绿色/奶油色厨具，俯侧视近景，克制留白。单幅方形构图，不要多格，不含文字、数字、标签、水印、品牌或UI。\n安全约束：手只握凉柄或戴隔热手套，不触碰热锅、热粥、热蒸汽；检查软度使用两把勺子在小碟上压开食材，绝不用手指碰热食。不能画品尝生蛋/生面糊。蒸锅取物使用夹子且蒸汽远离脸；热油里不能倒含水调味汁。说明和温度要求由App原生文字展示，插画仅辅助理解。",
+    "sha256": "904a950a44c54a27e741b0614d38ad241b18a81cb251930e89129faf893abe9c",
+    "bytes": 639295
+  },
+  {
+    "recipeId": "e8e4a6d6-4e47-58b8-bdae-dc458203b92d",
+    "recipeVersion": 1,
+    "step": 1,
+    "asset": "FamilyReward.Api/recipe-illustrations/e8e4a6d6-4e47-58b8-bdae-dc458203b92d/v1/step-1.jpg",
+    "tool": "built-in image_gen",
+    "prompt": "Use case: scientific-educational. Asset type: one cooking-step illustration for a native recipe app.\n菜名：番茄豆腐面；第1步：煮番茄豆腐汤。\n严格表现此核对后的步骤，不编造新做法：锅中放油炒软番茄，加300毫升水和豆腐，煮沸后小火炖6至8分钟，确认豆腐热透，加盐调味。\n本菜食材：干面条、番茄、北豆腐、食用油、盐、水。当前涉及：番茄、北豆腐、食用油、盐、水。厨具：汤锅、锅铲。当前食材状态与操作动作必须清晰。\n统一风格：温暖简洁的柔和水彩配细腻铅笔线，奶白浅色背景，青绿色/奶油色厨具，俯侧视近景，克制留白。单幅方形构图，不要多格，不含文字、数字、标签、水印、品牌或UI。\n安全约束：手只握凉柄或戴隔热手套，不触碰热锅、热粥、热蒸汽；检查软度使用两把勺子在小碟上压开食材，绝不用手指碰热食。不能画品尝生蛋/生面糊。蒸锅取物使用夹子且蒸汽远离脸；热油里不能倒含水调味汁。说明和温度要求由App原生文字展示，插画仅辅助理解。",
+    "sha256": "3b1f10e214f0dbb45f2e913d759087274ed8288980dcc8d57fa05be32ec8c387",
+    "bytes": 570465
+  },
+  {
+    "recipeId": "fa4833cb-c15d-5ea8-8202-d2da33ff04d8",
+    "recipeVersion": 1,
+    "step": 2,
+    "asset": "FamilyReward.Api/recipe-illustrations/fa4833cb-c15d-5ea8-8202-d2da33ff04d8/v1/step-2.jpg",
+    "tool": "built-in image_gen",
+    "prompt": "Use case: scientific-educational. Asset type: one cooking-step illustration for a native recipe app.\n菜名：葱油拌面；第2步：煮面捞面。\n严格表现此核对后的步骤，不编造新做法：另锅水沸后煮面，按包装时间煮至无硬芯，捞出沥水。\n本菜食材：干面条、小葱、食用油、生抽、白糖、水。当前涉及：干面条、水。厨具：汤锅、漏勺。当前食材状态与操作动作必须清晰。\n统一风格：温暖简洁的柔和水彩配细腻铅笔线，奶白浅色背景，青绿色/奶油色厨具，俯侧视近景，克制留白。单幅方形构图，不要多格，不含文字、数字、标签、水印、品牌或UI。\n安全约束：手只握凉柄或戴隔热手套，不触碰热锅、热粥、热蒸汽；检查软度使用两把勺子在小碟上压开食材，绝不用手指碰热食。不能画品尝生蛋/生面糊。蒸锅取物使用夹子且蒸汽远离脸；热油里不能倒含水调味汁。说明和温度要求由App原生文字展示，插画仅辅助理解。",
+    "sha256": "580f4c187db537e799b683c0c5d54dea1cbfd82c5e2f0a2615974c5d860891f4",
+    "bytes": 507281
+  },
+  {
+    "recipeId": "e8e4a6d6-4e47-58b8-bdae-dc458203b92d",
+    "recipeVersion": 1,
+    "step": 2,
+    "asset": "FamilyReward.Api/recipe-illustrations/e8e4a6d6-4e47-58b8-bdae-dc458203b92d/v1/step-2.jpg",
+    "tool": "built-in image_gen",
+    "prompt": "Use case: scientific-educational. Asset type: one cooking-step illustration for a native recipe app.\n菜名：番茄豆腐面；第2步：另锅煮面。\n严格表现此核对后的步骤，不编造新做法：另用1500毫升水煮面，按包装时间煮至无硬芯，捞出。\n本菜食材：干面条、番茄、北豆腐、食用油、盐、水。当前涉及：干面条、水。厨具：汤锅、漏勺。当前食材状态与操作动作必须清晰。\n统一风格：温暖简洁的柔和水彩配细腻铅笔线，奶白浅色背景，青绿色/奶油色厨具，俯侧视近景，克制留白。单幅方形构图，不要多格，不含文字、数字、标签、水印、品牌或UI。\n安全约束：手只握凉柄或戴隔热手套，不触碰热锅、热粥、热蒸汽；检查软度使用两把勺子在小碟上压开食材，绝不用手指碰热食。不能画品尝生蛋/生面糊。蒸锅取物使用夹子且蒸汽远离脸；热油里不能倒含水调味汁。说明和温度要求由App原生文字展示，插画仅辅助理解。",
+    "sha256": "b1139f04a0c62c3f0cca7d4975b7dbb424e86c75ad70fb49a7b2f13e5c8a8769",
+    "bytes": 504756
+  },
+  {
+    "recipeId": "fa4833cb-c15d-5ea8-8202-d2da33ff04d8",
+    "recipeVersion": 1,
+    "step": 3,
+    "asset": "FamilyReward.Api/recipe-illustrations/fa4833cb-c15d-5ea8-8202-d2da33ff04d8/v1/step-3.jpg",
+    "tool": "built-in image_gen",
+    "prompt": "Use case: scientific-educational. Asset type: one cooking-step illustration for a native recipe app.\n菜名：葱油拌面；第3步：拌匀。\n严格表现此核对后的步骤，不编造新做法：熟面分两碗，少量多次加入葱油汁并拌匀，按口味使用，不必倒入全部油汁。\n本菜食材：干面条、小葱、食用油、生抽、白糖、水。当前涉及：熟面条、葱油汁。厨具：碗、筷子。当前食材状态与操作动作必须清晰。\n统一风格：温暖简洁的柔和水彩配细腻铅笔线，奶白浅色背景，青绿色/奶油色厨具，俯侧视近景，克制留白。单幅方形构图，不要多格，不含文字、数字、标签、水印、品牌或UI。\n安全约束：手只握凉柄或戴隔热手套，不触碰热锅、热粥、热蒸汽；检查软度使用两把勺子在小碟上压开食材，绝不用手指碰热食。不能画品尝生蛋/生面糊。蒸锅取物使用夹子且蒸汽远离脸；热油里不能倒含水调味汁。说明和温度要求由App原生文字展示，插画仅辅助理解。",
+    "sha256": "cdd89371245c2db338308a7cd30c8248c8988b056401bc2563f6ce58a3df0de9",
+    "bytes": 524423
+  },
+  {
+    "recipeId": "e8e4a6d6-4e47-58b8-bdae-dc458203b92d",
+    "recipeVersion": 1,
+    "step": 3,
+    "asset": "FamilyReward.Api/recipe-illustrations/e8e4a6d6-4e47-58b8-bdae-dc458203b92d/v1/step-3.jpg",
+    "tool": "built-in image_gen",
+    "prompt": "Use case: scientific-educational. Asset type: one cooking-step illustration for a native recipe app.\n菜名：番茄豆腐面；第3步：浇汤。\n严格表现此核对后的步骤，不编造新做法：熟面分两碗，浇上滚热的番茄豆腐汤，拌匀后食用。\n本菜食材：干面条、番茄、北豆腐、食用油、盐、水。当前涉及：熟面条、番茄豆腐汤。厨具：碗、汤勺。当前食材状态与操作动作必须清晰。\n统一风格：温暖简洁的柔和水彩配细腻铅笔线，奶白浅色背景，青绿色/奶油色厨具，俯侧视近景，克制留白。单幅方形构图，不要多格，不含文字、数字、标签、水印、品牌或UI。\n安全约束：手只握凉柄或戴隔热手套，不触碰热锅、热粥、热蒸汽；检查软度使用两把勺子在小碟上压开食材，绝不用手指碰热食。不能画品尝生蛋/生面糊。蒸锅取物使用夹子且蒸汽远离脸；热油里不能倒含水调味汁。说明和温度要求由App原生文字展示，插画仅辅助理解。",
+    "sha256": "be62b6ac189eabe48cb50fe58726eb88b96141f942448b68eb23f97edb00d307",
+    "bytes": 550955
+  },
+  {
+    "recipeId": "cf0ac08f-1f1e-574f-9faa-bbdd799dd3c8",
+    "recipeVersion": 1,
+    "step": 1,
+    "asset": "FamilyReward.Api/recipe-illustrations/cf0ac08f-1f1e-574f-9faa-bbdd799dd3c8/v1/step-1.jpg",
+    "tool": "built-in image_gen",
+    "prompt": "Use case: scientific-educational. Asset type: one cooking-step illustration for a native recipe app.\n菜名：紫菜鸡蛋汤面；第1步：煮面。\n严格表现此核对后的步骤，不编造新做法：水沸后下面条，按包装时间煮至接近熟透，用筷子拨散防粘。\n本菜食材：干面条、即食干紫菜、鸡蛋、水、盐。当前涉及：干面条、水。厨具：汤锅、筷子。当前食材状态与操作动作必须清晰。\n统一风格：温暖简洁的柔和水彩配细腻铅笔线，奶白浅色背景，青绿色/奶油色厨具，俯侧视近景，克制留白。单幅方形构图，不要多格，不含文字、数字、标签、水印、品牌或UI。\n安全约束：手只握凉柄或戴隔热手套，不触碰热锅、热粥、热蒸汽；检查软度使用两把勺子在小碟上压开食材，绝不用手指碰热食。不能画品尝生蛋/生面糊。蒸锅取物使用夹子且蒸汽远离脸；热油里不能倒含水调味汁。说明和温度要求由App原生文字展示，插画仅辅助理解。",
+    "sha256": "523e64d1f25efca4a56a7b840e415dbcabe6a7f6db988d3ee682d21a1a779fc5",
+    "bytes": 534039
+  },
+  {
+    "recipeId": "7f602a5a-ad70-5994-b4c4-6a4e93ecd424",
+    "recipeVersion": 1,
+    "step": 2,
+    "asset": "FamilyReward.Api/recipe-illustrations/7f602a5a-ad70-5994-b4c4-6a4e93ecd424/v1/step-2.jpg",
+    "tool": "built-in image_gen",
+    "prompt": "Use case: scientific-educational. Asset type: one cooking-step illustration for a native recipe app.\n菜名：黄瓜鸡蛋拌面；第2步：煮面沥水。\n严格表现此核对后的步骤，不编造新做法：另锅水沸下面，按包装时间煮至无硬芯，捞出沥水。\n本菜食材：干面条、黄瓜、鸡蛋、食用油、生抽、水。当前涉及：干面条、水。厨具：汤锅、漏勺。当前食材状态与操作动作必须清晰。\n统一风格：温暖简洁的柔和水彩配细腻铅笔线，奶白浅色背景，青绿色/奶油色厨具，俯侧视近景，克制留白。单幅方形构图，不要多格，不含文字、数字、标签、水印、品牌或UI。\n安全约束：手只握凉柄或戴隔热手套，不触碰热锅、热粥、热蒸汽；检查软度使用两把勺子在小碟上压开食材，绝不用手指碰热食。不能画品尝生蛋/生面糊。蒸锅取物使用夹子且蒸汽远离脸；热油里不能倒含水调味汁。说明和温度要求由App原生文字展示，插画仅辅助理解。",
+    "sha256": "787fd4e66662bb7755a7e255e426df6f9b32ed230efda6ade494834c0c6190e6",
+    "bytes": 515078
+  },
+  {
+    "recipeId": "7f602a5a-ad70-5994-b4c4-6a4e93ecd424",
+    "recipeVersion": 1,
+    "step": 1,
+    "asset": "FamilyReward.Api/recipe-illustrations/7f602a5a-ad70-5994-b4c4-6a4e93ecd424/v1/step-1.jpg",
+    "tool": "built-in image_gen",
+    "prompt": "Use case: scientific-educational. Asset type: one cooking-step illustration for a native recipe app.\n菜名：黄瓜鸡蛋拌面；第1步：炒熟鸡蛋。\n严格表现此核对后的步骤，不编造新做法：热锅加油，中火炒蛋至完全凝固，中心温度达到71°C，再盛入干净盘中。\n本菜食材：干面条、黄瓜、鸡蛋、食用油、生抽、水。当前涉及：鸡蛋、食用油。厨具：炒锅、锅铲。当前食材状态与操作动作必须清晰。\n统一风格：温暖简洁的柔和水彩配细腻铅笔线，奶白浅色背景，青绿色/奶油色厨具，俯侧视近景，克制留白。单幅方形构图，不要多格，不含文字、数字、标签、水印、品牌或UI。\n安全约束：手只握凉柄或戴隔热手套，不触碰热锅、热粥、热蒸汽；检查软度使用两把勺子在小碟上压开食材，绝不用手指碰热食。不能画品尝生蛋/生面糊。蒸锅取物使用夹子且蒸汽远离脸；热油里不能倒含水调味汁。说明和温度要求由App原生文字展示，插画仅辅助理解。",
+    "sha256": "977b3e8935eb676dbd79aff753f14fff1ee1ed37a359af863b2e102a68b18e80",
+    "bytes": 512597
+  },
+  {
+    "recipeId": "cf0ac08f-1f1e-574f-9faa-bbdd799dd3c8",
+    "recipeVersion": 1,
+    "step": 2,
+    "asset": "FamilyReward.Api/recipe-illustrations/cf0ac08f-1f1e-574f-9faa-bbdd799dd3c8/v1/step-2.jpg",
+    "tool": "built-in image_gen",
+    "prompt": "Use case: scientific-educational. Asset type: one cooking-step illustration for a native recipe app.\n菜名：紫菜鸡蛋汤面；第2步：煮蛋花紫菜。\n严格表现此核对后的步骤，不编造新做法：保持汤滚，缓缓淋入蛋液，煮至完全凝固，再放紫菜和盐，继续煮沸；鸡蛋料理中心温度达到71°C，面条无硬芯。\n本菜食材：干面条、即食干紫菜、鸡蛋、水、盐。当前涉及：熟面条、鸡蛋、即食干紫菜、盐。厨具：汤锅、勺子。当前食材状态与操作动作必须清晰。\n统一风格：温暖简洁的柔和水彩配细腻铅笔线，奶白浅色背景，青绿色/奶油色厨具，俯侧视近景，克制留白。单幅方形构图，不要多格，不含文字、数字、标签、水印、品牌或UI。\n安全约束：手只握凉柄或戴隔热手套，不触碰热锅、热粥、热蒸汽；检查软度使用两把勺子在小碟上压开食材，绝不用手指碰热食。不能画品尝生蛋/生面糊。蒸锅取物使用夹子且蒸汽远离脸；热油里不能倒含水调味汁。说明和温度要求由App原生文字展示，插画仅辅助理解。",
+    "sha256": "3296a02af7e1e7cbd2ea5b9964a57b60f1b38e9cf1c62aafa04d15c5e732c672",
+    "bytes": 514786
+  },
+  {
+    "recipeId": "8fcf5538-06b4-5a82-82a6-7523be692194",
+    "recipeVersion": 1,
+    "step": 1,
+    "asset": "FamilyReward.Api/recipe-illustrations/8fcf5538-06b4-5a82-82a6-7523be692194/v1/step-1.jpg",
+    "tool": "built-in image_gen",
+    "prompt": "Use case: scientific-educational. Asset type: one cooking-step illustration for a native recipe app.\n菜名：玉米小米粥；第1步：下锅煮开。\n严格表现此核对后的步骤，不编造新做法：水烧开后放入小米和甜玉米粒，搅匀转小火。\n本菜食材：小米、甜玉米粒、水。当前涉及：小米、甜玉米粒、水。厨具：汤锅、长柄勺。当前食材状态与操作动作必须清晰。\n统一风格：温暖简洁的柔和水彩配细腻铅笔线，奶白浅色背景，青绿色/奶油色厨具，俯侧视近景，克制留白。单幅方形构图，不要多格，不含文字、数字、标签、水印、品牌或UI。\n安全约束：手只握凉柄或戴隔热手套，不触碰热锅、热粥、热蒸汽；检查软度使用两把勺子在小碟上压开食材，绝不用手指碰热食。不能画品尝生蛋/生面糊。蒸锅取物使用夹子且蒸汽远离脸；热油里不能倒含水调味汁。说明和温度要求由App原生文字展示，插画仅辅助理解。",
+    "sha256": "3f136472f758d005d017838fd3aa3f553d337d063a28331e7781f9a1524031ec",
+    "bytes": 499449
+  },
+  {
+    "recipeId": "cf0ac08f-1f1e-574f-9faa-bbdd799dd3c8",
+    "recipeVersion": 1,
+    "step": 3,
+    "asset": "FamilyReward.Api/recipe-illustrations/cf0ac08f-1f1e-574f-9faa-bbdd799dd3c8/v1/step-3.jpg",
+    "tool": "built-in image_gen",
+    "prompt": "Use case: scientific-educational. Asset type: one cooking-step illustration for a native recipe app.\n菜名：紫菜鸡蛋汤面；第3步：盛出汤面。\n严格表现此核对后的步骤，不编造新做法：把面条和蛋花紫菜汤分两碗，放至适口温度再吃。\n本菜食材：干面条、即食干紫菜、鸡蛋、水、盐。当前涉及：紫菜鸡蛋汤面。厨具：大碗、汤勺。当前食材状态与操作动作必须清晰。\n统一风格：温暖简洁的柔和水彩配细腻铅笔线，奶白浅色背景，青绿色/奶油色厨具，俯侧视近景，克制留白。单幅方形构图，不要多格，不含文字、数字、标签、水印、品牌或UI。\n安全约束：手只握凉柄或戴隔热手套，不触碰热锅、热粥、热蒸汽；检查软度使用两把勺子在小碟上压开食材，绝不用手指碰热食。不能画品尝生蛋/生面糊。蒸锅取物使用夹子且蒸汽远离脸；热油里不能倒含水调味汁。说明和温度要求由App原生文字展示，插画仅辅助理解。",
+    "sha256": "60c323751cc6ad4b1a2ff240686ed3fe991fcf7d0dd7e5dcfcde9eaf0be795ae",
+    "bytes": 485804
+  },
+  {
+    "recipeId": "8fcf5538-06b4-5a82-82a6-7523be692194",
+    "recipeVersion": 1,
+    "step": 2,
+    "asset": "FamilyReward.Api/recipe-illustrations/8fcf5538-06b4-5a82-82a6-7523be692194/v1/step-2.jpg",
+    "tool": "built-in image_gen",
+    "prompt": "Use case: scientific-educational. Asset type: one cooking-step illustration for a native recipe app.\n菜名：玉米小米粥；第2步：慢煮至熟。\n严格表现此核对后的步骤，不编造新做法：锅盖留缝，小火慢煮并定时搅拌防溢防糊，至小米无硬芯、甜玉米粒软透；实际时间以食材熟度为准。\n本菜食材：小米、甜玉米粒、水。当前涉及：小米、甜玉米粒、粥。厨具：汤锅、长柄勺。当前食材状态与操作动作必须清晰。\n统一风格：温暖简洁的柔和水彩配细腻铅笔线，奶白浅色背景，青绿色/奶油色厨具，俯侧视近景，克制留白。单幅方形构图，不要多格，不含文字、数字、标签、水印、品牌或UI。\n安全约束：手只握凉柄或戴隔热手套，不触碰热锅、热粥、热蒸汽；检查软度使用两把勺子在小碟上压开食材，绝不用手指碰热食。不能画品尝生蛋/生面糊。蒸锅取物使用夹子且蒸汽远离脸；热油里不能倒含水调味汁。说明和温度要求由App原生文字展示，插画仅辅助理解。",
+    "sha256": "e02ebb626b25f05f377b6a2a394e6cf8da8c1331153cc3efe45c02152e9763c1",
+    "bytes": 466755
+  },
+  {
+    "recipeId": "8fcf5538-06b4-5a82-82a6-7523be692194",
+    "recipeVersion": 1,
+    "step": 3,
+    "asset": "FamilyReward.Api/recipe-illustrations/8fcf5538-06b4-5a82-82a6-7523be692194/v1/step-3.jpg",
+    "tool": "built-in image_gen",
+    "prompt": "Use case: scientific-educational. Asset type: one cooking-step illustration for a native recipe app.\n菜名：玉米小米粥；第3步：检查后盛出。\n严格表现此核对后的步骤，不编造新做法：用勺子取少量粥检查，谷物无硬芯、块状食材可用另一把勺子轻松压碎；勿用手碰热粥。关火盛碗，稍凉后食用。\n本菜食材：小米、甜玉米粒、水。当前涉及：熟粥。厨具：勺子、碗。当前食材状态与操作动作必须清晰。\n统一风格：温暖简洁的柔和水彩配细腻铅笔线，奶白浅色背景，青绿色/奶油色厨具，俯侧视近景，克制留白。单幅方形构图，不要多格，不含文字、数字、标签、水印、品牌或UI。\n安全约束：手只握凉柄或戴隔热手套，不触碰热锅、热粥、热蒸汽；检查软度使用两把勺子在小碟上压开食材，绝不用手指碰热食。不能画品尝生蛋/生面糊。蒸锅取物使用夹子且蒸汽远离脸；热油里不能倒含水调味汁。说明和温度要求由App原生文字展示，插画仅辅助理解。",
+    "sha256": "6299388793cde8b1b0531233aa13a40cab008366494ba8fc1822223063162238",
+    "bytes": 468631
+  },
+  {
+    "recipeId": "1e3119b5-362d-5c1f-908e-868022cf33dd",
+    "recipeVersion": 1,
+    "step": 2,
+    "asset": "FamilyReward.Api/recipe-illustrations/1e3119b5-362d-5c1f-908e-868022cf33dd/v1/step-2.jpg",
+    "tool": "built-in image_gen",
+    "prompt": "Use case: scientific-educational. Asset type: one cooking-step illustration for a native recipe app.\n菜名：香菇青菜粥；第2步：慢煮至熟。\n严格表现此核对后的步骤，不编造新做法：锅盖留缝，小火慢煮并定时搅拌防溢防糊，至大米无硬芯、鲜香菇软透；实际时间以食材熟度为准。米粥软烂且香菇完全熟透后加入青菜和盐，再煮3至5分钟至菜熟。\n本菜食材：大米、鲜香菇、水、小青菜、盐。当前涉及：大米、鲜香菇、粥。厨具：汤锅、长柄勺。当前食材状态与操作动作必须清晰。\n统一风格：温暖简洁的柔和水彩配细腻铅笔线，奶白浅色背景，青绿色/奶油色厨具，俯侧视近景，克制留白。单幅方形构图，不要多格，不含文字、数字、标签、水印、品牌或UI。\n安全约束：手只握凉柄或戴隔热手套，不触碰热锅、热粥、热蒸汽；检查软度使用两把勺子在小碟上压开食材，绝不用手指碰热食。不能画品尝生蛋/生面糊。蒸锅取物使用夹子且蒸汽远离脸；热油里不能倒含水调味汁。说明和温度要求由App原生文字展示，插画仅辅助理解。",
+    "sha256": "9729102a95cc32578bdda114fbe3029ff75cd53691ad8690b3e17203a5551036",
+    "bytes": 513503
+  },
+  {
+    "recipeId": "1e3119b5-362d-5c1f-908e-868022cf33dd",
+    "recipeVersion": 1,
+    "step": 1,
+    "asset": "FamilyReward.Api/recipe-illustrations/1e3119b5-362d-5c1f-908e-868022cf33dd/v1/step-1.jpg",
+    "tool": "built-in image_gen",
+    "prompt": "Use case: scientific-educational. Asset type: one cooking-step illustration for a native recipe app.\n菜名：香菇青菜粥；第1步：下锅煮开。\n严格表现此核对后的步骤，不编造新做法：水烧开后放入大米和鲜香菇，搅匀转小火。\n本菜食材：大米、鲜香菇、水、小青菜、盐。当前涉及：大米、鲜香菇、水。厨具：汤锅、长柄勺。当前食材状态与操作动作必须清晰。\n统一风格：温暖简洁的柔和水彩配细腻铅笔线，奶白浅色背景，青绿色/奶油色厨具，俯侧视近景，克制留白。单幅方形构图，不要多格，不含文字、数字、标签、水印、品牌或UI。\n安全约束：手只握凉柄或戴隔热手套，不触碰热锅、热粥、热蒸汽；检查软度使用两把勺子在小碟上压开食材，绝不用手指碰热食。不能画品尝生蛋/生面糊。蒸锅取物使用夹子且蒸汽远离脸；热油里不能倒含水调味汁。说明和温度要求由App原生文字展示，插画仅辅助理解。",
+    "sha256": "3f30c3a3cad76913b4fdadde2a5d161e98f56b503b6d56b65b557030941e52b2",
+    "bytes": 533384
+  },
+  {
+    "recipeId": "1e3119b5-362d-5c1f-908e-868022cf33dd",
+    "recipeVersion": 1,
+    "step": 3,
+    "asset": "FamilyReward.Api/recipe-illustrations/1e3119b5-362d-5c1f-908e-868022cf33dd/v1/step-3.jpg",
+    "tool": "built-in image_gen",
+    "prompt": "Use case: scientific-educational. Asset type: one cooking-step illustration for a native recipe app.\n菜名：香菇青菜粥；第3步：检查后盛出。\n严格表现此核对后的步骤，不编造新做法：用勺子取少量粥检查，谷物无硬芯、块状食材可用另一把勺子轻松压碎；勿用手碰热粥。关火盛碗，稍凉后食用。\n本菜食材：大米、鲜香菇、水、小青菜、盐。当前涉及：熟粥。厨具：勺子、碗。当前食材状态与操作动作必须清晰。\n统一风格：温暖简洁的柔和水彩配细腻铅笔线，奶白浅色背景，青绿色/奶油色厨具，俯侧视近景，克制留白。单幅方形构图，不要多格，不含文字、数字、标签、水印、品牌或UI。\n安全约束：手只握凉柄或戴隔热手套，不触碰热锅、热粥、热蒸汽；检查软度使用两把勺子在小碟上压开食材，绝不用手指碰热食。不能画品尝生蛋/生面糊。蒸锅取物使用夹子且蒸汽远离脸；热油里不能倒含水调味汁。说明和温度要求由App原生文字展示，插画仅辅助理解。",
+    "sha256": "93b273540e2a5336b6ed926c8925630cd77624c0ed9c5d55cb76fb9f22f3e4b5",
+    "bytes": 489725
+  },
+  {
+    "recipeId": "77619f45-6da6-5172-9931-16ad80b2c213",
+    "recipeVersion": 1,
+    "step": 1,
+    "asset": "FamilyReward.Api/recipe-illustrations/77619f45-6da6-5172-9931-16ad80b2c213/v1/step-1.jpg",
+    "tool": "built-in image_gen",
+    "prompt": "Use case: scientific-educational. Asset type: one cooking-step illustration for a native recipe app.\n菜名：南瓜燕麦粥；第1步：下锅煮开。\n严格表现此核对后的步骤，不编造新做法：先把南瓜丁放入沸水中，小火煮约15分钟至软，再按燕麦片包装所需时间加入燕麦。\n本菜食材：燕麦片、南瓜、水。当前涉及：燕麦片、南瓜、水。厨具：汤锅、长柄勺。当前食材状态与操作动作必须清晰。\n统一风格：温暖简洁的柔和水彩配细腻铅笔线，奶白浅色背景，青绿色/奶油色厨具，俯侧视近景，克制留白。单幅方形构图，不要多格，不含文字、数字、标签、水印、品牌或UI。\n安全约束：手只握凉柄或戴隔热手套，不触碰热锅、热粥、热蒸汽；检查软度使用两把勺子在小碟上压开食材，绝不用手指碰热食。不能画品尝生蛋/生面糊。蒸锅取物使用夹子且蒸汽远离脸；热油里不能倒含水调味汁。说明和温度要求由App原生文字展示，插画仅辅助理解。",
+    "sha256": "643e680b0af3f60e6826a4bc42041b3ae6d50403e8a937a354b8da65c5cee736",
+    "bytes": 532415
+  },
+  {
+    "recipeId": "77619f45-6da6-5172-9931-16ad80b2c213",
+    "recipeVersion": 1,
+    "step": 2,
+    "asset": "FamilyReward.Api/recipe-illustrations/77619f45-6da6-5172-9931-16ad80b2c213/v1/step-2.jpg",
+    "tool": "built-in image_gen",
+    "prompt": "Use case: scientific-educational. Asset type: one cooking-step illustration for a native recipe app.\n菜名：南瓜燕麦粥；第2步：慢煮至熟。\n严格表现此核对后的步骤，不编造新做法：锅盖留缝，小火慢煮并定时搅拌防溢防糊，至燕麦片无硬芯、南瓜软透；实际时间以食材熟度为准。\n本菜食材：燕麦片、南瓜、水。当前涉及：燕麦片、南瓜、粥。厨具：汤锅、长柄勺。当前食材状态与操作动作必须清晰。\n统一风格：温暖简洁的柔和水彩配细腻铅笔线，奶白浅色背景，青绿色/奶油色厨具，俯侧视近景，克制留白。单幅方形构图，不要多格，不含文字、数字、标签、水印、品牌或UI。\n安全约束：手只握凉柄或戴隔热手套，不触碰热锅、热粥、热蒸汽；检查软度使用两把勺子在小碟上压开食材，绝不用手指碰热食。不能画品尝生蛋/生面糊。蒸锅取物使用夹子且蒸汽远离脸；热油里不能倒含水调味汁。说明和温度要求由App原生文字展示，插画仅辅助理解。",
+    "sha256": "3b46790912fa05bd8d867009c3aae54c0344530f0daa3acf5e0018bde891214b",
+    "bytes": 508809
+  },
+  {
+    "recipeId": "77619f45-6da6-5172-9931-16ad80b2c213",
+    "recipeVersion": 1,
+    "step": 3,
+    "asset": "FamilyReward.Api/recipe-illustrations/77619f45-6da6-5172-9931-16ad80b2c213/v1/step-3.jpg",
+    "tool": "built-in image_gen",
+    "prompt": "Use case: scientific-educational. Asset type: one cooking-step illustration for a native recipe app.\n菜名：南瓜燕麦粥；第3步：检查后盛出。\n严格表现此核对后的步骤，不编造新做法：用勺子取少量粥检查，谷物无硬芯、块状食材可用另一把勺子轻松压碎；勿用手碰热粥。关火盛碗，稍凉后食用。\n本菜食材：燕麦片、南瓜、水。当前涉及：熟粥。厨具：勺子、碗。当前食材状态与操作动作必须清晰。\n统一风格：温暖简洁的柔和水彩配细腻铅笔线，奶白浅色背景，青绿色/奶油色厨具，俯侧视近景，克制留白。单幅方形构图，不要多格，不含文字、数字、标签、水印、品牌或UI。\n安全约束：手只握凉柄或戴隔热手套，不触碰热锅、热粥、热蒸汽；检查软度使用两把勺子在小碟上压开食材，绝不用手指碰热食。不能画品尝生蛋/生面糊。蒸锅取物使用夹子且蒸汽远离脸；热油里不能倒含水调味汁。说明和温度要求由App原生文字展示，插画仅辅助理解。",
+    "sha256": "9f790024b21759be84ba70fe0fa8729c38d1d3a9d659d48d942c93ad6ec5720b",
+    "bytes": 485359
+  },
+  {
+    "recipeId": "c6b3c486-b347-5184-87e3-c4d745e20dee",
+    "recipeVersion": 1,
+    "step": 1,
+    "asset": "FamilyReward.Api/recipe-illustrations/c6b3c486-b347-5184-87e3-c4d745e20dee/v1/step-1.jpg",
+    "tool": "built-in image_gen",
+    "prompt": "Use case: scientific-educational. Asset type: one cooking-step illustration for a native recipe app.\n菜名：紫薯大米粥；第1步：下锅煮开。\n严格表现此核对后的步骤，不编造新做法：水烧开后放入大米和紫薯，搅匀转小火。\n本菜食材：大米、紫薯、水。当前涉及：大米、紫薯、水。厨具：汤锅、长柄勺。当前食材状态与操作动作必须清晰。\n统一风格：温暖简洁的柔和水彩配细腻铅笔线，奶白浅色背景，青绿色/奶油色厨具，俯侧视近景，克制留白。单幅方形构图，不要多格，不含文字、数字、标签、水印、品牌或UI。\n安全约束：手只握凉柄或戴隔热手套，不触碰热锅、热粥、热蒸汽；检查软度使用两把勺子在小碟上压开食材，绝不用手指碰热食。不能画品尝生蛋/生面糊。蒸锅取物使用夹子且蒸汽远离脸；热油里不能倒含水调味汁。说明和温度要求由App原生文字展示，插画仅辅助理解。",
+    "sha256": "5058fe8b36632316f1728413944669dfccecdc4f7dadd7bf0332a2426ead6ea0",
+    "bytes": 511894
+  },
+  {
+    "recipeId": "c6b3c486-b347-5184-87e3-c4d745e20dee",
+    "recipeVersion": 1,
+    "step": 2,
+    "asset": "FamilyReward.Api/recipe-illustrations/c6b3c486-b347-5184-87e3-c4d745e20dee/v1/step-2.jpg",
+    "tool": "built-in image_gen",
+    "prompt": "Use case: scientific-educational. Asset type: one cooking-step illustration for a native recipe app.\n菜名：紫薯大米粥；第2步：慢煮至熟。\n严格表现此核对后的步骤，不编造新做法：锅盖留缝，小火慢煮并定时搅拌防溢防糊，至大米无硬芯、紫薯软透；实际时间以食材熟度为准。\n本菜食材：大米、紫薯、水。当前涉及：大米、紫薯、粥。厨具：汤锅、长柄勺。当前食材状态与操作动作必须清晰。\n统一风格：温暖简洁的柔和水彩配细腻铅笔线，奶白浅色背景，青绿色/奶油色厨具，俯侧视近景，克制留白。单幅方形构图，不要多格，不含文字、数字、标签、水印、品牌或UI。\n安全约束：手只握凉柄或戴隔热手套，不触碰热锅、热粥、热蒸汽；检查软度使用两把勺子在小碟上压开食材，绝不用手指碰热食。不能画品尝生蛋/生面糊。蒸锅取物使用夹子且蒸汽远离脸；热油里不能倒含水调味汁。说明和温度要求由App原生文字展示，插画仅辅助理解。",
+    "sha256": "fb8ef9b44d3f814e060a8488492550fa33ba14e698a10682eac734d356084c9b",
+    "bytes": 529724
+  },
+  {
+    "recipeId": "c6b3c486-b347-5184-87e3-c4d745e20dee",
+    "recipeVersion": 1,
+    "step": 3,
+    "asset": "FamilyReward.Api/recipe-illustrations/c6b3c486-b347-5184-87e3-c4d745e20dee/v1/step-3.jpg",
+    "tool": "built-in image_gen",
+    "prompt": "Use case: scientific-educational. Asset type: one cooking-step illustration for a native recipe app.\n菜名：紫薯大米粥；第3步：检查后盛出。\n严格表现此核对后的步骤，不编造新做法：用勺子取少量粥检查，谷物无硬芯、块状食材可用另一把勺子轻松压碎；勿用手碰热粥。关火盛碗，稍凉后食用。\n本菜食材：大米、紫薯、水。当前涉及：熟粥。厨具：勺子、碗。当前食材状态与操作动作必须清晰。\n统一风格：温暖简洁的柔和水彩配细腻铅笔线，奶白浅色背景，青绿色/奶油色厨具，俯侧视近景，克制留白。单幅方形构图，不要多格，不含文字、数字、标签、水印、品牌或UI。\n安全约束：手只握凉柄或戴隔热手套，不触碰热锅、热粥、热蒸汽；检查软度使用两把勺子在小碟上压开食材，绝不用手指碰热食。不能画品尝生蛋/生面糊。蒸锅取物使用夹子且蒸汽远离脸；热油里不能倒含水调味汁。说明和温度要求由App原生文字展示，插画仅辅助理解。",
+    "sha256": "c85ae52041e9daed50cc20562a6e1afb3b550d78490ce5fe1e2d325575da36c5",
+    "bytes": 516116
+  },
+  {
+    "recipeId": "7f602a5a-ad70-5994-b4c4-6a4e93ecd424",
+    "recipeVersion": 1,
+    "step": 3,
+    "asset": "FamilyReward.Api/recipe-illustrations/7f602a5a-ad70-5994-b4c4-6a4e93ecd424/v1/step-3.jpg",
+    "tool": "built-in image_gen",
+    "prompt": "Use case: scientific-educational. Asset type: one cooking-step illustration for a native recipe app.\n菜名：黄瓜鸡蛋拌面；第3步：拌面。\n严格表现此核对后的步骤，不编造新做法：热面分两碗，放熟鸡蛋与黄瓜丝，淋生抽拌匀，立即吃完。\n本菜食材：干面条、黄瓜、鸡蛋、食用油、生抽、水。当前涉及：熟面条、熟鸡蛋、黄瓜、生抽。厨具：碗、筷子。当前食材状态与操作动作必须清晰。\n统一风格：温暖简洁的柔和水彩配细腻铅笔线，奶白浅色背景，青绿色/奶油色厨具，俯侧视近景，克制留白。单幅方形构图，不要多格，不含文字、数字、标签、水印、品牌或UI。\n安全约束：手只握凉柄或戴隔热手套，不触碰热锅、热粥、热蒸汽；检查软度使用两把勺子在小碟上压开食材，绝不用手指碰热食。不能画品尝生蛋/生面糊。蒸锅取物使用夹子且蒸汽远离脸；热油里不能倒含水调味汁。说明和温度要求由App原生文字展示，插画仅辅助理解。",
+    "sha256": "3ad13a2970de59ae2bb1ed5f92dc717bdc9a92cebe448a06165b1bb9d8a75961",
+    "bytes": 561132
+  },
+  {
+    "recipeId": "d608ec52-4e98-55dc-bc9e-608ae57911e6",
+    "recipeVersion": 1,
+    "step": 1,
+    "asset": "FamilyReward.Api/recipe-illustrations/d608ec52-4e98-55dc-bc9e-608ae57911e6/v1/step-1.jpg",
+    "tool": "built-in image_gen",
+    "prompt": "Use case: scientific-educational. Asset type: one cooking-step illustration for a native recipe app.\n菜名：蒸红薯；第1步：摆入蒸屉。\n严格表现此核对后的步骤，不编造新做法：锅中加水，红薯放蒸屉，彼此留出蒸汽流通间隙，不直接泡在水里。\n本菜食材：红薯、水。当前涉及：红薯、水。厨具：蒸锅、蒸屉。当前食材状态与操作动作必须清晰。\n统一风格：温暖简洁的柔和水彩配细腻铅笔线，奶白浅色背景，青绿色/奶油色厨具，俯侧视近景，克制留白。单幅方形构图，不要多格，不含文字、数字、标签、水印、品牌或UI。\n安全约束：手只握凉柄或戴隔热手套，不触碰热锅、热粥、热蒸汽；检查软度使用两把勺子在小碟上压开食材，绝不用手指碰热食。不能画品尝生蛋/生面糊。蒸锅取物使用夹子且蒸汽远离脸；热油里不能倒含水调味汁。说明和温度要求由App原生文字展示，插画仅辅助理解。",
+    "sha256": "48d16faff9568b1ea34608ba9f44afdec44c3cdd8b75f39f36be241ac1d3ea44",
+    "bytes": 507727
+  },
+  {
+    "recipeId": "d608ec52-4e98-55dc-bc9e-608ae57911e6",
+    "recipeVersion": 1,
+    "step": 2,
+    "asset": "FamilyReward.Api/recipe-illustrations/d608ec52-4e98-55dc-bc9e-608ae57911e6/v1/step-2.jpg",
+    "tool": "built-in image_gen",
+    "prompt": "Use case: scientific-educational. Asset type: one cooking-step illustration for a native recipe app.\n菜名：蒸红薯；第2步：蒸至熟透。\n严格表现此核对后的步骤，不编造新做法：水沸上汽后蒸20至30分钟，按大小延长，直到筷子可轻松插透最厚处，没有硬芯。留意水位，避免干烧。\n本菜食材：红薯、水。当前涉及：红薯。厨具：蒸锅、筷子。当前食材状态与操作动作必须清晰。\n统一风格：温暖简洁的柔和水彩配细腻铅笔线，奶白浅色背景，青绿色/奶油色厨具，俯侧视近景，克制留白。单幅方形构图，不要多格，不含文字、数字、标签、水印、品牌或UI。\n安全约束：手只握凉柄或戴隔热手套，不触碰热锅、热粥、热蒸汽；检查软度使用两把勺子在小碟上压开食材，绝不用手指碰热食。不能画品尝生蛋/生面糊。蒸锅取物使用夹子且蒸汽远离脸；热油里不能倒含水调味汁。说明和温度要求由App原生文字展示，插画仅辅助理解。",
+    "sha256": "a3de1b06d8ac22561cb05f283fb129673f8596088f83ecc5ba0396c5fb88d6af",
+    "bytes": 521602
+  },
+  {
+    "recipeId": "3021e40a-a72b-5fed-a4e5-00a388904e73",
+    "recipeVersion": 1,
+    "step": 1,
+    "asset": "FamilyReward.Api/recipe-illustrations/3021e40a-a72b-5fed-a4e5-00a388904e73/v1/step-1.jpg",
+    "tool": "built-in image_gen",
+    "prompt": "Use case: scientific-educational. Asset type: one cooking-step illustration for a native recipe app.\n菜名：山药大米粥；第1步：下锅煮开。\n严格表现此核对后的步骤，不编造新做法：水烧开后放入大米和山药，搅匀转小火。\n本菜食材：大米、山药、水。当前涉及：大米、山药、水。厨具：汤锅、长柄勺。当前食材状态与操作动作必须清晰。\n统一风格：温暖简洁的柔和水彩配细腻铅笔线，奶白浅色背景，青绿色/奶油色厨具，俯侧视近景，克制留白。单幅方形构图，不要多格，不含文字、数字、标签、水印、品牌或UI。\n安全约束：手只握凉柄或戴隔热手套，不触碰热锅、热粥、热蒸汽；检查软度使用两把勺子在小碟上压开食材，绝不用手指碰热食。不能画品尝生蛋/生面糊。蒸锅取物使用夹子且蒸汽远离脸；热油里不能倒含水调味汁。说明和温度要求由App原生文字展示，插画仅辅助理解。",
+    "sha256": "0686b20dec3174386888643fefb3aadc6c9216048cbd2568b1d93482ef6af911",
+    "bytes": 502792
+  },
+  {
+    "recipeId": "d608ec52-4e98-55dc-bc9e-608ae57911e6",
+    "recipeVersion": 1,
+    "step": 3,
+    "asset": "FamilyReward.Api/recipe-illustrations/d608ec52-4e98-55dc-bc9e-608ae57911e6/v1/step-3.jpg",
+    "tool": "built-in image_gen",
+    "prompt": "Use case: scientific-educational. Asset type: one cooking-step illustration for a native recipe app.\n菜名：蒸红薯；第3步：取出放凉。\n严格表现此核对后的步骤，不编造新做法：关火后用夹子取出，蒸汽朝远离面部方向释放，放至适口温度再剥皮食用。\n本菜食材：红薯、水。当前涉及：熟红薯。厨具：夹子、盘子。当前食材状态与操作动作必须清晰。\n统一风格：温暖简洁的柔和水彩配细腻铅笔线，奶白浅色背景，青绿色/奶油色厨具，俯侧视近景，克制留白。单幅方形构图，不要多格，不含文字、数字、标签、水印、品牌或UI。\n安全约束：手只握凉柄或戴隔热手套，不触碰热锅、热粥、热蒸汽；检查软度使用两把勺子在小碟上压开食材，绝不用手指碰热食。不能画品尝生蛋/生面糊。蒸锅取物使用夹子且蒸汽远离脸；热油里不能倒含水调味汁。说明和温度要求由App原生文字展示，插画仅辅助理解。",
+    "sha256": "ad375f889825146aef11d6b4b44c88dcaa932b4ffdb5595658eb3d7513d87f70",
+    "bytes": 492147
+  },
+  {
+    "recipeId": "3021e40a-a72b-5fed-a4e5-00a388904e73",
+    "recipeVersion": 1,
+    "step": 2,
+    "asset": "FamilyReward.Api/recipe-illustrations/3021e40a-a72b-5fed-a4e5-00a388904e73/v1/step-2.jpg",
+    "tool": "built-in image_gen",
+    "prompt": "Use case: scientific-educational. Asset type: one cooking-step illustration for a native recipe app.\n菜名：山药大米粥；第2步：慢煮至熟。\n严格表现此核对后的步骤，不编造新做法：锅盖留缝，小火慢煮并定时搅拌防溢防糊，至大米无硬芯、山药软透；实际时间以食材熟度为准。\n本菜食材：大米、山药、水。当前涉及：大米、山药、粥。厨具：汤锅、长柄勺。当前食材状态与操作动作必须清晰。\n统一风格：温暖简洁的柔和水彩配细腻铅笔线，奶白浅色背景，青绿色/奶油色厨具，俯侧视近景，克制留白。单幅方形构图，不要多格，不含文字、数字、标签、水印、品牌或UI。\n安全约束：手只握凉柄或戴隔热手套，不触碰热锅、热粥、热蒸汽；检查软度使用两把勺子在小碟上压开食材，绝不用手指碰热食。不能画品尝生蛋/生面糊。蒸锅取物使用夹子且蒸汽远离脸；热油里不能倒含水调味汁。说明和温度要求由App原生文字展示，插画仅辅助理解。",
+    "sha256": "d6537d13910670370143132aa05333d8e945fcf5aac9ea3eb22c40484f9869bb",
+    "bytes": 453586
+  },
+  {
+    "recipeId": "2723b104-0038-5a6d-9f5c-ef6a5218a0f7",
+    "recipeVersion": 1,
+    "step": 1,
+    "asset": "FamilyReward.Api/recipe-illustrations/2723b104-0038-5a6d-9f5c-ef6a5218a0f7/v1/step-1.jpg",
+    "tool": "built-in image_gen",
+    "prompt": "Use case: scientific-educational. Asset type: one cooking-step illustration for a native recipe app.\n菜名：香蕉燕麦松饼；第1步：拌面糊。\n严格表现此核对后的步骤，不编造新做法：将香蕉泥、蛋液、燕麦粉和牛奶搅成均匀面糊，不尝生面糊。\n本菜食材：香蕉、鸡蛋、燕麦粉、牛奶、食用油。当前涉及：香蕉、鸡蛋、燕麦粉、牛奶。厨具：碗、打蛋器。当前食材状态与操作动作必须清晰。\n统一风格：温暖简洁的柔和水彩配细腻铅笔线，奶白浅色背景，青绿色/奶油色厨具，俯侧视近景，克制留白。单幅方形构图，不要多格，不含文字、数字、标签、水印、品牌或UI。\n安全约束：手只握凉柄或戴隔热手套，不触碰热锅、热粥、热蒸汽；检查软度使用两把勺子在小碟上压开食材，绝不用手指碰热食。不能画品尝生蛋/生面糊。蒸锅取物使用夹子且蒸汽远离脸；热油里不能倒含水调味汁。说明和温度要求由App原生文字展示，插画仅辅助理解。",
+    "sha256": "75d34e78735a6462ea0685e3685af90d39e00972bdf67f1171adc7d4b140c029",
+    "bytes": 494717
+  },
+  {
+    "recipeId": "3021e40a-a72b-5fed-a4e5-00a388904e73",
+    "recipeVersion": 1,
+    "step": 3,
+    "asset": "FamilyReward.Api/recipe-illustrations/3021e40a-a72b-5fed-a4e5-00a388904e73/v1/step-3.jpg",
+    "tool": "built-in image_gen",
+    "prompt": "Use case: scientific-educational. Asset type: one cooking-step illustration for a native recipe app.\n菜名：山药大米粥；第3步：检查后盛出。\n严格表现此核对后的步骤，不编造新做法：用勺子取少量粥检查，谷物无硬芯、块状食材可用另一把勺子轻松压碎；勿用手碰热粥。关火盛碗，稍凉后食用。\n本菜食材：大米、山药、水。当前涉及：熟粥。厨具：勺子、碗。当前食材状态与操作动作必须清晰。\n统一风格：温暖简洁的柔和水彩配细腻铅笔线，奶白浅色背景，青绿色/奶油色厨具，俯侧视近景，克制留白。单幅方形构图，不要多格，不含文字、数字、标签、水印、品牌或UI。\n安全约束：手只握凉柄或戴隔热手套，不触碰热锅、热粥、热蒸汽；检查软度使用两把勺子在小碟上压开食材，绝不用手指碰热食。不能画品尝生蛋/生面糊。蒸锅取物使用夹子且蒸汽远离脸；热油里不能倒含水调味汁。说明和温度要求由App原生文字展示，插画仅辅助理解。",
+    "sha256": "601532f81e5bb030e34262d6482370a265c0bef7cf21580b0bdcb949aa48ae8a",
+    "bytes": 472662
+  },
+  {
+    "recipeId": "eb508681-02bc-5536-b4ce-c914af29e7d5",
+    "recipeVersion": 1,
+    "step": 2,
+    "asset": "FamilyReward.Api/recipe-illustrations/eb508681-02bc-5536-b4ce-c914af29e7d5/v1/step-2.jpg",
+    "tool": "built-in image_gen",
+    "prompt": "Use case: scientific-educational. Asset type: one cooking-step illustration for a native recipe app.\n菜名：牛奶炖蛋；第2步：隔水蒸熟。\n严格表现此核对后的步骤，不编造新做法：水沸后放蒸碗，盖耐热碗盖防滴水，中小火蒸约15至20分钟，直到完全凝固且中心温度达到71°C；碗大小不同须调整。\n本菜食材：鸡蛋、牛奶、白糖、蒸锅水。当前涉及：蛋奶液、蒸锅水。厨具：蒸锅、耐热碗、耐热碗盖。当前食材状态与操作动作必须清晰。\n统一风格：温暖简洁的柔和水彩配细腻铅笔线，奶白浅色背景，青绿色/奶油色厨具，俯侧视近景，克制留白。单幅方形构图，不要多格，不含文字、数字、标签、水印、品牌或UI。\n安全约束：手只握凉柄或戴隔热手套，不触碰热锅、热粥、热蒸汽；检查软度使用两把勺子在小碟上压开食材，绝不用手指碰热食。不能画品尝生蛋/生面糊。蒸锅取物使用夹子且蒸汽远离脸；热油里不能倒含水调味汁。说明和温度要求由App原生文字展示，插画仅辅助理解。",
+    "sha256": "160b64c12e6c9e67342bd12a88a32e5713207ea2cb7825a1ee9cb78cfab53cb3",
+    "bytes": 458278
+  },
+  {
+    "recipeId": "2723b104-0038-5a6d-9f5c-ef6a5218a0f7",
+    "recipeVersion": 1,
+    "step": 2,
+    "asset": "FamilyReward.Api/recipe-illustrations/2723b104-0038-5a6d-9f5c-ef6a5218a0f7/v1/step-2.jpg",
+    "tool": "built-in image_gen",
+    "prompt": "Use case: scientific-educational. Asset type: one cooking-step illustration for a native recipe app.\n菜名：香蕉燕麦松饼；第2步：两面煎熟。\n严格表现此核对后的步骤，不编造新做法：平底锅薄涂油，小火摊成直径约8厘米的薄饼，一面定型再翻面；两面金黄、内部无湿面糊，中心温度达到71°C。过厚时延长加热。\n本菜食材：香蕉、鸡蛋、燕麦粉、牛奶、食用油。当前涉及：面糊、食用油。厨具：不粘平底锅、锅铲。当前食材状态与操作动作必须清晰。\n统一风格：温暖简洁的柔和水彩配细腻铅笔线，奶白浅色背景，青绿色/奶油色厨具，俯侧视近景，克制留白。单幅方形构图，不要多格，不含文字、数字、标签、水印、品牌或UI。\n安全约束：手只握凉柄或戴隔热手套，不触碰热锅、热粥、热蒸汽；检查软度使用两把勺子在小碟上压开食材，绝不用手指碰热食。不能画品尝生蛋/生面糊。蒸锅取物使用夹子且蒸汽远离脸；热油里不能倒含水调味汁。说明和温度要求由App原生文字展示，插画仅辅助理解。",
+    "sha256": "9bf87e3ff91cf3e9b9efd7c09dfcc5081f18309cf5747a997a58f36e612ae0ee",
+    "bytes": 624777
+  },
+  {
+    "recipeId": "86f86c2d-5675-57aa-9078-a00dd32b67b6",
+    "recipeVersion": 1,
+    "step": 1,
+    "asset": "FamilyReward.Api/recipe-illustrations/86f86c2d-5675-57aa-9078-a00dd32b67b6/v1/step-1.jpg",
+    "tool": "built-in image_gen",
+    "prompt": "Use case: scientific-educational. Asset type: one cooking-step illustration for a native recipe app.\n菜名：酸奶水果杯；第1步：切水果。\n严格表现此核对后的步骤，不编造新做法：在与生肉、生蛋分开的干净案板上，把香蕉切片、草莓切小块。\n本菜食材：原味酸奶、香蕉、草莓。当前涉及：香蕉、草莓。厨具：水果刀、干净案板。当前食材状态与操作动作必须清晰。\n统一风格：温暖简洁的柔和水彩配细腻铅笔线，奶白浅色背景，青绿色/奶油色厨具，俯侧视近景，克制留白。单幅方形构图，不要多格，不含文字、数字、标签、水印、品牌或UI。\n安全约束：手只握凉柄或戴隔热手套，不触碰热锅、热粥、热蒸汽；检查软度使用两把勺子在小碟上压开食材，绝不用手指碰热食。不能画品尝生蛋/生面糊。蒸锅取物使用夹子且蒸汽远离脸；热油里不能倒含水调味汁。说明和温度要求由App原生文字展示，插画仅辅助理解。",
+    "sha256": "9519d30358f43c9592f19db1222b6d93d687a2b01962c7b2412af6e2d885ab9f",
+    "bytes": 475259
+  },
+  {
+    "recipeId": "2723b104-0038-5a6d-9f5c-ef6a5218a0f7",
+    "recipeVersion": 1,
+    "step": 3,
+    "asset": "FamilyReward.Api/recipe-illustrations/2723b104-0038-5a6d-9f5c-ef6a5218a0f7/v1/step-3.jpg",
+    "tool": "built-in image_gen",
+    "prompt": "Use case: scientific-educational. Asset type: one cooking-step illustration for a native recipe app.\n菜名：香蕉燕麦松饼；第3步：装盘。\n严格表现此核对后的步骤，不编造新做法：用干净锅铲盛盘，稍放凉再吃；不淋生蛋液或未加热面糊。\n本菜食材：香蕉、鸡蛋、燕麦粉、牛奶、食用油。当前涉及：熟松饼。厨具：盘子、锅铲。当前食材状态与操作动作必须清晰。\n统一风格：温暖简洁的柔和水彩配细腻铅笔线，奶白浅色背景，青绿色/奶油色厨具，俯侧视近景，克制留白。单幅方形构图，不要多格，不含文字、数字、标签、水印、品牌或UI。\n安全约束：手只握凉柄或戴隔热手套，不触碰热锅、热粥、热蒸汽；检查软度使用两把勺子在小碟上压开食材，绝不用手指碰热食。不能画品尝生蛋/生面糊。蒸锅取物使用夹子且蒸汽远离脸；热油里不能倒含水调味汁。说明和温度要求由App原生文字展示，插画仅辅助理解。",
+    "sha256": "f4aaf6016e3e344577401b8b1474dd5e82967ac119f60268aea48cef37206ba7",
+    "bytes": 500646
+  },
+  {
+    "recipeId": "eb508681-02bc-5536-b4ce-c914af29e7d5",
+    "recipeVersion": 1,
+    "step": 3,
+    "asset": "FamilyReward.Api/recipe-illustrations/eb508681-02bc-5536-b4ce-c914af29e7d5/v1/step-3.jpg",
+    "tool": "built-in image_gen",
+    "prompt": "Use case: scientific-educational. Asset type: one cooking-step illustration for a native recipe app.\n菜名：牛奶炖蛋；第3步：取出温食。\n严格表现此核对后的步骤，不编造新做法：关火后用夹子取碗，放至适口温度后食用；剩余及时冷藏，不长时间放在室温。\n本菜食材：鸡蛋、牛奶、白糖、蒸锅水。当前涉及：熟炖蛋。厨具：夹子、勺子。当前食材状态与操作动作必须清晰。\n统一风格：温暖简洁的柔和水彩配细腻铅笔线，奶白浅色背景，青绿色/奶油色厨具，俯侧视近景，克制留白。单幅方形构图，不要多格，不含文字、数字、标签、水印、品牌或UI。\n安全约束：手只握凉柄或戴隔热手套，不触碰热锅、热粥、热蒸汽；检查软度使用两把勺子在小碟上压开食材，绝不用手指碰热食。不能画品尝生蛋/生面糊。蒸锅取物使用夹子且蒸汽远离脸；热油里不能倒含水调味汁。说明和温度要求由App原生文字展示，插画仅辅助理解。",
+    "sha256": "7f03816f0ec14403d7db551701a8a7cf886b3832ec72326ad5d3dd8870adea22",
+    "bytes": 432658
+  },
+  {
+    "recipeId": "86f86c2d-5675-57aa-9078-a00dd32b67b6",
+    "recipeVersion": 1,
+    "step": 3,
+    "asset": "FamilyReward.Api/recipe-illustrations/86f86c2d-5675-57aa-9078-a00dd32b67b6/v1/step-3.jpg",
+    "tool": "built-in image_gen",
+    "prompt": "Use case: scientific-educational. Asset type: one cooking-step illustration for a native recipe app.\n菜名：酸奶水果杯；第3步：及时食用。\n严格表现此核对后的步骤，不编造新做法：装好后立即食用；暂不吃时立即盖好冷藏，按酸奶标签要求保存，避免久放室温。\n本菜食材：原味酸奶、香蕉、草莓。当前涉及：水果酸奶。厨具：杯子、勺子。当前食材状态与操作动作必须清晰。\n统一风格：温暖简洁的柔和水彩配细腻铅笔线，奶白浅色背景，青绿色/奶油色厨具，俯侧视近景，克制留白。单幅方形构图，不要多格，不含文字、数字、标签、水印、品牌或UI。\n安全约束：手只握凉柄或戴隔热手套，不触碰热锅、热粥、热蒸汽；检查软度使用两把勺子在小碟上压开食材，绝不用手指碰热食。不能画品尝生蛋/生面糊。蒸锅取物使用夹子且蒸汽远离脸；热油里不能倒含水调味汁。说明和温度要求由App原生文字展示，插画仅辅助理解。",
+    "sha256": "0930c3bee070dd9209d2fe0667e7f7668a028e5463bf7c4ae81efd002af82e67",
+    "bytes": 394918
+  },
+  {
+    "recipeId": "86f86c2d-5675-57aa-9078-a00dd32b67b6",
+    "recipeVersion": 1,
+    "step": 2,
+    "asset": "FamilyReward.Api/recipe-illustrations/86f86c2d-5675-57aa-9078-a00dd32b67b6/v1/step-2.jpg",
+    "tool": "built-in image_gen",
+    "prompt": "Use case: scientific-educational. Asset type: one cooking-step illustration for a native recipe app.\n菜名：酸奶水果杯；第2步：分层装杯。\n严格表现此核对后的步骤，不编造新做法：在两只干净杯中交替放酸奶和水果，不加入未清洗水果。\n本菜食材：原味酸奶、香蕉、草莓。当前涉及：原味酸奶、香蕉、草莓。厨具：杯子、勺子。当前食材状态与操作动作必须清晰。\n统一风格：温暖简洁的柔和水彩配细腻铅笔线，奶白浅色背景，青绿色/奶油色厨具，俯侧视近景，克制留白。单幅方形构图，不要多格，不含文字、数字、标签、水印、品牌或UI。\n安全约束：手只握凉柄或戴隔热手套，不触碰热锅、热粥、热蒸汽；检查软度使用两把勺子在小碟上压开食材，绝不用手指碰热食。不能画品尝生蛋/生面糊。蒸锅取物使用夹子且蒸汽远离脸；热油里不能倒含水调味汁。说明和温度要求由App原生文字展示，插画仅辅助理解。",
+    "sha256": "228deaf4eeed12fa038225fc65926f301c0051ee4f32f734e68bf12e9fe57395",
+    "bytes": 490490
+  },
+  {
+    "recipeId": "eb508681-02bc-5536-b4ce-c914af29e7d5",
+    "recipeVersion": 1,
+    "step": 1,
+    "asset": "FamilyReward.Api/recipe-illustrations/eb508681-02bc-5536-b4ce-c914af29e7d5/v1/step-1.jpg",
+    "tool": "built-in image_gen",
+    "prompt": "Use case: scientific-educational. Asset type: one cooking-step illustration for a native recipe app.\n菜名：牛奶炖蛋；第1步：调蛋奶液。\n严格表现此核对后的步骤，不编造新做法：蛋液、牛奶和糖充分搅匀，过筛倒入两个耐热小碗，不尝生蛋奶液。\n本菜食材：鸡蛋、牛奶、白糖、蒸锅水。当前涉及：鸡蛋、牛奶、白糖。厨具：碗、打蛋器、筛网。当前食材状态与操作动作必须清晰。\n统一风格：温暖简洁的柔和水彩配细腻铅笔线，奶白浅色背景，青绿色/奶油色厨具，俯侧视近景，克制留白。单幅方形构图，不要多格，不含文字、数字、标签、水印、品牌或UI。\n安全约束：手只握凉柄或戴隔热手套，不触碰热锅、热粥、热蒸汽；检查软度使用两把勺子在小碟上压开食材，绝不用手指碰热食。不能画品尝生蛋/生面糊。蒸锅取物使用夹子且蒸汽远离脸；热油里不能倒含水调味汁。说明和温度要求由App原生文字展示，插画仅辅助理解。",
+    "sha256": "ac1c2ea5b1a1976d1d01b35cc2f4871c2ccd154798f5ec646cd72c54b2ef6fe6",
+    "bytes": 437130
+  },
+  {
+    "recipeId": "2051d729-2bf5-5ed4-8aac-02513210eb20",
+    "recipeVersion": 1,
+    "step": 1,
+    "asset": "FamilyReward.Api/recipe-illustrations/2051d729-2bf5-5ed4-8aac-02513210eb20/v1/step-1.jpg",
+    "tool": "built-in image_gen",
+    "prompt": "Use case: scientific-educational. Asset type: one cooking-step illustration for a native recipe app.\n菜名：苹果肉桂烤燕麦；第1步：拌入烤碗。\n严格表现此核对后的步骤，不编造新做法：把燕麦、苹果丁、牛奶和肉桂粉拌匀，分入两个耐热烤碗，不装太满。\n本菜食材：燕麦片、苹果、牛奶、肉桂粉。当前涉及：燕麦片、苹果、牛奶、肉桂粉。厨具：耐热烤碗、勺子。当前食材状态与操作动作必须清晰。\n统一风格：温暖简洁的柔和水彩配细腻铅笔线，奶白浅色背景，青绿色/奶油色厨具，俯侧视近景，克制留白。单幅方形构图，不要多格，不含文字、数字、标签、水印、品牌或UI。\n安全约束：手只握凉柄或戴隔热手套，不触碰热锅、热粥、热蒸汽；检查软度使用两把勺子在小碟上压开食材，绝不用手指碰热食。不能画品尝生蛋/生面糊。蒸锅取物使用夹子且蒸汽远离脸；热油里不能倒含水调味汁。说明和温度要求由App原生文字展示，插画仅辅助理解。",
+    "sha256": "9c13cf00287a9ca992674c8175b8b30fde250c946c2124dc6b197bf70d02eedf",
+    "bytes": 562149
+  },
+  {
+    "recipeId": "2051d729-2bf5-5ed4-8aac-02513210eb20",
+    "recipeVersion": 1,
+    "step": 2,
+    "asset": "FamilyReward.Api/recipe-illustrations/2051d729-2bf5-5ed4-8aac-02513210eb20/v1/step-2.jpg",
+    "tool": "built-in image_gen",
+    "prompt": "Use case: scientific-educational. Asset type: one cooking-step illustration for a native recipe app.\n菜名：苹果肉桂烤燕麦；第2步：烤熟。\n严格表现此核对后的步骤，不编造新做法：放入预热至180°C的烤箱，烤约25至30分钟，直到苹果软透、燕麦充分吸液熟透；按燕麦包装和烤箱实际情况调整。\n本菜食材：燕麦片、苹果、牛奶、肉桂粉。当前涉及：苹果燕麦混合物。厨具：烤箱、烤碗。当前食材状态与操作动作必须清晰。\n统一风格：温暖简洁的柔和水彩配细腻铅笔线，奶白浅色背景，青绿色/奶油色厨具，俯侧视近景，克制留白。单幅方形构图，不要多格，不含文字、数字、标签、水印、品牌或UI。\n安全约束：手只握凉柄或戴隔热手套，不触碰热锅、热粥、热蒸汽；检查软度使用两把勺子在小碟上压开食材，绝不用手指碰热食。不能画品尝生蛋/生面糊。蒸锅取物使用夹子且蒸汽远离脸；热油里不能倒含水调味汁。说明和温度要求由App原生文字展示，插画仅辅助理解。",
+    "sha256": "95d0873eb2cef628f10528d018c64538256007715d5d6c22b9e6a2cf9cc5f21d",
+    "bytes": 574905
+  },
+  {
+    "recipeId": "2051d729-2bf5-5ed4-8aac-02513210eb20",
+    "recipeVersion": 1,
+    "step": 3,
+    "asset": "FamilyReward.Api/recipe-illustrations/2051d729-2bf5-5ed4-8aac-02513210eb20/v1/step-3.jpg",
+    "tool": "built-in image_gen",
+    "prompt": "Use case: scientific-educational. Asset type: one cooking-step illustration for a native recipe app.\n菜名：苹果肉桂烤燕麦；第3步：放凉后食用。\n严格表现此核对后的步骤，不编造新做法：用隔热手套取出烤碗，放至适口温度；烤碗仍会烫手，不直接徒手端。\n本菜食材：燕麦片、苹果、牛奶、肉桂粉。当前涉及：烤燕麦。厨具：隔热手套、勺子。当前食材状态与操作动作必须清晰。\n统一风格：温暖简洁的柔和水彩配细腻铅笔线，奶白浅色背景，青绿色/奶油色厨具，俯侧视近景，克制留白。单幅方形构图，不要多格，不含文字、数字、标签、水印、品牌或UI。\n安全约束：手只握凉柄或戴隔热手套，不触碰热锅、热粥、热蒸汽；检查软度使用两把勺子在小碟上压开食材，绝不用手指碰热食。不能画品尝生蛋/生面糊。蒸锅取物使用夹子且蒸汽远离脸；热油里不能倒含水调味汁。说明和温度要求由App原生文字展示，插画仅辅助理解。",
+    "sha256": "908bb8973555dfa9cb3c9f09bbd7546f8a74da095f9271b2365b615486f917a0",
+    "bytes": 584742
+  },
+  {
+    "recipeId": "a89e0366-4116-5af2-9dcf-f049c387b349",
+    "recipeVersion": 1,
+    "step": 1,
+    "asset": "FamilyReward.Api/recipe-illustrations/a89e0366-4116-5af2-9dcf-f049c387b349/v1/step-1.jpg",
+    "tool": "built-in image_gen",
+    "prompt": "Use case: scientific-educational. Asset type: one cooking-step illustration for a native recipe app.\n菜名：红豆牛奶小圆子；第1步：煮熟小圆子。\n严格表现此核对后的步骤，不编造新做法：水沸后放入小圆子，轻推防粘，按包装时间煮熟；不能只凭浮起判断，应确认内部无硬芯或生粉。\n本菜食材：即食熟红豆、冷冻小圆子、牛奶、水。当前涉及：冷冻小圆子、水。厨具：汤锅、勺子。当前食材状态与操作动作必须清晰。\n统一风格：温暖简洁的柔和水彩配细腻铅笔线，奶白浅色背景，青绿色/奶油色厨具，俯侧视近景，克制留白。单幅方形构图，不要多格，不含文字、数字、标签、水印、品牌或UI。\n安全约束：手只握凉柄或戴隔热手套，不触碰热锅、热粥、热蒸汽；检查软度使用两把勺子在小碟上压开食材，绝不用手指碰热食。不能画品尝生蛋/生面糊。蒸锅取物使用夹子且蒸汽远离脸；热油里不能倒含水调味汁。说明和温度要求由App原生文字展示，插画仅辅助理解。",
+    "sha256": "d89f0b983ed0ba29b2dc6487d5d8a9422ab250c975c257cea1177689bd89f132",
+    "bytes": 491535
+  },
+  {
+    "recipeId": "a89e0366-4116-5af2-9dcf-f049c387b349",
+    "recipeVersion": 1,
+    "step": 2,
+    "asset": "FamilyReward.Api/recipe-illustrations/a89e0366-4116-5af2-9dcf-f049c387b349/v1/step-2.jpg",
+    "tool": "built-in image_gen",
+    "prompt": "Use case: scientific-educational. Asset type: one cooking-step illustration for a native recipe app.\n菜名：红豆牛奶小圆子；第2步：温热红豆牛奶。\n严格表现此核对后的步骤，不编造新做法：另锅把熟红豆和牛奶用小火加热至整体热透，搅拌避免糊底，勿长时间大火滚煮。\n本菜食材：即食熟红豆、冷冻小圆子、牛奶、水。当前涉及：即食熟红豆、牛奶。厨具：小汤锅、勺子。当前食材状态与操作动作必须清晰。\n统一风格：温暖简洁的柔和水彩配细腻铅笔线，奶白浅色背景，青绿色/奶油色厨具，俯侧视近景，克制留白。单幅方形构图，不要多格，不含文字、数字、标签、水印、品牌或UI。\n安全约束：手只握凉柄或戴隔热手套，不触碰热锅、热粥、热蒸汽；检查软度使用两把勺子在小碟上压开食材，绝不用手指碰热食。不能画品尝生蛋/生面糊。蒸锅取物使用夹子且蒸汽远离脸；热油里不能倒含水调味汁。说明和温度要求由App原生文字展示，插画仅辅助理解。",
+    "sha256": "e2481045f71a466921ab001fc415f0c00939d9376009b82d3f5a10e209fae02d",
+    "bytes": 476076
+  },
+  {
+    "recipeId": "a89e0366-4116-5af2-9dcf-f049c387b349",
+    "recipeVersion": 1,
+    "step": 3,
+    "asset": "FamilyReward.Api/recipe-illustrations/a89e0366-4116-5af2-9dcf-f049c387b349/v1/step-3.jpg",
+    "tool": "built-in image_gen",
+    "prompt": "Use case: scientific-educational. Asset type: one cooking-step illustration for a native recipe app.\n菜名：红豆牛奶小圆子；第3步：合碗。\n严格表现此核对后的步骤，不编造新做法：煮熟小圆子沥水后放两碗，加入热红豆牛奶，放至适口温度再吃；糯米食物细嚼慢咽，避免烫口。\n本菜食材：即食熟红豆、冷冻小圆子、牛奶、水。当前涉及：熟小圆子、红豆牛奶。厨具：漏勺、碗。当前食材状态与操作动作必须清晰。\n统一风格：温暖简洁的柔和水彩配细腻铅笔线，奶白浅色背景，青绿色/奶油色厨具，俯侧视近景，克制留白。单幅方形构图，不要多格，不含文字、数字、标签、水印、品牌或UI。\n安全约束：手只握凉柄或戴隔热手套，不触碰热锅、热粥、热蒸汽；检查软度使用两把勺子在小碟上压开食材，绝不用手指碰热食。不能画品尝生蛋/生面糊。蒸锅取物使用夹子且蒸汽远离脸；热油里不能倒含水调味汁。说明和温度要求由App原生文字展示，插画仅辅助理解。",
+    "sha256": "ee16968c0c31e78cb6ec985b8e57809aa0883a332d8ce93cd7bdf842f740cd97",
+    "bytes": 507675
   }
 ]

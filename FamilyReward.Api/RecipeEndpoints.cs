@@ -83,7 +83,7 @@ internal static class RecipeEndpoints
                       CASE WHEN body->'mealPreferences' ? @meal THEN 2.0 ELSE 1.0 END
                     LIMIT 1
                     """, connection);
-                command.Parameters.AddWithValue("category", category ?? "");
+                command.Parameters.AddWithValue("category", category == "all" ? "" : category ?? "");
                 command.Parameters.AddWithValue("exclude", exclude ?? Guid.Empty);
                 command.Parameters.AddWithValue("meal", meal ?? "");
                 var body = await command.ExecuteScalarAsync(ct) as string;
