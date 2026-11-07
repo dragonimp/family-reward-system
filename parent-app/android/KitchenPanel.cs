@@ -122,7 +122,36 @@ public sealed class KitchenPanel : ContentView
         }
         rows.Add(MomentStyle.Title("注意事项", 21));
         foreach (var item in current.GetProperty("notes").EnumerateArray()) rows.Add(new Label { Text = item.GetString() });
-        await owner.Navigation.PushAsync(new ContentPage { Title = "查看做法", SafeAreaEdges = SafeAreaEdges.All, Content = new ScrollView { Content = rows } });
+        var page = new ContentPage { Title = "查看做法", SafeAreaEdges = SafeAreaEdges.All, BackgroundColor = MomentStyle.Background };
+        var header = new Grid { Padding = new Thickness(8, 4), ColumnDefinitions = new ColumnDefinitionCollection { new(GridLength.Auto), new(GridLength.Star), new(GridLength.Auto) } };
+        header.Add(MomentStyle.Action("完成", () => _ = page.Navigation.PopAsync()));
+        header.Add(new Label { Text = "查看做法", FontSize = 17, FontAttributes = FontAttributes.Bold, HorizontalTextAlignment = TextAlignment.Center, VerticalTextAlignment = TextAlignment.Center }, 1);
+        header.Add(MomentStyle.IconButton("分享", "分享菜谱", () => _ = ShareRecipe(current, page)), 2);
+        var layout = new Grid { RowDefinitions = new RowDefinitionCollection { new(GridLength.Auto), new(GridLength.Star) } };
+        layout.Add(header); layout.Add(new ScrollView { Content = rows }, 0, 1); page.Content = layout;
+        NavigationPage.SetHasNavigationBar(page, false);
+        await owner.Navigation.PushAsync(page);
+    }
+
+    private static async Task ShareRecipe(JsonElement current, ContentPage page)
+    {
+        try
+        {
+            var link = Text(current, "shareUrl");
+            var request = new ShareTextRequest { Title = Text(current, "name") };
+            if (Uri.TryCreate(link, UriKind.Absolute, out var url) && url.Scheme == "https") request.Uri = url.AbsoluteUri;
+            else
+            {
+                var lines = new List<string> { Text(current, "name"), Text(current, "description"), Meta(current), "食材" };
+                lines.AddRange(current.GetProperty("ingredients").EnumerateArray().Select(i => Text(i, "name") + " " + i.GetProperty("quantity") + " " + Text(i, "unit")));
+                lines.Add("准备工作"); lines.AddRange(current.GetProperty("preparation").EnumerateArray().Select(i => i.GetString() ?? ""));
+                lines.Add("制作步骤"); lines.AddRange(current.GetProperty("steps").EnumerateArray().Select(s => s.GetProperty("number") + ". " + Text(s, "action") + "\n" + Text(s, "instruction")));
+                lines.Add("注意事项"); lines.AddRange(current.GetProperty("notes").EnumerateArray().Select(i => i.GetString() ?? ""));
+                request.Text = string.Join("\n", lines);
+            }
+            await Share.Default.RequestAsync(request);
+        }
+        catch { await page.DisplayAlertAsync("分享", "暂时无法打开系统分享，请稍后重试。", "知道了"); }
     }
 
     private static string Text(JsonElement item, string name) =>

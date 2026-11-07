@@ -51,6 +51,7 @@ struct KitchenRecipe: Decodable, Identifiable {
     let steps: [Step]
     let notes: [String]
     let coverImage: String?
+    let shareUrl: String?
     let recipeVersion: Int
     var id: UUID { recipeId }
 }
@@ -205,8 +206,31 @@ private struct KitchenRecipeDetail: View {
                     ForEach(Array(recipe.notes.enumerated()), id: \.offset) { _, item in Text(item) }
                 }
             }.navigationTitle(kitchenText("查看做法")).navigationBarTitleDisplayMode(.inline)
-                .toolbar { Button(kitchenText("完成")) { dismiss() } }
+                .toolbar {
+                    ToolbarItem(placement: .topBarLeading) {
+                        Button(kitchenText("完成")) { dismiss() }
+                    }
+                    ToolbarItem(placement: .topBarTrailing) {
+                        if let value = recipe.shareUrl, let url = URL(string: value), url.scheme == "https" {
+                            MomentShareLink(url: url, title: recipe.name, label: kitchenText("分享"))
+                                .labelStyle(.iconOnly)
+                        } else {
+                            ShareLink(item: shareText) {
+                                Label(kitchenText("分享"), systemImage: "square.and.arrow.up").labelStyle(.iconOnly)
+                            }
+                        }
+                    }
+                }
         }
+    }
+
+    private var shareText: String {
+        var lines = [recipe.name, recipe.description, "\(recipe.duration) min · \(recipe.difficulty) · \(recipe.servings) " + kitchenText("人份"), kitchenText("食材")]
+        lines += recipe.ingredients.map { "\($0.name) \($0.quantity.formatted()) \($0.unit)" }
+        lines += [kitchenText("准备工作")] + recipe.preparation + [kitchenText("制作步骤")]
+        lines += recipe.steps.map { "\($0.number). \($0.action)\n\($0.instruction)" }
+        lines += [kitchenText("注意事项")] + recipe.notes
+        return lines.joined(separator: "\n")
     }
 
     @ViewBuilder private func recipeImage(_ value: String?) -> some View {

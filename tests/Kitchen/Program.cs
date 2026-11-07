@@ -42,6 +42,13 @@ await app.StartAsync();
 try
 {
     using var client = new HttpClient { BaseAddress = new Uri(app.Services.GetRequiredService<IServer>().Features.Get<IServerAddressesFeature>()!.Addresses.Single()) };
+    var sharePath = "/api/recipes/b3fcce06-1d3c-5b2f-822b-0419beae6ed4/share";
+    using var shared = await client.GetAsync(sharePath);
+    var sharedHtml = await shared.Content.ReadAsStringAsync();
+    Check(shared.StatusCode == HttpStatusCode.OK && shared.Content.Headers.ContentType?.MediaType == "text/html", "recipients can open the published recipe without app login");
+    Check(WebUtility.HtmlDecode(sharedHtml).Contains("番茄鸡蛋盖饭") && sharedHtml.Contains("/steps/1.jpg") && sharedHtml.Contains("og:title"), "shared page contains real recipe and step artwork metadata");
+    Check(shared.Headers.Contains("Content-Security-Policy"), "public recipe page has restrictive content policy");
+    Check((await client.GetAsync(sharePath.Replace("b3fcce06-1d3c-5b2f-822b-0419beae6ed4", Guid.NewGuid().ToString()))).StatusCode == HttpStatusCode.NotFound, "unknown shared recipe not disclosed");
     Check((await client.GetAsync("/api/recipes/categories")).StatusCode == HttpStatusCode.Unauthorized, "categories require app authentication");
     var drawing = "/api/recipe-illustrations/B3FCCE06-1D3C-5B2F-822B-0419BEAE6ED4/v1/steps/1.jpg";
     using var picture = await client.GetAsync(drawing);
@@ -67,6 +74,18 @@ try
     var dessert = JsonSerializer.Deserialize<KitchenRecipe>(await client.GetStringAsync("/api/recipes/random?category=dessert&meal=lunch"), RecipeEndpoints.Json)!;
     Check(dessert.Category == "dessert", "explicit dessert choice survives lunch preference");
     var first = JsonSerializer.Deserialize<KitchenRecipe>(await client.GetStringAsync("/api/recipes/random?category=noodles&meal=afternoonTea"), RecipeEndpoints.Json)!;
+    Check(first.ShareUrl == $"https://happylife.ai.impx.net/api/recipes/{first.RecipeId:D}/share", "share payload is a canonical public URL without user credentials");
+    var hostile = first with { Name = "<script>alert(1)</script>", Description = "\" onload=\"alert(2)", Steps = first.Steps.Select(s => s with { IllustrationUrl = "javascript:alert(3)" }).ToArray() };
+    var safeHtml = RecipeEndpoints.ShareHtml(hostile);
+    Check(!safeHtml.Contains("<script>") && !safeHtml.Contains("src=\"javascript:"), "text and image URLs cannot inject executable HTML");
+    await using (var connection = new NpgsqlConnection(connectionString))
+    {
+        await connection.OpenAsync();
+        await using var hide = new NpgsqlCommand("UPDATE kitchen_recipes SET published=false WHERE id=@id", connection);
+        hide.Parameters.AddWithValue("id", first.RecipeId); await hide.ExecuteNonQueryAsync();
+        try { Check((await client.GetAsync($"/api/recipes/{first.RecipeId:D}/share")).StatusCode == HttpStatusCode.NotFound, "unpublished recipes cannot be shared"); }
+        finally { hide.CommandText = "UPDATE kitchen_recipes SET published=true WHERE id=@id"; await hide.ExecuteNonQueryAsync(); }
+    }
     Check(first.Category == "noodles", "explicit category survives mealtime preference");
     var next = JsonSerializer.Deserialize<KitchenRecipe>(await client.GetStringAsync("/api/recipes/random?category=noodles&exclude=" + first.RecipeId), RecipeEndpoints.Json)!;
     Check(next.RecipeId != first.RecipeId, "reroll excludes previous recipe when alternatives exist");
