@@ -22,15 +22,21 @@ dotnet publish "$root/FamilyReward.Api/FamilyReward.Api.csproj" -c Release -r li
 rsync -a --exclude=node_modules --exclude=dist "$root/frontend/" "$stage/frontend/"
 mkdir -p "$stage/shared-sdk"
 git -C "$shared_projects_root/AgentFree" archive HEAD packages/agentfree-webapp-chat | tar -x -C "$stage/shared-sdk"
+git -C "$identity_root" archive HEAD src/AgentIdentity.WebSdk | tar -x -C "$stage/shared-sdk"
 shared_chat_package="$stage/shared-sdk/packages/agentfree-webapp-chat"
+shared_identity_package="$stage/shared-sdk/src/AgentIdentity.WebSdk"
 [[ -s "$shared_chat_package/dist/index.js" && -s "$shared_chat_package/dist/index.d.ts" ]] || {
   echo 'Committed AgentFree WebApp chat package is incomplete.' >&2; exit 1;
 }
-node - "$stage/frontend/package.json" "$shared_chat_package" <<'NODE'
+[[ -s "$shared_identity_package/dist/index.js" && -s "$shared_identity_package/dist/index.d.ts" ]] || {
+  echo 'Committed AgentIdentity Web SDK is incomplete.' >&2; exit 1;
+}
+node - "$stage/frontend/package.json" "$shared_chat_package" "$shared_identity_package" <<'NODE'
 const fs = require('fs');
-const [manifestPath, chatPackage] = process.argv.slice(2);
+const [manifestPath, chatPackage, identityPackage] = process.argv.slice(2);
 const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
 manifest.dependencies['@agentfree/webapp-chat'] = `file:${chatPackage}`;
+manifest.dependencies['@aihome/agentidentity-web-sdk'] = `file:${identityPackage}`;
 fs.writeFileSync(manifestPath, JSON.stringify(manifest, null, 2) + '\n');
 NODE
 (
