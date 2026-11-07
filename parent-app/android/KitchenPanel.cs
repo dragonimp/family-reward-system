@@ -29,7 +29,7 @@ public sealed class KitchenPanel : ContentView
         {
             var result = await store.CallAsync("/api/recipes/categories");
             categories = result.GetProperty("categories").EnumerateArray().ToArray();
-            category = categories.FirstOrDefault().ValueKind == JsonValueKind.Object ? Text(categories[0], "id") : null;
+            category = null;
             message = categories.Length == 0 ? "菜谱分类正在准备，请稍后再试。" : null;
         }
         catch { message = "菜谱暂时无法加载，请重试。"; }
@@ -38,7 +38,7 @@ public sealed class KitchenPanel : ContentView
 
     private async Task Choose()
     {
-        if (busy || category is null) return;
+        if (busy || categories.Length == 0) return;
         busy = true; message = null; Render();
         var meal = DiningMeal.Current(DateTimeOffset.Now) switch
         {
@@ -47,7 +47,7 @@ public sealed class KitchenPanel : ContentView
             DiningMealPeriod.AfternoonTea => "afternoonTea",
             _ => "dinner"
         };
-        var path = "/api/recipes/random?category=" + Uri.EscapeDataString(category == "all" ? "" : category) + "&meal=" + meal;
+        var path = "/api/recipes/random?category=" + Uri.EscapeDataString(category == "all" ? "" : category ?? "") + "&meal=" + meal;
         if (recipe is { } old) path += "&exclude=" + Uri.EscapeDataString(Text(old, "recipeId"));
         try
         {
@@ -72,7 +72,7 @@ public sealed class KitchenPanel : ContentView
             var id = Text(item, "id");
             var selected = category == id;
             var button = new Button { Text = Text(item, "icon") + " " + Text(item, "name"), BackgroundColor = Colors.Transparent, TextColor = MomentStyle.Ink, BorderWidth = 0 };
-            button.Clicked += (_, _) => { category = id; recipe = null; Render(); };
+            button.Clicked += (_, _) => { category = selected ? null : id; recipe = null; Render(); };
             var border = new Border
             {
                 Content = button, Stroke = selected ? Colors.Gray : Colors.LightGray, StrokeThickness = 1,
@@ -83,6 +83,7 @@ public sealed class KitchenPanel : ContentView
             grid.Add(border, index % 2, index / 2);
         }
         body.Add(grid);
+        if (categories.Length > 0 && category is null) body.Add(MomentStyle.Caption("不选分类，随便做一道"));
         if (categories.Length == 0) body.Add(MomentStyle.Action("加载菜谱分类", () => _ = Load()));
         else body.Add(MomentStyle.Action("随机选一道", () => _ = Choose(), true));
         if (busy) body.Add(new ActivityIndicator { IsRunning = true });

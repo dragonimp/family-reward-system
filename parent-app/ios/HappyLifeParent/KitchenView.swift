@@ -74,13 +74,13 @@ struct KitchenRecipe: Decodable, Identifiable {
             let response = try await family.call("/api/recipes/categories")
             let result = try JSONDecoder().decode(Categories.self, from: JSONSerialization.data(withJSONObject: response))
             categories = result.categories
-            category = categories.first?.id
+            category = nil
             message = categories.isEmpty ? kitchenText("菜谱分类正在准备，请稍后再试。") : nil
         } catch { message = kitchenText("菜谱暂时无法加载，请重试。") }
     }
 
     func choose() async {
-        guard let category, !busy else { return }
+        guard !categories.isEmpty, !busy else { return }
         busy = true; message = nil
         defer { busy = false }
         let period: String
@@ -91,7 +91,7 @@ struct KitchenRecipe: Decodable, Identifiable {
         case .dinner: period = "dinner"
         }
         var query = URLComponents()
-        query.queryItems = [URLQueryItem(name: "category", value: category == "all" ? "" : category),
+        query.queryItems = [URLQueryItem(name: "category", value: category == "all" ? "" : (category ?? "")),
                             URLQueryItem(name: "meal", value: period)]
         if let recipe { query.queryItems?.append(URLQueryItem(name: "exclude", value: recipe.id.uuidString)) }
         do {
@@ -125,7 +125,7 @@ private struct KitchenView: View {
                             ForEach(model.categories) { item in
                                 let selected = model.category == item.id
                                 Button {
-                                    model.category = item.id
+                                    model.category = selected ? nil : item.id
                                     model.recipe = nil
                                 } label: {
                                     Text(item.icon + " " + item.name).frame(maxWidth: .infinity).padding(14)
@@ -136,6 +136,9 @@ private struct KitchenView: View {
                                             style: StrokeStyle(lineWidth: 1, dash: selected ? [] : [5, 4])))
                                 }.buttonStyle(.plain).accessibilityAddTraits(selected ? .isSelected : [])
                             }
+                        }
+                        if model.category == nil {
+                            Text(kitchenText("不选分类，随便做一道")).font(.footnote).foregroundStyle(.secondary)
                         }
                         Button { Task { await model.choose() } } label: {
                             Text(kitchenText("随机选一道")).frame(maxWidth: .infinity)
