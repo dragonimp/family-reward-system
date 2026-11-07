@@ -86,5 +86,12 @@ Orbit SDK worker 测试使用受控 HTTP 响应，不是真实模型准确率验
 - iOS 1.3.22（222）：源码 c3be52fd69db18a20d8069a1c37662460608ab9b，签名 Archive/Export通过；Atlas IPA SHA256 6f62c4d4063f7149c6fb96496128f98d9dea24adcf15fd7c6b30a1b5e7df0bd8。TestFlight d25ed37d-ca5b-4ccc-8e63-ee58c8d790ea 已 VALID/testflight_visible；Apple build 02850c01-9712-4322-aa9d-ff602e60ccc6。邀请同步 e817bfa5-2d8e-4de1-b5ac-2c13e1222eb9 verified。
 - Android 1.0.9（18）：源码399bb1b，正式签名与包版本核验通过；Atlas版本a7cfc2f4-e669-43cd-beab-86032230c10b，APK SHA256 ebf234b523ca0b7a1d0e684877a136451d5cb117f714a14d27b77f4792f28402。邀请绑定3a90d4b6-192f-446b-921e-b421fd6f44ae verified，独立读回版本和实际APK URL。
 - 首次API版20261108-013614-activity-c3be52f：Atlas版本f032dd61-7d0d-452f-a4a3-b841e2233549，部署5b3a8ab4-6ad7-487f-8d91-34f9850a72ec stored，日志确认ledger验证/切换/启动/健康。迁移记录20261108-personal-kitchen-v1 SHA256 ff43374b9eb163249f88d42ef9bd72becdb7b8127b5b2a9ed736ffae3c41e6ba，五表归属family_reward_app，备份及校验清单受限保留。路由改为个人厨房专用目标的补充服务版本另行追加。
-- 后端聚焦32项检查、现有菜谱/图片/分享回归、原干饭HTTP/模型检查、真实城市中心Apple Maps查询通过；配套228项HTTP/WebSocket、前端lint/build通过。构建仅有既有SDK跨平台文件权限/地图弃用警告；原生正式编译无错误。
+- 后端聚焦31项检查、现有菜谱/图片/分享回归、原干饭HTTP/模型检查、真实城市中心Apple Maps查询通过；配套228项HTTP/WebSocket、前端lint/build通过。构建仅有既有SDK跨平台文件权限/地图弃用警告；原生正式编译无错误。
 - 已从Atlas重新下载12个正式制品，159,405,933字节全部匹配SHA256与大小。正式分发与真机安装/界面/拍照验收独立，后者尚未完成。
+
+- Apple材料只读核对本次仍返回HTTP502/ apple_materials_read_failed；没有进行材料写入，不宣称欧盟交易商或材料完整性已核验。内部TestFlight可见已独立确认，未提交外部Beta或App Store审核。
+- 公开邀请页数据独立读取显示1.3.22（222）及1.0.9（18）；后台目的地读回真实APK SHA256与正式制品一致，未覆盖外部测试等其他入口。
+- 已清理本地6个已在Atlas验证可恢复的重复正式包，共159,404,586字节；保留精简校验回执、受限数据库备份与迁移记录。没有新建worktree。另有未跟踪application/ocr_recipe.py不属于发布文件，已保留，未提交/删除。
+
+- 最终API版本20261108-015436-activity-8f05d10：源码8f05d10d76b61d9416e4ee25468509a3bde37614，已推送GitHub main；Atlas版本f78b18eb-e895-4ba0-803c-83dbb76261cf，部署0cd754ce-0a1f-4539-8091-74fdd24ca8a2 complete=true/stored/exitCode=0。运行指针、启动及健康独立读回。没有新增生产数据修复或修改已有迁移。
+- 最终服务端三个制品119,580,496字节已从Atlas下载并验证后清理本地及远端传输副本。本轮累计本地清理278,985,082字节；正式制品、符号包可由Atlas恢复，源码中的公共步骤图片继续保留。
