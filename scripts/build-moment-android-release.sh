@@ -16,8 +16,18 @@ git -C "$root" merge-base --is-ancestor "$commit" origin/main
 source="$ATLAS_BUILD_WORK/android-source"
 mkdir -p "$source"
 git -C "$root" archive "$commit" | tar -x -C "$source"
-git -C "$identity" diff --quiet HEAD -- src/AgentIdentity.NativeClient src/AgentIdentity.Maui src/AgentIdentity.Sdk
-git -C "$atlas" diff --quiet HEAD -- sdk
+sdk_root="$ATLAS_BUILD_WORK/android-sdk"
+mkdir -p "$sdk_root/AgentIdentity" "$sdk_root/Atlas"
+for dependency in AgentIdentity Atlas; do
+  if [[ "$dependency" == AgentIdentity ]]; then repository="$identity"; else repository="$atlas"; fi
+  sdk_commit="$(git -C "$repository" rev-parse HEAD)"
+  sdk_remote="$(git -C "$repository" ls-remote origin refs/heads/main | cut -f1)"
+  [[ "$sdk_commit" == "$sdk_remote" ]] || { echo "$dependency SDK is not published main"; exit 1; }
+  git -C "$repository" archive "$sdk_commit" | tar -x -C "$sdk_root/$dependency"
+  printf '%s %s\n' "$dependency" "$sdk_commit" >> "$ATLAS_BUILD_OUTPUT/android-sdk-dependencies.txt"
+done
+identity="$sdk_root/AgentIdentity"
+atlas="$sdk_root/Atlas"
 dotnet publish "$source/parent-app/android/LinkoFamily.csproj" -f net10.0-android -c Release -r android-arm64 \
  --artifacts-path "$ATLAS_BUILD_WORK/compiled" -m:1 -p:UseSharedCompilation=false \
  -p:AgentIdentityNativeClientProject="$identity/src/AgentIdentity.NativeClient/AgentIdentity.NativeClient.csproj" -p:AtlasSdkRoot="$atlas" \
