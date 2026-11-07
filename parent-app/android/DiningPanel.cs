@@ -46,7 +46,20 @@ public sealed class DiningPanel : ContentView
             archive = loaded;
         } }
         catch { readable = false; message = "干饭记录暂时无法读取，原记录已保留，请重试。"; }
-        Content = new ScrollView { Content = body }; Render();
+        var outside = new ScrollView { Content = body };
+        var cooking = new KitchenPanel(store, owner);
+        var viewport = new ContentView { Content = outside };
+        var mode = new Picker { ItemsSource = new[] { "出去吃", "下厨房" }, SelectedIndex = 0, Title = "用餐方式" };
+        mode.SelectedIndexChanged += (_, _) =>
+        {
+            viewport.Content = mode.SelectedIndex == 1 ? cooking : outside;
+            if (mode.SelectedIndex == 1) _ = cooking.Load();
+        };
+        var root = new Grid { RowDefinitions = new RowDefinitionCollection { new(GridLength.Auto), new(GridLength.Star) } };
+        root.Add(mode);
+        root.Add(viewport, 0, 1);
+        Content = root;
+        Render();
     }
     public void Suspend() { ++generation; operation?.Cancel(); busy = false; checkingIn = false; Render(); }
     private bool Update(Action<DiningArchive> change)

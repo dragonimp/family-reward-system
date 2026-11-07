@@ -157,6 +157,7 @@ if (!string.IsNullOrWhiteSpace(releaseControlApplicationId))
 
 var connectionString = BuildConnectionString(builder.Configuration);
 await VerifyDatabaseSchema(connectionString);
+app.MapRecipeEndpoints(connectionString);
 var configStore = new SystemConfigStore(connectionString, app.Environment.ContentRootPath);
 await configStore.LoadAsync();
 
