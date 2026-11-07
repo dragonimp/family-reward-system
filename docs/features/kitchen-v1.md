@@ -89,3 +89,16 @@ Orbit 当前 Goldfish.WebAppSdk 提供会话、运行和聊天流，未发现可
 - 邀请入口保持原 URL。Android 绑定操作 `b520b367-4d7b-4e53-8be2-cd56c5a33efe` 与 TestFlight 同步操作 `3a819d87-cf50-4cea-9cb5-49f868d033a9` 均 verified；独立公开读回内部测试 1.3.20（220）及 Android 1.0.7（16），其他入口未覆盖。
 - 14 个制品已从 Atlas 重新下载并匹配 SHA256 后清理传输副本；本地删除重复包和打包中间文件 158,801,208 字节。临时编译目录已由 host-build-output 清理，保留 Git 中的正式图片、提示词、菜谱、版本清单及受限备份/回执。没有新 worktree。
 - 本次未执行真机安装、分类点击与取消选择的真机验收，签名/编译、平台可获取和设备实测分别记录。自动生成/重新生成的运行期任务与对象存储仍未接通。
+
+## 2026-11-07 做法页完成与系统分享
+
+- 源码提交 `52a0bc7de6f502de983048013884342f4b908892`，已推送正式 GitHub main。iOS 做法页明确使用 topBarLeading 放置“完成”、topBarTrailing 放置分享；复用现有 MomentShareLink/ShareLink、SF Symbols `square.and.arrow.up`，不附加品牌图片 SharePreview。Android 同步左侧完成、右侧通用分享图标，复用 MomentStyle.IconButton 与系统 Share.Default。
+- JSON 新增计算字段 shareUrl，不改数据库。链接为 `https://happylife.ai.impx.net/api/recipes/{id}/share`；只包含菜谱 UUID，不附用户凭据或私有会话参数。旧缓存没有链接时，系统分享真实的完整文字菜谱，不伪造 URL。
+- 新增同工程公开 HTML 分享页，仅允许已发布、结构有效的库内菜谱，未发布或不存在返回 404。接收方无需安装 App 或登录，即可阅读食材、用量、准备工作、有序步骤、实际手绘图和注意事项。页面设置真实 Open Graph 标题、简介及现有菜谱图；文本/属性 HTML 转义，图片限定自有 HTTPS 素材，提供 CSP/nosniff/referrer 策略。
+- 隔离 PostgreSQL/HTTP 测试通过匿名页面、真实文字/插画、未知/未发布 404、HTML 注入和危险图片协议拒绝、canonical 分享 URL，以及原分类、随机、认证、UUID 与图片缓存回归。前端 lint/build、原生模型与干饭回归、真实地图查询及配套 228 项 HTTP/WebSocket 检查通过。iOS/Android 正式签名包构建完成。
+- API 版 `20261107-205012-activity-52a0bc7`，Atlas 记录 `b427b43d-47d9-446c-97de-d3beaaa111b4`。部署任务 `c2889704-f3f7-4799-a765-2ad0c5cd954f` 已 stored/exitCode=0，日志确认激活与健康验证完成。逐个匿名请求生产库实际 30 个分享页，确认全部 200、真实菜名、步骤文字、图片 URL 和 CSP。
+- iOS 目标 1.3.21（221），主应用、Watch、分享扩展包版本已核验一致；Atlas 记录 `b0c37114-39d0-4c3e-87b9-2c3c12a0247b`，TestFlight 尝试 `b8938c5d-0ede-41ec-a99b-08bbb5f456a3`，原 Apple 上传 `8aebdc81-e09d-43c5-b5c2-9b6f19955052`。处理中不创建第二个上传任务，测试组可见以随后独立读回为准。
+- Android 1.0.8（17），Atlas 记录 `bc725011-d202-428c-a98f-2291f04048e6`，正式签名、包名和 manifest 版本通过。APK SHA256 `10b8aa4f603c2e45fb9076c7cab848f34ef8524bb0acbaba03339fbbf9b23b78`。邀请绑定操作 `56da4f73-97f0-447c-a2a0-f57b191dc969` verified；保留原入口及其他平台目的地。
+- 13 个制品已从 Atlas 重新下载并匹配 SHA256 后删除传输副本；本地删除重复包/打包中间文件 158,831,416 字节，编译临时目录由 host-build-output 清理，必要校验清单和受限运维回执保留。
+- 浏览器预览工具实测返回“The browser access host is unavailable”，未宣称浏览器截图验收成功。未执行 iPhone/Android 的真实系统分享面板、微信目标选择、实际发送或接收验收；系统分享与真实链接接入不等同于这些设备结果。
+- 发布收尾已读回 iOS `VALID/testflight_visible`，Apple build `8aebdc81-e09d-43c5-b5c2-9b6f19955052`。邀请同步操作 `902831df-4800-4fc7-afdc-13204833ec8b` verified，公开邀请页独立读回 iOS 内部测试 1.3.21（221）、Android 1.0.8（17）。Apple 材料读取仍返回 502，不能据此声称材料完整性通过；不影响已独立确认的内部测试组可见事实。
