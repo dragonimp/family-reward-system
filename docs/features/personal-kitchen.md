@@ -34,7 +34,7 @@ POST /recognitions：稳定UUID/mediaId；GET /recognitions：最近20个自己�
 
 ## AI 配置与边界
 
-复用现有 SystemConfig 的 Orbit WebApp bot、AgentFreeGatewayConfiguration 和 Goldfish.WebAppSdk；只选择当前已授权智能体，未新增模型密钥或直连模型服务。传入的是私有 JPEG dataURL 附件，不暴露下载地址。要求所授权智能体支持图片理解并能输出结构化 JSON；没有授权、模型不支持图片或响应不合法时保留失败状态，用户可重试或手动填写。
+复用 AgentFreeGatewayConfiguration 和 Goldfish.WebAppSdk。SystemConfig.agent.kitchenWebAppBotId 可指定厨房入口，未设置使用 Orbit 默认 WebApp 授权范围；kitchenAgentId 可明确选择当前用户已授权且活跃的目标，未设置选择当前用户自己拥有的 Goldfish 实例。原积分专用 bot 不适用于菜谱，保持其配置不变。未新增模型密钥或直连模型服务。传入的是私有 JPEG dataURL 附件，不暴露下载地址。要求所授权智能体支持图片理解并能输出结构化 JSON；没有授权、模型不支持图片或响应不合法时保留失败状态，用户可重试或手动填写。
 
 worker 异步领取持久任务（FOR UPDATE SKIP LOCKED），单任务3分钟预算，重启遗留 running 超过10分钟标失败供用户重试。每用户每天10次、图片/任务入口20次/分钟。会话专用于本次识别，结束后停止并归档，不触及其他用户会话。识别不自动保存；应用识别草稿和最终确认保存均由用户执行，避免异步覆盖正在编辑的内容。食品安全仍须用户核对，识别不是烹饪安全审核。
 
@@ -51,3 +51,40 @@ Linux 客户端可复用相同认证接口读取用户自己的 recipe.body 和�
 Orbit SDK worker 测试使用受控 HTTP 响应，不是真实模型准确率验收：验证私有附件、SSE解析、结构化草稿、不会自动入库、任务不重复生成、专属会话停止/归档及失败状态。现有公共菜谱/分类/时间偏好、图片和分享回归独立执行。
 
 真机相机/相册、完整截图视觉验收、真实用户授权模型 OCR 及识别准确率仍需独立验证，不能由源码或构建替代。正式构建、生产迁移、发布和邀请同步回执追加于本节。
+
+## 真实识别链路限制
+
+已用原创中文菜谱图片执行真实 Orbit SDK 测试；截至本次记录，未获得成功识别结果：原积分专用实例返回积分提示而非菜谱；用户个人 Goldfish 实例返回 provider model_not_found；另一既有 Goldfish 实例超时；已授权 Codex 实例返回 AgentNode reverse journal recovery 502/turn_not_found。各测试均在隔离数据库使用专属会话，结束停止并归档，没有将响应伪造成菜谱。未修改用户共享智能体定义、模型凭据或运行中的节点来掩盖错误。
+
+因此，图片上传、草稿编辑/保存、识别任务/失败处理已实现，但真实 AI 图片转结构化菜谱仍未验收通过，当前不能宣称可用。需 Orbit 提供一个当前用户已授权、模型及节点正常、支持图片并能输出菜谱 JSON 的厨房目标，再通过 kitchenAgentId/kitchenWebAppBotId 配置及真实测试验证。
+
+可选真实测试使用 tests/PersonalKitchen 的 KITCHEN_LIVE_ORBIT_USERNAME/BASE/BOT/AGENT/IMAGE 环境变量，复用正式 SDK；不在生产库插入测试记录。默认测试只使用受控 HTTP 响应。本次不开发公共共建后台、Linux 定时同步或批量插画生成；真机相机/相册及完整视觉验收仍未完成。
+
+## 修改文件清单
+
+- FamilyReward.Api/PersonalKitchenEndpoints.cs：全部私有厨房 API 与权限/幂等/校验。
+- FamilyReward.Api/KitchenRecognitionWorker.cs：Orbit 图片识别持久队列与草稿。
+- FamilyReward.Api/KitchenOrbitResolver.cs：仅从当前用户已授权活跃实例中选择厨房目标。
+- FamilyReward.Api/Program.cs：认证人类身份、限流、模块及 worker 注册。
+- scripts/migrations/20261108-personal-kitchen-v1.sql：五表、索引及私有媒体复合外键。
+- parent-app/ios/HappyLifeParent/MyKitchenView.swift：我的厨房完整页面、编辑器与照片打卡。
+- parent-app/ios/HappyLifeParent/KitchenView.swift：更多菜单及公共菜谱个人操作入口。
+- parent-app/ios/HappyLifeParent/DearSocialView.swift：复用已有相机包装。
+- parent-app/ios/HappyLifeParent.xcodeproj/project.pbxproj：新文件及版本222。
+- parent-app/android/MyKitchenPage.cs：对应 MAUI 原生页面。
+- parent-app/android/KitchenPanel.cs：更多菜单及详情个人操作入口。
+- parent-app/android/FamilyStore.cs：带认证和会话世代校验的私有图片读取。
+- parent-app/android/Platforms/Android/AndroidManifest.xml：相机权限与拍照应用可见性。
+- parent-app/android/LinkoFamily.csproj：版本1.0.9（18）。
+- scripts/build-moment-android-release.sh：相同版本的签名包、manifest及回执核对。
+- scripts/check-personal-kitchen.sh：隔离数据库和迁移回放验证。
+- tests/PersonalKitchen/PersonalKitchen.csproj、Program.cs：HTTP/数据库、SDK可控响应、可选真实识别测试。
+- docs/features/personal-kitchen.md：实现、接口、存储、验证和未完成事项。
+
+## 当前发布回执
+
+- iOS 1.3.22（222）：源码 c3be52fd69db18a20d8069a1c37662460608ab9b，签名 Archive/Export通过；Atlas IPA SHA256 6f62c4d4063f7149c6fb96496128f98d9dea24adcf15fd7c6b30a1b5e7df0bd8。TestFlight d25ed37d-ca5b-4ccc-8e63-ee58c8d790ea 已 VALID/testflight_visible；Apple build 02850c01-9712-4322-aa9d-ff602e60ccc6。邀请同步 e817bfa5-2d8e-4de1-b5ac-2c13e1222eb9 verified。
+- Android 1.0.9（18）：源码399bb1b，正式签名与包版本核验通过；Atlas版本a7cfc2f4-e669-43cd-beab-86032230c10b，APK SHA256 ebf234b523ca0b7a1d0e684877a136451d5cb117f714a14d27b77f4792f28402。邀请绑定3a90d4b6-192f-446b-921e-b421fd6f44ae verified，独立读回版本和实际APK URL。
+- 首次API版20261108-013614-activity-c3be52f：Atlas版本f032dd61-7d0d-452f-a4a3-b841e2233549，部署5b3a8ab4-6ad7-487f-8d91-34f9850a72ec stored，日志确认ledger验证/切换/启动/健康。迁移记录20261108-personal-kitchen-v1 SHA256 ff43374b9eb163249f88d42ef9bd72becdb7b8127b5b2a9ed736ffae3c41e6ba，五表归属family_reward_app，备份及校验清单受限保留。路由改为个人厨房专用目标的补充服务版本另行追加。
+- 后端聚焦32项检查、现有菜谱/图片/分享回归、原干饭HTTP/模型检查、真实城市中心Apple Maps查询通过；配套228项HTTP/WebSocket、前端lint/build通过。构建仅有既有SDK跨平台文件权限/地图弃用警告；原生正式编译无错误。
+- 已从Atlas重新下载12个正式制品，159,405,933字节全部匹配SHA256与大小。正式分发与真机安装/界面/拍照验收独立，后者尚未完成。

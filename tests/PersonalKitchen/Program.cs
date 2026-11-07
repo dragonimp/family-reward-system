@@ -14,6 +14,9 @@ using Npgsql;
 
 var cs=Environment.GetEnvironmentVariable("KITCHEN_TEST_DSN")??throw new Exception("Isolated database required");
 void Check(bool ok,string label){if(!ok)throw new Exception(label);Console.WriteLine("PASS "+label);}
+var targets=JsonNode.Parse("[{\"id\":1,\"status\":\"Active\",\"agentType\":\"Goldfish\",\"ownerUsername\":\"bob\"},{\"id\":2,\"status\":\"Active\",\"agentType\":\"Goldfish\",\"ownerUsername\":\"alice\"},{\"id\":3,\"status\":\"Inactive\",\"agentType\":\"Goldfish\",\"ownerUsername\":\"alice\"}]")!.AsArray();
+Check(KitchenOrbitResolver.Select(targets,"alice",null)==2,"automatic OCR target belongs to current user");
+Check(KitchenOrbitResolver.Select(targets,"alice",99)==null&&KitchenOrbitResolver.Select(targets,"alice",3)==null,"configured OCR target must be currently authorized and active");
 var builder=WebApplication.CreateBuilder();builder.WebHost.UseUrls("http://127.0.0.1:0");builder.Logging.ClearProviders();
 builder.Services.AddAuthentication("test").AddScheme<AuthenticationSchemeOptions,Identity>("test",_=>{});builder.Services.AddAuthorization();builder.Services.AddRateLimiter(o=>o.AddFixedWindowLimiter("kitchen-upload",v=>{v.PermitLimit=100;v.Window=TimeSpan.FromMinutes(1);}));
 await using var app=builder.Build();app.UseAuthentication();app.UseAuthorization();app.UseRateLimiter();app.MapPersonalKitchen(cs,r=>r.HttpContext.User.Identity?.IsAuthenticated==true?new KitchenActor(r.HttpContext.User.FindFirst(ClaimTypes.NameIdentifier)!.Value,"test"):null);await app.StartAsync();
@@ -46,6 +49,17 @@ using(var transport=new VisionFixture())using(var http=new HttpClient(transport)
     Check((await Data(await Send("GET","recipes")))["items"]!.AsArray().Count==1,"recognition never automatically saves a recipe");
     Check(!await worker.RunOne(CancellationToken.None),"completed task is not generated again");
     var failedTask=Guid.NewGuid();await Data(await Send("POST","recognitions",new{id=failedTask,mediaId=media}));transport.Fail=true;await worker.RunOne(CancellationToken.None);Check((await Data(await Send("GET",$"recognitions/{failedTask}")))["state"]!.ToString()=="failed","provider error persists recoverable failure without saving recipe");
+}
+if(Environment.GetEnvironmentVariable("KITCHEN_LIVE_ORBIT_USERNAME") is {Length:>0} liveUser){
+    var fixture=File.ReadAllBytes(Environment.GetEnvironmentVariable("KITCHEN_LIVE_ORBIT_IMAGE")!);var liveMedia=Guid.NewGuid();await Data(await Send("POST","media",new{id=liveMedia,purpose="recipe",base64=Convert.ToBase64String(fixture)}));var liveTask=Guid.NewGuid();await Data(await Send("POST","recognitions",new{id=liveTask,mediaId=liveMedia}));
+    await using(var c=new NpgsqlConnection(cs)){await c.OpenAsync();await using var q=new NpgsqlCommand("UPDATE kitchen_recognition_tasks SET username=@username WHERE id=@id",c);q.Parameters.AddWithValue("username",liveUser);q.Parameters.AddWithValue("id",liveTask);await q.ExecuteNonQueryAsync();}
+    using var http=new HttpClient{Timeout=TimeSpan.FromMinutes(4)};var orbit=new OrbitWebAppClient(http,new OrbitWebAppOptions{ApplicationId="family-reward",WebAppBotId=Environment.GetEnvironmentVariable("KITCHEN_LIVE_ORBIT_BOT")!,BaseAddress=new Uri(Environment.GetEnvironmentVariable("KITCHEN_LIVE_ORBIT_BASE")!)});
+    using var liveLogs=LoggerFactory.Create(b=>b.AddSimpleConsole());
+    var worker=new KitchenRecognitionWorker(cs,async (user,ct)=>{var agents=await orbit.GetAuthorizedAgentsAsync(user,ct);var authorized=KitchenOrbitResolver.Select(agents,user,int.TryParse(Environment.GetEnvironmentVariable("KITCHEN_LIVE_ORBIT_AGENT"),out var chosen)?chosen:null)??throw new Exception("No currently authorized personal vision agent");return(orbit,authorized,Environment.GetEnvironmentVariable("KITCHEN_LIVE_ORBIT_BOT")!);},liveLogs.CreateLogger<KitchenRecognitionWorker>());
+    await worker.RunOne(CancellationToken.None);var result=await Data(await Send("GET",$"recognitions/{liveTask}"));
+    Console.WriteLine("LIVE VISION state="+result["state"]+" error="+result["error"]);
+    Check(result["state"]?.ToString()=="completed"&&result["result"]?["draft"]?["name"]?.ToString()=="测试蒸米饭","real authorized Orbit vision transcribes original fixture name");
+    Check(result["result"]?["draft"]?["ingredients"] is JsonArray {Count:>0},"real vision returns structured ingredients");
 }
 var photo=Guid.NewGuid();await Data(await Send("POST","media",new{id=photo,purpose="checkin",base64=Convert.ToBase64String(bytes)}));
 var action=Guid.NewGuid();var checkin=new{recipeId=id,kind="private",mediaId=photo,cookedOn="2026-11-08",note="当地日历日期"};

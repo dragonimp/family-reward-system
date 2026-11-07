@@ -136,11 +136,16 @@ builder.Services.AddRateLimiter(options => options.AddPolicy("kitchen-upload", c
 builder.Services.AddHostedService(sp => new KitchenRecognitionWorker(connectionString, async (username, ct) =>
 {
     var config = await configStore.LoadAsync();
-    var bot = ResolveFamilyRewardWebAppBotId(config, null);
-    var factory = sp.GetRequiredService<IHttpClientFactory>();
-    var agent = await ResolveFamilyRewardAgentFreeAgentIdForBot(factory, username, bot, ct)
-        ?? throw new InvalidOperationException("No authorized Orbit agent");
-    return (CreateOrbitWebAppClient(factory, bot), agent, bot);
+    // A points-only agent cannot transcribe recipes. Use the existing default WebApp
+    // authorization scope and the user's own conversational agent, or an explicitly
+    // configured kitchen target. Never change the family chat bot or its permissions.
+    var bot = config["agent"]?.AsObject().String("kitchenWebAppBotId") ?? "";
+    var configured = config["agent"]?.AsObject().Int("kitchenAgentId");
+    var client = CreateOrbitWebAppClient(sp.GetRequiredService<IHttpClientFactory>(), bot);
+    var agents = await client.GetAuthorizedAgentsAsync(username, ct);
+    var agent = KitchenOrbitResolver.Select(agents, username, configured)
+        ?? throw new InvalidOperationException("No authorized personal vision agent");
+    return (client, agent, bot);
 }, sp.GetRequiredService<ILogger<KitchenRecognitionWorker>>()));
 
 var app = builder.Build();
