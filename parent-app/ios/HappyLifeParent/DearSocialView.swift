@@ -10,7 +10,7 @@ import ImageIO
 import Photos
 import MapKit
 
-private struct DearCamera: UIViewControllerRepresentable {
+struct DearCamera: UIViewControllerRepresentable {
     enum Mode: String, Identifiable {
         case photo, video
         var id: String { rawValue }

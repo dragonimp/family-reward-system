@@ -63,7 +63,10 @@ public sealed class KitchenPanel : ContentView
     private void Render()
     {
         body.Children.Clear();
-        body.Add(MomentStyle.Title("今天做什么？", 28));
+        var title = new Grid { ColumnDefinitions = new ColumnDefinitionCollection { new(GridLength.Star), new(GridLength.Auto) } };
+        title.Add(MomentStyle.Title("今天做什么？", 28));
+        title.Add(MomentStyle.Action("···", async () => { if (await owner.DisplayActionSheetAsync("下厨房", "取消", null, "我的厨房") == "我的厨房") await owner.Navigation.PushAsync(new MyKitchenPage(store)); }), 1);
+        body.Add(title);
         var grid = new Grid { ColumnSpacing = 10, RowSpacing = 10,
             ColumnDefinitions = new ColumnDefinitionCollection { new(GridLength.Star), new(GridLength.Star) } };
         for (var index = 0; index < categories.Length; index++)
@@ -103,6 +106,7 @@ public sealed class KitchenPanel : ContentView
     {
         var rows = new VerticalStackLayout { Padding = 20, Spacing = 14 };
         rows.Add(MomentStyle.Title(Text(current, "name"), 26));
+        rows.Add(MomentStyle.Action("收藏、星标与做菜打卡", () => _ = owner.Navigation.PushAsync(new MyKitchenRecipePage(store, Text(current, "recipeId"), "public"))));
         Image(rows, Text(current, "coverImage"));
         rows.Add(MomentStyle.Caption(Meta(current)));
         rows.Add(new Label { Text = Text(current, "description") });

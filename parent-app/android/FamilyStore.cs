@@ -131,6 +131,17 @@ public sealed class FamilyStore
         return data;
     }
 
+    public async Task<byte[]> KitchenImageAsync(string id)
+    {
+        if (!Guid.TryParse(id, out var parsed)) throw new FamilyApiException("图片标识无效。");
+        var attempt = SessionVersion;
+        using var response = await api.GetAsync("/api/kitchen/media/" + parsed.ToString("D"));
+        response.EnsureSuccessStatusCode();
+        var data = await response.Content.ReadAsByteArrayAsync();
+        if (attempt != SessionVersion || !Authenticated) throw new OperationCanceledException();
+        return data;
+    }
+
     public async Task<NotificationClient> NotificationsAsync(CancellationToken ct = default)
     {
         var config = await loginHttp.GetFromJsonAsync<JsonElement>("auth/native/configuration", ct);

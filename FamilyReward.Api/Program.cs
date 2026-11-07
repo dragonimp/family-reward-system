@@ -127,6 +127,21 @@ if (!string.IsNullOrWhiteSpace(releaseControlApplicationId))
 builder.Services.AddAgentIdentityFeedbackClient(builder.Configuration);
 builder.Services.AddAgentIdentityNativeLogin();
 builder.Services.AddSingleton(ReleaseRuntimeIdentity.Capture("family-points", AppContext.BaseDirectory));
+var connectionString = BuildConnectionString(builder.Configuration);
+var configStore = new SystemConfigStore(connectionString, builder.Environment.ContentRootPath);
+builder.Services.AddRateLimiter(options => options.AddPolicy("kitchen-upload", context =>
+    RateLimitPartition.GetFixedWindowLimiter(context.User.FindFirst(ClaimTypes.NameIdentifier)?.Value
+        ?? context.User.FindFirst("sub")?.Value ?? context.Connection.RemoteIpAddress?.ToString() ?? "anonymous",
+        _ => new FixedWindowRateLimiterOptions { PermitLimit = 20, Window = TimeSpan.FromMinutes(1), QueueLimit = 0 })));
+builder.Services.AddHostedService(sp => new KitchenRecognitionWorker(connectionString, async (username, ct) =>
+{
+    var config = await configStore.LoadAsync();
+    var bot = ResolveFamilyRewardWebAppBotId(config, null);
+    var factory = sp.GetRequiredService<IHttpClientFactory>();
+    var agent = await ResolveFamilyRewardAgentFreeAgentIdForBot(factory, username, bot, ct)
+        ?? throw new InvalidOperationException("No authorized Orbit agent");
+    return (CreateOrbitWebAppClient(factory, bot), agent, bot);
+}, sp.GetRequiredService<ILogger<KitchenRecognitionWorker>>()));
 
 var app = builder.Build();
 
@@ -139,10 +154,10 @@ app.UseForwardedHeaders(new ForwardedHeadersOptions
 {
     ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto | ForwardedHeaders.XForwardedHost
 });
-app.UseRateLimiter();
 app.UseCors();
 app.UseWebSockets();
 app.UseAgentIdentity();
+app.UseRateLimiter();
 app.UseAtlasReleaseDrain(context => HttpMethods.IsGet(context.Request.Method) && context.Request.Path == "/health");
 app.MapAgentIdentityAuthEndpoints();
 app.MapAgentIdentityNativeLogin(new Uri("https://happylife.ai.impx.net"), new Uri("linkofamily://login-complete"), "Linko-Family",
@@ -155,10 +170,17 @@ app.MapAtlasReleaseVersion();
 if (!string.IsNullOrWhiteSpace(releaseControlApplicationId))
     app.MapAtlasReleaseDrain(ReleaseDrainExtensions.UpgradeControlPolicy);
 
-var connectionString = BuildConnectionString(builder.Configuration);
 await VerifyDatabaseSchema(connectionString);
 app.MapRecipeEndpoints(connectionString);
-var configStore = new SystemConfigStore(connectionString, app.Environment.ContentRootPath);
+app.MapPersonalKitchen(connectionString, request =>
+{
+    if (!AgentIdentityAuthorizationExtensions.IsUserIdentity(request.HttpContext.User)) return null;
+    var owner = FirstClaim(request, ClaimTypes.NameIdentifier, "sub", "user_id", "uid");
+    if (string.IsNullOrWhiteSpace(owner)) return null;
+    if (Guid.TryParse(owner, out var id)) owner = id.ToString("D");
+    var username = FirstClaim(request, "preferred_username", ClaimTypes.Name, "name") ?? owner;
+    return new KitchenActor(owner, NormalizeBusinessUserName(username));
+});
 await configStore.LoadAsync();
 
 app.MapCreditScoreEndpoints(connectionString,

@@ -112,7 +112,8 @@ private struct KitchenView: View {
     @StateObject private var model: KitchenStore
     @State private var showingRecipe = false
     let active: Bool
-    init(family: FamilyStore, active: Bool) { _model = StateObject(wrappedValue: KitchenStore(family: family)); self.active = active }
+    let family: FamilyStore
+    init(family: FamilyStore, active: Bool) { _model = StateObject(wrappedValue: KitchenStore(family: family)); self.active = active; self.family = family }
 
     var body: some View {
         NavigationStack {
@@ -160,10 +161,11 @@ private struct KitchenView: View {
                 }.padding(20).frame(maxWidth: 760).frame(maxWidth: .infinity)
             }.background(Color(uiColor: .systemGroupedBackground))
                 .navigationTitle(kitchenText("下厨房")).navigationBarTitleDisplayMode(.inline)
+                .toolbar { ToolbarItem(placement: .topBarTrailing) { Menu { NavigationLink("我的厨房") { MyKitchenView(family: family) } } label: { Image(systemName: "ellipsis") }.accessibilityLabel("更多") } }
                 .disabled(model.busy)
                 .task(id: active) { if active { await model.load() } }
                 .sheet(isPresented: $showingRecipe) {
-                    if let recipe = model.recipe { KitchenRecipeDetail(recipe: recipe) }
+                    if let recipe = model.recipe { KitchenRecipeDetail(recipe: recipe, family: family) }
                 }
         }
     }
@@ -171,11 +173,13 @@ private struct KitchenView: View {
 
 private struct KitchenRecipeDetail: View {
     let recipe: KitchenRecipe
+    let family: FamilyStore
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
         NavigationStack {
             List {
+                Section { NavigationLink("收藏、星标与做菜打卡") { PersonalRecipeView(family: family, item: PersonalRecipe(["id": recipe.id.uuidString, "kind": "public", "name": recipe.name])) } }
                 Section {
                     Text(recipe.name).font(.title.bold())
                     recipeImage(recipe.coverImage)
