@@ -340,6 +340,11 @@ struct ChildDetail: View {
                 NavigationLink(String(localized: "守约信用分", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) { CreditView(store: store, child: current) }
                 Button(String(localized: "修改姓名与备注", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) { editor = EditorSpec(title: String(localized: "修改孩子资料", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), path: "/api/children/\(child.id)", method: "PUT", fields: [.init(key: "name", title: String(localized: "姓名", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), initial: current.text("name")), .init(key: "note", title: String(localized: "备注", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), initial: current.text("note"), required: false)]) }
             }
+            Section(String(localized: "手表设备", bundle: AgentIdentityLanguage.appBundle())) {
+                NavigationLink(String(localized: "手表设备", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) { RemoteRecords(store: store, title: String(localized: "手表设备", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), path: "/api/children/\(child.id)/devices?\(store.scope)", mode: .devices, childID: child.id) }
+                Button(String(localized: "连接手表", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) { editor = EditorSpec(title: String(localized: "连接孩子手表", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), path: "/api/children/\(child.id)/pair-device", fields: [.init(key: "code", title: String(localized: "手表上显示的配对码", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)))], scansWatchCode: true) }
+                Button(String(localized: "生成孩子授权码", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) { editor = EditorSpec(title: String(localized: "生成孩子授权码", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), path: "/api/children/\(child.id)/auth-code", fields: [], fixed: ["familyGroupId": store.groupID, "expiresInMinutes": 10], showsReceipt: true) }
+            }
             Section(String(localized: "成长", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) {
                 NavigationLink(String(localized: "温暖瞬间", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) { RemoteRecords(store: store, title: String(localized: "温暖瞬间", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), path: "/api/warm-moments?childId=\(child.id)&limit=30", mode: .moments) }
                 NavigationLink(String(localized: "成长周报", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) { RemoteRecords(store: store, title: String(localized: "成长周报", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), path: "/api/growth-reports?childId=\(child.id)&audience=child&period=weekly&ai=false", mode: .reports) }
@@ -353,27 +358,6 @@ struct ChildDetail: View {
             }
             .sheet(item: $editor) { NativeEditor(store: store, spec: $0) }
             .sheet(isPresented: $rewarding) { RewardEditor(store: store, child: current) }
-    }
-}
-
-struct WatchConnectionSettingsView: View {
-    @ObservedObject var store: FamilyStore
-    @State private var editor: EditorSpec?
-    var body: some View {
-        List {
-            Text(String(localized: "手表默认使用配对手机当前账号；下方用于孩子手表绑定与设备管理。", bundle: AgentIdentityLanguage.appBundle())).font(.footnote).foregroundStyle(.secondary)
-            ForEach(store.children) { child in
-                Section(child.text("name")) {
-                NavigationLink(String(localized: "手表设备", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) { RemoteRecords(store: store, title: String(localized: "手表设备", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), path: "/api/children/\(child.id)/devices?\(store.scope)", mode: .devices, childID: child.id) }
-                Button(String(localized: "连接手表", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) { editor = EditorSpec(title: String(localized: "连接孩子手表", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), path: "/api/children/\(child.id)/pair-device", fields: [.init(key: "code", title: String(localized: "手表上显示的配对码", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)))], scansWatchCode: true) }
-                Button(String(localized: "生成孩子授权码", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) { editor = EditorSpec(title: String(localized: "生成孩子授权码", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), path: "/api/children/\(child.id)/auth-code", fields: [], fixed: ["familyGroupId": store.groupID, "expiresInMinutes": 10], showsReceipt: true) }
-                }
-            }
-            if store.children.isEmpty { Text(String(localized: "暂无孩子", bundle: AgentIdentityLanguage.appBundle())).foregroundStyle(.secondary) }
-        }
-        .navigationTitle(String(localized: "连接手表", bundle: AgentIdentityLanguage.appBundle()))
-        .task { await store.refreshIfStale() }
-        .sheet(item: $editor) { NativeEditor(store: store, spec: $0) }
     }
 }
 
@@ -634,7 +618,7 @@ struct AccountView: View {
                     }
                 }
                 Section(String(localized: "应用与设置", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) {
-                    NavigationLink { WatchConnectionSettingsView(store: store) } label: { Label(String(localized: "连接手表", bundle: AgentIdentityLanguage.appBundle()), systemImage: "applewatch") }
+                    NavigationLink { ExerciseWatchConnectionView(family: store) } label: { Label(String(localized: "连接手表", bundle: AgentIdentityLanguage.appBundle()), systemImage: "applewatch") }
                     Button { scanningLogin = true } label: { Label(String(localized: "扫码登录", bundle: AgentIdentityLanguage.appBundle()), systemImage: "qrcode.viewfinder") }
                         .sheet(isPresented: $scanningLogin, onDismiss: {
                             if let url = loginApprovalURL { loginApprovalURL = nil; openURL(url) }

@@ -320,6 +320,8 @@ public sealed class FamilyPage : ContentPage
         content.Add(Heading(child.Text("name"), 23));
         content.Add(Card(new Label { Text = $"积分 {child.Number("score")}  ·  零用钱 ¥{child.Number("cash")}  ·  物品 {child.Number("items")}", FontSize = 17 }));
         content.Add(Button("记录奖励或扣分", () => _ = AddReward(child), true));
+        content.Add(Button("连接孩子手表", () => _ = PairWatch(child)));
+        content.Add(Button("生成孩子手表授权码", () => _ = GenerateWatchCode(child)));
         content.Add(Heading("奖励规则", 20));
         foreach (var rule in store.Rules.Take(30))
         {
@@ -510,14 +512,13 @@ public sealed class FamilyPage : ContentPage
     private void WatchConnections()
     {
         var rows = new VerticalStackLayout { Spacing = 12, Padding = 16 };
-        rows.Add(MomentStyle.Caption("手表默认使用配对手机当前账号；下方用于孩子手表绑定。"));
-        foreach (var child in store.Children)
-        {
-            rows.Add(Heading(child.Text("name"), 20));
-            rows.Add(Button("连接手表", () => _ = PairWatch(child)));
-            rows.Add(Button("生成孩子手表授权码", () => _ = GenerateWatchCode(child)));
-        }
-        if (store.Children.Count == 0) rows.Add(new Label { Text = "暂无孩子" });
+        rows.Add(MomentStyle.Caption("手表配对可在系统蓝牙设置中管理。"));
+        rows.Add(Button("打开蓝牙设置", () => {
+            var intent = new global::Android.Content.Intent(global::Android.Provider.Settings.ActionBluetoothSettings);
+            intent.AddFlags(global::Android.Content.ActivityFlags.NewTask);
+            global::Android.App.Application.Context.StartActivity(intent);
+        }));
+        rows.Add(MomentStyle.Caption("当前安卓版本暂不支持手表健康数据同步。孩子手表请在带娃的孩子菜单中连接。"));
         _ = Navigation.PushAsync(new ContentPage { Title = "连接手表", Content = new ScrollView { Content = rows } });
     }
 

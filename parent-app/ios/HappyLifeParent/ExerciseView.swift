@@ -401,22 +401,6 @@ struct ExerciseView: View {
                         Button(String(localized: "打开系统设置", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) { if let url = URL(string: UIApplication.openSettingsURLString) { UIApplication.shared.open(url) } }
                     }
                 }
-                Section(String(localized: "健康与手表", bundle: AgentIdentityLanguage.appBundle())) {
-                    if !family.watchExerciseMetrics.isEmpty {
-                        Text(String(localized: "手表运动数据", bundle: AgentIdentityLanguage.appBundle())).font(.headline)
-                        if let updated = family.watchMetricsUpdatedAt { Text(updated, style: .time).font(.caption).foregroundStyle(.secondary) }
-                        if let value = family.watchExerciseMetrics["heart"] { Text(String(format: String(localized: "心率 %.0f 次/分", bundle: AgentIdentityLanguage.appBundle()), value)) }
-                        if let value = family.watchExerciseMetrics["energy"] { Text(String(format: String(localized: "活动能量 %.0f 千卡", bundle: AgentIdentityLanguage.appBundle()), value)) }
-                        if let value = family.watchExerciseMetrics["distance"] { Text(String(format: String(localized: "距离 %.2f 公里", bundle: AgentIdentityLanguage.appBundle()), value / 1000)) }
-                    }
-                    Button(String(localized: "连接 Apple 健康与手表数据", bundle: AgentIdentityLanguage.appBundle())) { Task { await refreshHealth(request: true) } }
-                    if let status = health.message { Text(status).font(.caption).foregroundStyle(.secondary) }
-                    if let value = health.steps { Text(String(format: String(localized: "%.0f 步", bundle: AgentIdentityLanguage.appBundle()), value)) }
-                    if let value = health.distance { Text(String(format: String(localized: "距离 %.2f 公里", bundle: AgentIdentityLanguage.appBundle()), value / 1000)) }
-                    if let heart = health.heartRate { Text(String(format: String(localized: "平均心率 %.0f 次/分", bundle: AgentIdentityLanguage.appBundle()), heart)) }
-                    if let energy = health.energy { Text(String(format: String(localized: "活动能量 %.0f 千卡", bundle: AgentIdentityLanguage.appBundle()), energy)) }
-                    Text(String(localized: "健康数据由系统授权读取。手表运动保存后同步到 iPhone；未授权或尚未同步时不显示测量值。", bundle: AgentIdentityLanguage.appBundle())).font(.caption).foregroundStyle(.secondary)
-                }
                 Section {
                     if exercise.history.isEmpty {
                         ContentUnavailableView(String(localized: "还没有运动记录", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), systemImage: "figure.walk", description: Text(String(localized: "完成一次运动后，时长、步数和公里数会保存在这里。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))))
@@ -684,5 +668,44 @@ struct ActivityExerciseTimelineRow: View {
                 Button(String(localized: "继续", bundle: AgentIdentityLanguage.appBundle()), action: onContinue).buttonStyle(.borderless)
             }
         }.padding(.vertical, 6)
+    }
+}
+
+
+struct ExerciseWatchConnectionView: View {
+    @ObservedObject var family: FamilyStore
+    @StateObject private var health = ExerciseHealth()
+    var body: some View {
+        List {
+                Section(String(localized: "健康与手表", bundle: AgentIdentityLanguage.appBundle())) {
+                    if !family.watchExerciseMetrics.isEmpty {
+                        Text(String(localized: "手表运动数据", bundle: AgentIdentityLanguage.appBundle())).font(.headline)
+                        if let updated = family.watchMetricsUpdatedAt { Text(updated, style: .time).font(.caption).foregroundStyle(.secondary) }
+                        if let value = family.watchExerciseMetrics["heart"] { Text(String(format: String(localized: "心率 %.0f 次/分", bundle: AgentIdentityLanguage.appBundle()), value)) }
+                        if let value = family.watchExerciseMetrics["energy"] { Text(String(format: String(localized: "活动能量 %.0f 千卡", bundle: AgentIdentityLanguage.appBundle()), value)) }
+                        if let value = family.watchExerciseMetrics["distance"] { Text(String(format: String(localized: "距离 %.2f 公里", bundle: AgentIdentityLanguage.appBundle()), value / 1000)) }
+                    }
+                    Button(String(localized: "连接 Apple 健康与手表数据", bundle: AgentIdentityLanguage.appBundle())) { Task { await refresh(request: true) } }
+                    if let status = health.message { Text(status).font(.caption).foregroundStyle(.secondary) }
+                    if let value = health.steps { Text(String(format: String(localized: "%.0f 步", bundle: AgentIdentityLanguage.appBundle()), value)) }
+                    if let value = health.distance { Text(String(format: String(localized: "距离 %.2f 公里", bundle: AgentIdentityLanguage.appBundle()), value / 1000)) }
+                    if let heart = health.heartRate { Text(String(format: String(localized: "平均心率 %.0f 次/分", bundle: AgentIdentityLanguage.appBundle()), heart)) }
+                    if let energy = health.energy { Text(String(format: String(localized: "活动能量 %.0f 千卡", bundle: AgentIdentityLanguage.appBundle()), energy)) }
+                    Text(String(localized: "健康数据由系统授权读取。手表运动保存后同步到 iPhone；未授权或尚未同步时不显示测量值。", bundle: AgentIdentityLanguage.appBundle())).font(.caption).foregroundStyle(.secondary)
+                }
+        }
+        .navigationTitle(String(localized: "连接手表", bundle: AgentIdentityLanguage.appBundle()))
+        .task { await refresh() }
+    }
+    private func refresh(request: Bool = false) async {
+        guard let owner = family.profile?.text("unifiedUserId"), !owner.isEmpty else { return }
+        let exercise = ExerciseStore.shared(userID: owner)
+        exercise.connect(family)
+        if request { await health.authorize() }
+        let records = await health.watchRecords(userID: owner)
+        guard family.profile?.text("unifiedUserId") == owner else { return }
+        exercise.importWatchRecords(records)
+        await exercise.sync()
+        if let record = exercise.active ?? exercise.history.first { await health.read(record) }
     }
 }
