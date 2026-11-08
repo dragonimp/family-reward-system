@@ -84,7 +84,7 @@ public sealed partial class ExercisePanel
                 try {
                     var linked = item.Activity!;
                     await api.CallAsync($"/api/dear/social/tenants/{linked.TenantID:D}/activities/{linked.Id:D}/moments", HttpMethod.Post,
-                        new { text = SharedText(item), requestId = item.SyncId, recordedAt = item.EndedAt ?? item.StartedAt });
+                        new { text = SharedText(item), requestId = item.SyncId, recordedAt = item.StartedAt });
                     if (!OwnSession(generation)) return;
                     archive.ActivityShares.Add(item.SyncId); Save();
                 } catch (Exception error) { if (!OwnSession(generation)) return; activityError = "活动动态待重试：" + error.Message; }

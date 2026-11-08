@@ -235,7 +235,7 @@ import HealthKit
             for record in archive.history where record.activity != nil && archive.activityShares?[record.id] == nil {
                 guard let linked = record.activity, !(archive.pendingDeletions ?? []).contains(record.id), api.profile?.text("unifiedUserId") == userID else { continue }
                 do {
-                let response = try await api.call("/api/dear/social/tenants/\(linked.tenantID.uuidString)/activities/\(linked.id.uuidString)/moments", method: "POST", body: ["text": record.activitySummary, "requestId": record.id.uuidString, "recordedAt": ISO8601DateFormatter().string(from: record.endedAt ?? record.startedAt)]) as? [String: Any] ?? [:]
+                let response = try await api.call("/api/dear/social/tenants/\(linked.tenantID.uuidString)/activities/\(linked.id.uuidString)/moments", method: "POST", body: ["text": record.activitySummary, "requestId": record.id.uuidString, "recordedAt": ISO8601DateFormatter().string(from: record.startedAt)]) as? [String: Any] ?? [:]
                 guard api.profile?.text("unifiedUserId") == userID else { return }
                 guard let raw = response["id"] as? String, let id = UUID(uuidString: raw) else { throw APIError.message(String(localized: "活动动态未返回有效记录标识。", bundle: AgentIdentityLanguage.appBundle())) }
                 if archive.activityShares == nil { archive.activityShares = [:] }; archive.activityShares?[record.id] = id; save()

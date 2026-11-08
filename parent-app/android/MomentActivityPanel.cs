@@ -105,7 +105,7 @@ public sealed class MomentActivityPanel : ContentView
         var items = (showJoined ? joined : activities).OrderByDescending(a => MomentDates.ActivityDate(a)).ThenByDescending(a => a.Created).ToList();
         var list = new CollectionView { ItemsSource = items, SelectionMode = SelectionMode.None, EmptyView = Empty("还没有活动", space == Guid.Empty ? "创建空间或在完整活动页接受邀请。" : "点击活动列表右侧的新增，记录一次相聚。"), ItemTemplate = new DataTemplate(() =>
         {
-            var row = new ActivityRow(store.Profile?.Text("unifiedUserId") ?? "");
+            var row = new ActivityRow();
             row.Opened += item => _ = OpenActivityAsync(item);
             return row;
         }) };
@@ -205,17 +205,15 @@ public sealed class MomentActivityPanel : ContentView
     }
     private sealed class ActivityRow : ContentView
     {
-        private readonly Label title = MomentStyle.Title("", 18), date = MomentStyle.Caption(""), exercise = MomentStyle.Caption("");
-        private readonly string userID;
+        private readonly Label title = MomentStyle.Title("", 18), date = MomentStyle.Caption("");
         public event Action<MomentRecord>? Opened;
-        public ActivityRow(string userID)
+        public ActivityRow()
         {
-            this.userID = userID;
-            var stack = new VerticalStackLayout { Spacing = 6 }; stack.Add(title); stack.Add(date); stack.Add(exercise);
+            var stack = new VerticalStackLayout { Spacing = 6 }; stack.Add(title); stack.Add(date);
             Content = MomentStyle.Card(stack); Margin = new Thickness(0, 0, 0, 10);
             var tap = new TapGestureRecognizer(); tap.Tapped += (_, _) => { if (BindingContext is MomentRecord item) Opened?.Invoke(item); }; GestureRecognizers.Add(tap);
         }
-        protected override void OnBindingContextChanged() { base.OnBindingContextChanged(); if (BindingContext is MomentRecord item) { title.Text = item.Text("title"); date.Text = MomentDates.ActivityLabel(item); exercise.Text = ExercisePanel.ActivitySummary(userID, item.Id); exercise.IsVisible = !string.IsNullOrEmpty(exercise.Text); } }
+        protected override void OnBindingContextChanged() { base.OnBindingContextChanged(); if (BindingContext is MomentRecord item) { title.Text = item.Text("title"); date.Text = MomentDates.ActivityLabel(item); } }
     }
 }
 

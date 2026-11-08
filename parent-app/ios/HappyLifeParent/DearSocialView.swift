@@ -729,7 +729,6 @@ struct DearSocialView: View {
                                     } label: { Image(systemName: "ellipsis.circle").accessibilityLabel(String(localized: "管理\(item.text("title"))", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) }
                                     .disabled(busy)
                                 }
-                                ActivityExerciseRecords(activityID: item.id)
                                 }
                             }
                         }
