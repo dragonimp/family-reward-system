@@ -1119,6 +1119,9 @@ struct DearSocialView: View {
                 if !batchDownloadError.isEmpty { Text(batchDownloadError).font(.caption).foregroundStyle(.red) }
             }
         } header: { Text("照片分享").textCase(nil) }
+        .onReceive(NotificationCenter.default.publisher(for: .exerciseActivityPublished)) { _ in
+            Task { try? await loadMoments() }
+        }
         .onReceive(store.photoSource.$syncRevision.dropFirst()) { _ in
             Task { try? await loadPhotos(); try? await loadMoments(); try? await loadCheckIns() }
         }
@@ -1260,7 +1263,7 @@ struct DearSocialView: View {
         } message: { Text("活动成员将无法再获取这些文件；iPhone 相册中的原文件不会删除。") }
         .sheet(isPresented: $showingCheckIn) { checkInSheet }
         .sheet(isPresented: $showingMomentCreate) { momentCreateSheet }
-        .fullScreenCover(item: $cameraMode, onDismiss: { shareCapturedMedia() }) { mode in
+        .fullScreenCover(item: $cameraMode, onDismiss: { store.captureInProgress = false; shareCapturedMedia() }) { mode in
             DearCamera(mode: mode, recordLocation: true) { result in
                 switch result {
                 case .success(let media):
@@ -1382,6 +1385,7 @@ struct DearSocialView: View {
             }
             guard token == store.identity.accessToken, target.activityID == activityId, showingActivity else { return }
             cameraTarget = target
+            store.captureInProgress = true
             cameraMode = mode
         } catch { cameraError = error.localizedDescription; showingCameraError = true }
     }

@@ -3,7 +3,7 @@
   "messages": {
     "moment.nslocationwheninuseusagedescription": {
       "iosKey": "NSLocationWhenInUseUsageDescription",
-      "zh-Hans": "在活动中打卡时记录手表当前位置、海拔和地址。",
+      "zh-Hans": "记录运动轨迹、海拔，以及您主动进行的活动打卡位置。",
       "en": "Linko Moment uses your location to record exercise routes and activity check-ins when you choose to use these features."
     },
     "moment.nshealthshareusagedescription": {

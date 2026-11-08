@@ -108,6 +108,28 @@ import Foundation
         precondition(continued.id != distanceSession.id && continued.endedAt == nil && continued.running)
         precondition(continued.duration(at: start.addingTimeInterval(3610)) == 10)
         precondition(continued.activity == distanceSession.activity && distanceSession.endedAt != nil)
+        var elevated = distanceSession
+        elevated.routeEnabled = true
+        elevated.route = [ExerciseRoutePoint(latitude: 24, longitude: 118, recordedAt: start.addingTimeInterval(1), segment: UUID(), altitudeMeters: -3.5, verticalAccuracyMeters: 8)]
+        precondition(elevated.routePoints.count == 1 && elevated.altitudeRange?.lowerBound == -3.5)
+        let elevatedRoundTrip = try decoder.decode(ExerciseSession.self, from: encoder.encode(elevated))
+        precondition(elevatedRoundTrip.routePoints[0].altitudeMeters == -3.5)
+        precondition(elevated.activitySummary == "慢跑 · 00:00:20\n1.80 公里\n海拔 -3.5–-3.5 米")
+        precondition(oldRecord.routePoints.isEmpty)
+        let envelope = ExerciseDeliveryEnvelope(owner: "AABBCCDD-1111-2222-3333-444455556666", record: elevated)
+        let packet = try encoder.encode(envelope)
+        let inboxFile = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString).appendingPathComponent("record.json")
+        defer { try? FileManager.default.removeItem(at: inboxFile.deletingLastPathComponent()) }
+        let received = try ExerciseDeliveryEnvelope.persist(packet, at: inboxFile)
+        precondition(received.record.id == elevated.id && received.canonicalOwner == "AABBCCDD-1111-2222-3333-444455556666")
+        _ = try ExerciseDeliveryEnvelope.persist(packet, at: inboxFile)
+        var conflicting = elevated; conflicting.kind = "another workout"
+        do { _ = try ExerciseDeliveryEnvelope.persist(encoder.encode(ExerciseDeliveryEnvelope(owner: envelope.owner, record: conflicting)), at: inboxFile); preconditionFailure("conflicting delivery accepted") } catch { }
+        let durablePacket = try Data(contentsOf: inboxFile)
+        precondition(durablePacket == packet)
+        var unfinished = elevated; unfinished.endedAt = nil
+        do { _ = try ExerciseDeliveryEnvelope.decode(encoder.encode(ExerciseDeliveryEnvelope(owner: envelope.owner, record: unfinished))); preconditionFailure("unfinished delivery accepted") } catch { }
+        print("PASS: negative altitude and accuracy roundtrip, durable delivery replay, conflict preservation and incomplete delivery rejection")
         print("PASS: continuation preserves completed record and excludes stopped time")
         print("PASS: distance totals, pause exclusion, persistence, legacy archive compatibility")
         print("PASS: pause/resume, interval steps, completed immutability, restart persistence, local time across midnight")

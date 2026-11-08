@@ -6195,6 +6195,31 @@
       "iosKey": "不选分类，随便做一道",
       "en": "Leave categories unselected to pick anything",
       "zh-Hans": "不选分类，随便做一道"
+    },
+    "moment.td31eb1cfb755": {
+      "zh-Hans": "活动动态未返回有效记录标识。",
+      "en": "The activity feed did not return a valid record ID.",
+      "iosKey": "活动动态未返回有效记录标识。"
+    },
+    "moment.tc8e7d2c5bb86": {
+      "zh-Hans": "运动已同步，活动动态待重试：%@",
+      "en": "Workout synced. Activity feed will retry: %@",
+      "iosKey": "运动已同步，活动动态待重试：%@"
+    },
+    "moment.t806d2409e57f": {
+      "zh-Hans": "海拔 %.1f–%.1f 米",
+      "en": "Elevation %.1f–%.1f m",
+      "iosKey": "海拔 %.1f–%.1f 米"
+    },
+    "moment.td476f1135d26": {
+      "zh-Hans": "运动已保存并加入同步队列，手机接收后会同步到账号和关联活动。",
+      "en": "Workout saved and queued. After receiving it, iPhone will sync it to your account and linked activity.",
+      "iosKey": "运动已保存并加入同步队列，手机接收后会同步到账号和关联活动。"
+    },
+    "moment.t8776f1e8717d": {
+      "zh-Hans": "重试同步运动记录",
+      "en": "Retry workout sync",
+      "iosKey": "重试同步运动记录"
     }
   }
 }

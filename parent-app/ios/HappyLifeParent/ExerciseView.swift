@@ -7,6 +7,11 @@ import CoreLocation
 import HealthKit
 
 @MainActor final class ExerciseStore: NSObject, ObservableObject, CLLocationManagerDelegate {
+    private static var stores: [String: ExerciseStore] = [:]
+    static func shared(userID: String) -> ExerciseStore {
+        if let value = stores[userID] { return value }
+        let value = ExerciseStore(userID: userID); stores[userID] = value; return value
+    }
     @Published private var archive = ExerciseArchive()
     @Published var message: String?
     @Published var busy = false
@@ -50,14 +55,15 @@ import HealthKit
 
     deinit { locator.stopUpdatingLocation(); pedometer.stopUpdates() }
 
-    private func save() {
-        guard readable else { return }
+    @discardableResult private func save() -> Bool {
+        guard readable else { return false }
         do {
             try archive.write(to: file)
             if Date().timeIntervalSince(lastNotice) >= 5 || active == nil {
                 lastNotice = Date(); NotificationCenter.default.post(name: .exerciseRecordsChanged, object: nil)
             }
-        } catch { message = String(localized: "运动记录尚未保存：\(error.localizedDescription)。请保留页面并重试保存。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)) }
+            return true
+        } catch { message = String(localized: "运动记录尚未保存：\(error.localizedDescription)。请保留页面并重试保存。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)); return false }
     }
     func retrySave() { guard readable else { return }; message = nil; save() }
 
@@ -81,13 +87,14 @@ import HealthKit
         archive.active = record.continuation(at: Date())
         save(); observe(); updateLocationTracking()
     }
-    func importWatchRecords(_ records: [ExerciseSession]) {
-        guard readable else { return }
-        for record in records where !(archive.importedWatchIDs ?? []).contains(record.id) {
+    @discardableResult func importWatchRecords(_ records: [ExerciseSession]) -> Bool {
+        guard readable else { return false }
+        for var record in records where !(archive.importedWatchIDs ?? []).contains(record.id) {
+            if record.activityText == nil { record.activityText = record.activitySummary }
             if !archive.history.contains(where: { $0.id == record.id }) && !(archive.pendingDeletions ?? []).contains(record.id) { archive.history.append(record) }
             archive.importedWatchIDs = (archive.importedWatchIDs ?? []) + [record.id]
         }
-        archive.history.sort { $0.startedAt > $1.startedAt }; save()
+        archive.history.sort { $0.startedAt > $1.startedAt }; return save()
     }
     func resume() {
         guard readable, !busy else { return }
@@ -110,6 +117,8 @@ import HealthKit
         await reconcile()
         guard var completed = archive.active else { return }
         completed.endedAt = now
+        completed.route = completed.route?.filter { point in completed.intervals.contains { point.recordedAt >= $0.start && point.recordedAt <= ($0.end ?? now) } }
+        completed.activityText = completed.activitySummary
         archive.history.insert(completed, at: 0)
         archive.active = nil
         save()
@@ -123,8 +132,8 @@ import HealthKit
     }
     func stopObserving() { generation = UUID(); pedometer.stopUpdates() }
 
-    func connect(_ store: FamilyStore) { api = store }
-    func accountDidChange() { api = nil; stopLocationTracking(); stopObserving() }
+    func connect(_ store: FamilyStore) { api = store; store.exerciseStore = self }
+    func accountDidChange() { api = nil; stopLocationTracking(); stopObserving(); Self.stores.removeValue(forKey: userID) }
     func enableRoute() {
         guard active != nil, readable else { return }
         archive.active?.routeEnabled = true; save(); updateLocationTracking()
@@ -160,7 +169,9 @@ import HealthKit
                 else if dt < 3 || location.distance(from: previous) < 3 || location.distance(from: previous) / dt > 20 { continue }
             }
             let point = ExerciseRoutePoint(latitude: location.coordinate.latitude, longitude: location.coordinate.longitude,
-                recordedAt: location.timestamp, segment: routeSegment)
+                recordedAt: location.timestamp, segment: routeSegment,
+                altitudeMeters: location.verticalAccuracy >= 0 && location.altitude.isFinite ? location.altitude : nil,
+                verticalAccuracyMeters: location.verticalAccuracy >= 0 ? location.verticalAccuracy : nil)
             if archive.active?.appendRoute(point) == true {
                 lastLocation = location; lastLocationAt = location.timestamp; changed = true
                 locationMessage = String(localized: "正在记录轨迹", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))
@@ -220,7 +231,18 @@ import HealthKit
                     archive.history.append(record); archive.uploaded = Array(Set((archive.uploaded ?? []) + [id])); save()
                 }
             }
-            archive.history.sort { $0.startedAt > $1.startedAt }; save(); syncMessage = String(localized: "已同步到当前账号", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))
+            var activityShareError: String?
+            for record in archive.history where record.activity != nil && archive.activityShares?[record.id] == nil {
+                guard let linked = record.activity, !(archive.pendingDeletions ?? []).contains(record.id), api.profile?.text("unifiedUserId") == userID else { continue }
+                do {
+                let response = try await api.call("/api/dear/social/tenants/\(linked.tenantID.uuidString)/activities/\(linked.id.uuidString)/moments", method: "POST", body: ["text": record.activitySummary, "requestId": record.id.uuidString, "recordedAt": ISO8601DateFormatter().string(from: record.endedAt ?? record.startedAt)]) as? [String: Any] ?? [:]
+                guard api.profile?.text("unifiedUserId") == userID else { return }
+                guard let raw = response["id"] as? String, let id = UUID(uuidString: raw) else { throw APIError.message(String(localized: "活动动态未返回有效记录标识。", bundle: AgentIdentityLanguage.appBundle())) }
+                if archive.activityShares == nil { archive.activityShares = [:] }; archive.activityShares?[record.id] = id; save()
+                NotificationCenter.default.post(name: .exerciseActivityPublished, object: nil)
+                } catch { activityShareError = String(localized: "运动已同步，活动动态待重试：\(error.localizedDescription)", bundle: AgentIdentityLanguage.appBundle()) }
+            }
+            archive.history.sort { $0.startedAt > $1.startedAt }; save(); syncMessage = activityShareError ?? String(localized: "已同步到当前账号", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))
         } catch is CancellationError { }
         catch { syncMessage = String(localized: "同步未完成，本机记录已保留：\(error.localizedDescription)", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)) }
     }
@@ -286,7 +308,7 @@ struct ExerciseView: View {
     @State private var activity: ExerciseActivity?
     @State private var confirmFinish = false
     @State private var pendingDeletion: ExerciseSession?
-    init(userID: String) { _exercise = StateObject(wrappedValue: ExerciseStore(userID: userID)) }
+    init(userID: String) { _exercise = StateObject(wrappedValue: ExerciseStore.shared(userID: userID)) }
 
     var body: some View {
         NavigationStack {
@@ -324,6 +346,7 @@ struct ExerciseView: View {
                                     .accessibilityLabel(String(localized: "运动距离，\(exerciseDistanceTitle(active))", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)))
                                 Text(active.steps.map { String(localized: "\($0) 步", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)) } ?? String(localized: "步数待获取", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)))
                                     .font(.title2).monospacedDigit()
+                                if let altitude = active.routePoints.last?.altitudeMeters { Text(String(format: String(localized: "海拔 %.1f 米", bundle: AgentIdentityLanguage.appBundle()), altitude)).font(.subheadline) }
                                 Text(active.running ? String(localized: "运动中", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)) : String(localized: "已暂停", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))).foregroundStyle(active.running ? .teal : .secondary)
                             }.frame(maxWidth: .infinity).padding(.vertical, 18)
                         }
@@ -390,6 +413,7 @@ struct ExerciseView: View {
                             Button(String(localized: "继续\(item.kind)", bundle: AgentIdentityLanguage.appBundle())) { exercise.continueRecord(item) }.buttonStyle(.borderless).disabled(exercise.active != nil || exercise.busy)
                             if let linked = item.activity { Text(linked.title).font(.subheadline).foregroundStyle(.secondary) }
                             Text(exerciseDistanceTitle(item)).font(.headline).monospacedDigit()
+                            if let altitude = item.altitudeRange { Text(String(format: String(localized: "海拔 %.1f–%.1f 米", bundle: AgentIdentityLanguage.appBundle()), altitude.lowerBound, altitude.upperBound)).font(.caption) }
                             if !item.routePoints.isEmpty {
                                 Button { selectedRoute = item } label: { Label(String(localized: "查看轨迹", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), systemImage: "map") }.buttonStyle(.borderless)
                             }
@@ -442,7 +466,7 @@ struct ExerciseView: View {
                     mapMode = exercise.active?.routeEnabled == true
                     receiveActivity()
                     if let id = family.pendingExerciseContinuation, let record = exercise.history.first(where: { $0.id == id }) { exercise.continueRecord(record); family.pendingExerciseContinuation = nil }
-                    await exercise.refresh(); await refreshHealth(); await exercise.sync()
+                    await exercise.refresh(); await refreshHealth()
                 }
                 .onChange(of: family.pendingExerciseContinuation) { _, value in
                     if let id = value, let record = exercise.history.first(where: { $0.id == id }) { exercise.continueRecord(record); family.pendingExerciseContinuation = nil }
@@ -451,7 +475,7 @@ struct ExerciseView: View {
                 .onChange(of: family.profile?.text("unifiedUserId")) { _, _ in activity = nil; exercise.accountDidChange() }
                 .onChange(of: mapMode) { _, value in if value { exercise.enableRoute() } }
                 .onChange(of: phase) { _, value in
-                    if value == .active { Task { await exercise.refresh(); await refreshHealth(); await exercise.sync() } }
+                    if value == .active { Task { await exercise.refresh(); await refreshHealth() } }
                     else { exercise.stopObserving() }
                 }
                 .onDisappear { exercise.stopObserving() }
@@ -461,6 +485,7 @@ struct ExerciseView: View {
         if request { await health.authorize() }
         let records = await health.watchRecords(userID: family.profile?.text("unifiedUserId") ?? "")
         exercise.importWatchRecords(records)
+        await exercise.sync()
         if let record = exercise.active ?? exercise.history.first { await health.read(record) }
     }
     private func receiveActivity() {
@@ -538,7 +563,7 @@ private func exerciseDistanceTitle(_ session: ExerciseSession) -> String {
     return String(format: format, locale: Locale(identifier: AgentIdentityLanguage.current), distance / 1000)
 }
 
-extension Notification.Name { static let exerciseRecordsChanged = Notification.Name("moment.exerciseRecordsChanged") }
+extension Notification.Name { static let exerciseActivityPublished = Notification.Name("moment.exerciseActivityPublished"); static let exerciseRecordsChanged = Notification.Name("moment.exerciseRecordsChanged") }
 
 @MainActor final class ExerciseHealth: ObservableObject {
     private let store = HKHealthStore()
@@ -583,7 +608,7 @@ extension Notification.Name { static let exerciseRecordsChanged = Notification.N
             store.execute(HKSampleQuery(sampleType: .workoutType(), predicate: predicate, limit: HKObjectQueryNoLimit, sortDescriptors: nil) { _, samples, _ in continuation.resume(returning: samples ?? []) })
         }
         return samples.compactMap { sample in
-            guard let workout = sample as? HKWorkout, let text = workout.metadata?["net.impx.moment.record"] as? String,
+            guard let workout = sample as? HKWorkout, workout.metadata?["net.impx.moment.delivery"] as? String != "watch-connectivity", let text = workout.metadata?["net.impx.moment.record"] as? String,
                   let data = text.data(using: .utf8), let record = try? ExerciseSession.syncDecoder().decode(ExerciseSession.self, from: data), record.endedAt != nil else { return nil }
             return record
         }

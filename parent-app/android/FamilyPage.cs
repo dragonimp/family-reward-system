@@ -155,7 +155,7 @@ public sealed class FamilyPage : ContentPage
                 var user = store.Profile?.Text("unifiedUserId") ?? "";
                 if (exercise == null || exerciseUser != user)
                 {
-                    exercise?.Suspend(); exercise = new ExercisePanel(user); exerciseUser = user;
+                    exercise?.Suspend(); exercise = new ExercisePanel(store, user); exerciseUser = user;
                 }
                 content.Add(exercise); exercise.Show(); break;
             case "我的": AccountContent(); break;

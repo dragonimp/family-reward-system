@@ -124,7 +124,14 @@ struct FamilyRoot: View {
         .sheet(isPresented: Binding(get: { identity.isAuthenticated && notifications.showingInbox }, set: { notifications.showingInbox = $0 })) {
             MomentNotificationInbox(store: store, notifications: notifications)
         }
-        .alert(String(localized: "操作提示", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), isPresented: Binding(get: { store.error != nil }, set: { if !$0 { store.error = nil } })) { Button(String(localized: "知道了", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), role: .cancel) { store.error = nil } } message: { Text(store.error ?? "") }
+        .overlay(alignment: .bottom) {
+            if let message = store.error {
+                HStack(spacing: 12) {
+                    Text(message).font(.caption).lineLimit(2).frame(maxWidth: .infinity, alignment: .leading)
+                    Button { store.error = nil } label: { Label(String(localized: "关闭", bundle: AgentIdentityLanguage.appBundle()), systemImage: "xmark") }.labelStyle(.iconOnly)
+                }.padding(12).background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12)).padding()
+            }
+        }
     }
     private var login: some View {
         NavigationStack {

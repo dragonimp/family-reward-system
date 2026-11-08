@@ -1,0 +1,4 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+  <PropertyGroup><TargetFramework>net10.0</TargetFramework><ImplicitUsings>enable</ImplicitUsings><Nullable>enable</Nullable></PropertyGroup>
+  <ItemGroup><Compile Include="../../FamilyReward.Api/ExerciseEndpoints.cs" Link="ExerciseEndpoints.cs" /><Compile Include="../../parent-app/android/ExerciseSummaryText.cs" Link="ExerciseSummaryText.cs" /></ItemGroup>
+</Project>

@@ -7,11 +7,14 @@ using Microsoft.AspNetCore.Mvc;
 internal static class ExerciseEndpoints
 {
     internal sealed record Interval(DateTimeOffset Start, DateTimeOffset? End, int? Steps, double? DistanceMeters);
-    internal sealed record Point(double Latitude, double Longitude, DateTimeOffset RecordedAt, Guid Segment);
+    internal sealed record Point(double Latitude, double Longitude, DateTimeOffset RecordedAt, Guid Segment,
+        [property: System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)] double? AltitudeMeters = null,
+        [property: System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)] double? VerticalAccuracyMeters = null);
     internal sealed record Activity(Guid TenantID, Guid Id, string Title);
     internal sealed record Record(Guid Id, string Kind, DateTimeOffset StartedAt, DateTimeOffset? EndedAt,
         Interval[] Intervals, bool? RouteEnabled, Point[]? Route,
-        [property: System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)] Activity? Activity = null);
+        [property: System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)] Activity? Activity = null,
+        [property: System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)] string? ActivityText = null);
     internal static bool Valid(Record r)
     {
         if (r.Id == Guid.Empty || string.IsNullOrWhiteSpace(r.Kind) || r.Kind.Length > 40 || r.EndedAt is not { } end ||
@@ -19,6 +22,7 @@ internal static class ExerciseEndpoints
             r.Intervals[0].Start != r.StartedAt || r.Route?.Length > 20_000) return false;
         if (r.Activity is { } activity && (activity.TenantID == Guid.Empty || activity.Id == Guid.Empty ||
             activity.Title is null || activity.Title.Length > 300)) return false;
+        if (r.ActivityText is { } text && (string.IsNullOrWhiteSpace(text) || text.Length > 1000)) return false;
         var previous = r.StartedAt;
         foreach (var interval in r.Intervals) {
             if (interval == null || interval.End is not { } stop || stop < interval.Start || interval.Start < previous || stop > end ||
@@ -28,6 +32,8 @@ internal static class ExerciseEndpoints
         DateTimeOffset? last = null;
         foreach (var point in r.Route ?? []) {
             if (point == null || point.Segment == Guid.Empty || !double.IsFinite(point.Latitude) || !double.IsFinite(point.Longitude) ||
+                point.AltitudeMeters is { } altitude && !double.IsFinite(altitude) ||
+                point.VerticalAccuracyMeters is { } accuracy && (!double.IsFinite(accuracy) || accuracy < 0) ||
                 Math.Abs(point.Latitude) > 90 || Math.Abs(point.Longitude) > 180 || point.RecordedAt < r.StartedAt || point.RecordedAt > end ||
                 last is { } before && point.RecordedAt <= before || !r.Intervals.Any(i => point.RecordedAt >= i.Start && point.RecordedAt <= i.End)) return false;
             last = point.RecordedAt;

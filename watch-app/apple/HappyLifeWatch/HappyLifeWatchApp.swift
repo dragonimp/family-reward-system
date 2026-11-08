@@ -18,6 +18,7 @@ struct HappyLifeWatchApp: App {
             WatchHomeView().environmentObject(workout).environmentObject(store).environmentObject(language).environment(\.locale, language.locale)
                 .task { await store.start(); await language.refresh() }
                 .onChange(of: scenePhase) { _, phase in
+                    if phase == .active { store.retryWorkoutSync() }
                     if phase == .active && store.ready && store.token != nil && store.pairing == nil { Task { await store.refresh() } }
                 }
         }

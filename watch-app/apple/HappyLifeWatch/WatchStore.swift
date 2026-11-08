@@ -1,6 +1,8 @@
 import AgentIdentityLocalization
 import SwiftUI
 import HealthKit
+import CryptoKit
+import CoreLocation
 #if canImport(WatchConnectivity)
 import WatchConnectivity
 #endif
@@ -16,6 +18,36 @@ private final class WatchActivityTransport: NSObject, WCSessionDelegate {
     private let session: WCSession? = WCSession.isSupported() ? .default : nil
     private var photoTransfers: [String: (CheckedContinuation<Void, Error>, WCSessionFileTransfer)] = [:]
 
+    private var workoutRoot: URL { FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0].appendingPathComponent("ExerciseOutbox") }
+    func queueWorkout(_ data: Data, id: UUID) throws {
+        let hash = SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
+        if let acknowledged = UserDefaults.standard.dictionary(forKey: "exercise.acknowledged")?[id.uuidString] as? String {
+            guard acknowledged == hash else { throw CocoaError(.fileWriteFileExists) }; return
+        }
+        try FileManager.default.createDirectory(at: workoutRoot, withIntermediateDirectories: true)
+        let file = workoutRoot.appendingPathComponent(id.uuidString + ".json")
+        if FileManager.default.fileExists(atPath: file.path) {
+            guard try Data(contentsOf: file) == data else { throw CocoaError(.fileWriteFileExists) }
+        } else { try data.write(to: file, options: [.atomic, .completeFileProtectionUntilFirstUserAuthentication]) }
+        retryWorkouts()
+    }
+    func retryWorkouts() {
+        guard let session, session.activationState == .activated,
+              let files = try? FileManager.default.contentsOfDirectory(at: workoutRoot, includingPropertiesForKeys: nil) else { return }
+        for file in files where file.pathExtension == "json" {
+            guard !session.outstandingFileTransfers.contains(where: { $0.file.fileURL.lastPathComponent == file.lastPathComponent }), let data = try? Data(contentsOf: file) else { continue }
+            let hash = SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
+            session.transferFile(file, metadata: ["kind": "exercise", "sha256": hash])
+        }
+    }
+    func session(_ session: WCSession, didReceiveUserInfo userInfo: [String: Any]) {
+        guard userInfo["kind"] as? String == "exerciseAck", let raw = userInfo["id"] as? String, let id = UUID(uuidString: raw), let hash = userInfo["sha256"] as? String else { return }
+        let file = workoutRoot.appendingPathComponent(id.uuidString + ".json")
+        guard let data = try? Data(contentsOf: file), SHA256.hash(data: data).map({ String(format: "%02x", $0) }).joined() == hash else { return }
+        var acknowledged = UserDefaults.standard.dictionary(forKey: "exercise.acknowledged") ?? [:]
+        acknowledged[id.uuidString] = hash; UserDefaults.standard.set(acknowledged, forKey: "exercise.acknowledged")
+        try? FileManager.default.removeItem(at: file)
+    }
     func activate() {
         session?.delegate = self
         session?.activate()
@@ -36,7 +68,7 @@ private final class WatchActivityTransport: NSObject, WCSessionDelegate {
         }
     }
 
-    func session(_ session: WCSession, activationDidCompleteWith activationState: WCSessionActivationState, error: Error?) { }
+    func session(_ session: WCSession, activationDidCompleteWith activationState: WCSessionActivationState, error: Error?) { retryWorkouts() }
 
     func sendPhoto(_ data: Data, metadata: [String: Any]) async throws {
         guard let session, session.activationState == .activated,
@@ -58,6 +90,7 @@ private final class WatchActivityTransport: NSObject, WCSessionDelegate {
     }
 
     func session(_ session: WCSession, didFinish fileTransfer: WCSessionFileTransfer, error: Error?) {
+        if fileTransfer.file.metadata?["kind"] as? String == "exercise" { return } // Retain until durable iPhone acknowledgement.
         Task { @MainActor in
             guard let operationID = fileTransfer.file.metadata?["operationId"] as? String else { return }
             try? FileManager.default.removeItem(at: fileTransfer.file.fileURL)
@@ -69,6 +102,8 @@ private final class WatchActivityTransport: NSObject, WCSessionDelegate {
 }
 #else
 private final class WatchActivityTransport {
+    func retryWorkouts() { }
+    func queueWorkout(_ data: Data, id: UUID) throws { throw CocoaError(.featureUnsupported) }
     func activate() { }
     func request(_ message: [String: Any]) async throws -> [String: Any] {
         throw APIError(status: 0, message: String(localized: "手表活动照片需要 Apple Watch。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)))
@@ -110,6 +145,24 @@ final class WatchStore: ObservableObject {
     @Published var message: String?
     private let api: WatchAPI
     private let activityTransport = WatchActivityTransport()
+    func retryWorkoutSync() {
+        activityTransport.retryWorkouts()
+        Task {
+            guard let context = try? await exerciseContext(), let user = context["userID"] as? String, !user.isEmpty else { return }
+            let owner = UUID(uuidString: user)?.uuidString ?? user
+            let health = HKHealthStore()
+            let predicate = HKQuery.predicateForObjects(withMetadataKey: "net.impx.moment.owner", allowedValues: [owner])
+            let samples: [HKSample] = await withCheckedContinuation { continuation in
+                health.execute(HKSampleQuery(sampleType: .workoutType(), predicate: predicate, limit: HKObjectQueryNoLimit, sortDescriptors: nil) { _, samples, _ in continuation.resume(returning: samples ?? []) })
+            }
+            for sample in samples {
+                guard let text = sample.metadata?["net.impx.moment.record"] as? String, let data = text.data(using: .utf8), let record = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                      let raw = record["id"] as? String, let id = UUID(uuidString: raw), let payload = try? JSONSerialization.data(withJSONObject: ["owner": owner, "record": record], options: [.sortedKeys]) else { continue }
+                try? activityTransport.queueWorkout(payload, id: id)
+            }
+        }
+    }
+    func queueWorkoutRecord(_ data: Data, id: UUID) throws { try activityTransport.queueWorkout(data, id: id) }
     func exerciseMetrics(owner: String, values: [String: Double]) async {
         _ = try? await activityTransport.request(["action": "exerciseLive", "owner": owner, "metrics": values])
     }
@@ -454,7 +507,7 @@ final class WatchStore: ObservableObject {
     }
 }
 
-@MainActor final class WatchWorkout: NSObject, ObservableObject, HKWorkoutSessionDelegate, HKLiveWorkoutBuilderDelegate {
+@MainActor final class WatchWorkout: NSObject, ObservableObject, HKWorkoutSessionDelegate, HKLiveWorkoutBuilderDelegate, CLLocationManagerDelegate {
     @Published var running = false
     @Published var active = false
     @Published var saving = false
@@ -462,10 +515,16 @@ final class WatchStore: ObservableObject {
     @Published var energy: Double?
     @Published var distance: Double?
     @Published var message: String?
+    var onCompleted: ((Data, UUID) throws -> Void)?
     var onMetrics: ((String, [String: Double]) -> Void)?
     private var collectionEnded = false
     private var metadataAdded = false
     private let health = HKHealthStore()
+    private let locator = CLLocationManager()
+    private var route: [[String: Any]] = []
+    private var routeSegment = UUID()
+    private var lastLocation: CLLocation?
+    @Published var altitude: Double?
     private var session: HKWorkoutSession?
     private var builder: HKLiveWorkoutBuilder?
     private var owner = ""
@@ -490,7 +549,11 @@ final class WatchStore: ObservableObject {
             self.session = session; self.builder = builder; self.owner = UUID(uuidString: user)?.uuidString ?? user
             activity = context["activity"] as? [String: Any]; self.kind = kind; id = UUID(); starts = [Date()]; stops = []
             heart = nil; energy = nil; distance = nil; message = nil; collectionEnded = false; metadataAdded = false
+            route = []; routeSegment = UUID(); lastLocation = nil; altitude = nil
+            locator.delegate = self; locator.desiredAccuracy = kCLLocationAccuracyBest; locator.distanceFilter = 5; locator.activityType = .fitness
+            locator.requestWhenInUseAuthorization()
             session.startActivity(with: starts[0]); active = true; running = true
+            locator.startUpdatingLocation()
             try await builder.beginCollection(at: starts[0])
         } catch { session?.end(); active = false; running = false; message = String(localized: "运动启动失败：\(error.localizedDescription)", bundle: AgentIdentityLanguage.appBundle()) }
     }
@@ -501,6 +564,7 @@ final class WatchStore: ObservableObject {
         guard active, !saving, let session, session.state == .running || session.state == .paused else { return }
         if running { stops.append(Date()); session.pause() } else { starts.append(Date()); session.resume() }
         running.toggle()
+        if running { routeSegment = UUID(); lastLocation = nil; locator.startUpdatingLocation() } else { locator.stopUpdatingLocation() }
     }
     func finish() async {
         guard active, !saving, let session, let builder else { return }
@@ -508,7 +572,7 @@ final class WatchStore: ObservableObject {
         defer { saving = false }
         let end = stops.count == starts.count ? stops.last! : Date()
         if stops.count < starts.count { stops.append(end) }
-        running = false
+        running = false; locator.stopUpdatingLocation()
         if session.state != .stopped && session.state != .ended { session.stopActivity(with: end) }
         do {
             let deadline = Date().addingTimeInterval(15)
@@ -527,14 +591,42 @@ final class WatchStore: ObservableObject {
             var record: [String: Any] = ["id": id.uuidString, "kind": kind, "startedAt": formatter.string(from: starts[0]), "endedAt": formatter.string(from: end), "intervals": intervals]
             if let activity { record["activity"] = activity }
             let text = String(data: try JSONSerialization.data(withJSONObject: record), encoding: .utf8)!
-            if !metadataAdded { try await builder.addMetadata(["net.impx.moment.owner": owner, "net.impx.moment.record": text]); metadataAdded = true }
+            if !metadataAdded { try await builder.addMetadata(["net.impx.moment.owner": owner, "net.impx.moment.record": text, "net.impx.moment.delivery": "watch-connectivity"]); metadataAdded = true }
+            var delivered = record
+            let includedRoute = route.filter { point in
+                guard let text = point["recordedAt"] as? String, let at = formatter.date(from: text) else { return false }
+                return zip(starts, stops).contains { at >= $0.0 && at <= $0.1 }
+            }
+            if !includedRoute.isEmpty { delivered["routeEnabled"] = true; delivered["route"] = includedRoute }
+            let payload = try JSONSerialization.data(withJSONObject: ["owner": owner, "record": delivered], options: [.sortedKeys])
+            guard let onCompleted else { throw CocoaError(.fileWriteUnknown) }
+            try onCompleted(payload, id)
             _ = try await builder.finishWorkout()
             session.end()
             onMetrics?(owner, [:])
             active = false; self.session = nil; self.builder = nil
-            message = String(localized: "已保存到 Apple 健康，iPhone 同步后可查看。", bundle: AgentIdentityLanguage.appBundle())
+            message = String(localized: "运动已保存并加入同步队列，手机接收后会同步到账号和关联活动。", bundle: AgentIdentityLanguage.appBundle())
         } catch { message = String(localized: "保存未完成，请保留页面重试：\(error.localizedDescription)", bundle: AgentIdentityLanguage.appBundle()) }
     }
+    func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
+        guard active, running, route.count < 20_000 else { return }
+        let formatter = ISO8601DateFormatter()
+        for location in locations {
+            guard location.horizontalAccuracy >= 0, location.horizontalAccuracy <= 65,
+                  abs(location.timestamp.timeIntervalSinceNow) <= 15, let start = starts.last, location.timestamp >= start else { continue }
+            if let lastLocation {
+                let gap = location.timestamp.timeIntervalSince(lastLocation.timestamp)
+                guard gap >= 5, location.distance(from: lastLocation) >= 3, location.distance(from: lastLocation) / gap < 20 else { continue }
+                if gap > 60 { routeSegment = UUID() }
+            }
+            var point: [String: Any] = ["latitude": location.coordinate.latitude, "longitude": location.coordinate.longitude, "recordedAt": formatter.string(from: location.timestamp), "segment": routeSegment.uuidString]
+            if location.verticalAccuracy >= 0, location.altitude.isFinite {
+                altitude = location.altitude; point["altitudeMeters"] = location.altitude; point["verticalAccuracyMeters"] = location.verticalAccuracy
+            }
+            route.append(point); lastLocation = location
+        }
+    }
+    func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) { }
     nonisolated func workoutSession(_ workoutSession: HKWorkoutSession, didChangeTo toState: HKWorkoutSessionState, from fromState: HKWorkoutSessionState, date: Date) {
         Task { @MainActor in
             if toState == .paused || toState == .ended {
@@ -579,6 +671,7 @@ struct WatchWorkoutView: View {
                     let seconds = Int(workout.duration(at: context.date))
                     Text(String(format: "%02d:%02d:%02d", seconds / 3600, seconds / 60 % 60, seconds % 60)).monospacedDigit()
                 }
+                if let altitude = workout.altitude { Text(String(format: String(localized: "海拔 %.1f 米", bundle: AgentIdentityLanguage.appBundle()), altitude)) }
                 if let heart = workout.heart { Text(String(format: String(localized: "心率 %.0f 次/分", bundle: AgentIdentityLanguage.appBundle()), heart)) }
                 if let energy = workout.energy { Text(String(format: String(localized: "%.0f 千卡", bundle: AgentIdentityLanguage.appBundle()), energy)) }
                 if let distance = workout.distance { Text(String(format: String(localized: "%.2f 公里", bundle: AgentIdentityLanguage.appBundle()), distance / 1000)) }
@@ -589,12 +682,14 @@ struct WatchWorkoutView: View {
                 Button(String(localized: "开始\(kind)", bundle: AgentIdentityLanguage.appBundle())) { Task {
                     connecting = true; error = nil
                     defer { connecting = false }
+                    workout.onCompleted = { data, id in try store.queueWorkoutRecord(data, id: id) }
                     workout.onMetrics = { owner, values in Task { await store.exerciseMetrics(owner: owner, values: values) } }
                     do { await workout.start(kind: kind, context: try await store.exerciseContext()) }
                     catch { self.error = error.localizedDescription }
                 } }.disabled(connecting)
                 Text(String(localized: "开始前连接已登录的 iPhone，运动中可独立采集健康数据。活动关联以 iPhone 最近选择的活动为准。", bundle: AgentIdentityLanguage.appBundle())).font(.footnote)
             }
+            Button(String(localized: "重试同步运动记录", bundle: AgentIdentityLanguage.appBundle())) { store.retryWorkoutSync() }
             if let text = error ?? workout.message { Text(text).font(.footnote) }
             if connecting || workout.saving { ProgressView() }
         }.navigationTitle(String(localized: "运动", bundle: AgentIdentityLanguage.appBundle()))

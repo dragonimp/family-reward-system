@@ -699,6 +699,7 @@
 "刷新气温" = "Refresh temperature";
 "健康与手表" = "Health and Watch";
 "仅向你要绑定的孩子提供此授权码。" = "Give this authorization code only to the child you intend to link.";
+"海拔 %.1f–%.1f 米" = "Elevation %.1f–%.1f m";
 "登录并生成邀请" = "Sign in and create invitation";
 "已存本机 · 待同步" = "Saved locally · Pending sync";
 "待办与记录" = "Tasks and records";
@@ -721,6 +722,7 @@
 "预览上传失败。" = "Preview upload failed.";
 "专心陪伴时间" = "Focused time together";
 "照片预览无法读取。" = "Unable to load the photo preview.";
+"重试同步运动记录" = "Retry workout sync";
 "删除空间「%@」？" = "Delete space “%@”?";
 "重试同步" = "Retry sync";
 "重新定位" = "Locate again";
@@ -990,6 +992,7 @@
 "先听听" = "Listen first";
 "邀请码" = "Invitation code";
 "栏目" = "Category";
+"运动已同步，活动动态待重试：%@" = "Workout synced. Activity feed will retry: %@";
 "心愿提案 · %lld" = "Wish proposals · %lld";
 "移出后，对方将无法查看这场活动的新内容；已有邀请链接仍可再次用于加入。" = "This person will no longer see new activity content. Existing invitation links can still be used to rejoin.";
 "标准版 · 基础功能已包含" = "Standard · Basic features included";
@@ -1031,12 +1034,14 @@
 "请在系统设置中允许 Linko Moment 使用相机，或返回手动输入设备码。" = "Allow camera access for Linko Moment in Settings, or go back and enter the device code manually.";
 "邀请与反馈" = "Invitations and feedback";
 "其他" = "Other";
+"活动动态未返回有效记录标识。" = "The activity feed did not return a valid record ID.";
 "+%@ 分" = "+%@ points";
 "确认删除活动？" = "Delete this activity?";
 "设备凭据存储不可用（%d），请解锁手表后重试" = "Device credential storage is unavailable (%d). Unlock your watch and try again.";
 "人均消费暂无数据" = "Price per person unavailable";
 "请输入手表上显示的 8 位设备码。" = "Enter the 8-digit device code shown on the watch.";
 "还没有活动" = "No activities yet";
+"运动已保存并加入同步队列，手机接收后会同步到账号和关联活动。" = "Workout saved and queued. After receiving it, iPhone will sync it to your account and linked activity.";
 "散步" = "Walking";
 "反馈服务返回错误（%lld），请稍后重试。" = "The feedback service returned an error (%lld). Please try again later.";
 "完成多选" = "Finish selection";

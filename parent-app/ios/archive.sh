@@ -27,7 +27,10 @@ chinese='Linko MomentX' if flavor=='legacy' else 'Linko Moment'
 for bundle in [app,app/'Watch/Linko Moment Watch.app']:
     for locale,name in [('en',english),('zh-Hans',chinese)]:
         directory=bundle/(locale+'.lproj');directory.mkdir(exist_ok=True)
-        (directory/'InfoPlist.strings').write_bytes(plistlib.dumps({'CFBundleDisplayName':name,'CFBundleName':name},fmt=plistlib.FMT_BINARY))
+        path=directory/'InfoPlist.strings'
+        values=plistlib.loads(path.read_bytes()) if path.exists() else {}
+        values.update({'CFBundleDisplayName':name,'CFBundleName':name})
+        path.write_bytes(plistlib.dumps(values,fmt=plistlib.FMT_BINARY))
 LOCALIZE
 if [[ -n "${CONNECT_RTC_LIBRARY_DIR:-}" ]]; then
   mkdir -p "$app/ConnectLicenses"

@@ -83,6 +83,8 @@ private actor PhotoPreviewLoader {
         get { photoTransfers.progress }
         set { photoTransfers.updateProgress(newValue) }
     }
+    var captureInProgress = false
+    var exerciseStore: ExerciseStore?
     @Published var pendingExerciseContinuation: UUID?
     @Published var watchMetricsUpdatedAt: Date?
     @Published var watchExerciseMetrics: [String: Double] = [:]
@@ -275,7 +277,7 @@ private actor PhotoPreviewLoader {
         lastRefresh = Date()
     }
     func refreshIfStale() async {
-        guard ready, Date().timeIntervalSince(lastRefresh) > 5 else { return }
+        guard !captureInProgress, ready, Date().timeIntervalSince(lastRefresh) > 5 else { return }
         do { try await refreshBalancesAndLedger() }
         catch is CancellationError {} catch { self.error = momentDisplayError(error) }
     }
@@ -295,6 +297,8 @@ private actor PhotoPreviewLoader {
         groupID = id; revision = UUID(); await load()
     }
     func logout() {
+        captureInProgress = false
+        exerciseStore?.accountDidChange(); exerciseStore = nil
         pendingExerciseActivity = nil
         pendingExerciseContinuation = nil; watchExerciseActivity = nil; watchExerciseMetrics = [:]; watchMetricsUpdatedAt = nil
         Task { await photoPreviews.clear() }
@@ -306,8 +310,32 @@ private actor PhotoPreviewLoader {
         revision = UUID(); identity.logout(); profile = nil; groups = []; children = []; homeChildren = []; growthReports = []; growthReportError = nil; rules = []; requests = []; transactions = []; growth = []; members = []; groupID = 0; loading = false
     }
 
-    func resumePhotoSharing() { if identity.isAuthenticated { photoSource.start(); Task { await photoSource.importSharedItems(); await notifications.resume() } } }
+    func resumePhotoSharing() { if identity.isAuthenticated { photoSource.start(); Task { await importWatchExerciseInbox() }; Task { await photoSource.importSharedItems(); await notifications.resume() } } }
     func suspendPhotoSharing() { photoSource.stop() }
+}
+
+extension FamilyStore {
+    nonisolated static func exerciseInboxURL(owner: String) -> URL {
+        let canonical = UUID(uuidString: owner)?.uuidString ?? owner
+        let hash = SHA256.hash(data: Data(canonical.utf8)).map { String(format: "%02x", $0) }.joined()
+        return FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0].appendingPathComponent("ExerciseInbox/" + hash)
+    }
+    func importWatchExerciseInbox() async {
+        guard identity.isAuthenticated, let owner = profile?.text("unifiedUserId"), !owner.isEmpty else { return }
+        let canonical = UUID(uuidString: owner)?.uuidString ?? owner
+        let root = Self.exerciseInboxURL(owner: canonical)
+        let files = (try? FileManager.default.contentsOfDirectory(at: root, includingPropertiesForKeys: nil)) ?? []
+        guard !files.isEmpty || exerciseStore != nil else { return }
+        let target = exerciseStore ?? ExerciseStore.shared(userID: owner)
+        target.connect(self)
+        for file in files where file.pathExtension == "json" {
+            guard let data = try? Data(contentsOf: file), let envelope = try? ExerciseDeliveryEnvelope.decode(data), envelope.canonicalOwner == canonical else { continue }
+            if target.importWatchRecords([envelope.record]) {
+                try? FileManager.default.removeItem(at: file)
+            }
+        }
+        await target.sync()
+    }
 }
 
 extension FamilyStore: WCSessionDelegate {
@@ -325,7 +353,21 @@ extension FamilyStore: WCSessionDelegate {
 
     nonisolated func session(_ session: WCSession, didReceive file: WCSessionFile) {
         let metadata = file.metadata ?? [:]
-        let data = try? Data(contentsOf: file.fileURL)
+        let oversizedExercise = metadata["kind"] as? String == "exercise" && ((try? file.fileURL.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? Int.max) > 5 * 1024 * 1024
+        let data = oversizedExercise ? nil : try? Data(contentsOf: file.fileURL)
+        if metadata["kind"] as? String == "exercise", let data {
+            // Persist before the system removes its temporary delivery file.
+            do {
+                let hash = SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
+                guard metadata["sha256"] as? String == hash else { return }
+                let envelope = try ExerciseDeliveryEnvelope.decode(data)
+                let root = Self.exerciseInboxURL(owner: envelope.canonicalOwner)
+                _ = try ExerciseDeliveryEnvelope.persist(data, at: root.appendingPathComponent(envelope.record.id.uuidString + ".json"))
+                session.transferUserInfo(["kind": "exerciseAck", "id": envelope.record.id.uuidString, "sha256": hash])
+                Task { @MainActor in await self.importWatchExerciseInbox() }
+            } catch { /* No acknowledgement: the Watch keeps its durable outbox for retry. */ }
+            return
+        }
         Task { @MainActor in
             guard let operationID = metadata["operationId"] as? String, UUID(uuidString: operationID) != nil else { return }
             photoTransferStatuses[operationID] = "publishing"

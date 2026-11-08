@@ -7,13 +7,21 @@ using Android.Content;
 namespace LinkoFamily;
 
 // Foreground exercise: Android pauses tracking when the window stops.
-public sealed class ExercisePanel : ContentView
+public sealed partial class ExercisePanel : ContentView
 {
     public sealed record ActivityLink(Guid TenantID, Guid Id, string Title);
     private ActivityLink? pendingActivity;
     private Workout? previousWorkout;
     public sealed class Workout
     {
+        public Guid Id { get; set; }
+        public DateTimeOffset? EndedAt { get; set; }
+        public List<WorkoutInterval> Intervals { get; set; } = [];
+        public List<WorkoutPoint> Route { get; set; } = [];
+        public double? DistanceOverride { get; set; }
+        public string? ActivityText { get; set; }
+        public JsonElement? SourceRecord { get; set; }
+        public Guid SyncId => Id != Guid.Empty ? Id : new Guid(SHA256.HashData(Encoding.UTF8.GetBytes(Kind + "\0" + StartedAt.UtcTicks.ToString(System.Globalization.CultureInfo.InvariantCulture)))[..16]);
         public ActivityLink? Activity { get; set; }
         public string Kind { get; set; } = "散步";
         public DateTimeOffset StartedAt { get; set; }
@@ -23,12 +31,15 @@ public sealed class ExercisePanel : ContentView
         public int Steps { get; set; }
         public bool HasSteps { get; set; }
         public double? StepLengthMeters { get; set; }
-        public string DistanceText => HasSteps && StepLengthMeters is { } length
+        public string DistanceText => DistanceOverride is { } measured ? $"{measured / 1000:F2} 公里" : HasSteps && StepLengthMeters is { } length
             ? $"约 {Steps * length / 1000:F2} 公里（估算）" : "距离未获取";
         public double Duration => Seconds + (RunningSince is { } start ? Math.Max(0, (DateTimeOffset.UtcNow - start).TotalSeconds) : 0);
     }
     public sealed class Archive
     {
+        public List<Guid> Uploaded { get; set; } = [];
+        public List<Guid> ActivityShares { get; set; } = [];
+        public List<Guid> PendingDeletions { get; set; } = [];
         public Workout? Active { get; set; }
         public List<Workout> History { get; set; } = [];
     }
@@ -47,8 +58,9 @@ public sealed class ExercisePanel : ContentView
     private bool starting;
     private double stepLengthCm = 70;
     private int lifecycle;
-    public ExercisePanel(string userID)
+    public ExercisePanel(FamilyStore api, string userID)
     {
+        this.api = api; this.userID = userID;
         var key = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(userID)));
         file = Path.Combine(FileSystem.AppDataDirectory, $"exercise-{key}.json");
         Content = body;
@@ -57,6 +69,10 @@ public sealed class ExercisePanel : ContentView
         {
             if (archive.Active?.RunningSince is null) return;
             archive.Active.Steps++;
+            if (archive.Active.Intervals.LastOrDefault() is { } interval) {
+                interval.Steps = (interval.Steps ?? 0) + 1;
+                interval.DistanceMeters = interval.Steps * archive.Active.StepLengthMeters;
+            }
             Update(); Save();
         }));
         try
@@ -66,6 +82,7 @@ public sealed class ExercisePanel : ContentView
             {
                 active.Seconds += Math.Max(0, (active.LastSeen - active.RunningSince.Value).TotalSeconds);
                 active.RunningSince = null;
+                if (active.Intervals.LastOrDefault() is { End: null } interval) interval.End = active.LastSeen;
                 notice.Text = "上次运动已恢复为暂停状态，请确认后继续。";
                 Save();
             }
@@ -82,7 +99,7 @@ public sealed class ExercisePanel : ContentView
         previousWorkout = archive.History.FirstOrDefault(item => item.Activity?.Id == scope.Activity && item.Activity.TenantID == scope.Tenant);
         Render();
     }
-    public void Show() { timer.Start(); Update(); }
+    public void Show() { timer.Start(); Update(); _ = SyncAsync(); }
     private bool Save()
     {
         if (!readable) return false;
@@ -109,26 +126,30 @@ public sealed class ExercisePanel : ContentView
             if (attempt != lifecycle) return;
             var sensor = sensors?.GetDefaultSensor(SensorType.StepDetector);
             var now = DateTimeOffset.UtcNow;
-            archive.Active ??= new Workout { Kind = kind, Activity = pendingActivity, StartedAt = now, HasSteps = true, StepLengthMeters = stepLengthCm / 100 };
+            archive.Active ??= new Workout { Id = Guid.NewGuid(), Kind = kind, Activity = pendingActivity, StartedAt = now, HasSteps = true, StepLengthMeters = stepLengthCm / 100 };
             pendingActivity = null;
             archive.Active.RunningSince = now;
             var canCount = granted && sensor != null;
             archive.Active.HasSteps &= canCount;
+            archive.Active.Intervals.Add(new WorkoutInterval { Start = now, Steps = canCount ? 0 : null, DistanceMeters = canCount ? 0 : null });
             if (!canCount) notice.Text = "未获得运动权限或设备不支持计步；本次可继续计时。";
             else if (sensors?.RegisterListener(listener, sensor, SensorDelay.Normal) != true)
             {
                 archive.Active.HasSteps = false; notice.Text = "计步传感器暂不可用，本次可继续计时。";
             }
-            Save(); Render(); timer.Start();
+            Save(); Render(); timer.Start(); StartLocation();
         }
         catch (Exception error) { notice.Text = $"无法开启计步：{error.Message}"; }
         finally { starting = false; }
     }
     private void Pause()
     {
+        locationCancellation?.Cancel(); locationCancellation?.Dispose(); locationCancellation = null;
         sensors?.UnregisterListener(listener);
         if (archive.Active is not { RunningSince: not null } active) return;
+        var now = DateTimeOffset.UtcNow;
         active.Seconds = active.Duration; active.RunningSince = null;
+        if (active.Intervals.LastOrDefault() is { End: null } interval) interval.End = now;
         Save(); Render();
     }
     private async Task Finish()
@@ -136,8 +157,8 @@ public sealed class ExercisePanel : ContentView
         if (archive.Active == null || Window?.Page == null) return;
         if (!await Window.Page.DisplayAlertAsync("结束运动", "结束本次运动并保存记录？", "结束并保存", "继续运动")) return;
         Pause();
-        if (archive.Active is { } completed) archive.History.Insert(0, completed);
-        archive.Active = null; Save(); Render();
+        if (archive.Active is { } completed) { completed.EndedAt = DateTimeOffset.UtcNow; if (completed.Intervals.Count > 0 && completed.Intervals[0].Start == completed.StartedAt) completed.Seconds = completed.Intervals.Sum(i => Math.Max(0, ((i.End ?? i.Start) - i.Start).TotalSeconds)); completed.ActivityText = SharedText(completed); archive.History.Insert(0, completed); }
+        archive.Active = null; Save(); Render(); await SyncAsync();
     }
     private async Task Continue(Workout item)
     {
@@ -164,12 +185,13 @@ public sealed class ExercisePanel : ContentView
         var index = archive.History.IndexOf(item);
         if (index < 0) return;
         archive.History.RemoveAt(index);
+        archive.PendingDeletions.Add(item.SyncId);
         if (!Save())
         {
-            archive.History.Insert(index, item);
+            archive.History.Insert(index, item); archive.PendingDeletions.Remove(item.SyncId);
             notice.Text = "删除失败，运动记录已保留，请稍后重试。";
         }
-        Render();
+        Render(); await SyncAsync();
     }
     private void Update()
     {
@@ -182,9 +204,9 @@ public sealed class ExercisePanel : ContentView
         body.Children.Clear();
         body.Add(MomentStyle.Title("运动", 32));
         if ((archive.Active?.Activity ?? pendingActivity) is { } linked) body.Add(new Label { Text = $"关联活动 · {linked.Title}" });
-        body.Add(MomentStyle.Caption("带上手机，记录一场散步或轻运动。"));
+
         clock.TextColor = MomentStyle.Accent; distance.TextColor = MomentStyle.Ink;
-        metrics ??= MomentStyle.Card(new VerticalStackLayout { Spacing = 14, Padding = new Thickness(4, 18), Children = { clock, distance, steps, notice } });
+        metrics ??= MomentStyle.Card(new VerticalStackLayout { Spacing = 14, Padding = new Thickness(4, 18), Children = { clock, distance, steps, altitudeLabel, notice } });
         body.Add(metrics);
         if (archive.Active is { } active)
         {
@@ -203,6 +225,7 @@ public sealed class ExercisePanel : ContentView
             foreach (var kind in pendingActivity != null ? new[] { "徒步", "散步", "慢跑", "自由运动" } : new[] { "散步", "慢跑", "徒步", "自由运动" }) body.Add(Action($"开始{kind}", () => _ = Start(kind)));
         }
         body.Add(new Label { Text = "请保持应用在前台。锁屏或切到后台时自动暂停，回到应用后可继续；暂停期间不计时、不计步、不累计距离。公里数按步数乘本次步长估算，默认 70 厘米/步，可在开始前调整；非 GPS 测距。计步可能稍有延迟。", FontSize = 13 });
+        body.Add(Action("重试同步运动记录", () => _ = SyncAsync()));
         body.Add(Action("重试保存记录", () => Save()));
         body.Add(Action("运动权限设置", AppInfo.ShowSettingsUI));
         body.Add(new Label { Text = "运动记录 · 当地时间", FontSize = 20, FontAttributes = FontAttributes.Bold });
@@ -216,10 +239,11 @@ public sealed class ExercisePanel : ContentView
             resume.Clicked += (_, _) => _ = Continue(item); row.Add(resume);
             var delete = new Button { Text = "删除记录", TextColor = Colors.Red, BackgroundColor = Colors.Transparent };
             delete.Clicked += (_, _) => _ = DeleteRecord(item);
+            if (item.Route.Any(p => p.AltitudeMeters != null)) { var heights = item.Route.Where(p => p.AltitudeMeters != null).Select(p => p.AltitudeMeters!.Value); row.Add(new Label { Text = $"海拔 {heights.Min():F1}–{heights.Max():F1} 米" }); }
             row.Add(delete);
             body.Add(row);
         }
-        body.Add(new Label { Text = "记录按当前账号保存在此手机，暂不跨设备同步。", FontSize = 13 });
+        body.Add(new Label { Text = "新记录自动同步到当前账号，关联运动同时发布到活动动态；离线时保留本机记录并等待重试。", FontSize = 13 });
         Update();
     }
     private sealed class StepListener(Action step) : Java.Lang.Object, ISensorEventListener

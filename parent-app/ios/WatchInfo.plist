@@ -21,7 +21,7 @@
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
 	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>在活动中打卡时记录手表当前位置、海拔和地址。</string>
+	<string>记录运动轨迹、海拔，以及您主动进行的活动打卡位置。</string>
 	<key>WKApplication</key>
 	<true/>
 	<key>WKCompanionAppBundleIdentifier</key>
