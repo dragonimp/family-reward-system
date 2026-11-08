@@ -498,7 +498,7 @@ final class WatchStore: ObservableObject {
         starts.enumerated().reduce(0) { $0 + max(0, (stops.indices.contains($1.offset) ? stops[$1.offset] : now).timeIntervalSince($1.element)) }
     }
     func toggle() {
-        guard active, !saving, let session else { return }
+        guard active, !saving, let session, session.state == .running || session.state == .paused else { return }
         if running { stops.append(Date()); session.pause() } else { starts.append(Date()); session.resume() }
         running.toggle()
     }
@@ -511,6 +511,7 @@ final class WatchStore: ObservableObject {
         running = false; if session.state != .ended { session.end() }
         do {
             if !collectionEnded { try await builder.endCollection(at: end); collectionEnded = true }
+            distance = builder.statistics(for: HKQuantityType(.distanceWalkingRunning))?.sumQuantity()?.doubleValue(for: .meter()) ?? distance
             let formatter = ISO8601DateFormatter()
             let intervals: [[String: Any]] = zip(starts, stops).enumerated().map { index, pair in
                 var row: [String: Any] = ["start": formatter.string(from: pair.0), "end": formatter.string(from: pair.1)]
@@ -539,7 +540,7 @@ final class WatchStore: ObservableObject {
         }
     }
     nonisolated func workoutSession(_ workoutSession: HKWorkoutSession, didFailWithError error: Error) {
-        Task { @MainActor in self.running = false; self.message = String(localized: "运动会话异常：\(error.localizedDescription)", bundle: AgentIdentityLanguage.appBundle()) }
+        Task { @MainActor in if self.stops.count < self.starts.count { self.stops.append(Date()) }; self.running = false; self.message = String(localized: "运动会话异常：\(error.localizedDescription)", bundle: AgentIdentityLanguage.appBundle()) }
     }
     nonisolated func workoutBuilderDidCollectEvent(_ workoutBuilder: HKLiveWorkoutBuilder) { }
     nonisolated func workoutBuilder(_ workoutBuilder: HKLiveWorkoutBuilder, didCollectDataOf collectedTypes: Set<HKSampleType>) {
