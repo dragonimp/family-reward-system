@@ -5765,6 +5765,11 @@
       "zh-Hans": "手表运动数据",
       "en": "Watch workout data",
       "iosKey": "手表运动数据"
+    },
+    "moment.ta344f65e916c": {
+      "iosKey": "%.0f 步",
+      "zh-Hans": "%.0f 步",
+      "en": "%.0f steps"
     }
   }
 }

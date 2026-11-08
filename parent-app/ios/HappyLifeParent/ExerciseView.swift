@@ -367,6 +367,8 @@ struct ExerciseView: View {
                     }
                     Button(String(localized: "连接 Apple 健康与手表数据", bundle: AgentIdentityLanguage.appBundle())) { Task { await refreshHealth(request: true) } }
                     if let status = health.message { Text(status).font(.caption).foregroundStyle(.secondary) }
+                    if let value = health.steps { Text(String(format: String(localized: "%.0f 步", bundle: AgentIdentityLanguage.appBundle()), value)) }
+                    if let value = health.distance { Text(String(format: String(localized: "距离 %.2f 公里", bundle: AgentIdentityLanguage.appBundle()), value / 1000)) }
                     if let heart = health.heartRate { Text(String(format: String(localized: "平均心率 %.0f 次/分", bundle: AgentIdentityLanguage.appBundle()), heart)) }
                     if let energy = health.energy { Text(String(format: String(localized: "活动能量 %.0f 千卡", bundle: AgentIdentityLanguage.appBundle()), energy)) }
                     Text(String(localized: "健康数据由系统授权读取。手表运动保存后同步到 iPhone；未授权或尚未同步时不显示测量值。", bundle: AgentIdentityLanguage.appBundle())).font(.caption).foregroundStyle(.secondary)
@@ -540,6 +542,8 @@ extension Notification.Name { static let exerciseRecordsChanged = Notification.N
 
 @MainActor final class ExerciseHealth: ObservableObject {
     private let store = HKHealthStore()
+    @Published var steps: Double?
+    @Published var distance: Double?
     @Published var heartRate: Double?
     @Published var energy: Double?
     @Published var message: String?
@@ -553,12 +557,14 @@ extension Notification.Name { static let exerciseRecordsChanged = Notification.N
     }
     func read(_ record: ExerciseSession) async {
         guard HKHealthStore.isHealthDataAvailable() else { return }
-        heartRate = nil; energy = nil
+        heartRate = nil; energy = nil; steps = nil; distance = nil
         let predicates = record.intervals.map { HKQuery.predicateForSamples(withStart: $0.start, end: $0.end ?? Date(), options: .strictStartDate) }
         guard !predicates.isEmpty else { return }
         let predicate = NSCompoundPredicate(orPredicateWithSubpredicates: predicates)
         heartRate = await value(.heartRate, predicate: predicate, options: .discreteAverage, unit: HKUnit.count().unitDivided(by: .minute()))
         energy = await value(.activeEnergyBurned, predicate: predicate, options: .cumulativeSum, unit: .kilocalorie())
+        steps = await value(.stepCount, predicate: predicate, options: .cumulativeSum, unit: .count())
+        distance = await value(.distanceWalkingRunning, predicate: predicate, options: .cumulativeSum, unit: .meter())
         if heartRate == nil && energy == nil { message = String(localized: "暂无可读取的健康数据；请检查授权并等待手表同步。", bundle: AgentIdentityLanguage.appBundle()) }
     }
     private func value(_ identifier: HKQuantityTypeIdentifier, predicate: NSPredicate, options: HKStatisticsOptions, unit: HKUnit) async -> Double? {
