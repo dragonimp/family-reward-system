@@ -1346,7 +1346,7 @@ struct DearSocialView: View {
                     } else {
                         let data = try Data(contentsOf: capture.url, options: .mappedIfSafe)
                         try await store.photoSource.publish(data, spaceID: capture.target.spaceID, activityID: capture.target.activityID,
-                                                            name: "拍摄照片.jpg", locationName: capture.target.locationName)
+                                                            name: capture.url.lastPathComponent, locationName: capture.target.locationName)
                     }
                 } catch {
                     throw APIError.message("已保存到系统相册，共享未完成：\(error.localizedDescription)。可点击重试保存并共享。")

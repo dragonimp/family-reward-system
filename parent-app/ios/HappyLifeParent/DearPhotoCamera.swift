@@ -246,7 +246,8 @@ private final class DearPhotoCapture: NSObject, AVCaptureVideoDataOutputSampleBu
                 return
             }
             self.photoCompletion = completion
-            let settings = AVCapturePhotoSettings(format: [AVVideoCodecKey: AVVideoCodecType.jpeg])
+            let codec: AVVideoCodecType = self.photoOutput.availablePhotoCodecTypes.contains(.hevc) ? .hevc : .jpeg
+            let settings = AVCapturePhotoSettings(format: [AVVideoCodecKey: codec])
             if self.photoOutput.supportedFlashModes.contains(flash) { settings.flashMode = flash }
             self.photoOutput.capturePhoto(with: settings, delegate: self)
         }
@@ -293,6 +294,15 @@ private final class DearPhotoCapture: NSObject, AVCaptureVideoDataOutputSampleBu
 }
 
 enum DearCaptureGeography {
+    static func fileExtension(in data: Data) throws -> String {
+        guard let source = CGImageSourceCreateWithData(data as CFData, nil),
+              let identifier = CGImageSourceGetType(source),
+              let type = UTType(identifier as String), let suffix = type.preferredFilenameExtension else {
+            throw CocoaError(.fileReadCorruptFile)
+        }
+        return suffix
+    }
+
     static func valid(_ location: CLLocation, at date: Date = Date()) -> Bool {
         CLLocationCoordinate2DIsValid(location.coordinate) && location.horizontalAccuracy >= 0 &&
             location.horizontalAccuracy <= 100 && abs(location.timestamp.timeIntervalSince(date)) <= 15
@@ -940,8 +950,9 @@ final class DearPhotoCameraController: UIViewController {
 
     @objc private func acceptPhoto() {
         guard let data else { return }
-        let url = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".jpg")
         do {
+            let suffix = try DearCaptureGeography.fileExtension(in: data)
+            let url = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + "." + suffix)
             try data.write(to: url, options: .atomic)
             finish(.success((url, false)))
         } catch {
