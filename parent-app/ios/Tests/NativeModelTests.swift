@@ -1,6 +1,33 @@
 import Foundation
 @main struct NativeModelTests {
+    static func require(_ condition: @autoclosure () throws -> Bool) throws { let result = try condition(); precondition(result) }
     static func main() throws {
+        let draftBase = URL(fileURLWithPath: ProcessInfo.processInfo.environment["ATLAS_BUILD_WORK"] ?? NSTemporaryDirectory()).appendingPathComponent("draft-check-" + UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: draftBase) }
+        try FileManager.default.createDirectory(at: draftBase, withIntermediateDirectories: true)
+        let original = draftBase.appendingPathComponent("capture.heic")
+        let bytes = Data([1, 3, 5, 7]); try bytes.write(to: original)
+        let drafts = try MomentDraftStore(base: draftBase, account: "account-a")
+        var entry = MomentLocalDraft(tenant: UUID(), activity: UUID(), kind: "media", createdAt: Date(timeIntervalSince1970: 1_700_000_000))
+        entry.displayName = "capture.heic"; entry.contentType = "image/heic"
+        let saved = try drafts.enqueue(entry, media: original)
+        let restored = try MomentDraftStore(base: draftBase, account: "account-a").entries()
+        precondition(restored.count == 1 && restored[0].id == entry.id && restored[0].createdAt == entry.createdAt)
+        try require(Data(contentsOf: drafts.file(saved)!) == bytes)
+        try require(MomentDraftStore(base: draftBase, account: "account-b").entries().isEmpty)
+        var failed = saved; failed.lastError = "offline"; try drafts.save(failed)
+        try require(drafts.entries().first?.id == saved.id)
+        try require(Data(contentsOf: drafts.file(saved)!) == bytes)
+        try drafts.remove(saved)
+        try require(drafts.entries().isEmpty)
+        precondition(!FileManager.default.fileExists(atPath: drafts.file(saved)!.path))
+        // A failed manifest commit must preserve the source and remove only its uncommitted copy.
+        var blocked = entry; blocked.id = UUID()
+        try FileManager.default.createDirectory(at: drafts.root.appendingPathComponent(blocked.id.uuidString + ".json"), withIntermediateDirectories: true)
+        do { _ = try drafts.enqueue(blocked, media: original); preconditionFailure("Expected a manifest write failure") } catch { }
+        try require(Data(contentsOf: original) == bytes)
+        precondition(!FileManager.default.fileExists(atPath: drafts.root.appendingPathComponent(blocked.id.uuidString + ".heic").path))
+        print("PASS: offline drafts survive restart, isolate accounts, retain failed sends and original bytes; acknowledge before removal")
         var fingerprint = OriginalResourceFingerprint(limit: 3)
         precondition(fingerprint.append(Data([97])))
         precondition(fingerprint.append(Data([98,99])))

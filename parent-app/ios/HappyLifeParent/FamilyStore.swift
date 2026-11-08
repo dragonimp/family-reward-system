@@ -1,3 +1,4 @@
+import CryptoKit
 import Foundation
 import SwiftUI
 import AgentIdentity
@@ -117,6 +118,34 @@ private actor PhotoPreviewLoader {
     var selectedFamily: String { groups.first(where: { $0.id == groupID })?.text("name") ?? String(localized: "我的群组", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)) }
 
     func call(_ path: String, method: String = "GET", body: [String: Any]? = nil, timeout: TimeInterval = 30) async throws -> Any {
+        let account = identity.accountIdentifier
+        var cacheURL: URL?
+        if method == "GET", path.hasPrefix("/api/dear/social/"), !path.hasSuffix("/locations"), let account, identity.isAuthenticated {
+            let directory = try photoSource.draftStore().root.appendingPathComponent("responses")
+            try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+            let key = SHA256.hash(data: Data(path.utf8)).map { String(format: "%02x", $0) }.joined()
+            cacheURL = directory.appendingPathComponent(key)
+            _ = account
+        }
+        if let cacheURL {
+            photoSource.start()
+            if !photoSource.networkAvailable, let data = try? Data(contentsOf: cacheURL), let cached = try? JSONSerialization.jsonObject(with: data) { return cached }
+        }
+        do {
+            let value = try await networkCall(path, method: method, body: body, timeout: timeout)
+            if identity.accountIdentifier == account, let cacheURL, JSONSerialization.isValidJSONObject(value) {
+                try? JSONSerialization.data(withJSONObject: value).write(to: cacheURL, options: [.atomic, .completeFileProtectionUntilFirstUserAuthentication])
+            }
+            return value
+        } catch {
+            // Never fall back on a permission denial, revoked membership or another account.
+            if error is URLError, identity.accountIdentifier == account, identity.isAuthenticated,
+               let cacheURL, let data = try? Data(contentsOf: cacheURL), let value = try? JSONSerialization.jsonObject(with: data) { return value }
+            throw error
+        }
+    }
+
+    private func networkCall(_ path: String, method: String = "GET", body: [String: Any]? = nil, timeout: TimeInterval = 30) async throws -> Any {
         guard let token = try await identity.validAccessToken() else { throw APIError.message(String(localized: "请先登录用户中心。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) }
         let current = revision
         var request = URLRequest(url: URL(string: path, relativeTo: base)!.absoluteURL)

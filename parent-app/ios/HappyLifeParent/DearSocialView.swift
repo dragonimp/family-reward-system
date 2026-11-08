@@ -337,6 +337,7 @@ private struct DearActivityMapPoint: Identifiable {
 }
 
 private struct DearActivityMapView: View {
+    @ObservedObject var locations: MomentActivityLocations
     @ObservedObject var store: FamilyStore
     let title: String
     let spaceID: String
@@ -367,13 +368,22 @@ private struct DearActivityMapView: View {
 
 
     var body: some View {
+        TimelineView(.periodic(from: .now, by: 1)) { tick in
         VStack(spacing: 0) {
-            if points.isEmpty {
+            if points.isEmpty && locations.members.filter({ $0.expiresAt > tick.date }).isEmpty {
                 ContentUnavailableView(String(localized: "暂无地图位置", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), systemImage: "map",
                                        description: Text(String(localized: "照片没有记录坐标时仍可在下方查看，但无法固定到地图上。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))))
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
                 Map(position: $cameraPosition) {
+                    ForEach(locations.members.filter { $0.expiresAt > tick.date }) { member in
+                        Annotation(member.name, coordinate: member.coordinate) {
+                            VStack(spacing: 3) {
+                                Image(systemName: "person.circle.fill").font(.title).foregroundStyle(.blue).background(.white, in: Circle())
+                                Text(member.observedAt, style: .time).font(.caption2).padding(3).background(.regularMaterial, in: Capsule())
+                            }
+                        }
+                    }
                     ForEach(points) { point in
                         Annotation("", coordinate: point.coordinate) {
                             Button { selectedPointID = point.id } label: {
@@ -478,6 +488,7 @@ private struct DearActivityMapView: View {
             }
             .frame(height: min(CGFloat(points.count) * 70 + 16, 220))
         }
+        }
         .navigationTitle(String(localized: "\(title) · 地图", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)))
         .navigationBarTitleDisplayMode(.inline)
         .fullScreenCover(item: $selectedPhoto) { selectedPhoto in
@@ -486,16 +497,18 @@ private struct DearActivityMapView: View {
                                      onDeleted: { _, _ in })
         }
         .onAppear { fitAllPoints() }
+        .onChange(of: locations.members.map(\.id)) { _, _ in fitAllPoints() }
     }
 
     private func fitAllPoints() {
-        guard let first = points.first else { return }
-        let latitudes = points.map(\.coordinate.latitude)
-        let longitudes = points.map(\.coordinate.longitude)
-        let minLat = latitudes.min() ?? first.coordinate.latitude
-        let maxLat = latitudes.max() ?? first.coordinate.latitude
-        let minLon = longitudes.min() ?? first.coordinate.longitude
-        let maxLon = longitudes.max() ?? first.coordinate.longitude
+        let coordinates = points.map(\.coordinate) + locations.members.map(\.coordinate)
+        guard let first = coordinates.first else { return }
+        let latitudes = coordinates.map(\.latitude)
+        let longitudes = coordinates.map(\.longitude)
+        let minLat = latitudes.min() ?? first.latitude
+        let maxLat = latitudes.max() ?? first.latitude
+        let minLon = longitudes.min() ?? first.longitude
+        let maxLon = longitudes.max() ?? first.longitude
         cameraPosition = .region(MKCoordinateRegion(
             center: CLLocationCoordinate2D(latitude: (minLat + maxLat) / 2, longitude: (minLon + maxLon) / 2),
             span: MKCoordinateSpan(latitudeDelta: max((maxLat - minLat) * 1.5, 0.02),
@@ -512,6 +525,8 @@ private struct DearTimelineEntry: Identifiable {
 }
 
 struct DearSocialView: View {
+    @Environment(\.scenePhase) private var scenePhase
+    @StateObject private var locations = MomentActivityLocations()
     @ObservedObject var store: FamilyStore
     var showLogout = false
     @State private var invitationToOpen: MomentActivityLink?
@@ -796,7 +811,7 @@ struct DearSocialView: View {
                     .toolbar { ToolbarItem(placement: .topBarTrailing) { Button(String(localized: "完成", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) { showingSpaceMembers = false } } }
                 }
             }
-            .onChange(of: activityId) { _, _ in photos = []; moments = []; checkIns = []; activityMembers = []; run { try await loadDetails() } }
+            .onChange(of: activityId) { _, _ in if showingActivity { locations.activate(store: store, tenant: activityTenantId, activity: activityId) }; photos = []; moments = []; checkIns = []; activityMembers = []; run { try await loadDetails() } }
             .alert(String(localized: "新增空间", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), isPresented: $showingSpaceCreate) {
                 TextField(String(localized: "空间名称", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), text: $spaceName)
                 Button(String(localized: "取消", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), role: .cancel) { }
@@ -812,6 +827,17 @@ struct DearSocialView: View {
                 Button(String(localized: "取消", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), role: .cancel) { }
             } message: { Text(String(localized: "仅可删除没有活动、其他成员或分享记录的空间。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) }
         }
+        .onDisappear { locations.stop() }
+        .onReceive(store.photoSource.$networkAvailable.removeDuplicates().filter { $0 }) { _ in Task { await refresh() } }
+        .onChange(of: showingActivity) { _, shown in
+            if shown { locations.activate(store: store, tenant: activityTenantId, activity: activityId) }
+            else { locations.stop() }
+        }
+        .onChange(of: scenePhase) { _, phase in
+            if phase == .active && showingActivity { locations.activate(store: store, tenant: activityTenantId, activity: activityId) }
+            else { locations.stop() }
+        }
+        .onChange(of: store.identity.accountIdentifier) { _, _ in locations.stop() }
     }
 
     @ViewBuilder private func photoLink(_ photo: DearRecord) -> some View {
@@ -1027,6 +1053,8 @@ struct DearSocialView: View {
 
     private var activityPhotoSection: some View {
         Section {
+            MomentPendingActivityView(source: store.photoSource, spaceID: activityTenantId, activityID: activityId)
+
             HStack(spacing: 8) {
                 PhotosPicker(selection: $selectedPhotos, maxSelectionCount: 50, matching: .any(of: [.images, .videos]), preferredItemEncoding: .current) {
                     activityPhotoTile(String(localized: "分享", bundle: AgentIdentityLanguage.appBundle()), icon: "photo.badge.plus")
@@ -1085,6 +1113,9 @@ struct DearSocialView: View {
                 if !batchDownloadError.isEmpty { Text(batchDownloadError).font(.caption).foregroundStyle(.red) }
             }
         } header: { Text("照片分享").textCase(nil) }
+        .onReceive(store.photoSource.$syncRevision.dropFirst()) { _ in
+            Task { try? await loadPhotos(); try? await loadMoments(); try? await loadCheckIns() }
+        }
     }
 
     private var activityTimeline: [DearTimelineEntry] {
@@ -1155,11 +1186,20 @@ struct DearSocialView: View {
                             .font(.caption).foregroundStyle(.secondary)
                     }.padding(.vertical, 4)
                 }
+                Section {
+                    Toggle(String(localized: "共享我的位置", bundle: AgentIdentityLanguage.appBundle()), isOn: Binding(get: { locations.sharing }, set: { locations.setSharing($0) }))
+                    NavigationLink {
+                        DearActivityMapView(locations: locations, store: store, title: selectedActivity.text("title"), spaceID: activityTenantId, activityID: activityId,
+                                            points: DearActivityMapPoint.points(checkIns: checkIns, photos: photos), photos: photos)
+                    } label: { Label(String(localized: "活动地图", bundle: AgentIdentityLanguage.appBundle()), systemImage: "map") }
+                    if !locations.status.isEmpty { Text(locations.status).font(.caption).foregroundStyle(.secondary) }
+                }
                 activityPhotoSection
                 activityTimelineSection
             }
         }
         .listStyle(.insetGrouped)
+        .onAppear { locations.activate(store: store, tenant: activityTenantId, activity: activityId) }
         .readablePage()
         .task(id: activityTenantId + activityId + photos.map(\.id).joined()) {
             let tenant = activityTenantId, activity = activityId, rows = photos.map(\.data)
@@ -1271,8 +1311,8 @@ struct DearSocialView: View {
                         failures.append(String(localized: "第 \(index + 1) 项：\(momentDisplayError(error))", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)))
                     }
                 }
-                try await loadPhotos()
-                notice = String(localized: "已共享 \(completed) 项；请保持此 iPhone 可以响应原文件请求。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))
+                try? await loadPhotos()
+                notice = String(localized: "已保存到本机，联网后自动同步到活动。", bundle: AgentIdentityLanguage.appBundle())
                 if !failures.isEmpty { error = failures.joined(separator: "；") }
             }
         }
@@ -1308,8 +1348,8 @@ struct DearSocialView: View {
                     }
                     let points = DearActivityMapPoint.points(checkIns: checkIns, photos: photos)
                     NavigationLink {
-                        DearActivityMapView(store: store, title: selectedActivity?.text("title") ?? "活动地图", spaceID: activityTenantId, activityID: activityId, points: points, photos: photos)
-                    } label: { Label("活动地图", systemImage: "map") }.disabled(points.isEmpty && photos.isEmpty)
+                        DearActivityMapView(locations: locations, store: store, title: selectedActivity?.text("title") ?? "活动地图", spaceID: activityTenantId, activityID: activityId, points: points, photos: photos)
+                    } label: { Label("活动地图", systemImage: "map") }
                 } label: { Image(systemName: "ellipsis").accessibilityLabel("更多活动操作") }
     }
 
@@ -1331,10 +1371,6 @@ struct DearSocialView: View {
                 let microphoneAllowed = await AVCaptureDevice.requestAccess(for: .audio)
                 guard microphoneAllowed else { throw APIError.message("请在设置中允许使用麦克风，以录制有声音的视频。") }
             }
-            let library = await PHPhotoLibrary.requestAuthorization(for: .addOnly)
-            guard library == .authorized || library == .limited else {
-                throw APIError.message("请在设置中允许添加照片，以保存拍摄的照片和视频。")
-            }
             guard token == store.identity.accessToken, target.activityID == activityId, showingActivity else { return }
             cameraTarget = target
             cameraMode = mode
@@ -1350,35 +1386,30 @@ struct DearSocialView: View {
                 guard capture.target.sessionToken == store.identity.accessToken else {
                     throw APIError.message("登录状态已变化，拍摄内容未共享。请另存到相册，再使用当前账号选择共享。")
                 }
+                // Commit the app's durable copy before any Photos or network operation.
+                if capture.video {
+                    try await store.photoSource.publishVideo(at: capture.url, spaceID: capture.target.spaceID,
+                                                            activityID: capture.target.activityID, locationName: capture.target.locationName)
+                } else {
+                    let data = try Data(contentsOf: capture.url, options: .mappedIfSafe)
+                    try await store.photoSource.publish(data, spaceID: capture.target.spaceID, activityID: capture.target.activityID,
+                                                        name: capture.url.lastPathComponent, locationName: capture.target.locationName)
+                }
+                Task {
+                    defer { try? FileManager.default.removeItem(at: capture.url) }
                 if !capture.savedToLibrary {
-                    let photoLocation = capture.video ? nil : DearCaptureGeography.location(in: capture.url)
-                    try await PHPhotoLibrary.shared().performChanges {
-                        if capture.video {
-                            PHAssetChangeRequest.creationRequestForAssetFromVideo(atFileURL: capture.url)
-                        } else {
-                            let request = PHAssetChangeRequest.creationRequestForAssetFromImage(atFileURL: capture.url)
-                            request?.location = photoLocation
+                    let permission = await PHPhotoLibrary.requestAuthorization(for: .addOnly)
+                    if permission == .authorized || permission == .limited {
+                        let photoLocation = capture.video ? nil : DearCaptureGeography.location(in: capture.url)
+                        try? await PHPhotoLibrary.shared().performChanges {
+                            if capture.video { PHAssetChangeRequest.creationRequestForAssetFromVideo(atFileURL: capture.url) }
+                            else { PHAssetChangeRequest.creationRequestForAssetFromImage(atFileURL: capture.url)?.location = photoLocation }
                         }
                     }
-                    capturedMedia?.savedToLibrary = true
                 }
-                guard capture.target.sessionToken == store.identity.accessToken else { throw CancellationError() }
-                do {
-                    if capture.video {
-                        try await store.photoSource.publishVideo(at: capture.url, spaceID: capture.target.spaceID,
-                                                                activityID: capture.target.activityID, locationName: capture.target.locationName)
-                    } else {
-                        let data = try Data(contentsOf: capture.url, options: .mappedIfSafe)
-                        try await store.photoSource.publish(data, spaceID: capture.target.spaceID, activityID: capture.target.activityID,
-                                                            name: capture.url.lastPathComponent, locationName: capture.target.locationName)
-                    }
-                } catch {
-                    throw APIError.message("已保存到系统相册，共享未完成：\(error.localizedDescription)。可点击重试保存并共享。")
                 }
                 capturedMedia = nil
-                try? FileManager.default.removeItem(at: capture.url)
-                notice = "已保存到系统相册并共享到活动；请保持此 iPhone 可以响应原文件请求。"
-                if activityId == capture.target.activityID { try await loadPhotos() }
+                notice = String(localized: "已保存到本机，联网后自动同步到活动。", bundle: AgentIdentityLanguage.appBundle())
             } catch { self.error = error.localizedDescription }
         }
     }
@@ -1665,15 +1696,16 @@ struct DearSocialView: View {
         guard let location = checkInLocator.location, !checkInLocator.fetching else { throw APIError.message(String(localized: "请先获取当前位置。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) }
         let note = checkInNote.trimmingCharacters(in: .whitespacesAndNewlines)
         guard note.count <= 1000 else { throw APIError.message(String(localized: "备注不能超过 1000 字。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) }
-        _ = try await store.call(base + "tenants/\(activityTenantId)/activities/\(activityId)/checkins", method: "POST", body: [
+        try store.photoSource.enqueueRecord(kind: "checkins", spaceID: activityTenantId, activityID: activityId, payload: [
             "requestId": checkInRequestID.uuidString,
             "latitude": location.coordinate.latitude, "longitude": location.coordinate.longitude,
             "altitudeMeters": location.altitude, "address": checkInLocator.address,
             "note": note.isEmpty ? checkInLocator.address : note
         ])
-        checkInRequestID = UUID(); try await loadCheckIns()
-        notice = String(format: String(localized: "打卡已保存，海拔 %.1f 米。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), location.altitude)
+        checkInRequestID = UUID(); showingCheckIn = false
+        notice = String(localized: "已保存到本机，联网后自动同步到活动。", bundle: AgentIdentityLanguage.appBundle())
     }
+
     private func updateCheckIn() async throws {
         guard let selectedCheckIn, selectedCheckIn.flag("canEdit") else { throw APIError.message(String(localized: "只能修改自己的打卡。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) }
         let note = checkInNote.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -1718,9 +1750,11 @@ struct DearSocialView: View {
     private func publishMoment() async throws {
         let body = momentDraft.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !body.isEmpty, body.count <= 1000 else { throw APIError.message(String(localized: "请填写 1 至 1000 字的日常内容。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) }
-        _ = try await store.call(base + "tenants/\(activityTenantId)/activities/\(activityId)/moments", method: "POST", body: ["text": body, "requestId": momentRequestID.uuidString])
-        momentDraft = ""; momentRequestID = UUID(); try await loadMoments(); notice = String(localized: "日常已发布。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))
+        try store.photoSource.enqueueRecord(kind: "moments", spaceID: activityTenantId, activityID: activityId, payload: ["text": body, "requestId": momentRequestID.uuidString])
+        momentDraft = ""; momentRequestID = UUID()
+        notice = String(localized: "已保存到本机，联网后自动同步到活动。", bundle: AgentIdentityLanguage.appBundle())
     }
+
     private func deleteMoment(_ moment: DearRecord) async throws {
         _ = try await store.call(base + "tenants/\(activityTenantId)/activities/\(activityId)/moments/\(moment.id)", method: "DELETE")
         try await loadMoments(); notice = String(localized: "日常已删除。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))
@@ -1855,6 +1889,9 @@ private final class DearCheckInLocator: NSObject, ObservableObject, CLLocationMa
         guard let current = locations.last(where: { $0.horizontalAccuracy >= 0 && $0.verticalAccuracy >= 0 && abs($0.timestamp.timeIntervalSinceNow) < 120 }) else {
             fetching = false; error = String(localized: "没有获取到有效的位置与海拔，请重试。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)); return
         }
+        location = current
+        address = String(format: "%.6f, %.6f", current.coordinate.latitude, current.coordinate.longitude)
+        fetching = false
         geocoder.reverseGeocodeLocation(current) { [weak self] placemarks, _ in
             guard let self else { return }
             guard self.fetching else { return }
@@ -2567,4 +2604,148 @@ struct MomentShareLink: View {
             Label(label, systemImage: "square.and.arrow.up")
         }
     }
+}
+
+private struct MomentPendingActivityView: View {
+    @ObservedObject var source: DearPhotoSource
+    let spaceID: String
+    let activityID: String
+    var body: some View {
+        let drafts = source.pendingDrafts(spaceID: spaceID, activityID: activityID)
+        if !drafts.isEmpty {
+            VStack(alignment: .leading, spacing: 8) {
+                HStack {
+                    Label(String(localized: "已存本机 · 待同步", bundle: AgentIdentityLanguage.appBundle()), systemImage: "internaldrive")
+                    Spacer()
+                    Button(String(localized: "重试同步", bundle: AgentIdentityLanguage.appBundle())) { source.retryDrafts() }
+                }.font(.caption)
+                ForEach(drafts) { draft in
+                    HStack(spacing: 8) {
+                        if let local = try? source.draftStore().file(draft) {
+                            MomentDraftPreview(url: local, video: draft.contentType?.hasPrefix("video/") == true)
+                                .frame(width: 56, height: 56).clipped()
+                        } else { Image(systemName: draft.kind == "checkins" ? "location.circle" : "square.and.pencil") }
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text(draft.displayName ?? String(localized: "活动记录", bundle: AgentIdentityLanguage.appBundle())).font(.caption).lineLimit(2)
+                            Text(draft.createdAt, style: .time).font(.caption2).foregroundStyle(.secondary)
+                            if let error = draft.lastError { Text(error).font(.caption2).foregroundStyle(.secondary).lineLimit(2) }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+private struct MomentDraftPreview: View {
+    let url: URL
+    let video: Bool
+    @State private var image: UIImage?
+    var body: some View {
+        Group {
+            if let image { Image(uiImage: image).resizable().scaledToFill() }
+            else { Image(systemName: video ? "video" : "photo") }
+        }.task(id: url) { image = try? await PhotoDisplayImage.preview(url, isVideo: video) }
+    }
+}
+
+@MainActor private final class MomentActivityLocations: NSObject, ObservableObject, CLLocationManagerDelegate {
+    struct Member: Identifiable {
+        let id: String
+        let name: String
+        let coordinate: CLLocationCoordinate2D
+        let observedAt: Date
+        let expiresAt: Date
+    }
+    @Published private(set) var sharing = false
+    @Published private(set) var members: [Member] = []
+    @Published private(set) var status = ""
+    private let manager = CLLocationManager()
+    private weak var store: FamilyStore?
+    private var path = ""
+    private var account: String?
+    private var lease: String?
+    private var location: CLLocation?
+    private var worker: Task<Void, Never>?
+    private var generation = UUID()
+    override init() {
+        super.init(); manager.delegate = self; manager.desiredAccuracy = kCLLocationAccuracyBest; manager.distanceFilter = kCLDistanceFilterNone
+    }
+    func activate(store: FamilyStore, tenant: String, activity: String) {
+        guard UUID(uuidString: tenant) != nil, UUID(uuidString: activity) != nil else { return }
+        let route = "/api/dear/social/tenants/\(tenant)/activities/\(activity)"
+        if path == route, account == store.identity.accountIdentifier, worker != nil { return }
+        stop(); self.store = store; path = route; account = store.identity.accountIdentifier
+        let expected = generation
+        worker = Task {
+            while !Task.isCancelled, expected == generation {
+                await refresh(expected: expected)
+                try? await Task.sleep(for: .seconds(5))
+            }
+        }
+    }
+    func setSharing(_ enabled: Bool) {
+        guard enabled != sharing else { return }
+        if !enabled { sharing = false; manager.stopUpdatingLocation(); closeLease(); return }
+        sharing = true; status = ""
+        switch manager.authorizationStatus {
+        case .authorizedAlways, .authorizedWhenInUse: manager.startUpdatingLocation()
+        case .notDetermined: manager.requestWhenInUseAuthorization()
+        default: sharing = false; status = String(localized: "请在系统设置中允许此 App 使用位置后重试。", bundle: AgentIdentityLanguage.appBundle())
+        }
+    }
+    private func closeLease() {
+        guard let lease, let store else { return }
+        self.lease = nil
+        let target = path, owner = account
+        Task {
+            guard store.identity.accountIdentifier == owner else { return }
+            _ = try? await store.call(target + "/location-sharing?leaseId=" + lease, method: "DELETE", timeout: 5)
+        }
+    }
+    func stop() {
+        generation = UUID(); worker?.cancel(); worker = nil
+        sharing = false; manager.stopUpdatingLocation(); closeLease(); members = []; location = nil
+    }
+    private func refresh(expected: UUID) async {
+        guard let store, account == store.identity.accountIdentifier, expected == generation else { return }
+        members = members.filter { $0.expiresAt > Date() }
+        do {
+            if sharing, let location, location.horizontalAccuracy >= 0, location.horizontalAccuracy <= 1000,
+               abs(location.timestamp.timeIntervalSinceNow) <= 30 {
+                if lease == nil {
+                    let receipt = try await store.call(path + "/location-sharing", method: "POST", body: [:], timeout: 8) as? [String: Any]
+                    guard expected == generation, sharing else { return }
+                    lease = receipt?["leaseId"] as? String
+                }
+                if let lease {
+                    _ = try await store.call(path + "/location-sharing", method: "PUT", body: [
+                        "leaseId": lease, "latitude": location.coordinate.latitude, "longitude": location.coordinate.longitude,
+                        "accuracy": location.horizontalAccuracy, "altitude": location.verticalAccuracy >= 0 ? location.altitude as Any : NSNull(),
+                        "observedAt": ISO8601DateFormatter().string(from: location.timestamp)
+                    ], timeout: 8)
+                }
+            }
+            let rows = try DearRecord.list(await store.call(path + "/locations", timeout: 8))
+            guard expected == generation else { return }
+            members = rows.compactMap { row in
+                guard let observed = ActivityListDate.parse(row.text("observedAt")), let expires = ActivityListDate.parse(row.text("expiresAt")), expires > Date() else { return nil }
+                return Member(id: row.text("subject"), name: row.text("name"), coordinate: CLLocationCoordinate2D(latitude: row.number("latitude"), longitude: row.number("longitude")), observedAt: observed, expiresAt: expires)
+            }
+            status = ""
+        } catch {
+            guard expected == generation else { return }
+            lease = nil; status = momentDisplayError(error)
+        }
+    }
+    func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {
+        guard sharing else { return }
+        if manager.authorizationStatus == .authorizedWhenInUse || manager.authorizationStatus == .authorizedAlways { manager.startUpdatingLocation() }
+        else if manager.authorizationStatus != .notDetermined { setSharing(false); status = String(localized: "位置访问未获授权，请在系统设置中开启。", bundle: AgentIdentityLanguage.appBundle()) }
+    }
+    func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
+        guard sharing, let latest = locations.last, latest.horizontalAccuracy >= 0 else { return }
+        location = latest
+    }
+    func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) { status = momentDisplayError(error) }
 }

@@ -5485,6 +5485,31 @@
       "zh-Hans": "活动封面已更新，分享页将使用这项照片或视频的预览图。",
       "en": "Activity cover updated. The share page will use this photo or video preview.",
       "iosKey": "活动封面已更新，分享页将使用这项照片或视频的预览图。"
+    },
+    "moment.t0dd0abc66ae4": {
+      "zh-Hans": "已保存到本机，联网后自动同步到活动。",
+      "en": "Saved on this device. It will sync to the activity when online.",
+      "iosKey": "已保存到本机，联网后自动同步到活动。"
+    },
+    "moment.t810827385f9b": {
+      "zh-Hans": "已存本机 · 待同步",
+      "en": "Saved locally · Pending sync",
+      "iosKey": "已存本机 · 待同步"
+    },
+    "moment.t87d53fea3f05": {
+      "zh-Hans": "重试同步",
+      "en": "Retry sync",
+      "iosKey": "重试同步"
+    },
+    "moment.tf98dfe0b4d54": {
+      "zh-Hans": "活动记录",
+      "en": "Activity record",
+      "iosKey": "活动记录"
+    },
+    "moment.te7b0eb183251": {
+      "zh-Hans": "共享我的位置",
+      "en": "Share my location",
+      "iosKey": "共享我的位置"
     }
   }
 }

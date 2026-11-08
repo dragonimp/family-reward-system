@@ -272,3 +272,66 @@ struct MomentActivityLink: Identifiable, Equatable {
         tenantID = tenant; activityID = activity; invitation = token
     }
 }
+
+// Durable, account-isolated activity drafts. No tokens or remote URLs are stored.
+struct MomentLocalDraft: Codable, Identifiable {
+    var id = UUID()
+    let tenant: UUID
+    let activity: UUID
+    let kind: String
+    let createdAt: Date
+    var fileName: String?
+    var displayName: String?
+    var contentType: String?
+    var locationName: String?
+    var assetIdentifier: String?
+    var payload: Data?
+    var lastError: String?
+}
+
+struct MomentDraftStore {
+    let root: URL
+    init(base: URL, account: String) throws {
+        guard !account.isEmpty else { throw CocoaError(.userCancelled) }
+        let key = SHA256.hash(data: Data(account.utf8)).map { String(format: "%02x", $0) }.joined()
+        root = base.appendingPathComponent("MomentActivityDrafts").appendingPathComponent(key)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+    }
+    func entries() throws -> [MomentLocalDraft] {
+        try FileManager.default.contentsOfDirectory(at: root, includingPropertiesForKeys: nil)
+            .filter { $0.pathExtension == "json" }
+            .map { try JSONDecoder().decode(MomentLocalDraft.self, from: Data(contentsOf: $0)) }
+            .sorted { $0.createdAt < $1.createdAt }
+    }
+    func save(_ draft: MomentLocalDraft) throws {
+        let path = root.appendingPathComponent(draft.id.uuidString + ".json")
+        try JSONEncoder().encode(draft).write(to: path, options: .atomic)
+        #if os(iOS)
+        try FileManager.default.setAttributes([.protectionKey: FileProtectionType.completeUntilFirstUserAuthentication], ofItemAtPath: path.path)
+        #endif
+    }
+    func enqueue(_ entry: MomentLocalDraft, media: URL? = nil) throws -> MomentLocalDraft {
+        var draft = entry
+        if let media {
+            let suffix = media.pathExtension
+            let name = draft.id.uuidString + (suffix.isEmpty ? "" : "." + suffix)
+            let target = root.appendingPathComponent(name)
+            try FileManager.default.copyItem(at: media, to: target)
+            #if os(iOS)
+            try FileManager.default.setAttributes([.protectionKey: FileProtectionType.completeUntilFirstUserAuthentication], ofItemAtPath: target.path)
+            #endif
+            draft.fileName = name
+            do { try save(draft) } catch { try? FileManager.default.removeItem(at: target); throw error }
+        } else { try save(draft) }
+        return draft
+    }
+    func file(_ draft: MomentLocalDraft) -> URL? {
+        guard let name = draft.fileName, URL(fileURLWithPath: name).lastPathComponent == name else { return nil }
+        return root.appendingPathComponent(name)
+    }
+    func remove(_ draft: MomentLocalDraft) throws {
+        // Commit removal only after the server's durable acknowledgement.
+        try FileManager.default.removeItem(at: root.appendingPathComponent(draft.id.uuidString + ".json"))
+        if let file = file(draft) { try? FileManager.default.removeItem(at: file) }
+    }
+}

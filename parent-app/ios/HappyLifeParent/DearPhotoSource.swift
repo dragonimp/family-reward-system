@@ -1,3 +1,4 @@
+import Network
 import AgentIdentity
 import CryptoKit
 import MyVncRealtime
@@ -15,6 +16,12 @@ import UniformTypeIdentifiers
 // stores selected photos and videos on the iPhone and serves verified requests.
 @MainActor final class DearPhotoSource: ObservableObject {
     @Published private(set) var originalsRevision = UUID()
+    @Published private(set) var draftRevision = UUID()
+    @Published private(set) var syncRevision = UUID()
+    @Published private(set) var networkAvailable = false
+    @Published private(set) var draftStatus = ""
+    private var draftSync: Task<Void, Never>?
+    private var draftNetwork: NWPathMonitor?
     private struct SharedPhoto: Codable {
         let id: String
         let spaceID: String
@@ -88,8 +95,18 @@ import UniformTypeIdentifiers
 
     func start() {
         guard pump == nil else { return }
+        let monitor = NWPathMonitor()
+        monitor.pathUpdateHandler = { [weak self] path in
+            Task { @MainActor [weak self] in
+                self?.networkAvailable = path.status == .satisfied
+                if path.status == .satisfied { self?.retryDrafts() }
+            }
+        }
+        draftNetwork = monitor
+        monitor.start(queue: DispatchQueue(label: "moment.activity.network"))
         pump = Task {
             while !Task.isCancelled {
+                await syncDrafts()
                 if !enabledForSession { await enableExistingDevice() }
                 if enabledForSession { await poll() }
                 try? await Task.sleep(for: .seconds(10))
@@ -98,6 +115,8 @@ import UniformTypeIdentifiers
     }
 
     func stop() {
+        draftNetwork?.cancel(); draftNetwork = nil
+        draftSync?.cancel(); draftSync = nil; draftRevision = UUID()
         for task in localReads.values { task.cancel() }; localReads.removeAll(); fileVerifiers.removeAll(); legacyLibraryAttempts.removeAll(); legacyRead?.cancel(); legacyRead = nil
         generation = UUID(); originalsRevision = UUID(); librarySearch?.cancel(); librarySearch = nil; cacheTask?.cancel(); cacheTask = nil; cachedShares.removeAll(); cacheRetries.removeAll(); currentDeviceID = nil; pump?.cancel(); pump = nil; enabledForSession = false
         for task in sourceTasks.values { task.cancel() }; sourceTasks.removeAll()
@@ -259,7 +278,80 @@ import UniformTypeIdentifiers
         try await publishMedia(at: url, contentType: type, spaceID: spaceID, activityID: activityID, name: fileName, locationName: locationName, assetIdentifier: assetIdentifier)
     }
 
+    func draftStore() throws -> MomentDraftStore {
+        guard let account = store?.identity.accountIdentifier, store?.identity.isAuthenticated == true else { throw CancellationError() }
+        return try MomentDraftStore(base: FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0], account: account)
+    }
+
+    func pendingDrafts(spaceID: String, activityID: String) -> [MomentLocalDraft] {
+        guard let tenant = UUID(uuidString: spaceID), let activity = UUID(uuidString: activityID),
+              let drafts = try? draftStore().entries() else { return [] }
+        return drafts.filter { $0.tenant == tenant && $0.activity == activity }
+    }
+
+    func enqueueRecord(kind: String, spaceID: String, activityID: String, payload: [String: Any]) throws {
+        guard let tenant = UUID(uuidString: spaceID), let activity = UUID(uuidString: activityID), ["checkins", "moments"].contains(kind) else { throw CocoaError(.fileWriteInvalidFileName) }
+        var draft = MomentLocalDraft(tenant: tenant, activity: activity, kind: kind, createdAt: Date())
+        var body = payload
+        if let raw = payload["requestId"] as? String, let id = UUID(uuidString: raw) { draft.id = id }
+        body["requestId"] = draft.id.uuidString
+        body["recordedAt"] = ISO8601DateFormatter().string(from: draft.createdAt)
+        draft.displayName = payload["note"] as? String ?? payload["text"] as? String
+        draft.payload = try JSONSerialization.data(withJSONObject: body)
+        try draftStore().save(draft)
+        draftRevision = UUID(); start(); retryDrafts()
+    }
+
     private func publishMedia(at sourceURL: URL, contentType: String, spaceID: String, activityID: String, name: String, locationName: String, assetIdentifier: String? = nil) async throws {
+        guard let tenant = UUID(uuidString: spaceID), let activity = UUID(uuidString: activityID) else { throw CocoaError(.fileWriteInvalidFileName) }
+        var draft = MomentLocalDraft(tenant: tenant, activity: activity, kind: "media", createdAt: Date())
+        draft.displayName = name; draft.contentType = contentType; draft.locationName = locationName; draft.assetIdentifier = assetIdentifier
+        let local = try draftStore()
+        let entry = draft
+        _ = try await Task.detached(priority: .utility) { try local.enqueue(entry, media: sourceURL) }.value
+        draftRevision = UUID(); start(); retryDrafts()
+    }
+
+    func retryDrafts() {
+        guard draftSync == nil else { return }
+        draftSync = Task { await syncDrafts(); draftSync = nil }
+    }
+
+    private var syncingDrafts = false
+    private func syncDrafts() async {
+        guard !syncingDrafts, !Task.isCancelled, let account = store?.identity.accountIdentifier, let store else { return }
+        let expected = generation
+        syncingDrafts = true
+        var completed = false
+        defer { syncingDrafts = false; if completed { syncRevision = UUID() } }
+        do {
+            let local = try draftStore()
+            for var draft in try local.entries() {
+                guard expected == generation, !Task.isCancelled, store.identity.accountIdentifier == account else { return }
+                do {
+                    if draft.kind == "media", let url = local.file(draft), let mime = draft.contentType {
+                        try await uploadMedia(at: url, contentType: mime, spaceID: draft.tenant.uuidString, activityID: draft.activity.uuidString,
+                                              name: draft.displayName ?? url.lastPathComponent, locationName: draft.locationName ?? "", assetIdentifier: draft.assetIdentifier, operationID: draft.id, recordedAt: draft.createdAt)
+                    } else if ["checkins", "moments"].contains(draft.kind), let payload = draft.payload,
+                              let body = try JSONSerialization.jsonObject(with: payload) as? [String: Any] {
+                        _ = try await store.call("/api/dear/social/tenants/\(draft.tenant.uuidString)/activities/\(draft.activity.uuidString)/\(draft.kind)", method: "POST", body: body)
+                    } else { throw CocoaError(.fileReadCorruptFile) }
+                    guard expected == generation, store.identity.accountIdentifier == account, !Task.isCancelled else { return }
+                    try local.remove(draft)
+                    completed = true
+                    draftRevision = UUID(); draftStatus = ""
+                } catch {
+                    guard store.identity.accountIdentifier == account else { return }
+                    draft.lastError = momentDisplayError(error)
+                    try local.save(draft); draftStatus = draft.lastError ?? ""; draftRevision = UUID()
+                    // Leave each draft durable; retry on resume or the next pump tick.
+                    if error is URLError || error is CancellationError { return }
+                }
+            }
+        } catch { draftStatus = momentDisplayError(error); draftRevision = UUID() }
+    }
+
+    private func uploadMedia(at sourceURL: URL, contentType: String, spaceID: String, activityID: String, name: String, locationName: String, assetIdentifier: String? = nil, operationID: UUID, recordedAt: Date) async throws {
         guard !publishing else { throw APIError.message(String(localized: "另一张照片正在共享，请稍后重试。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) }
         publishing = true
         defer { publishing = false }
@@ -290,11 +382,11 @@ import UniformTypeIdentifiers
         case "image/webp": suffix = ".webp"
         default: suffix = ".jpg"
         }
-        let localName = UUID().uuidString + suffix
+        let localName = operationID.uuidString + suffix
         let localURL = root.appendingPathComponent(localName)
         do {
             try await Task.detached(priority: .utility) {
-                try FileManager.default.copyItem(at: sourceURL, to: localURL)
+                if !FileManager.default.fileExists(atPath: localURL.path) { try FileManager.default.copyItem(at: sourceURL, to: localURL) }
                 try FileManager.default.setAttributes([.protectionKey: FileProtectionType.completeUntilFirstUserAuthentication], ofItemAtPath: localURL.path)
             }.value
         } catch {
@@ -310,6 +402,7 @@ import UniformTypeIdentifiers
             let geography = await DearPhotoLocation.geography(at: localURL, fallbackName: locationName)
             let response = try await store.call(prefix + "/native-photos", method: "POST", body: [
                 "deviceId": deviceID, "fileName": displayName, "contentType": contentType,
+                "clientPhotoId": operationID.uuidString, "recordedAt": ISO8601DateFormatter().string(from: recordedAt),
                 "length": length, "sha256": sha, "locationName": String(geography.name.trimmingCharacters(in: .whitespacesAndNewlines).prefix(200)),
                 "latitude": geography.latitude as Any? ?? NSNull(), "longitude": geography.longitude as Any? ?? NSNull(),
                 "altitudeMeters": geography.altitudeMeters as Any? ?? NSNull()]) as? [String: Any]
@@ -317,29 +410,20 @@ import UniformTypeIdentifiers
                 throw APIError.message(String(localized: "照片登记回执无效。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)))
             }
             publishedID = photoID
+            index.photos.removeAll { UUID(uuidString: $0.id) == UUID(uuidString: photoID) }
             index.photos.append(SharedPhoto(id: photoID, spaceID: spaceID, activityID: activityID,
                                             fileName: localName, length: length, sha256: sha, assetIdentifier: assetIdentifier, originalFileName: displayName))
             try writeIndex(index, at: root)
-            do {
-                try await uploadThumbnail(thumbnail, prefix: prefix, photoID: photoID, revision: sha)
-            } catch {
-                // The original remains available. Opening the album retries a missing preview.
-            }
+            try await uploadThumbnail(thumbnail, prefix: prefix, photoID: photoID, revision: sha)
             start()
-            if !(await enableNotificationsIfNeeded()) {
-                store.error = String(localized: "有人请求原图时需要通知提醒。请在系统设置中允许 Linko Moment 发送通知，并保持 App 打开完成传输。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))
-            }
         } catch {
-            if let publishedID {
-                if (try? await store.call(prefix + "/live/photos/\(publishedID)", method: "DELETE")) != nil {
-                    try? FileManager.default.removeItem(at: localURL)
-                }
-            } else {
-                try? FileManager.default.removeItem(at: localURL)
-            }
+            // An ambiguous remote response must never revoke a possibly committed share.
+            // The durable draft retains its original and stable ID for a safe retry.
+            if publishedID == nil { try? FileManager.default.removeItem(at: localURL) }
             throw error
         }
     }
+
 
     func revoke(photoID: String, spaceID: String, activityID: String) async throws -> Bool {
         guard UUID(uuidString: photoID) != nil, UUID(uuidString: spaceID) != nil,
@@ -849,6 +933,10 @@ import UniformTypeIdentifiers
     private func currentSubject() async throws -> String {
         let expected = generation
         if let subjectCache, store?.identity.isAuthenticated == true { return subjectCache }
+        if let account = store?.identity.accountIdentifier, store?.identity.isAuthenticated == true,
+           let subject = UserDefaults.standard.string(forKey: "moment.subject." + account), !subject.isEmpty {
+            subjectCache = subject; return subject
+        }
         guard let store, store.identity.isAuthenticated,
               let me = try await store.call("/api/dear/social/me") as? [String: Any],
               let subject = me["subject"] as? String, !subject.isEmpty else {
@@ -856,6 +944,7 @@ import UniformTypeIdentifiers
         }
         guard expected == generation else { throw CancellationError() }
         subjectCache = subject
+        if let account = store.identity.accountIdentifier { UserDefaults.standard.set(subject, forKey: "moment.subject." + account) }
         return subject
     }
 
