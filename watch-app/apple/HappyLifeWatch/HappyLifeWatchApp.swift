@@ -29,36 +29,57 @@ struct HappyLifeWatchApp: App {
 struct WatchHomeView: View {
     @EnvironmentObject private var store: WatchStore
     @EnvironmentObject private var language: AgentIdentityLanguageStore
+    @Environment(\.scenePhase) private var phase
     var body: some View {
         NavigationStack {
             List {
-                Text(String(localized: "通过配对的 iPhone 使用已登录账号管理活动。", bundle: AgentIdentityLanguage.appBundle())).font(.footnote).foregroundStyle(.secondary)
-                NavigationLink(String(localized: "运动", bundle: AgentIdentityLanguage.appBundle()), destination: WatchWorkoutView())
-                NavigationLink(String(localized: "活动照片", bundle: AgentIdentityLanguage.appBundle()), destination: WatchSocialSpacesView())
-                NavigationLink(String(localized: "扫码登录", bundle: AgentIdentityLanguage.appBundle())) { WatchAccountLoginView(login: store.accountLogin) }
-                NavigationLink(language.text("settings.application")) {
-                    List {
-                        NavigationLink(language.text("language.settings"), destination: WatchLanguageSettingsView())
-                        NavigationLink(String(localized: "孩子绑定与积分", bundle: AgentIdentityLanguage.appBundle()), destination: WatchChildView())
-                    }.navigationTitle(language.text("settings.application"))
+                if store.menuSections["dining"] == true {
+                    NavigationLink(String(localized: "干饭", bundle: AgentIdentityLanguage.appBundle()), destination: WatchDiningView())
                 }
+                if store.menuSections["growth"] == true {
+                    NavigationLink(String(localized: "带娃", bundle: AgentIdentityLanguage.appBundle()), destination: WatchChildView(allowsPairing: false))
+                }
+                if store.menuSections["activities"] == true {
+                    NavigationLink(String(localized: "活动", bundle: AgentIdentityLanguage.appBundle()), destination: WatchSocialSpacesView())
+                }
+                if store.menuSections["exercise"] == true {
+                    NavigationLink(String(localized: "运动", bundle: AgentIdentityLanguage.appBundle()), destination: WatchWorkoutView())
+                }
+                NavigationLink(String(localized: "我的", bundle: AgentIdentityLanguage.appBundle())) {
+                    List {
+                        NavigationLink(String(localized: "扫码登录", bundle: AgentIdentityLanguage.appBundle())) { WatchAccountLoginView(login: store.accountLogin) }
+                        Section(language.text("settings.application")) {
+                            NavigationLink(language.text("language.settings"), destination: WatchLanguageSettingsView())
+                            NavigationLink(String(localized: "孩子绑定与积分", bundle: AgentIdentityLanguage.appBundle()), destination: WatchChildView())
+                        }
+                    }.navigationTitle(String(localized: "我的", bundle: AgentIdentityLanguage.appBundle()))
+                }
+                if let error = store.menuError { Text(error).font(.footnote).foregroundStyle(.secondary) }
             }.navigationTitle("Linko Moment")
+        }
+        .task(id: phase == .active) {
+            guard phase == .active else { store.clearMenu(); return }
+            while !Task.isCancelled {
+                await store.refreshMenu()
+                do { try await Task.sleep(for: .seconds(10)) } catch { return }
+            }
         }
     }
 }
 
 struct WatchChildView: View {
+    var allowsPairing = true
     @EnvironmentObject private var store: WatchStore
     @EnvironmentObject private var language: AgentIdentityLanguageStore
 
     var body: some View {
         NavigationStack {
             List {
-                NavigationLink(String(localized: "运动", bundle: AgentIdentityLanguage.appBundle()), destination: WatchWorkoutView())
                 if !store.ready {
                     Button(String(localized: "读取设备凭据", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) { Task { await store.start() } }
                 } else if store.token == nil {
-                    WatchPairingView()
+                    if allowsPairing { WatchPairingView() }
+                    else { Text(String(localized: "请到“我的”中打开孩子绑定。", bundle: AgentIdentityLanguage.appBundle())) }
                 } else {
                     Section(String(localized: "我的积分", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) {
                         if let score = store.score {

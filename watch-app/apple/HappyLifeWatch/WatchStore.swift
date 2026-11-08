@@ -49,6 +49,7 @@ private final class WatchActivityTransport: NSObject, WCSessionDelegate {
         acknowledged[id.uuidString] = hash; UserDefaults.standard.set(acknowledged, forKey: "exercise.acknowledged")
         try? FileManager.default.removeItem(at: file)
     }
+    var reachable: Bool { session?.activationState == .activated && session?.isReachable == true }
     func activate() {
         session?.delegate = self
         session?.activate()
@@ -104,6 +105,7 @@ private final class WatchActivityTransport: NSObject, WCSessionDelegate {
 #else
 private final class WatchActivityTransport {
     func retryWorkouts() { }
+    var reachable: Bool { false }
     func queueWorkout(_ data: Data, id: UUID) throws { throw CocoaError(.featureUnsupported) }
     func activate() { }
     func request(_ message: [String: Any]) async throws -> [String: Any] {
@@ -143,6 +145,46 @@ final class WatchStore: ObservableObject {
     @Published private(set) var socialError: String?
     @Published private(set) var busy = false
     @Published private(set) var ready = false
+    @Published private(set) var menuSections: [String: Bool] = [:]
+    @Published private(set) var menuError: String?
+    private var menuOwner = ""
+    private var menuVersion = -1
+    func clearMenu() { menuSections = [:]; menuOwner = ""; menuVersion = -1 }
+    func refreshMenu() async {
+        do {
+            let value: [String: Any]
+            if activityTransport.reachable {
+                value = try await activityTransport.request(["action": "modulePreferences"])
+            } else {
+                guard accountLogin.signedIn else { throw ServiceClientError.signedOut }
+                let profile = try await accountAPI.send("/api/user/profile?channel=watch")
+                let owner = profile["unifiedUserId"].text
+                let data = try await accountAPI.send("/api/user/module-preferences")
+                let sections = data["sections"].object.mapValues { $0.boolean }
+                value = ["owner": owner, "sections": sections, "version": Int(data["version"].text) ?? -1]
+            }
+            guard !Task.isCancelled else { return }
+            guard let owner = value["owner"] as? String, !owner.isEmpty,
+                  let sections = value["sections"] as? [String: Bool], let version = value["version"] as? Int, version >= 0,
+                  ["dining", "growth", "activities", "exercise"].allSatisfy({ sections[$0] != nil }) else { throw ServiceClientError.invalidStream }
+            if owner != menuOwner { clearMenu(); menuOwner = owner }
+            guard version >= menuVersion else { return }
+            menuVersion = version
+            if menuSections != sections { menuSections = sections }
+            menuError = nil
+        } catch {
+            guard !Task.isCancelled else { return }
+            clearMenu(); menuError = watchDisplayError(error)
+        }
+    }
+    func diningNearby(latitude: Double, longitude: Double) async throws -> [[String: Any]] {
+        if activityTransport.reachable {
+            let result = try await activityTransport.request(["action": "diningNearby", "latitude": latitude, "longitude": longitude])
+            return result["restaurants"] as? [[String: Any]] ?? []
+        }
+        let result = try await accountAPI.send("/api/dining/nearby", method: "POST", body: .object(["latitude": .number(Decimal(latitude)), "longitude": .number(Decimal(longitude))]))
+        return try JSONSerialization.jsonObject(with: JSONEncoder().encode(result["restaurants"])) as? [[String: Any]] ?? []
+    }
     @Published var message: String?
     let accountLogin: AgentIdentityDeviceLogin
     private lazy var accountAPI = AgentIdentityHTTPClient(origin: accountOrigin, applicationID: "happylife.ai", token: { [weak self] in try await self?.accountLogin.accessToken() })

@@ -625,3 +625,34 @@ struct FaceSettingsView: View {
             .task { await store.loadSection("settings") }
     }
 }
+
+
+struct WatchDiningView: View {
+    @EnvironmentObject private var store: WatchStore
+    @StateObject private var locator = WatchSocialLocator()
+    @State private var restaurants: [[String: Any]] = []
+    @State private var busy = false
+    @State private var error: String?
+    var body: some View {
+        List {
+            Button(String(localized: "查找附近餐厅", bundle: AgentIdentityLanguage.appBundle())) { locator.locate() }.disabled(locator.fetching || busy)
+            if locator.fetching || busy { ProgressView() }
+            if let error = error ?? locator.error { Text(error).font(.footnote) }
+            ForEach(restaurants.indices, id: \.self) { index in
+                let restaurant = restaurants[index]
+                VStack(alignment: .leading) {
+                    Text(restaurant["name"] as? String ?? "")
+                    Text(restaurant["address"] as? String ?? "").font(.footnote).foregroundStyle(.secondary)
+                }
+            }
+        }.navigationTitle(String(localized: "干饭", bundle: AgentIdentityLanguage.appBundle()))
+        .onChange(of: locator.location) { _, location in
+            guard let location else { return }
+            Task {
+                busy = true; error = nil; defer { busy = false }
+                do { restaurants = try await store.diningNearby(latitude: location.coordinate.latitude, longitude: location.coordinate.longitude) }
+                catch { self.error = watchDisplayError(error) }
+            }
+        }
+    }
+}

@@ -1250,3 +1250,7 @@
 "扫码登录" = "Scan to sign in";
 "使用手机扫描二维码，在用户中心确认登录。也可使用 Linko Moment 手机端“扫码登录”。" = "Scan with your phone and confirm through User Center. You can also use Scan to sign in in Linko Moment on iPhone.";
 "扫描手表登录二维码，核对配对码后确认登录。" = "Scan the Watch sign-in QR code and verify the pairing code before confirming.";
+
+"请到“我的”中打开孩子绑定。" = "Open My to pair a child’s watch.";
+
+"查找附近餐厅" = "Find nearby restaurants";

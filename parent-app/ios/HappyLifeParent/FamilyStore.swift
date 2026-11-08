@@ -452,6 +452,15 @@ extension FamilyStore: WCSessionDelegate {
             watchMetricsUpdatedAt = Date()
             watchExerciseMetrics = (message["metrics"] as? [String: Double] ?? [:]).filter { ["heart", "energy", "distance"].contains($0.key) && $0.value.isFinite && $0.value >= 0 }
             return ["received": true]
+        case "modulePreferences":
+            let owner = identity.accountIdentifier
+            await refreshModulePreferences()
+            guard identity.accountIdentifier == owner, modulePreferenceOwner == owner else { throw APIError.message("请先在配对的 iPhone 上登录 Linko Moment。") }
+            return ["owner": owner ?? "", "sections": moduleSections, "version": modulePreferenceVersion]
+        case "diningNearby":
+            guard let latitude = message["latitude"] as? Double, let longitude = message["longitude"] as? Double,
+                  latitude.isFinite, longitude.isFinite, (-90...90).contains(latitude), (-180...180).contains(longitude) else { throw APIError.message("位置无效。") }
+            return try await call("/api/dining/nearby", method: "POST", body: ["latitude": latitude, "longitude": longitude]) as? [String: Any] ?? [:]
         case "exerciseContext":
             var result: [String: Any] = ["userID": profile?.text("unifiedUserId") ?? ""]
             if let activity = watchExerciseActivity {
