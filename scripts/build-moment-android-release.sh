@@ -9,7 +9,7 @@ export ANDROID_HOME=/opt/homebrew/share/android-commandlinetools
 export PATH="$JAVA_HOME/bin:$PATH" MSBUILDDISABLENODEREUSE=1 DOTNET_CLI_USE_MSBUILD_SERVER=0
 signing="$HOME/.local/share/android-signing/linko-dear"
 [[ -f "$signing/linko-dear-android-release.jks" && -f "$signing/key-password" ]]
-git -C "$root" diff --quiet HEAD -- parent-app/android scripts/build-moment-android-release.sh
+# Build only the pushed commit archived below; preserve unrelated working-tree edits.
 commit="$(git -C "$root" rev-parse HEAD)"
 git -C "$root" fetch -q origin main
 git -C "$root" merge-base --is-ancestor "$commit" origin/main
