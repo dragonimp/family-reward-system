@@ -13,8 +13,8 @@
     },
     "moment.nslocationwheninuseusagedescription": {
       "iosKey": "NSLocationWhenInUseUsageDescription",
-      "zh-Hans": "在活动打卡或搜索附近餐厅时获取位置；在您开启运动地图模式后记录轨迹，完成后随运动记录同步到当前账号。",
-      "en": "Use location for activity check-ins or nearby dining searches. When you enable workout map mode, record your route and sync completed workouts privately to your account."
+      "zh-Hans": "在活动拍照、打卡或搜索附近餐厅时获取位置；开启运动地图后记录并同步轨迹。仅当您主动开启活动位置共享时，向当前活动成员显示位置，离开活动或进入后台即停止。",
+      "en": "Use location for activity photos, check-ins, nearby dining, and workout routes. Only when you enable activity location sharing, show your position to current activity members. Sharing stops when you leave the activity or the app enters the background."
     }
   }
 }

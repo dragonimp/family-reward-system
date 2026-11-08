@@ -833,7 +833,7 @@ struct DearSocialView: View {
         }
         .onChange(of: scenePhase) { _, phase in
             if phase == .active && showingActivity { locations.activate(store: store, tenant: activityTenantId, activity: activityId) }
-            else { locations.stop() }
+            else if phase == .background { locations.stop() }
         }
         .onChange(of: store.identity.accountIdentifier) { _, _ in locations.stop() }
     }
