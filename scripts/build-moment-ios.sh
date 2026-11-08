@@ -30,7 +30,7 @@ for key,path,scope in [('connect',connect,['sdk/MyVnc.Realtime.Apple','native/rt
     commit=subprocess.check_output(['git','-C',str(path),'rev-parse','HEAD'],text=True).strip()
     remote=subprocess.check_output(['git','-C',str(path),'ls-remote','origin','refs/heads/main'],text=True).split()[0]
     assert commit==remote, key+' source is not pushed main'
-    subprocess.run(['git','-C',str(path),'diff','--quiet','HEAD','--',*scope],check=True)
+    # Archive the pushed commit below; concurrent working-tree edits are excluded.
     receipts[key]=commit
     # Freeze only the public SDK inputs; unrelated concurrent app work stays outside the archive.
     directory,package=packages[key]
