@@ -43,7 +43,7 @@ public sealed class MomentActivityPanel : ContentView
         else if (needsRefresh) { if (activity is { } selected) await OpenActivityAsync(selected); else await ReloadAsync(); }
         else if (activity == null) RenderRoot();
     }
-    public void Deactivate(bool stopLocation = true) { if (stopLocation) _ = locations.Stop(); if (loading != null) needsRefresh = true; revision++; loading?.Cancel(); loading?.Dispose(); loading = null; }
+    public void Deactivate(bool stopLocation = true) { if (stopLocation) { _ = locations.Stop(); if (sharingToggle != null) sharingToggle.IsToggled = false; } if (loading != null) needsRefresh = true; revision++; loading?.Cancel(); loading?.Dispose(); loading = null; }
     public void Reset() { Deactivate(); loaded = false; spaces = []; activities = []; joined = []; activity = null; space = Guid.Empty; thumbnails.Clear(); body.Content = null; }
     public bool Back()
     {
