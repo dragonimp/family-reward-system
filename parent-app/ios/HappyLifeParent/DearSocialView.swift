@@ -2835,7 +2835,7 @@ private struct MomentAnonymousMediaSharesView: View {
             _ = try await store.call(route + "/" + link.id, method: "DELETE")
             if UUID(uuidString: generatedID ?? "") == UUID(uuidString: link.id) { shareURL = nil; generatedID = nil }
             await load()
-        } catch { error = momentDisplayError(error) }
+        } catch { self.error = momentDisplayError(error) }
     }
 }
 
