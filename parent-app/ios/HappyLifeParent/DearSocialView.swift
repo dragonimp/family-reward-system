@@ -993,16 +993,16 @@ struct DearSocialView: View {
     }
 
     private func activityPhotoTile(_ title: String, icon: String, selected: Bool = false) -> some View {
-        VStack(spacing: 6) {
-            Image(systemName: icon).font(.title2).accessibilityHidden(true)
+        HStack(spacing: 4) {
+            Image(systemName: icon).font(.body).accessibilityHidden(true)
             Text(title).font(.caption).multilineTextAlignment(.center)
                 .fixedSize(horizontal: false, vertical: true)
         }
-        .frame(maxWidth: .infinity, minHeight: 66, maxHeight: .infinity)
-        .padding(.vertical, 8)
+        .frame(maxWidth: .infinity, minHeight: 36, maxHeight: .infinity)
+        .padding(.vertical, 4)
         .foregroundStyle(selected ? Color.white : Color.teal)
-        .background(selected ? Color.teal : Color.teal.opacity(0.10), in: RoundedRectangle(cornerRadius: 12))
-        .contentShape(RoundedRectangle(cornerRadius: 12))
+        .background(selected ? Color.teal : Color.teal.opacity(0.10), in: RoundedRectangle(cornerRadius: 8))
+        .contentShape(RoundedRectangle(cornerRadius: 8))
         .accessibilityElement(children: .combine)
     }
 
