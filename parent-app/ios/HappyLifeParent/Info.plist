@@ -82,5 +82,7 @@
 	<string>通过 Linko Connect 与活动成员的设备连接，传输您共享的照片和视频原文件。</string>
 	<key>NSHealthShareUsageDescription</key>
 	<string>读取您授权的心率、活动能量、步数、距离和手表体能训练，用于显示本次运动数据。</string>
+	<key>NSHealthUpdateUsageDescription</key>
+	<string>将您主动记录的手表运动保存到 Apple 健康，用于在手机和手表查看运动记录。</string>
 </dict>
 </plist>

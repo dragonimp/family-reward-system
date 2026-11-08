@@ -5,6 +5,16 @@
       "iosKey": "NSLocationWhenInUseUsageDescription",
       "zh-Hans": "在活动中打卡时记录手表当前位置、海拔和地址。",
       "en": "Linko Moment uses your location to record exercise routes and activity check-ins when you choose to use these features."
+    },
+    "moment.nshealthshareusagedescription": {
+      "iosKey": "NSHealthShareUsageDescription",
+      "zh-Hans": "读取您授权的心率、活动能量、步数、距离和手表体能训练，用于显示本次运动数据。",
+      "en": "Read the heart rate, active energy, steps, distance and Watch workouts you authorize to display your exercise data."
+    },
+    "moment.nshealthupdateusagedescription": {
+      "iosKey": "NSHealthUpdateUsageDescription",
+      "zh-Hans": "将您主动记录的手表运动保存到 Apple 健康，用于在手机和手表查看运动记录。",
+      "en": "Save workouts you record on Apple Watch to Apple Health so you can view them on your phone and watch."
     }
   }
 }

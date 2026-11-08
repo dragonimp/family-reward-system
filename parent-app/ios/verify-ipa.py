@@ -47,6 +47,7 @@ with tempfile.TemporaryDirectory(prefix="happylife-parent-ipa-") as directory:
     assert entitlements.get("get-task-allow") is False
     assert entitlements.get("aps-environment") == "production"
     assert entitlements.get("com.apple.developer.healthkit") is True
+    assert info.get("NSHealthShareUsageDescription") and info.get("NSHealthUpdateUsageDescription")
     assert group in entitlements.get("com.apple.security.application-groups", [])
     profile = plistlib.loads(subprocess.run(
         ["security", "cms", "-D", "-i", str(app / "embedded.mobileprovision")],

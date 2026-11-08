@@ -1,3 +1,5 @@
 "NSCameraUsageDescription" = "扫描孩子手表的二维码以填写配对码并确认绑定。";
+"NSHealthShareUsageDescription" = "读取您授权的心率、活动能量、步数、距离和手表体能训练，用于显示本次运动数据。";
+"NSHealthUpdateUsageDescription" = "将您主动记录的手表运动保存到 Apple 健康，用于在手机和手表查看运动记录。";
 "NSLocationWhenInUseUsageDescription" = "在活动拍照、打卡或搜索附近餐厅时获取位置；开启运动地图后记录并同步轨迹。仅当您主动开启活动位置共享时，向当前活动成员显示位置，离开活动或进入后台即停止。";
 "NSMotionUsageDescription" = "在您开始运动后读取本机步数，用于散步、慢跑等运动记录。";

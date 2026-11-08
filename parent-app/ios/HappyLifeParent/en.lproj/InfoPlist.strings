@@ -1,3 +1,5 @@
 "NSCameraUsageDescription" = "Linko Moment uses the camera to scan watch pairing QR codes.";
+"NSHealthShareUsageDescription" = "Read the heart rate, active energy, steps, distance and Watch workouts you authorize to display your exercise data.";
+"NSHealthUpdateUsageDescription" = "Save workouts you record on Apple Watch to Apple Health so you can view them on your phone and watch.";
 "NSLocationWhenInUseUsageDescription" = "Use location for activity photos, check-ins, nearby dining, and workout routes. Only when you enable activity location sharing, show your position to current activity members. Sharing stops when you leave the activity or the app enters the background.";
 "NSMotionUsageDescription" = "Linko Moment uses motion data to count steps during your exercise sessions.";

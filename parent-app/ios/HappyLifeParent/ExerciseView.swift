@@ -295,7 +295,7 @@ struct ExerciseView: View {
                     Section(String(localized: "关联活动", bundle: AgentIdentityLanguage.appBundle())) {
                         Text(linked.title)
                         if exercise.active == nil {
-                            Button(String(localized: "取消关联", bundle: AgentIdentityLanguage.appBundle())) { activity = nil }
+                            Button(String(localized: "取消关联", bundle: AgentIdentityLanguage.appBundle())) { activity = nil; family.watchExerciseActivity = nil }
                         }
                     }
                 }
@@ -341,7 +341,7 @@ struct ExerciseView: View {
                         }.pickerStyle(.menu)
                         Button {
                             exercise.start(kind: kind, map: mapMode, activity: activity)
-                            if exercise.active != nil { activity = nil }
+                            if exercise.active != nil { activity = nil; family.watchExerciseActivity = nil }
                         } label: {
                             Label(String(localized: "开始\(exerciseKindTitle(kind))", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), systemImage: "play.fill").frame(maxWidth: .infinity).padding(.vertical, 8)
                         }.buttonStyle(.borderedProminent)

@@ -1,1 +1,3 @@
+"NSHealthShareUsageDescription" = "Read the heart rate, active energy, steps, distance and Watch workouts you authorize to display your exercise data.";
+"NSHealthUpdateUsageDescription" = "Save workouts you record on Apple Watch to Apple Health so you can view them on your phone and watch.";
 "NSLocationWhenInUseUsageDescription" = "Linko Moment uses your location to record exercise routes and activity check-ins when you choose to use these features.";
