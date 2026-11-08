@@ -5420,6 +5420,31 @@
       "iosKey": "自动曝光/对焦锁定",
       "zh-Hans": "自动曝光/对焦锁定",
       "en": "AE/AF lock"
+    },
+    "moment.photo_actions.share_media": {
+      "iosKey": "分享照片 / 视频",
+      "zh-Hans": "分享照片 / 视频",
+      "en": "Share photos / videos"
+    },
+    "moment.photo_actions.record_video": {
+      "iosKey": "录制视频",
+      "zh-Hans": "录制视频",
+      "en": "Record video"
+    },
+    "moment.photo_actions.large": {
+      "iosKey": "大图",
+      "zh-Hans": "大图",
+      "en": "Large"
+    },
+    "moment.photo_actions.compact": {
+      "iosKey": "紧凑",
+      "zh-Hans": "紧凑",
+      "en": "Compact"
+    },
+    "moment.photo_actions.grid_five": {
+      "iosKey": "网格 · 每行5张",
+      "zh-Hans": "网格 · 每行5张",
+      "en": "Grid · 5 per row"
     }
   }
 }
