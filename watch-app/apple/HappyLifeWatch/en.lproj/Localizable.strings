@@ -1088,3 +1088,9 @@
 "分享" = "Share";
 
 "拍视频" = "Record video";
+
+"风景构图：参考三分线安排天空与地面，突出前景" = "Landscape: use the thirds grid to balance sky and ground and highlight the foreground.";
+
+"地平线已水平，可参考三分线安排天空与地面" = "Horizon is level. Use the thirds grid to balance sky and ground.";
+
+"画面有些倾斜，转动手机让地平线保持水平" = "The scene is tilted. Rotate your phone to level the horizon.";

@@ -7,7 +7,7 @@ import ImageIO
 import UniformTypeIdentifiers
 
 private enum DearCompositionAdvice: Equatable {
-    case looking, clipped, groupBalance, portraitHeight, subjectPlacement, ready
+    case looking, clipped, groupBalance, portraitHeight, subjectPlacement, landscapeGuide, landscapeLevel, horizonTilt, ready
 
     var text: String {
         switch self {
@@ -21,6 +21,12 @@ private enum DearCompositionAdvice: Equatable {
             return String(localized: "移动镜头，让脸部靠近上方三分线", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))
         case .subjectPlacement:
             return String(localized: "试着让主体靠近一个九宫格交点", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))
+        case .landscapeGuide:
+            return String(localized: "风景构图：参考三分线安排天空与地面，突出前景", bundle: AgentIdentityLanguage.appBundle())
+        case .landscapeLevel:
+            return String(localized: "地平线已水平，可参考三分线安排天空与地面", bundle: AgentIdentityLanguage.appBundle())
+        case .horizonTilt:
+            return String(localized: "画面有些倾斜，转动手机让地平线保持水平", bundle: AgentIdentityLanguage.appBundle())
         case .ready:
             return String(localized: "构图合适，可以拍摄", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))
         }
@@ -32,11 +38,24 @@ private struct DearCompositionFrame {
     let advice: DearCompositionAdvice
 
     // Coordinates are upright, normalized to the image, with the origin at the top left.
-    static func evaluate(people: [CGRect], faces: [CGRect], subject: CGRect?) -> Self {
+    static func evaluate(people: [CGRect], faces: [CGRect], subject: CGRect?, horizonAngle: CGFloat? = nil) -> Self {
         let standaloneFaces = faces.filter { face in
             !people.contains { $0.insetBy(dx: -0.02, dy: -0.03).contains(CGPoint(x: face.midX, y: face.midY)) }
         }
         let portraits = people + standaloneFaces
+        if portraits.isEmpty {
+            let boxes = subject.map { [$0] } ?? []
+            if let angle = horizonAngle, angle.isFinite, abs(angle) > .pi / 60 {
+                return Self(boxes: boxes, advice: .horizonTilt)
+            }
+            guard let subject else {
+                return Self(boxes: [], advice: horizonAngle == nil ? .landscapeGuide : .landscapeLevel)
+            }
+            // A scenery foreground may touch the frame edge; it is not a clipped portrait.
+            let nearX = min(abs(subject.midX - 1 / 3), abs(subject.midX - 2 / 3)) <= 0.13
+            let nearY = min(abs(subject.midY - 1 / 3), abs(subject.midY - 2 / 3)) <= 0.13
+            return Self(boxes: boxes, advice: nearX && nearY ? .ready : .subjectPlacement)
+        }
         let boxes = portraits.isEmpty ? subject.map { [$0] } ?? [] : portraits
         guard let first = boxes.first else { return Self(boxes: [], advice: .looking) }
         let bounds = boxes.dropFirst().reduce(first) { $0.union($1) }
@@ -80,6 +99,7 @@ private final class DearPhotoCapture: NSObject, AVCaptureVideoDataOutputSampleBu
     private let photoOutput = AVCapturePhotoOutput()
     private let humans = VNDetectHumanRectanglesRequest()
     private let faces = VNDetectFaceRectanglesRequest()
+    private let horizon = VNDetectHorizonRequest()
     private let saliency = VNGenerateAttentionBasedSaliencyImageRequest()
     private var input: AVCaptureDeviceInput?
     private var generation = 0
@@ -283,7 +303,12 @@ private final class DearPhotoCapture: NSObject, AVCaptureVideoDataOutputSampleBu
             let rect = Self.imageRect(object.boundingBox)
             if rect.width * rect.height < 0.65 { subject = rect }
         }
-        let frame = DearCompositionFrame.evaluate(people: people, faces: faceBoxes, subject: subject)
+        var horizonAngle: CGFloat?
+        if people.isEmpty, faceBoxes.isEmpty, (try? handler.perform([horizon])) != nil,
+           let observation = horizon.results?.first, observation.confidence >= 0.5 {
+            horizonAngle = observation.angle
+        }
+        let frame = DearCompositionFrame.evaluate(people: people, faces: faceBoxes, subject: subject, horizonAngle: horizonAngle)
         let generation = self.generation
         DispatchQueue.main.async { [weak self] in self?.onFrame?(generation, frame) }
     }
