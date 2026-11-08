@@ -182,7 +182,7 @@ public sealed class MomentActivityPanel : ContentView
     }
     private async Task ActivityMenuAsync(MomentScope scope, MomentRecord selected)
     {
-        var choice = await owner.DisplayActionSheetAsync("活动操作", "取消", null, "创建运动", "分享活动链接", "写日常", "在浏览器分享照片或打卡", "活动管理与邀请", "刷新");
+        var choice = await owner.DisplayActionSheetAsync("活动操作", "取消", null, "分享活动链接", "写日常", "在浏览器分享照片或打卡", "创建运动", "活动管理与邀请", "刷新");
         if (choice == "创建运动") createExercise(scope, selected.Text("title"));
         else if (choice == "分享活动链接") await Share.Default.RequestAsync(new ShareTextRequest { Title = selected.Text("title"), Uri = scope.ShareUrl.AbsoluteUri });
         else if (choice == "写日常")

@@ -1016,14 +1016,25 @@ struct DearSocialView: View {
         Section {
             HStack(spacing: 8) {
                 PhotosPicker(selection: $selectedPhotos, maxSelectionCount: 50, matching: .any(of: [.images, .videos]), preferredItemEncoding: .current) {
-                    activityPhotoTile(String(localized: "分享照片 / 视频", bundle: AgentIdentityLanguage.appBundle()), icon: "photo.badge.plus")
+                    activityPhotoTile(String(localized: "分享", bundle: AgentIdentityLanguage.appBundle()), icon: "photo.badge.plus")
                 }
                 Button { Task { await openCamera(.photo) } } label: {
                     activityPhotoTile(String(localized: "拍照", bundle: AgentIdentityLanguage.appBundle()), icon: "camera")
                 }
                 Button { Task { await openCamera(.video) } } label: {
-                    activityPhotoTile(String(localized: "录制视频", bundle: AgentIdentityLanguage.appBundle()), icon: "video")
+                    activityPhotoTile(String(localized: "拍视频", bundle: AgentIdentityLanguage.appBundle()), icon: "video")
                 }
+                Button { checkInNote = ""; checkInRequestID = UUID(); pendingCheckIn = true; checkInLocator.locate() } label: {
+                    activityPhotoTile(String(localized: "打卡", bundle: AgentIdentityLanguage.appBundle()), icon: "location.circle")
+                }.disabled(pendingCheckIn)
+                Button {
+                    if let tenant = UUID(uuidString: activityTenantId), let activity = UUID(uuidString: activityId) {
+                        store.pendingExerciseActivity = ExerciseActivity(tenantID: tenant, id: activity, title: selectedActivity?.text("title") ?? "")
+                        showingActivity = false
+                    }
+                } label: {
+                    activityPhotoTile(String(localized: "创建运动", bundle: AgentIdentityLanguage.appBundle()), icon: "figure.hiking")
+                }.disabled(UUID(uuidString: activityTenantId) == nil || UUID(uuidString: activityId) == nil)
             }
             .buttonStyle(.plain)
             .fixedSize(horizontal: false, vertical: true)
@@ -1260,12 +1271,6 @@ struct DearSocialView: View {
 
     private var activityActions: some View {
                 Menu {
-                    if let tenant = UUID(uuidString: activityTenantId), let activity = UUID(uuidString: activityId) {
-                        Button {
-                            store.pendingExerciseActivity = ExerciseActivity(tenantID: tenant, id: activity, title: selectedActivity?.text("title") ?? "")
-                            showingActivity = false
-                        } label: { Label(String(localized: "创建运动", bundle: AgentIdentityLanguage.appBundle()), systemImage: "figure.hiking") }
-                    }
                     if let url = activityShareURL() {
                         ShareLink(item: url) { Label("分享活动链接", systemImage: "square.and.arrow.up") }
                     }
@@ -1282,6 +1287,12 @@ struct DearSocialView: View {
                     Button { momentDraft = ""; momentRequestID = UUID(); error = ""; showingMomentCreate = true } label: { Label("写日常", systemImage: "square.and.pencil") }
                     Button { checkInNote = ""; checkInRequestID = UUID(); pendingCheckIn = true; checkInLocator.locate() } label: { Label("打卡", systemImage: "location.circle") }
                         .disabled(busy || pendingCheckIn)
+                    if let tenant = UUID(uuidString: activityTenantId), let activity = UUID(uuidString: activityId) {
+                        Button {
+                            store.pendingExerciseActivity = ExerciseActivity(tenantID: tenant, id: activity, title: selectedActivity?.text("title") ?? "")
+                            showingActivity = false
+                        } label: { Label(String(localized: "创建运动", bundle: AgentIdentityLanguage.appBundle()), systemImage: "figure.hiking") }
+                    }
                     let points = DearActivityMapPoint.points(checkIns: checkIns, photos: photos)
                     NavigationLink {
                         DearActivityMapView(store: store, title: selectedActivity?.text("title") ?? "活动地图", spaceID: activityTenantId, activityID: activityId, points: points, photos: photos)

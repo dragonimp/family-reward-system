@@ -5445,6 +5445,21 @@
       "iosKey": "网格 · 每行5张",
       "zh-Hans": "网格 · 每行5张",
       "en": "Grid · 5 per row"
+    },
+    "moment.t2190382e94e4": {
+      "zh-Hans": "栏目启用",
+      "en": "Enabled sections",
+      "iosKey": "栏目启用"
+    },
+    "moment.t7e564575eb7d": {
+      "zh-Hans": "分享",
+      "en": "Share",
+      "iosKey": "分享"
+    },
+    "moment.t20c7a6b9e488": {
+      "zh-Hans": "拍视频",
+      "en": "Record video",
+      "iosKey": "拍视频"
     }
   }
 }

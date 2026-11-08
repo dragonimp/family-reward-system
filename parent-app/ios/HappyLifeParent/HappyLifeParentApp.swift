@@ -101,6 +101,10 @@ struct FamilyRoot: View {
     @ObservedObject var identity: AgentIdentitySession
     @ObservedObject var notifications: MomentNotifications
     @State private var selectedTab = 0
+    @AppStorage("moment.sections.dining") private var diningEnabled = true
+    @AppStorage("moment.sections.growth") private var growthEnabled = false
+    @AppStorage("moment.sections.activities") private var activitiesEnabled = true
+    @AppStorage("moment.sections.exercise") private var exerciseEnabled = true
     var body: some View {
         Group {
             if !identity.isAuthenticated { login }
@@ -168,16 +172,31 @@ struct FamilyRoot: View {
     }
     private var main: some View {
         TabView(selection: $selectedTab) {
+            if diningEnabled {
             DiningModesView(userID: identity.accountIdentifier ?? "", family: store).id(identity.accountIdentifier ?? "").tabItem { Label(String(localized: "干饭", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), systemImage: "fork.knife") }.tag(0)
+            }
+            if growthEnabled {
             Group { if store.ready { FamilyHome(store: store) } else { growthUnavailable } }.tabItem { Label(String(localized: "带娃", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), systemImage: "person.3.fill") }
                 .badge(store.requests.filter { $0.text("status") == "pending" }.count).tag(1)
+            }
+            if activitiesEnabled {
             DearSocialView(store: store).tabItem { Label(String(localized: "活动", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), systemImage: "photo.on.rectangle.angled") }.tag(2)
+            }
+            if exerciseEnabled {
             Group { if store.ready { ExerciseView(userID: store.profile?.text("unifiedUserId") ?? "").id(store.profile?.text("unifiedUserId") ?? "") } else { growthUnavailable } }.tabItem { Label(String(localized: "运动", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), systemImage: "figure.walk") }.tag(3)
+            }
             AccountView(store: store).tabItem { Label(String(localized: "我的", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), systemImage: "person.crop.circle") }.badge(notifications.unreadCount).tag(4)
         }
-        .onChange(of: store.pendingExerciseActivity) { _, value in if value != nil { selectedTab = 3 } }
-        .onAppear { if store.pendingActivityLink != nil { selectedTab = 2 } }
-        .onChange(of: store.pendingActivityLink?.id) { _, id in if id != nil { selectedTab = 2 } }
+        .onChange(of: store.pendingExerciseActivity) { _, value in if value != nil { exerciseEnabled = true; selectedTab = 3 } }
+        .onAppear { if store.pendingActivityLink != nil { activitiesEnabled = true; selectedTab = 2 } }
+        .onChange(of: store.pendingActivityLink?.id) { _, id in if id != nil { activitiesEnabled = true; selectedTab = 2 } }
+        .onChange(of: [diningEnabled, growthEnabled, activitiesEnabled, exerciseEnabled]) { _, enabled in
+            if selectedTab < 4 && !enabled[selectedTab] { selectedTab = 4 }
+        }
+        .onAppear {
+            let enabled = [diningEnabled, growthEnabled, activitiesEnabled, exerciseEnabled]
+            if selectedTab < 4 && !enabled[selectedTab] { selectedTab = 4 }
+        }
     }
 }
 
@@ -579,6 +598,7 @@ struct AccountView: View {
                     }
                 }
                 Section(String(localized: "应用与设置", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) {
+                    NavigationLink { MomentSectionSettings() } label: { Label(String(localized: "栏目启用", bundle: AgentIdentityLanguage.appBundle()), systemImage: "square.grid.2x2") }
                     NavigationLink { FamilyChatView(store: store) } label: {
                         Label(String(localized: "AI 对话", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), systemImage: "bubble.left.and.bubble.right.fill")
                     }
@@ -1303,4 +1323,19 @@ func momentDisplayError(_ error: Error) -> String {
     guard !Task.isCancelled else { return }
     language.accountDidChange(identity.isAuthenticated ? identity.accountIdentifier : nil)
     await language.refresh()
+}
+
+private struct MomentSectionSettings: View {
+    @AppStorage("moment.sections.dining") private var dining = true
+    @AppStorage("moment.sections.growth") private var growth = false
+    @AppStorage("moment.sections.activities") private var activities = true
+    @AppStorage("moment.sections.exercise") private var exercise = true
+    var body: some View {
+        Form {
+            Toggle(String(localized: "干饭", bundle: AgentIdentityLanguage.appBundle()), isOn: $dining)
+            Toggle(String(localized: "带娃", bundle: AgentIdentityLanguage.appBundle()), isOn: $growth)
+            Toggle(String(localized: "活动", bundle: AgentIdentityLanguage.appBundle()), isOn: $activities)
+            Toggle(String(localized: "运动", bundle: AgentIdentityLanguage.appBundle()), isOn: $exercise)
+        }.navigationTitle(String(localized: "栏目启用", bundle: AgentIdentityLanguage.appBundle()))
+    }
 }

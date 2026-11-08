@@ -50,8 +50,25 @@ public sealed class FamilyPage : ContentPage
 
     private void WindowStopped(object? sender, EventArgs e) { exercise?.Suspend(); dining?.Suspend(); activities?.Deactivate(); }
 
+    private static bool SectionEnabled(string name) => name == "我的" || Preferences.Default.Get("moment.sections." + name, name != "带娃");
+
+    private void SectionSettings()
+    {
+        var rows = new VerticalStackLayout { Padding = 20, Spacing = 16 };
+        foreach (var name in new[] { "干饭", "带娃", "活动", "运动" })
+        {
+            var toggle = new Switch { IsToggled = SectionEnabled(name) };
+            toggle.Toggled += (_, e) => { Preferences.Default.Set("moment.sections." + name, e.Value); Render(); };
+            var row = new Grid { ColumnDefinitions = new ColumnDefinitionCollection { new(GridLength.Star), new(GridLength.Auto) } };
+            row.Add(new Label { Text = name, VerticalOptions = LayoutOptions.Center }, 0, 0);
+            row.Add(toggle, 1, 0); rows.Add(row);
+        }
+        _ = Navigation.PushAsync(new ContentPage { Title = "栏目启用", Content = rows, BackgroundColor = MomentStyle.Background });
+    }
+
     private void SelectTab(string name)
     {
+        if (name is "干饭" or "带娃" or "活动" or "运动") Preferences.Default.Set("moment.sections." + name, true);
         if (name != "干饭") dining?.Suspend();
         if (name != "运动") exercise?.Suspend();
         if (name != "活动") activities?.Deactivate();
@@ -62,8 +79,11 @@ public sealed class FamilyPage : ContentPage
     {
         bottom.Children.Clear();
         var selected = tab is "审批" or "记录" or "规则" or "管理" ? "带娃" : tab;
+        var names = new[] { "干饭", "带娃", "活动", "运动", "我的" }.Where(SectionEnabled).ToArray();
+        bottom.ColumnDefinitions.Clear();
+        foreach (var _ in names) bottom.ColumnDefinitions.Add(new ColumnDefinition(GridLength.Star));
         var column = 0;
-        foreach (var name in new[] { "干饭", "带娃", "活动", "运动", "我的" })
+        foreach (var name in names)
         {
             var active = selected == name;
             var view = new VerticalStackLayout { Spacing = 3, Padding = new Thickness(4, 3), MinimumHeightRequest = 52 };
@@ -344,7 +364,7 @@ public sealed class FamilyPage : ContentPage
             MomentStyle.Row("消息中心", action: () => _ = Navigation.PushAsync(new MomentInboxPage(store))),
             MomentStyle.Row("修改密码", action: () => _ = AgentIdentity.Maui.InAppWebLinks.OpenAsync(new Uri("https://auth.ai.xmkurt.com/personal/info?section=password"), BrowserLaunchMode.SystemPreferred)));
         if (store.AccountProfileError is { } profileError) content.Add(new Label { Text = profileError, FontSize = 12 });
-        Section("应用与设置", MomentStyle.Row("家庭与成员", action: () => SelectTab("管理")), MomentStyle.Row("刷新资料", action: () => _ = Run(store.LoadAsync)));
+        Section("应用与设置", MomentStyle.Row("栏目启用", action: SectionSettings), MomentStyle.Row("家庭与成员", action: () => SelectTab("管理")), MomentStyle.Row("刷新资料", action: () => _ = Run(store.LoadAsync)));
         Section("帮助与隐私",
             MomentStyle.Row("隐私政策", action: () => _ = Navigation.PushModalAsync(new PrivacyPolicyPage())),
             MomentStyle.Row("用户协议", action: () => _ = Navigation.PushAsync(new AtlasInformationPage(false, "termsUrl"))),
