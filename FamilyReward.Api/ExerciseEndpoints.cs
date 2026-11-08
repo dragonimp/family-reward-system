@@ -8,13 +8,17 @@ internal static class ExerciseEndpoints
 {
     internal sealed record Interval(DateTimeOffset Start, DateTimeOffset? End, int? Steps, double? DistanceMeters);
     internal sealed record Point(double Latitude, double Longitude, DateTimeOffset RecordedAt, Guid Segment);
+    internal sealed record Activity(Guid TenantID, Guid Id, string Title);
     internal sealed record Record(Guid Id, string Kind, DateTimeOffset StartedAt, DateTimeOffset? EndedAt,
-        Interval[] Intervals, bool? RouteEnabled, Point[]? Route);
+        Interval[] Intervals, bool? RouteEnabled, Point[]? Route,
+        [property: System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)] Activity? Activity = null);
     internal static bool Valid(Record r)
     {
         if (r.Id == Guid.Empty || string.IsNullOrWhiteSpace(r.Kind) || r.Kind.Length > 40 || r.EndedAt is not { } end ||
             end < r.StartedAt || end > DateTimeOffset.UtcNow.AddMinutes(5) || r.Intervals is not { Length: > 0 and <= 1000 } ||
             r.Intervals[0].Start != r.StartedAt || r.Route?.Length > 20_000) return false;
+        if (r.Activity is { } activity && (activity.TenantID == Guid.Empty || activity.Id == Guid.Empty ||
+            activity.Title is null || activity.Title.Length > 300)) return false;
         var previous = r.StartedAt;
         foreach (var interval in r.Intervals) {
             if (interval == null || interval.End is not { } stop || stop < interval.Start || interval.Start < previous || stop > end ||

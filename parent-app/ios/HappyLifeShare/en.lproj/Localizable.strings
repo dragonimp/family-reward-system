@@ -1063,3 +1063,9 @@
 "暂无排行" = "No rankings yet";
 "仅可删除没有其他成员、照片或日常记录的活动。" = "Only activities without other members, photos, or moments can be deleted.";
 "活动与照片" = "Activities and photos";
+
+"关联活动" = "Linked activity";
+"请先结束当前运动，再从活动创建运动。" = "Finish the current workout before creating one from an activity.";
+"创建运动" = "Create workout";
+"徒步" = "Hiking";
+"取消关联" = "Unlink activity";

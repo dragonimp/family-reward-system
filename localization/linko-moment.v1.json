@@ -5355,6 +5355,31 @@
       "zh-Hans": "Linko Moment 帮助家庭记录生活、分享照片与活动，并一起管理孩子的成长和日常事务。",
       "en": "Linko Moment helps families capture everyday life, share photos and activities, and manage children’s growth and daily routines together.",
       "iosKey": "Linko Moment 帮助家庭记录生活、分享照片与活动，并一起管理孩子的成长和日常事务。"
+    },
+    "moment.exercise.hiking": {
+      "zh-Hans": "徒步",
+      "en": "Hiking",
+      "iosKey": "徒步"
+    },
+    "moment.exercise.create": {
+      "zh-Hans": "创建运动",
+      "en": "Create workout",
+      "iosKey": "创建运动"
+    },
+    "moment.exercise.activity": {
+      "zh-Hans": "关联活动",
+      "en": "Linked activity",
+      "iosKey": "关联活动"
+    },
+    "moment.exercise.unlink": {
+      "zh-Hans": "取消关联",
+      "en": "Unlink activity",
+      "iosKey": "取消关联"
+    },
+    "moment.exercise.busy": {
+      "zh-Hans": "请先结束当前运动，再从活动创建运动。",
+      "en": "Finish the current workout before creating one from an activity.",
+      "iosKey": "请先结束当前运动，再从活动创建运动。"
     }
   }
 }

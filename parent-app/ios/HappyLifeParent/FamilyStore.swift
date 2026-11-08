@@ -82,6 +82,7 @@ private actor PhotoPreviewLoader {
         get { photoTransfers.progress }
         set { photoTransfers.updateProgress(newValue) }
     }
+    @Published var pendingExerciseActivity: ExerciseActivity?
     @Published var pendingActivityLink: MomentActivityLink?
     @Published var profile: Record?
     @Published var groups: [Record] = []
@@ -262,6 +263,7 @@ private actor PhotoPreviewLoader {
         groupID = id; revision = UUID(); await load()
     }
     func logout() {
+        pendingExerciseActivity = nil
         Task { await photoPreviews.clear() }
         DearShareInbox.clearCatalog()
         notifications.reset(token: identity.accessToken)

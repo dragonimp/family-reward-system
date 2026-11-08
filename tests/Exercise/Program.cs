@@ -20,14 +20,14 @@ try {
  using var other=new HttpClient{BaseAddress=new Uri(address)};other.DefaultRequestHeaders.Add("X-Test-User","other");
  using var anonymous=new HttpClient{BaseAddress=new Uri(address)};
  var start=DateTimeOffset.UtcNow.AddHours(-1);var id=Guid.NewGuid();
- var record=new ExerciseEndpoints.Record(id,"散步",start,start.AddMinutes(30),[new(start,start.AddMinutes(10),100,80),new(start.AddMinutes(20),start.AddMinutes(30),100,80)],true,[new(30,120,start.AddMinutes(1),Guid.NewGuid())]);
+ var record=new ExerciseEndpoints.Record(id,"徒步",start,start.AddMinutes(30),[new(start,start.AddMinutes(10),100,80),new(start.AddMinutes(20),start.AddMinutes(30),100,80)],true,[new(30,120,start.AddMinutes(1),Guid.NewGuid())],new(Guid.NewGuid(),Guid.NewGuid(),"周末徒步"));
  var path="/api/exercise/records/"+id;
  void Check(bool ok,string name){if(!ok)throw new Exception(name);}
  Check((await anonymous.GetAsync("/api/exercise/records")).StatusCode==HttpStatusCode.Unauthorized,"anonymous denied");
  Check((await owner.PutAsJsonAsync(path,record)).IsSuccessStatusCode,"create completed record");
  Check((await owner.PutAsJsonAsync(path.ToUpperInvariant().Replace("/API/EXERCISE/RECORDS/","/api/exercise/records/"),record)).IsSuccessStatusCode,"UUID variants and upload retry are idempotent");
  Check((await other.GetAsync(path)).StatusCode==HttpStatusCode.NotFound,"owner isolation");
- var restored=await owner.GetFromJsonAsync<ExerciseEndpoints.Record>(path);Check(restored?.Route?.Length==1 && restored.Intervals.Length==2,"cross-device full record read");
+ var restored=await owner.GetFromJsonAsync<ExerciseEndpoints.Record>(path);Check(restored?.Route?.Length==1 && restored.Intervals.Length==2 && restored.Activity==record.Activity,"cross-device full record read");
  Check((await owner.PutAsJsonAsync(path,record with {Kind="changed"})).StatusCode==HttpStatusCode.Conflict,"immutable record conflict preserves data");
  Check((await owner.PutAsJsonAsync(path,record with {EndedAt=null})).StatusCode==HttpStatusCode.BadRequest,"active incomplete record rejected");
  Check((await owner.PutAsJsonAsync(path,record with {Route=[new(30,120,start.AddMinutes(15),Guid.NewGuid())]})).StatusCode==HttpStatusCode.BadRequest,"paused location rejected");

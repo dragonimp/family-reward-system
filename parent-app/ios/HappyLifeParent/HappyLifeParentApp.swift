@@ -175,6 +175,7 @@ struct FamilyRoot: View {
             Group { if store.ready { ExerciseView(userID: store.profile?.text("unifiedUserId") ?? "").id(store.profile?.text("unifiedUserId") ?? "") } else { growthUnavailable } }.tabItem { Label(String(localized: "运动", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), systemImage: "figure.walk") }.tag(3)
             AccountView(store: store).tabItem { Label(String(localized: "我的", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), systemImage: "person.crop.circle") }.badge(notifications.unreadCount).tag(4)
         }
+        .onChange(of: store.pendingExerciseActivity) { _, value in if value != nil { selectedTab = 3 } }
         .onAppear { if store.pendingActivityLink != nil { selectedTab = 2 } }
         .onChange(of: store.pendingActivityLink?.id) { _, id in if id != nil { selectedTab = 2 } }
     }

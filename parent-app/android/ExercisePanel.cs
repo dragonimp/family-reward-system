@@ -9,8 +9,11 @@ namespace LinkoFamily;
 // Foreground exercise: Android pauses tracking when the window stops.
 public sealed class ExercisePanel : ContentView
 {
+    public sealed record ActivityLink(Guid TenantID, Guid Id, string Title);
+    private ActivityLink? pendingActivity;
     public sealed class Workout
     {
+        public ActivityLink? Activity { get; set; }
         public string Kind { get; set; } = "散步";
         public DateTimeOffset StartedAt { get; set; }
         public DateTimeOffset? RunningSince { get; set; }
@@ -72,6 +75,11 @@ public sealed class ExercisePanel : ContentView
         Render();
     }
     public void Suspend() { lifecycle++; Pause(); timer.Stop(); }
+    public void LinkActivity(MomentScope scope, string title) {
+        if (archive.Active != null) { notice.Text = "请先结束当前运动，再从活动创建运动。"; return; }
+        pendingActivity = new(scope.Tenant, scope.Activity, title);
+        Render();
+    }
     public void Show() { timer.Start(); Update(); }
     private bool Save()
     {
@@ -99,7 +107,8 @@ public sealed class ExercisePanel : ContentView
             if (attempt != lifecycle) return;
             var sensor = sensors?.GetDefaultSensor(SensorType.StepDetector);
             var now = DateTimeOffset.UtcNow;
-            archive.Active ??= new Workout { Kind = kind, StartedAt = now, HasSteps = true, StepLengthMeters = stepLengthCm / 100 };
+            archive.Active ??= new Workout { Kind = kind, Activity = pendingActivity, StartedAt = now, HasSteps = true, StepLengthMeters = stepLengthCm / 100 };
+            pendingActivity = null;
             archive.Active.RunningSince = now;
             var canCount = granted && sensor != null;
             archive.Active.HasSteps &= canCount;
@@ -152,6 +161,7 @@ public sealed class ExercisePanel : ContentView
     {
         body.Children.Clear();
         body.Add(MomentStyle.Title("运动", 32));
+        if ((archive.Active?.Activity ?? pendingActivity) is { } linked) body.Add(new Label { Text = $"关联活动 · {linked.Title}" });
         body.Add(MomentStyle.Caption("带上手机，记录一场散步或轻运动。"));
         clock.TextColor = MomentStyle.Accent; distance.TextColor = MomentStyle.Ink;
         metrics ??= MomentStyle.Card(new VerticalStackLayout { Spacing = 14, Padding = new Thickness(4, 18), Children = { clock, distance, steps, notice } });
@@ -169,7 +179,7 @@ public sealed class ExercisePanel : ContentView
             var strideLabel = new Label { Text = $"{stepLengthCm:F0} 厘米/步" };
             stride.ValueChanged += (_, e) => { stepLengthCm = e.NewValue; strideLabel.Text = $"{stepLengthCm:F0} 厘米/步"; };
             body.Add(stride); body.Add(strideLabel);
-            foreach (var kind in new[] { "散步", "慢跑", "自由运动" }) body.Add(Action($"开始{kind}", () => _ = Start(kind)));
+            foreach (var kind in pendingActivity != null ? new[] { "徒步", "散步", "慢跑", "自由运动" } : new[] { "散步", "慢跑", "徒步", "自由运动" }) body.Add(Action($"开始{kind}", () => _ = Start(kind)));
         }
         body.Add(new Label { Text = "请保持应用在前台。锁屏或切到后台时自动暂停，回到应用后可继续；暂停期间不计时、不计步、不累计距离。公里数按步数乘本次步长估算，默认 70 厘米/步，可在开始前调整；非 GPS 测距。计步可能稍有延迟。", FontSize = 13 });
         body.Add(Action("重试保存记录", () => Save()));
@@ -179,6 +189,7 @@ public sealed class ExercisePanel : ContentView
         foreach (var item in archive.History)
         {
             var row = new VerticalStackLayout { Spacing = 6 };
+            if (item.Activity is { } linkedActivity) row.Add(new Label { Text = linkedActivity.Title });
             row.Add(new Label { Text = $"{item.Kind} · {item.DistanceText} · {item.StartedAt.ToLocalTime():yyyy-MM-dd HH:mm}\n{TimeSpan.FromSeconds(item.Seconds):hh\\:mm\\:ss} · {(item.HasSteps ? $"{item.Steps} 步" : "步数未完整获取")}" });
             var delete = new Button { Text = "删除记录", TextColor = Colors.Red, BackgroundColor = Colors.Transparent };
             delete.Clicked += (_, _) => _ = DeleteRecord(item);

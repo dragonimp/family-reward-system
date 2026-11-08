@@ -114,7 +114,7 @@ public sealed class FamilyPage : ContentPage
                 if (dining == null || diningUser != diningId) { dining?.Suspend(); dining = new DiningPanel(store, this, diningId); diningUser = diningId; }
                 viewport.Content = dining; break;
             case "活动":
-                activities ??= new MomentActivityPanel(store, this, Render);
+                activities ??= new MomentActivityPanel(store, this, Render, (scope, title) => { SelectTab("运动"); exercise?.LinkActivity(scope, title); });
                 viewport.Content = activities;
                 _ = activities.ShowAsync(); break;
             case "管理": FamilyManagementContent(); break;

@@ -1235,6 +1235,12 @@ struct DearSocialView: View {
 
     private var activityActions: some View {
                 Menu {
+                    if let tenant = UUID(uuidString: activityTenantId), let activity = UUID(uuidString: activityId) {
+                        Button {
+                            store.pendingExerciseActivity = ExerciseActivity(tenantID: tenant, id: activity, title: selectedActivity?.text("title") ?? "")
+                            showingActivity = false
+                        } label: { Label(String(localized: "创建运动", bundle: AgentIdentityLanguage.appBundle()), systemImage: "figure.hiking") }
+                    }
                     if let url = activityShareURL() {
                         ShareLink(item: url) { Label("分享活动链接", systemImage: "square.and.arrow.up") }
                     }

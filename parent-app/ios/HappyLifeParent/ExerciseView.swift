@@ -65,10 +65,10 @@ import CoreLocation
         }
     }
 
-    func start(kind: String, map: Bool) {
+    func start(kind: String, map: Bool, activity: ExerciseActivity? = nil) {
         guard readable, active == nil, !busy else { return }
         let now = Date()
-        archive.active = ExerciseSession(kind: kind, startedAt: now, intervals: [ExerciseInterval(start: now)], routeEnabled: map)
+        archive.active = ExerciseSession(kind: kind, startedAt: now, intervals: [ExerciseInterval(start: now)], activity: activity, routeEnabled: map)
         save(); observe(); updateLocationTracking()
     }
     func resume() {
@@ -264,6 +264,7 @@ struct ExerciseView: View {
     @State private var mapMode = false
     @State private var selectedRoute: ExerciseSession?
     @State private var kind = "散步"
+    @State private var activity: ExerciseActivity?
     @State private var confirmFinish = false
     @State private var pendingDeletion: ExerciseSession?
     init(userID: String) { _exercise = StateObject(wrappedValue: ExerciseStore(userID: userID)) }
@@ -271,6 +272,14 @@ struct ExerciseView: View {
     var body: some View {
         NavigationStack {
             List {
+                if let linked = exercise.active?.activity ?? activity {
+                    Section(String(localized: "关联活动", bundle: AgentIdentityLanguage.appBundle())) {
+                        Text(linked.title)
+                        if exercise.active == nil {
+                            Button(String(localized: "取消关联", bundle: AgentIdentityLanguage.appBundle())) { activity = nil }
+                        }
+                    }
+                }
                 Section {
                     Picker(String(localized: "显示模式", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), selection: $mapMode) {
                         Label(String(localized: "数据", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), systemImage: "figure.walk").tag(false)
@@ -309,8 +318,12 @@ struct ExerciseView: View {
                     } else {
                         Picker(String(localized: "运动项目", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), selection: $kind) {
                             Text(String(localized: "散步", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))).tag("散步"); Text(String(localized: "慢跑", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))).tag("慢跑"); Text(String(localized: "自由运动", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))).tag("自由运动")
-                        }.pickerStyle(.segmented)
-                        Button { exercise.start(kind: kind, map: mapMode) } label: {
+                            Text(String(localized: "徒步", bundle: AgentIdentityLanguage.appBundle())).tag("徒步")
+                        }.pickerStyle(.menu)
+                        Button {
+                            exercise.start(kind: kind, map: mapMode, activity: activity)
+                            if exercise.active != nil { activity = nil }
+                        } label: {
                             Label(String(localized: "开始\(exerciseKindTitle(kind))", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), systemImage: "play.fill").frame(maxWidth: .infinity).padding(.vertical, 8)
                         }.buttonStyle(.borderedProminent)
                     }
@@ -339,6 +352,7 @@ struct ExerciseView: View {
                                     Label(String(localized: "删除", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), systemImage: "trash")
                                 }.buttonStyle(.borderless).disabled(exercise.busy)
                             }
+                            if let linked = item.activity { Text(linked.title).font(.subheadline).foregroundStyle(.secondary) }
                             Text(exerciseDistanceTitle(item)).font(.headline).monospacedDigit()
                             if !item.routePoints.isEmpty {
                                 Button { selectedRoute = item } label: { Label(String(localized: "查看轨迹", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), systemImage: "map") }.buttonStyle(.borderless)
@@ -390,9 +404,11 @@ struct ExerciseView: View {
                 .task {
                     exercise.connect(family)
                     mapMode = exercise.active?.routeEnabled == true
+                    receiveActivity()
                     await exercise.refresh(); await exercise.sync()
                 }
-                .onChange(of: family.profile?.text("unifiedUserId")) { _, _ in exercise.accountDidChange() }
+                .onChange(of: family.pendingExerciseActivity) { _, _ in receiveActivity() }
+                .onChange(of: family.profile?.text("unifiedUserId")) { _, _ in activity = nil; exercise.accountDidChange() }
                 .onChange(of: mapMode) { _, value in if value { exercise.enableRoute() } }
                 .onChange(of: phase) { _, value in
                     if value == .active { Task { await exercise.refresh(); await exercise.sync() } }
@@ -401,12 +417,25 @@ struct ExerciseView: View {
                 .onDisappear { exercise.stopObserving() }
         }
     }
+    private func receiveActivity() {
+        guard let pending = family.pendingExerciseActivity else { return }
+        family.pendingExerciseActivity = nil
+        guard exercise.active == nil else {
+            exercise.message = String(localized: "请先结束当前运动，再从活动创建运动。", bundle: AgentIdentityLanguage.appBundle())
+            return
+        }
+        activity = pending
+        kind = "徒步"
+        mapMode = true
+    }
+
 }
 
 private func exerciseKindTitle(_ value: String) -> String {
     let locale = Locale(identifier: AgentIdentityLanguage.current)
     switch value {
     case "散步": return String(localized: "散步", bundle: AgentIdentityLanguage.appBundle(), locale: locale)
+    case "徒步": return String(localized: "徒步", bundle: AgentIdentityLanguage.appBundle())
     case "慢跑": return String(localized: "慢跑", bundle: AgentIdentityLanguage.appBundle(), locale: locale)
     case "自由运动": return String(localized: "自由运动", bundle: AgentIdentityLanguage.appBundle(), locale: locale)
     default: return value

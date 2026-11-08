@@ -7,6 +7,7 @@ public sealed class MomentActivityPanel : ContentView
 {
     private const string Api = "/api/dear/social/";
     private readonly FamilyStore store;
+    private readonly Action<MomentScope, string> createExercise;
     private readonly Page owner;
     private readonly Action authenticationChanged;
     private readonly Grid layout = new() { RowDefinitions = new RowDefinitionCollection { new(GridLength.Auto), new(GridLength.Auto), new(GridLength.Star) }, Padding = new Thickness(16, 12, 16, 0), RowSpacing = 10 };
@@ -23,8 +24,9 @@ public sealed class MomentActivityPanel : ContentView
     private string mode = "动态";
     private List<MomentFeedItem> feed = [];
 
-    public MomentActivityPanel(FamilyStore store, Page owner, Action authenticationChanged)
+    public MomentActivityPanel(FamilyStore store, Page owner, Action authenticationChanged, Action<MomentScope, string> createExercise)
     {
+        this.createExercise = createExercise;
         this.store = store; this.owner = owner; this.authenticationChanged = authenticationChanged;
         thumbnails = new MomentThumbnails(store);
         layout.Add(header, 0, 0); layout.Add(controls, 0, 1); layout.Add(body, 0, 2);
@@ -180,8 +182,9 @@ public sealed class MomentActivityPanel : ContentView
     }
     private async Task ActivityMenuAsync(MomentScope scope, MomentRecord selected)
     {
-        var choice = await owner.DisplayActionSheetAsync("活动操作", "取消", null, "分享活动链接", "写日常", "在浏览器分享照片或打卡", "活动管理与邀请", "刷新");
-        if (choice == "分享活动链接") await Share.Default.RequestAsync(new ShareTextRequest { Title = selected.Text("title"), Uri = scope.ShareUrl.AbsoluteUri });
+        var choice = await owner.DisplayActionSheetAsync("活动操作", "取消", null, "创建运动", "分享活动链接", "写日常", "在浏览器分享照片或打卡", "活动管理与邀请", "刷新");
+        if (choice == "创建运动") createExercise(scope, selected.Text("title"));
+        else if (choice == "分享活动链接") await Share.Default.RequestAsync(new ShareTextRequest { Title = selected.Text("title"), Uri = scope.ShareUrl.AbsoluteUri });
         else if (choice == "写日常")
         {
             var text = await owner.DisplayPromptAsync("写日常", "记录活动生活", "发表", "取消", maxLength: 2000);

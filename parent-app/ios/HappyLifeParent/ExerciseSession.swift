@@ -1,5 +1,11 @@
 import Foundation
 
+struct ExerciseActivity: Codable, Equatable, Identifiable {
+    var tenantID: UUID
+    var id: UUID
+    var title: String
+}
+
 struct ExerciseArchive: Codable {
     var active: ExerciseSession?
     var history: [ExerciseSession] = []
@@ -36,6 +42,7 @@ struct ExerciseSession: Codable, Identifiable {
     var startedAt: Date
     var endedAt: Date?
     var intervals: [ExerciseInterval]
+    var activity: ExerciseActivity?
     var routeEnabled: Bool?
     var route: [ExerciseRoutePoint]?
     var routePoints: [ExerciseRoutePoint] { (route ?? []).filter(\.valid) }
