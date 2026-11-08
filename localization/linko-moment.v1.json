@@ -5510,6 +5510,146 @@
       "zh-Hans": "共享我的位置",
       "en": "Share my location",
       "iosKey": "共享我的位置"
+    },
+    "moment.t8f7257f78d81": {
+      "zh-Hans": "匿名分享照片与视频",
+      "en": "Share photos and videos anonymously",
+      "iosKey": "匿名分享照片与视频"
+    },
+    "moment.tdb7a47aebf81": {
+      "zh-Hans": "全屏查看照片",
+      "en": "View photo full screen",
+      "iosKey": "全屏查看照片"
+    },
+    "moment.ta8e5f1716600": {
+      "zh-Hans": "过期时间",
+      "en": "Expires",
+      "iosKey": "过期时间"
+    },
+    "moment.t1137375b07a5": {
+      "zh-Hans": "生成匿名分享链接",
+      "en": "Create anonymous share link",
+      "iosKey": "生成匿名分享链接"
+    },
+    "moment.t702fd7a88c30": {
+      "zh-Hans": "分享照片与视频链接",
+      "en": "Share album link",
+      "iosKey": "分享照片与视频链接"
+    },
+    "moment.t10d86506ffec": {
+      "zh-Hans": "持有链接的人可在有效期内匿名浏览照片与视频。成员位置不包含在分享中。",
+      "en": "Anyone with the link can browse photos and videos until it expires. Live member locations are excluded.",
+      "iosKey": "持有链接的人可在有效期内匿名浏览照片与视频。成员位置不包含在分享中。"
+    },
+    "moment.tca989e11a65e": {
+      "zh-Hans": "已生成的链接",
+      "en": "Created links",
+      "iosKey": "已生成的链接"
+    },
+    "moment.ta158f4668413": {
+      "zh-Hans": "撤销链接",
+      "en": "Revoke link",
+      "iosKey": "撤销链接"
+    },
+    "moment.t2fe5a8d0eee9": {
+      "zh-Hans": "已失效",
+      "en": "Inactive",
+      "iosKey": "已失效"
+    },
+    "moment.t9d2e874cc498": {
+      "zh-Hans": "匿名分享链接",
+      "en": "Anonymous share links",
+      "iosKey": "匿名分享链接"
+    },
+    "moment.t3a8160bb0252": {
+      "zh-Hans": "撤销此分享链接？",
+      "en": "Revoke this share link?",
+      "iosKey": "撤销此分享链接？"
+    },
+    "moment.ta78d70ea6819": {
+      "zh-Hans": "关闭全屏",
+      "en": "Close full screen",
+      "iosKey": "关闭全屏"
+    },
+    "moment.t59f7a92f5d39": {
+      "zh-Hans": "气温 %.1f °C",
+      "en": "Air temperature %.1f °C",
+      "iosKey": "气温 %.1f °C"
+    },
+    "moment.tf468d01cbc61": {
+      "zh-Hans": "气温来源与时间",
+      "en": "Temperature source and time",
+      "iosKey": "气温来源与时间"
+    },
+    "moment.t232a53cfff80": {
+      "zh-Hans": "气象站",
+      "en": "Weather station",
+      "iosKey": "气象站"
+    },
+    "moment.t44843ff48e46": {
+      "zh-Hans": "站点距离（公里）",
+      "en": "Station distance (km)",
+      "iosKey": "站点距离（公里）"
+    },
+    "moment.t79ac5f9060ab": {
+      "zh-Hans": "站点海拔（米）",
+      "en": "Station elevation (m)",
+      "iosKey": "站点海拔（米）"
+    },
+    "moment.t45ae64ffccda": {
+      "zh-Hans": "气温数据时间",
+      "en": "Weather data time",
+      "iosKey": "气温数据时间"
+    },
+    "moment.tcd18357cb4fb": {
+      "zh-Hans": "查询时间",
+      "en": "Queried at",
+      "iosKey": "查询时间"
+    },
+    "moment.teb2b07478d93": {
+      "zh-Hans": "附近气象站资料，可能包含模型补全；不是手机测温。",
+      "en": "Nearby station data may include model-filled values. This is not a phone temperature measurement.",
+      "iosKey": "附近气象站资料，可能包含模型补全；不是手机测温。"
+    },
+    "moment.t8fa3a8ada219": {
+      "zh-Hans": "Meteostat 及其数据提供方 · CC BY 4.0",
+      "en": "Meteostat and its data providers · CC BY 4.0",
+      "iosKey": "Meteostat 及其数据提供方 · CC BY 4.0"
+    },
+    "moment.tccab3d16dd24": {
+      "zh-Hans": "该地点或时段暂无气温资料",
+      "en": "No temperature data for this place and time",
+      "iosKey": "该地点或时段暂无气温资料"
+    },
+    "moment.t3fa432694d1c": {
+      "zh-Hans": "气温待查询或更新",
+      "en": "Temperature lookup or update pending",
+      "iosKey": "气温待查询或更新"
+    },
+    "moment.t7ff0857251ef": {
+      "zh-Hans": "刷新气温",
+      "en": "Refresh temperature",
+      "iosKey": "刷新气温"
+    },
+    "moment.t2fe0e3339ac4": {
+      "zh-Hans": "已过期",
+      "en": "Expired",
+      "iosKey": "已过期"
+    },
+    "moment.tfef96e34f77b": {
+      "zh-Hans": "已撤销",
+      "en": "Revoked",
+      "iosKey": "已撤销"
+    },
+    "moment.t9bb71b5c736f": {
+      "zh-Hans": "未记录拍摄地点，无法查询气温",
+      "en": "No capture location is available for a temperature lookup",
+      "iosKey": "未记录拍摄地点，无法查询气温"
+    },
+    "moment.t7309b653d135": {
+      "zh-Hans": "未取得可靠拍摄时间，暂不填气温",
+      "en": "No reliable capture time is available; temperature is left blank",
+      "iosKey": "未取得可靠拍摄时间，暂不填气温"
     }
   }
 }

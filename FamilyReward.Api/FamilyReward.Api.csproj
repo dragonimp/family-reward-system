@@ -43,7 +43,7 @@
     </Content>
   </ItemGroup>
 
-  <ItemGroup><EmbeddedResource Include="../frontend/public/moment-app-icon.png" LogicalName="MomentShareIcon" /><EmbeddedResource Include="../frontend/public/moment-share-default.svg" LogicalName="MomentShareDefaultCover" /></ItemGroup>
+  <ItemGroup><EmbeddedResource Include="AnonymousMediaSharePage.html" LogicalName="MomentAnonymousMediaPage" /><EmbeddedResource Include="../frontend/public/moment-app-icon.png" LogicalName="MomentShareIcon" /><EmbeddedResource Include="../frontend/public/moment-share-default.svg" LogicalName="MomentShareDefaultCover" /></ItemGroup>
   <ItemGroup>
     <Content Include="recipe-illustrations/**/*.jpg" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
   </ItemGroup>

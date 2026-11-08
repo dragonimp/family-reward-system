@@ -251,7 +251,7 @@ import UniformTypeIdentifiers
         return "\(["mov", "mp4"].contains(suffix.lowercased()) ? "视频" : "照片")-\(formatter.string(from: Date()))-\(UUID().uuidString.prefix(6))" + (suffix.isEmpty ? "" : "." + suffix)
     }
 
-    func publish(_ imageData: Data, spaceID: String, activityID: String, name: String, locationName: String = "", assetIdentifier: String? = nil) async throws {
+    func publish(_ imageData: Data, spaceID: String, activityID: String, name: String, locationName: String = "", assetIdentifier: String? = nil, capturedAt: Date? = nil) async throws {
         guard imageData.count > 0, imageData.count <= 50 * 1024 * 1024,
               UIImage(data: imageData) != nil else { throw APIError.message(String(localized: "照片文件无效或超过 50 MB。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) }
         guard let source = CGImageSourceCreateWithData(imageData as CFData, nil),
@@ -267,15 +267,40 @@ import UniformTypeIdentifiers
         try await Task.detached(priority: .utility) { try imageData.write(to: temporary, options: .atomic) }.value
         defer { try? FileManager.default.removeItem(at: temporary) }
         let fileName = name.contains(".") ? name : name + "." + format.ext
-        try await publishMedia(at: temporary, contentType: format.mime, spaceID: spaceID, activityID: activityID, name: fileName, locationName: locationName, assetIdentifier: assetIdentifier)
+        try await publishMedia(at: temporary, contentType: format.mime, spaceID: spaceID, activityID: activityID, name: fileName, locationName: locationName, assetIdentifier: assetIdentifier, capturedAt: capturedAt)
     }
 
-    func publishVideo(at url: URL, spaceID: String, activityID: String, locationName: String = "", name: String? = nil, assetIdentifier: String? = nil) async throws {
+    func publishVideo(at url: URL, spaceID: String, activityID: String, locationName: String = "", name: String? = nil, assetIdentifier: String? = nil, capturedAt: Date? = nil) async throws {
         let length = try url.resourceValues(forKeys: [.fileSizeKey]).fileSize ?? 0
         guard (1...500 * 1024 * 1024).contains(length) else { throw APIError.message(String(localized: "视频必须在 500 MB 以内。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) }
         let type = url.pathExtension.lowercased() == "mp4" ? "video/mp4" : "video/quicktime"
         let fileName = name ?? Self.originalFileName(assetIdentifier: assetIdentifier, fallback: "视频." + (type == "video/mp4" ? "mp4" : "mov"))
-        try await publishMedia(at: url, contentType: type, spaceID: spaceID, activityID: activityID, name: fileName, locationName: locationName, assetIdentifier: assetIdentifier)
+        try await publishMedia(at: url, contentType: type, spaceID: spaceID, activityID: activityID, name: fileName, locationName: locationName, assetIdentifier: assetIdentifier, capturedAt: capturedAt)
+    }
+
+    static func captureDate(at url: URL, assetIdentifier: String? = nil) async -> Date? {
+        if let assetIdentifier, let date = PHAsset.fetchAssets(withLocalIdentifiers: [assetIdentifier], options: nil).firstObject?.creationDate { return date }
+        if let source = CGImageSourceCreateWithURL(url as CFURL, nil), let properties = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [String: Any] {
+            if let gps = properties[kCGImagePropertyGPSDictionary as String] as? [String: Any],
+               let day = gps[kCGImagePropertyGPSDateStamp as String] as? String, let time = gps[kCGImagePropertyGPSTimeStamp as String] as? String {
+                let formatter = DateFormatter(); formatter.locale = Locale(identifier: "en_US_POSIX"); formatter.timeZone = TimeZone(secondsFromGMT: 0)
+                for format in ["yyyy:MM:dd HH:mm:ss.SSS", "yyyy:MM:dd HH:mm:ss"] {
+                    formatter.dateFormat = format; if let date = formatter.date(from: day + " " + time) { return date }
+                }
+            }
+            if let exif = properties[kCGImagePropertyExifDictionary as String] as? [String: Any],
+               let raw = exif[kCGImagePropertyExifDateTimeOriginal as String] as? String, let offset = exif["OffsetTimeOriginal"] as? String, raw.count >= 19 {
+                let datePart = String(raw.prefix(10)).replacingOccurrences(of: ":", with: "-")
+                return ISO8601DateFormatter().date(from: datePart + "T" + String(raw.dropFirst(11)) + offset)
+            }
+        }
+        let asset = AVURLAsset(url: url)
+        if let metadata = try? await asset.load(.commonMetadata) {
+            for item in metadata where item.commonKey == .commonKeyCreationDate {
+                if let date = try? await item.load(.dateValue) { return date }
+            }
+        }
+        return nil
     }
 
     func draftStore() throws -> MomentDraftStore {
@@ -302,10 +327,12 @@ import UniformTypeIdentifiers
         draftRevision = UUID(); start(); retryDrafts()
     }
 
-    private func publishMedia(at sourceURL: URL, contentType: String, spaceID: String, activityID: String, name: String, locationName: String, assetIdentifier: String? = nil) async throws {
+    private func publishMedia(at sourceURL: URL, contentType: String, spaceID: String, activityID: String, name: String, locationName: String, assetIdentifier: String? = nil, capturedAt: Date? = nil) async throws {
         guard let tenant = UUID(uuidString: spaceID), let activity = UUID(uuidString: activityID) else { throw CocoaError(.fileWriteInvalidFileName) }
         var draft = MomentLocalDraft(tenant: tenant, activity: activity, kind: "media", createdAt: Date())
         draft.displayName = name; draft.contentType = contentType; draft.locationName = locationName; draft.assetIdentifier = assetIdentifier
+        if let capturedAt { draft.capturedAt = capturedAt }
+        else { draft.capturedAt = await Self.captureDate(at: sourceURL, assetIdentifier: assetIdentifier) }
         let local = try draftStore()
         let entry = draft
         _ = try await Task.detached(priority: .utility) { try local.enqueue(entry, media: sourceURL) }.value
@@ -331,7 +358,7 @@ import UniformTypeIdentifiers
                 do {
                     if draft.kind == "media", let url = local.file(draft), let mime = draft.contentType {
                         try await uploadMedia(at: url, contentType: mime, spaceID: draft.tenant.uuidString, activityID: draft.activity.uuidString,
-                                              name: draft.displayName ?? url.lastPathComponent, locationName: draft.locationName ?? "", assetIdentifier: draft.assetIdentifier, operationID: draft.id, recordedAt: draft.createdAt)
+                                              name: draft.displayName ?? url.lastPathComponent, locationName: draft.locationName ?? "", assetIdentifier: draft.assetIdentifier, operationID: draft.id, recordedAt: draft.createdAt, capturedAt: draft.capturedAt)
                     } else if ["checkins", "moments"].contains(draft.kind), let payload = draft.payload,
                               let body = try JSONSerialization.jsonObject(with: payload) as? [String: Any] {
                         _ = try await store.call("/api/dear/social/tenants/\(draft.tenant.uuidString)/activities/\(draft.activity.uuidString)/\(draft.kind)", method: "POST", body: body)
@@ -351,7 +378,7 @@ import UniformTypeIdentifiers
         } catch { draftStatus = momentDisplayError(error); draftRevision = UUID() }
     }
 
-    private func uploadMedia(at sourceURL: URL, contentType: String, spaceID: String, activityID: String, name: String, locationName: String, assetIdentifier: String? = nil, operationID: UUID, recordedAt: Date) async throws {
+    private func uploadMedia(at sourceURL: URL, contentType: String, spaceID: String, activityID: String, name: String, locationName: String, assetIdentifier: String? = nil, operationID: UUID, recordedAt: Date, capturedAt: Date?) async throws {
         guard !publishing else { throw APIError.message(String(localized: "另一张照片正在共享，请稍后重试。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) }
         publishing = true
         defer { publishing = false }
@@ -415,6 +442,13 @@ import UniformTypeIdentifiers
                                             fileName: localName, length: length, sha256: sha, assetIdentifier: assetIdentifier, originalFileName: displayName))
             try writeIndex(index, at: root)
             try await uploadThumbnail(thumbnail, prefix: prefix, photoID: photoID, revision: sha)
+            if let capturedAt, geography.latitude != nil, geography.longitude != nil {
+                let owner = store.identity.accountIdentifier
+                Task {
+                    guard owner == store.identity.accountIdentifier else { return }
+                    _ = try? await store.call(prefix + "/native-photos/\(photoID)/weather", method: "POST", body: ["capturedAt": ISO8601DateFormatter().string(from: capturedAt)])
+                }
+            }
             start()
         } catch {
             // An ambiguous remote response must never revoke a possibly committed share.

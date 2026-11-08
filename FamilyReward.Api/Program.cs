@@ -169,6 +169,7 @@ app.MapAgentIdentityNativeLogin(new Uri("https://happylife.ai.impx.net"), new Ur
     additionalPublicOrigins: [new Uri("https://happylife.ai.xmkurt.com")]);
 app.MapLinkoSocialGateway();
 app.MapPublicActivityIntroduction();
+app.MapAnonymousActivityMedia();
 app.MapExerciseEndpoints();
 app.MapDiningEndpoints();
 app.MapAtlasReleaseVersion();

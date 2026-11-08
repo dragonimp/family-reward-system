@@ -59,6 +59,7 @@ private struct DearCaptureTarget {
 }
 
 private struct DearCapturedMedia {
+    var capturedAt = Date()
     let url: URL
     let video: Bool
     let target: DearCaptureTarget
@@ -527,6 +528,7 @@ struct DearSocialView: View {
     @StateObject private var locations = MomentActivityLocations()
     @ObservedObject var store: FamilyStore
     var showLogout = false
+    @State private var showingAnonymousShares = false
     @State private var invitationToOpen: MomentActivityLink?
     @State private var spaces: [DearRecord] = []
     @State private var joinedActivities: [DearRecord] = []
@@ -780,6 +782,9 @@ struct DearSocialView: View {
             .onChange(of: spaceId) { _, _ in if !showingActivity { activityId = ""; selectedPhoto = nil; showingActivityManagement = false; photos = [] }; activities = []; activityError = ""; activityLoading = true; run { try await loadActivities() } }
             .navigationDestination(isPresented: $showingActivity) { activityDetail }
             .sheet(isPresented: $showingActivityManagement) { activityManagement }
+            .sheet(isPresented: $showingAnonymousShares) {
+                MomentAnonymousMediaSharesView(store: store, tenant: activityTenantId, activity: activityId, title: selectedActivity?.text("title") ?? "")
+            }
             .sheet(isPresented: $showingActivityCreate) { activityCreateSheet }
             .sheet(isPresented: $showingSpaceMembers) {
                 NavigationStack {
@@ -1322,6 +1327,9 @@ struct DearSocialView: View {
 
     private var activityActions: some View {
                 Menu {
+                    if selectedActivity?.flag("canEdit") == true {
+                        Button { showingAnonymousShares = true } label: { Label(String(localized: "匿名分享照片与视频", bundle: AgentIdentityLanguage.appBundle()), systemImage: "link") }
+                    }
                     if let url = activityShareURL() {
                         ShareLink(item: url) { Label("分享活动链接", systemImage: "square.and.arrow.up") }
                     }
@@ -1387,11 +1395,11 @@ struct DearSocialView: View {
                 // Commit the app's durable copy before any Photos or network operation.
                 if capture.video {
                     try await store.photoSource.publishVideo(at: capture.url, spaceID: capture.target.spaceID,
-                                                            activityID: capture.target.activityID, locationName: capture.target.locationName)
+                                                            activityID: capture.target.activityID, locationName: capture.target.locationName, capturedAt: capture.capturedAt)
                 } else {
                     let data = try Data(contentsOf: capture.url, options: .mappedIfSafe)
                     try await store.photoSource.publish(data, spaceID: capture.target.spaceID, activityID: capture.target.activityID,
-                                                        name: capture.url.lastPathComponent, locationName: capture.target.locationName)
+                                                        name: capture.url.lastPathComponent, locationName: capture.target.locationName, capturedAt: capture.capturedAt)
                 }
                 Task {
                     defer { try? FileManager.default.removeItem(at: capture.url) }
@@ -2107,6 +2115,7 @@ private struct DearPhotoDetailView: View {
     var onPageSwipe: ((Int) -> Void)? = nil
     @State private var dismissOffset = 0.0
     @State private var downwardDrag: Bool?
+    @State private var showingFullscreenPhoto = false
     @State private var image: UIImage?
     @State private var error: String?
     @State private var originalURL: URL?
@@ -2131,6 +2140,9 @@ private struct DearPhotoDetailView: View {
                     } else if let image = originalImage ?? image {
                         Image(uiImage: image).resizable().scaledToFit()
                             .clipShape(RoundedRectangle(cornerRadius: 12))
+                            .onTapGesture { showingFullscreenPhoto = true }
+                            .accessibilityLabel(String(localized: "全屏查看照片", bundle: AgentIdentityLanguage.appBundle()))
+                            .accessibilityAddTraits(.isButton)
                     } else if let error {
                         ContentUnavailableView(String(localized: "无法显示照片预览", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), systemImage: "photo.badge.exclamationmark",
                                                    description: Text(error))
@@ -2171,6 +2183,7 @@ private struct DearPhotoDetailView: View {
                 } else { Text((serverCacheReady ?? photo.flag("serverCached")) ? "服务器已缓存，可在共享设备离线时获取" : "服务器尚未缓存，获取原件需等待共享设备上线").font(.caption).foregroundStyle(.secondary) }
                 Text("分享时间：\(photo.dateText("createdAt"))").font(.subheadline).foregroundStyle(.secondary)
                 DearPhotoPlaceView(photo: photo).font(.subheadline).foregroundStyle(.secondary)
+                MomentPhotoWeatherView(store: store, photo: photo, tenant: spaceID, activity: activityID, original: originalURL)
                 if let originalURL {
                     HStack(spacing: 20) {
                         Button { Task { await saveOriginalToPhotos(originalURL) } } label: {
@@ -2226,6 +2239,9 @@ private struct DearPhotoDetailView: View {
                 }
                 do { try await Task.sleep(for: .seconds(5)) } catch { return }
             }
+        }
+        .fullScreenCover(isPresented: $showingFullscreenPhoto) {
+            if let current = originalImage ?? image { MomentFullscreenPhoto(image: current) }
         }
         .onDisappear { player?.pause() }
     }
@@ -2748,4 +2764,177 @@ private struct MomentDraftPreview: View {
         location = latest
     }
     func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) { status = momentDisplayError(error) }
+}
+
+private struct MomentAnonymousMediaSharesView: View {
+    @ObservedObject var store: FamilyStore
+    let tenant: String
+    let activity: String
+    let title: String
+    @Environment(\.dismiss) private var dismiss
+    @State private var expiry = Date().addingTimeInterval(7 * 86400)
+    @State private var operationID = UUID()
+    @State private var links: [DearRecord] = []
+    @State private var shareURL: URL?
+    @State private var generatedID: String?
+    @State private var revoking: DearRecord?
+    @State private var busy = false
+    @State private var error = ""
+    private var route: String { "/api/dear/social/tenants/\(tenant)/activities/\(activity)/media-shares" }
+    var body: some View {
+        NavigationStack {
+            Form {
+                if !error.isEmpty { Text(error).foregroundStyle(.red) }
+                Section {
+                    DatePicker(String(localized: "过期时间", bundle: AgentIdentityLanguage.appBundle()), selection: $expiry,
+                               in: Date().addingTimeInterval(120)...Date().addingTimeInterval(30 * 86400), displayedComponents: [.date, .hourAndMinute])
+                        .disabled(busy)
+                    Button(String(localized: "生成匿名分享链接", bundle: AgentIdentityLanguage.appBundle())) { Task { await create() } }.disabled(busy)
+                    if let shareURL {
+                        ShareLink(item: shareURL, subject: Text(title)) { Label(String(localized: "分享照片与视频链接", bundle: AgentIdentityLanguage.appBundle()), systemImage: "square.and.arrow.up") }
+                    }
+                } footer: { Text(String(localized: "持有链接的人可在有效期内匿名浏览照片与视频。成员位置不包含在分享中。", bundle: AgentIdentityLanguage.appBundle())) }
+                Section(String(localized: "已生成的链接", bundle: AgentIdentityLanguage.appBundle())) {
+                    ForEach(links) { link in
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text(link.dateText("createdAt")).font(.caption).foregroundStyle(.secondary)
+                            LabeledContent(String(localized: "过期时间", bundle: AgentIdentityLanguage.appBundle()), value: link.dateText("expiresAt"))
+                            if link.flag("active") {
+                                Button(String(localized: "撤销链接", bundle: AgentIdentityLanguage.appBundle()), role: .destructive) { revoking = link }.disabled(busy)
+                            } else { Text(link.text("revokedAt").isEmpty ? String(localized: "已过期", bundle: AgentIdentityLanguage.appBundle()) : String(localized: "已撤销", bundle: AgentIdentityLanguage.appBundle())).font(.caption).foregroundStyle(.secondary) }
+                        }
+                    }
+                }
+            }.navigationTitle(String(localized: "匿名分享链接", bundle: AgentIdentityLanguage.appBundle()))
+                .toolbar { ToolbarItem(placement: .confirmationAction) { Button(String(localized: "完成", bundle: AgentIdentityLanguage.appBundle())) { dismiss() } } }
+                .task { await load() }
+                .refreshable { await load() }
+                .onChange(of: expiry) { _, _ in operationID = UUID(); shareURL = nil; generatedID = nil }
+                .confirmationDialog(String(localized: "撤销此分享链接？", bundle: AgentIdentityLanguage.appBundle()), isPresented: Binding(get: { revoking != nil }, set: { if !$0 { revoking = nil } })) {
+                    Button(String(localized: "撤销链接", bundle: AgentIdentityLanguage.appBundle()), role: .destructive) { if let link = revoking { Task { await revoke(link) } } }
+                    Button(String(localized: "取消", bundle: AgentIdentityLanguage.appBundle()), role: .cancel) { revoking = nil }
+                }
+        }
+    }
+    private func load() async {
+        do { links = try DearRecord.list(await store.call(route)); error = "" }
+        catch { self.error = momentDisplayError(error) }
+    }
+    private func create() async {
+        guard !busy else { return }; busy = true; defer { busy = false }
+        do {
+            let value = try await store.call(route, method: "POST", body: ["requestId": operationID.uuidString, "expiresAt": ISO8601DateFormatter().string(from: expiry)])
+            let link = DearRecord(data: value as? [String: Any] ?? [:]); let token = link.text("token")
+            guard token.count == 64, token.allSatisfy(\.isHexDigit), let url = URL(string: "https://happylife.ai.impx.net/api/dear/public/media-shares/" + token + "/view") else { throw CocoaError(.coderReadCorrupt) }
+            shareURL = url; generatedID = link.id; operationID = UUID(); await load()
+        } catch { let message = momentDisplayError(error); await load(); self.error = message }
+    }
+    private func revoke(_ link: DearRecord) async {
+        guard !busy else { return }; busy = true; defer { busy = false; revoking = nil }
+        do {
+            _ = try await store.call(route + "/" + link.id, method: "DELETE")
+            if UUID(uuidString: generatedID ?? "") == UUID(uuidString: link.id) { shareURL = nil; generatedID = nil }
+            await load()
+        } catch { error = momentDisplayError(error) }
+    }
+}
+
+private struct MomentFullscreenPhoto: View {
+    let image: UIImage
+    @Environment(\.dismiss) private var dismiss
+    var body: some View {
+        ZStack(alignment: .topTrailing) {
+            Color.black.ignoresSafeArea()
+            MomentZoomablePhoto(image: image).ignoresSafeArea()
+            Button { dismiss() } label: { Image(systemName: "xmark").font(.body.bold()).foregroundStyle(.white).frame(width: 44, height: 44).background(.black.opacity(0.55), in: Circle()) }
+                .padding(16).accessibilityLabel(String(localized: "关闭全屏", bundle: AgentIdentityLanguage.appBundle()))
+        }.statusBarHidden()
+    }
+}
+
+private struct MomentZoomablePhoto: UIViewControllerRepresentable {
+    let image: UIImage
+    func makeUIViewController(context: Context) -> Controller { Controller(image: image) }
+    func updateUIViewController(_ controller: Controller, context: Context) { controller.update(image) }
+    final class Controller: UIViewController, UIScrollViewDelegate {
+        private let scroll = UIScrollView()
+        private let picture = UIImageView()
+        private var lastSize = CGSize.zero
+        init(image: UIImage) { super.init(nibName: nil, bundle: nil); picture.image = image }
+        required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
+        override func viewDidLoad() {
+            super.viewDidLoad(); view.backgroundColor = .black; scroll.delegate = self; scroll.minimumZoomScale = 1; scroll.maximumZoomScale = 6
+            scroll.contentInsetAdjustmentBehavior = .never; scroll.showsHorizontalScrollIndicator = false; scroll.showsVerticalScrollIndicator = false
+            picture.contentMode = .scaleAspectFit; scroll.addSubview(picture); view.addSubview(scroll)
+            let doubleTap = UITapGestureRecognizer(target: self, action: #selector(zoom(_:))); doubleTap.numberOfTapsRequired = 2; scroll.addGestureRecognizer(doubleTap)
+        }
+        override func viewDidLayoutSubviews() {
+            super.viewDidLayoutSubviews(); scroll.frame = view.bounds
+            if lastSize != view.bounds.size { lastSize = view.bounds.size; scroll.zoomScale = 1; picture.frame = CGRect(origin: .zero, size: scroll.bounds.size); scroll.contentSize = scroll.bounds.size; scroll.contentOffset = .zero }
+        }
+        func update(_ image: UIImage) { if picture.image !== image { picture.image = image } }
+        func viewForZooming(in scrollView: UIScrollView) -> UIView? { picture }
+        @objc private func zoom(_ tap: UITapGestureRecognizer) {
+            if scroll.zoomScale > 1 { scroll.setZoomScale(1, animated: true) }
+            else { let point = tap.location(in: picture); let size = CGSize(width: scroll.bounds.width / 3, height: scroll.bounds.height / 3); scroll.zoom(to: CGRect(x: point.x - size.width / 2, y: point.y - size.height / 2, width: size.width, height: size.height), animated: true) }
+        }
+    }
+}
+
+private struct MomentPhotoWeatherView: View {
+    @ObservedObject var store: FamilyStore
+    let photo: DearRecord
+    let tenant: String
+    let activity: String
+    let original: URL?
+    @State private var weather: DearRecord?
+    @State private var missingTime = false
+    @State private var retry = UUID()
+    private var route: String { "/api/dear/social/tenants/\(tenant)/activities/\(activity)/native-photos/\(photo.id)/weather" }
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            if let value = weather?.data["temperatureCelsius"] as? NSNumber, value.doubleValue.isFinite {
+                Label(String(format: String(localized: "气温 %.1f °C", bundle: AgentIdentityLanguage.appBundle()), value.doubleValue), systemImage: "thermometer.medium")
+                DisclosureGroup(String(localized: "气温来源与时间", bundle: AgentIdentityLanguage.appBundle())) {
+                    if let weather {
+                        LabeledContent(String(localized: "气象站", bundle: AgentIdentityLanguage.appBundle()), value: weather.text("stationName"))
+                        LabeledContent(String(localized: "站点距离（公里）", bundle: AgentIdentityLanguage.appBundle()), value: weather.number("stationDistanceKm").formatted(.number.precision(.fractionLength(1))))
+                        if weather.data["stationElevationMeters"] is NSNumber {
+                            LabeledContent(String(localized: "站点海拔（米）", bundle: AgentIdentityLanguage.appBundle()), value: weather.number("stationElevationMeters").formatted(.number.precision(.fractionLength(0))))
+                        }
+                        LabeledContent(String(localized: "气温数据时间", bundle: AgentIdentityLanguage.appBundle()), value: weather.dateText("observedAt"))
+                        LabeledContent(String(localized: "查询时间", bundle: AgentIdentityLanguage.appBundle()), value: weather.dateText("queriedAt"))
+                    }
+                    Text(String(localized: "附近气象站资料，可能包含模型补全；不是手机测温。", bundle: AgentIdentityLanguage.appBundle()))
+                    Link(String(localized: "Meteostat 及其数据提供方 · CC BY 4.0", bundle: AgentIdentityLanguage.appBundle()), destination: URL(string: "https://dev.meteostat.net/license.html")!)
+                }.font(.caption)
+            } else {
+                if !(photo.data["latitude"] is NSNumber) || !(photo.data["longitude"] is NSNumber) {
+                    Text(String(localized: "未记录拍摄地点，无法查询气温", bundle: AgentIdentityLanguage.appBundle()))
+                } else if missingTime {
+                    Text(String(localized: "未取得可靠拍摄时间，暂不填气温", bundle: AgentIdentityLanguage.appBundle()))
+                } else {
+                Label(weather?.text("status") == "unavailable" ? String(localized: "该地点或时段暂无气温资料", bundle: AgentIdentityLanguage.appBundle()) : String(localized: "气温待查询或更新", bundle: AgentIdentityLanguage.appBundle()), systemImage: "thermometer.medium")
+                Button(String(localized: "刷新气温", bundle: AgentIdentityLanguage.appBundle())) { retry = UUID() }.font(.caption)
+                }
+            }
+        }.font(.subheadline).foregroundStyle(.secondary)
+        .task(id: photo.id + (original?.path ?? "") + retry.uuidString) {
+            do {
+                weather = DearRecord(data: try await store.call(route, timeout: 8) as? [String: Any] ?? [:])
+                if weather?.text("status") == "not_requested", photo.flag("canDelete"), let original,
+                   photo.data["latitude"] is NSNumber, photo.data["longitude"] is NSNumber {
+                    if let time = await DearPhotoSource.captureDate(at: original) {
+                        missingTime = false
+                        _ = try await store.call(route, method: "POST", body: ["capturedAt": ISO8601DateFormatter().string(from: time)], timeout: 8)
+                        weather = DearRecord(data: ["status": "pending"])
+                    } else { missingTime = true }
+                }
+                for _ in 0..<8 where weather?.text("status") == "pending" {
+                    try await Task.sleep(for: .seconds(10)); try Task.checkCancellation()
+                    weather = DearRecord(data: try await store.call(route, timeout: 8) as? [String: Any] ?? [:])
+                }
+            } catch { /* Missing network or source data never blocks viewing the photo. */ }
+        }
+    }
 }

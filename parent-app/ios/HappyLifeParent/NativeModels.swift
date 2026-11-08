@@ -285,6 +285,7 @@ struct MomentLocalDraft: Codable, Identifiable {
     var contentType: String?
     var locationName: String?
     var assetIdentifier: String?
+    var capturedAt: Date?
     var payload: Data?
     var lastError: String?
 }
@@ -351,6 +352,7 @@ enum ActivityOfflineReadPolicy {
         if resource.count == 3 { return ["activities", "members"].contains(resource[2]) }
         guard resource[0] == "tenants", resource[2] == "activities", UUID(uuidString: resource[3]) != nil else { return false }
         if resource.count == 4 { return true }
+        if resource.count == 7, resource[4] == "native-photos", UUID(uuidString: resource[5]) != nil, resource[6] == "weather" { return true }
         return Array(resource.dropFirst(4)) == ["live", "photos"] || resource.count == 5 && ["moments", "checkins", "members"].contains(resource[4])
     }
 }

@@ -1108,3 +1108,59 @@
 "活动记录" = "Activity record";
 
 "共享我的位置" = "Share my location";
+
+"匿名分享照片与视频" = "Share photos and videos anonymously";
+
+"全屏查看照片" = "View photo full screen";
+
+"过期时间" = "Expires";
+
+"生成匿名分享链接" = "Create anonymous share link";
+
+"分享照片与视频链接" = "Share album link";
+
+"持有链接的人可在有效期内匿名浏览照片与视频。成员位置不包含在分享中。" = "Anyone with the link can browse photos and videos until it expires. Live member locations are excluded.";
+
+"已生成的链接" = "Created links";
+
+"撤销链接" = "Revoke link";
+
+"已失效" = "Inactive";
+
+"匿名分享链接" = "Anonymous share links";
+
+"撤销此分享链接？" = "Revoke this share link?";
+
+"关闭全屏" = "Close full screen";
+
+"气温 %.1f °C" = "Air temperature %.1f °C";
+
+"气温来源与时间" = "Temperature source and time";
+
+"气象站" = "Weather station";
+
+"站点距离（公里）" = "Station distance (km)";
+
+"站点海拔（米）" = "Station elevation (m)";
+
+"气温数据时间" = "Weather data time";
+
+"查询时间" = "Queried at";
+
+"附近气象站资料，可能包含模型补全；不是手机测温。" = "Nearby station data may include model-filled values. This is not a phone temperature measurement.";
+
+"Meteostat 及其数据提供方 · CC BY 4.0" = "Meteostat and its data providers · CC BY 4.0";
+
+"该地点或时段暂无气温资料" = "No temperature data for this place and time";
+
+"气温待查询或更新" = "Temperature lookup or update pending";
+
+"刷新气温" = "Refresh temperature";
+
+"已过期" = "Expired";
+
+"已撤销" = "Revoked";
+
+"未记录拍摄地点，无法查询气温" = "No capture location is available for a temperature lookup";
+
+"未取得可靠拍摄时间，暂不填气温" = "No reliable capture time is available; temperature is left blank";
