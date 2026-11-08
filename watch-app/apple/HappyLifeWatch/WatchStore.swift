@@ -1,4 +1,5 @@
 import AgentIdentityLocalization
+import AgentIdentityHTTP
 import SwiftUI
 import HealthKit
 import CryptoKit
@@ -143,6 +144,9 @@ final class WatchStore: ObservableObject {
     @Published private(set) var busy = false
     @Published private(set) var ready = false
     @Published var message: String?
+    let accountLogin: AgentIdentityDeviceLogin
+    private lazy var accountAPI = AgentIdentityHTTPClient(origin: accountOrigin, applicationID: "happylife.ai", token: { [weak self] in try await self?.accountLogin.accessToken() })
+    private var accountOrigin: URL { URL(string: Bundle.main.object(forInfoDictionaryKey: "HappyLifeIdentityOrigin") as! String)! }
     private let api: WatchAPI
     private let activityTransport = WatchActivityTransport()
     func retryWorkoutSync() {
@@ -158,16 +162,34 @@ final class WatchStore: ObservableObject {
             for sample in samples {
                 guard let text = sample.metadata?["net.impx.moment.record"] as? String, let data = text.data(using: .utf8), let record = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
                       let raw = record["id"] as? String, let id = UUID(uuidString: raw), let payload = try? JSONSerialization.data(withJSONObject: ["owner": owner, "record": record], options: [.sortedKeys]) else { continue }
-                try? activityTransport.queueWorkout(payload, id: id)
+                try? queueWorkoutRecord(payload, id: id)
             }
         }
     }
-    func queueWorkoutRecord(_ data: Data, id: UUID) throws { try activityTransport.queueWorkout(data, id: id) }
+    func queueWorkoutRecord(_ data: Data, id: UUID) throws {
+        try activityTransport.queueWorkout(data, id: id)
+        if accountLogin.signedIn { Task { try? await uploadAccountWorkout(data, id: id) } }
+    }
+    private func uploadAccountWorkout(_ data: Data, id: UUID) async throws {
+        guard let envelope = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let owner = envelope["owner"] as? String, let record = envelope["record"] as? [String: Any] else { return }
+        let profile = try await accountAPI.send("/api/user/profile?channel=watch")
+        guard UUID(uuidString: owner) == UUID(uuidString: profile["unifiedUserId"].text), UUID(uuidString: owner) != nil else { return }
+        let body = try JSONDecoder().decode(JSONValue.self, from: JSONSerialization.data(withJSONObject: record))
+        _ = try await accountAPI.send("/api/exercise/records/" + id.uuidString, method: "PUT", body: body)
+    }
     func exerciseMetrics(owner: String, values: [String: Double]) async {
         _ = try? await activityTransport.request(["action": "exerciseLive", "owner": owner, "metrics": values])
     }
     func exerciseContext() async throws -> [String: Any] {
-        try await activityTransport.request(["action": "exerciseContext"])
+        do {
+            let context = try await activityTransport.request(["action": "exerciseContext"])
+            if let user = context["userID"] as? String, !user.isEmpty { return context }
+        } catch { if !accountLogin.signedIn { throw error } }
+        let profile = try await accountAPI.send("/api/user/profile?channel=watch")
+        let user = profile["unifiedUserId"].text
+        guard !user.isEmpty else { throw ServiceClientError.signedOut }
+        return ["userID": user]
     }
     // Watch pairing is a device credential; it does not prove the paired phone's account owns this Watch identity.
     lazy var languagePreferences = AgentIdentityLanguageStore(applicationKey: "net.impx.happylife.parent.watchkitapp",
@@ -181,6 +203,8 @@ final class WatchStore: ObservableObject {
          saveCredential: @escaping (String) throws -> Void = DeviceCredential.save,
          clearCredential: @escaping () throws -> Void = DeviceCredential.clear) {
         let address = Bundle.main.object(forInfoDictionaryKey: "HappyLifeAPIBaseURL") as? String ?? ""
+        let origin = URL(string: Bundle.main.object(forInfoDictionaryKey: "HappyLifeIdentityOrigin") as! String)!
+        accountLogin = AgentIdentityDeviceLogin(origin: origin, service: (Bundle.main.bundleIdentifier ?? "LinkoMomentWatch") + ".identity")
         self.api = api ?? WatchAPI(baseURL: URL(string: address) ?? URL(fileURLWithPath: "/"))
         self.readCredential = readCredential
         self.saveCredential = saveCredential

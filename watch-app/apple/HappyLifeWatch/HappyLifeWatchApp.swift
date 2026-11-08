@@ -1,4 +1,5 @@
 import AgentIdentityLocalization
+import AgentIdentityHTTP
 import SwiftUI
 
 @main
@@ -34,6 +35,7 @@ struct WatchHomeView: View {
                 Text(String(localized: "通过配对的 iPhone 使用已登录账号管理活动。", bundle: AgentIdentityLanguage.appBundle())).font(.footnote).foregroundStyle(.secondary)
                 NavigationLink(String(localized: "运动", bundle: AgentIdentityLanguage.appBundle()), destination: WatchWorkoutView())
                 NavigationLink(String(localized: "活动照片", bundle: AgentIdentityLanguage.appBundle()), destination: WatchSocialSpacesView())
+                NavigationLink(String(localized: "扫码登录", bundle: AgentIdentityLanguage.appBundle())) { WatchAccountLoginView(login: store.accountLogin) }
                 NavigationLink(language.text("settings.application")) {
                     List {
                         NavigationLink(language.text("language.settings"), destination: WatchLanguageSettingsView())
@@ -349,5 +351,49 @@ struct WatchLanguageSettingsView: View {
             Text(String(localized: "此设备的语言设置不影响家长或孩子的用户中心账号。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))).font(.footnote)
             if let code = language.errorCode { Text(language.text(code)) }
         }.navigationTitle(language.text("language.settings"))
+    }
+}
+
+
+struct WatchAccountLoginView: View {
+    @ObservedObject var login: AgentIdentityDeviceLogin
+    @State private var error: String?
+    @State private var attempt = UUID()
+    var body: some View {
+        List {
+            if login.signedIn {
+                Text(String(localized: "已登录", bundle: AgentIdentityLanguage.appBundle()))
+                Button(String(localized: "退出登录", bundle: AgentIdentityLanguage.appBundle()), role: .destructive) { Task { try? await login.logout(); attempt = UUID() } }
+            } else {
+                if let value = login.challenge {
+                    Canvas { context, size in
+                        let unit = min(size.width, size.height) / CGFloat(value.qrModules.count)
+                        context.fill(Path(CGRect(origin: .zero, size: size)), with: .color(.white))
+                        for (y, row) in value.qrModules.enumerated() {
+                            for (x, dark) in row.enumerated() where dark {
+                                context.fill(Path(CGRect(x: CGFloat(x) * unit, y: CGFloat(y) * unit, width: unit, height: unit)), with: .color(.black))
+                            }
+                        }
+                    }.frame(width: 150, height: 150).frame(maxWidth: .infinity)
+                    Text(value.displayCode).font(.system(.title3, design: .monospaced))
+                    Text(value.expiresAt, style: .timer).font(.caption)
+                } else if error == nil { ProgressView() }
+                Text(String(localized: "使用手机扫描二维码，在用户中心确认登录。也可使用 Linko Moment 手机端“扫码登录”。", bundle: AgentIdentityLanguage.appBundle())).font(.footnote)
+                if let error { Text(error).foregroundStyle(.red).font(.footnote) }
+                Button(String(localized: "刷新", bundle: AgentIdentityLanguage.appBundle())) { attempt = UUID() }
+            }
+        }.navigationTitle(String(localized: "扫码登录", bundle: AgentIdentityLanguage.appBundle()))
+        .task(id: attempt) {
+            guard !login.signedIn else { return }
+            error = nil
+            do {
+                try await login.start()
+                while !Task.isCancelled {
+                    if try await login.poll() { return }
+                    try await Task.sleep(for: .seconds(2))
+                }
+            } catch is CancellationError { } catch { self.error = watchDisplayError(error) }
+        }
+        .onDisappear { Task { await login.cancel() } }
     }
 }

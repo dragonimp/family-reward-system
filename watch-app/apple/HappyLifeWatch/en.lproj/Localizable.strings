@@ -1246,3 +1246,7 @@
 "活动与照片" = "Activities and photos";
 
 "孩子绑定与积分" = "Child pairing and points";
+
+"扫码登录" = "Scan to sign in";
+"使用手机扫描二维码，在用户中心确认登录。也可使用 Linko Moment 手机端“扫码登录”。" = "Scan with your phone and confirm through User Center. You can also use Scan to sign in in Linko Moment on iPhone.";
+"扫描手表登录二维码，核对配对码后确认登录。" = "Scan the Watch sign-in QR code and verify the pairing code before confirming.";

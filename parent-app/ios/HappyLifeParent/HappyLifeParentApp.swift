@@ -567,6 +567,9 @@ struct FamilyInvitationHub: View {
 struct AccountView: View {
     @EnvironmentObject private var language: AgentIdentityLanguageStore
     @ObservedObject var store: FamilyStore
+    @Environment(\.openURL) private var openURL
+    @State private var scanningLogin = false
+    @State private var loginApprovalURL: URL?
     @State private var logout = false
     @State private var deleteAccount = false
     @State private var userInfo: AgentIdentityUserInfo?
@@ -606,6 +609,13 @@ struct AccountView: View {
                     }
                 }
                 Section(String(localized: "应用与设置", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) {
+                    Button { scanningLogin = true } label: { Label(String(localized: "扫码登录", bundle: AgentIdentityLanguage.appBundle()), systemImage: "qrcode.viewfinder") }
+                        .sheet(isPresented: $scanningLogin, onDismiss: {
+                            if let url = loginApprovalURL { loginApprovalURL = nil; openURL(url) }
+                        }) {
+                            WatchCodeScanner(loginOrigin: URL(string: "https://happylife.ai.impx.net")!) { payload in loginApprovalURL = URL(string: payload) }
+                        }
+
                     NavigationLink { MomentSectionSettings() } label: { Label(String(localized: "栏目启用", bundle: AgentIdentityLanguage.appBundle()), systemImage: "square.grid.2x2") }
                     NavigationLink { FamilyChatView(store: store) } label: {
                         Label(String(localized: "AI 对话", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), systemImage: "bubble.left.and.bubble.right.fill")

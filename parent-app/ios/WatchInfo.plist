@@ -18,23 +18,25 @@
 	<string>$(CURRENT_PROJECT_VERSION)</string>
 	<key>HappyLifeAPIBaseURL</key>
 	<string>https://happylife.ai.xmkurt.com</string>
+	<key>HappyLifeIdentityOrigin</key>
+	<string>https://happylife.ai.impx.net</string>
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
-	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>记录运动轨迹、海拔，以及您主动进行的活动打卡位置。</string>
-	<key>WKApplication</key>
-	<true/>
-	<key>WKCompanionAppBundleIdentifier</key>
-	<string>net.impx.happylife</string>
-	<key>WKRunsIndependentlyOfCompanionApp</key>
-	<true/>
 	<key>NSHealthShareUsageDescription</key>
 	<string>读取您授权的心率、活动能量、步数、距离和手表体能训练，用于显示本次运动数据。</string>
 	<key>NSHealthUpdateUsageDescription</key>
 	<string>将手表上记录的运动保存到 Apple 健康，并同步到您配对的 iPhone。</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>记录运动轨迹、海拔，以及您主动进行的活动打卡位置。</string>
+	<key>WKApplication</key>
+	<true/>
 	<key>WKBackgroundModes</key>
 	<array>
 		<string>workout-processing</string>
 	</array>
+	<key>WKCompanionAppBundleIdentifier</key>
+	<string>net.impx.happylife</string>
+	<key>WKRunsIndependentlyOfCompanionApp</key>
+	<true/>
 </dict>
 </plist>
