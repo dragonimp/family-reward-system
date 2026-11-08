@@ -161,6 +161,32 @@ internal sealed class MomentPhotoPage : ContentPage
             var preview = new MomentThumbnail(cache, detail: true) { IsClippedToBounds = true };
             preview.BindingContextChanged += (_, _) => { if (preview.BindingContext is MomentFeedItem row) preview.Bind(row); };
             var zoom = new PinchGestureRecognizer(); zoom.PinchUpdated += (_, e) => { if (e.Status == GestureStatus.Running && double.IsFinite(e.Scale)) preview.Scale = Math.Clamp(preview.Scale * e.Scale, 1, 4); }; preview.GestureRecognizers.Add(zoom);
+            var fullscreen = new TapGestureRecognizer();
+            fullscreen.Tapped += async (_, _) =>
+            {
+                if (preview.BindingContext is not MomentFeedItem selected) return;
+                var photo = new MomentThumbnail(cache, detail: true) { HeightRequest = -1 };
+                photo.Bind(selected);
+                var page = new ContentPage { BackgroundColor = Colors.Black, SafeAreaEdges = SafeAreaEdges.All };
+                var close = MomentStyle.Action("关闭", async () => await Navigation.PopModalAsync());
+                var layout = new Grid { RowDefinitions = new RowDefinitionCollection { new(GridLength.Star), new(GridLength.Auto) } };
+                layout.Add(photo); layout.Add(close, 0, 1); page.Content = layout;
+                var pinch = new PinchGestureRecognizer();
+                pinch.PinchUpdated += (_, e) =>
+                {
+                    if (e.Status == GestureStatus.Running && double.IsFinite(e.Scale))
+                        photo.Scale = Math.Clamp(photo.Scale * e.Scale, 1, 4);
+                };
+                photo.GestureRecognizers.Add(pinch);
+                var doubleTap = new TapGestureRecognizer { NumberOfTapsRequired = 2 };
+                doubleTap.Tapped += (_, _) => photo.Scale = photo.Scale > 1 ? 1 : 2;
+                photo.GestureRecognizers.Add(doubleTap);
+                var dismiss = new SwipeGestureRecognizer { Direction = SwipeDirection.Down };
+                dismiss.Swiped += async (_, _) => { if (photo.Scale <= 1) await Navigation.PopModalAsync(); };
+                photo.GestureRecognizers.Add(dismiss);
+                await Navigation.PushModalAsync(page);
+            };
+            preview.GestureRecognizers.Add(fullscreen);
             var down = new SwipeGestureRecognizer { Direction = SwipeDirection.Down }; down.Swiped += async (_, _) => { if (preview.Scale <= 1) await Navigation.PopAsync(); }; preview.GestureRecognizers.Add(down);
             return preview;
         }) };
@@ -175,8 +201,8 @@ internal sealed class MomentPhotoPage : ContentPage
         paging.Add(position); paging.Add(MomentStyle.Action("下一张 ›", () => carousel.Position = Math.Min(this.gallery.Count - 1, carousel.Position + 1)));
         var body = new VerticalStackLayout { Padding = 16, Spacing = 14 };
         body.Add(carousel); body.Add(paging); body.Add(fileName); body.Add(source); body.Add(place); body.Add(time); body.Add(device);
-        body.Add(MomentStyle.Action("在浏览器获取原件或播放视频", () => _ = MomentActivityPanel.OpenWebAsync(this.item.Scope.Web), true));
-        body.Add(MomentStyle.Caption("打开本活动的完整页面，继续原件共享与传输。"));
+        body.Add(MomentStyle.Action("获取原文件", () => _ = MomentActivityPanel.OpenWebAsync(this.item.Scope.Web), true));
+        body.Add(MomentStyle.Caption("原文件可从共享设备或服务器缓存获取。"));
         body.Add(MomentStyle.Title("照片点评", 20)); body.Add(MomentStyle.Action("发表点评", () => _ = PostAsync()));
         body.Add(error); body.Add(comments);
         body.Add(MomentStyle.Action("加载更多点评", () => _ = LoadCommentsAsync(false)));

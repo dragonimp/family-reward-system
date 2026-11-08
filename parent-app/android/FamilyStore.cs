@@ -64,16 +64,38 @@ public sealed class FamilyStore
         loginCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         var login = loginCancellation;
         var identity = new NativeLoginClient(loginHttp);
-        var result = await identity.LoginSessionAsync(
+        INavigation? loginNavigation = null;
+        Page? loginPage = null;
+        NativeLoginClient.Session result;
+        try
+        {
+            result = await identity.LoginSessionAsync(
             async (url, ct) =>
             {
-                var opened = await Browser.Default.OpenAsync(url, BrowserLaunchMode.SystemPreferred);
+                var opened = await AgentIdentity.Maui.InAppWebLinks.OpenAsync(url);
+                if (opened)
+                {
+                    await MainThread.InvokeOnMainThreadAsync(() =>
+                    {
+                        loginNavigation = Application.Current?.Windows.LastOrDefault(window => window.Page?.IsVisible == true)?.Page?.Navigation;
+                        loginPage = loginNavigation?.ModalStack.LastOrDefault();
+                    });
+                }
                 ct.ThrowIfCancellationRequested();
                 return opened;
             },
             code => { DisplayCode = code; MainThread.BeginInvokeOnMainThread(() => showCode(code)); },
             register,
             login.Token);
+        }
+        finally
+        {
+        await MainThread.InvokeOnMainThreadAsync(async () =>
+        {
+            if (loginPage != null && loginNavigation?.ModalStack.LastOrDefault() == loginPage)
+                await loginNavigation.PopModalAsync();
+        });
+        }
         if (attempt != generation || login.IsCancellationRequested) throw new OperationCanceledException();
         await session.SaveAsync(result, login.Token);
         if (attempt != generation || login.IsCancellationRequested)

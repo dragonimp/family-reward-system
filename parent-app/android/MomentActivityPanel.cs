@@ -71,7 +71,9 @@ public sealed class MomentActivityPanel : ContentView
         if (!Current(ct)) return;
         spaces = nextSpaces; joined = nextJoined;
         if (!spaces.Any(s => s.Id == space)) space = spaces.FirstOrDefault().GuidValue("id") ?? Guid.Empty;
-        if (space != Guid.Empty) activities = MomentRecord.List(await store.CallAsync(Api + $"spaces/{space:D}/activities", ct: ct));
+        activities = space == Guid.Empty
+            ? []
+            : MomentRecord.List(await store.CallAsync(Api + $"spaces/{space:D}/activities", ct: ct));
         if (!Current(ct)) return;
         loaded = true; status.Text = ""; RenderRoot();
     });
@@ -102,7 +104,13 @@ public sealed class MomentActivityPanel : ContentView
         section.Add(MomentStyle.Caption("活动列表"));
         if (space != Guid.Empty && !showJoined) section.Add(MomentStyle.Action("＋ 新增", () => _ = CreateActivityAsync()), 1, 0);
         stack.Add(section); stack.Add(MomentStyle.Caption("按活动日期排序 · 日期按设备当地时区显示")); stack.Add(status); controls.Content = stack;
-        var items = (showJoined ? joined : activities).OrderByDescending(a => MomentDates.ActivityDate(a)).ThenByDescending(a => a.Created).ToList();
+        var visibleActivities = showJoined
+            ? joined
+            : activities.Concat(joined.Where(item => !activities.Any(current => current.Id == item.Id)));
+        var items = visibleActivities
+            .OrderByDescending(item => MomentDates.ActivityDate(item))
+            .ThenBy(item => item.Id.ToString("D"), StringComparer.Ordinal)
+            .ToList();
         var list = new CollectionView { ItemsSource = items, SelectionMode = SelectionMode.None, EmptyView = Empty("还没有活动", space == Guid.Empty ? "创建空间或在完整活动页接受邀请。" : "点击活动列表右侧的新增，记录一次相聚。"), ItemTemplate = new DataTemplate(() =>
         {
             var row = new ActivityRow();
