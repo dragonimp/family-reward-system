@@ -153,8 +153,9 @@ final class WatchStore: ObservableObject {
     func refreshMenu() async {
         do {
             let value: [String: Any]
-            if activityTransport.reachable {
-                value = try await activityTransport.request(["action": "modulePreferences"])
+            let phone = activityTransport.reachable ? try? await activityTransport.request(["action": "modulePreferences"]) : nil
+            if let phone {
+                value = phone
             } else {
                 guard accountLogin.signedIn else { throw ServiceClientError.signedOut }
                 let profile = try await accountAPI.send("/api/user/profile?channel=watch")
