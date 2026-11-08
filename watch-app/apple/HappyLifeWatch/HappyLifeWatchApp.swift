@@ -58,7 +58,7 @@ struct WatchHomeView: View {
             }.navigationTitle("Linko Moment")
         }
         .task(id: phase == .active) {
-            guard phase == .active else { store.clearMenu(); return }
+            guard phase == .active else { return }
             while !Task.isCancelled {
                 await store.refreshMenu()
                 do { try await Task.sleep(for: .seconds(10)) } catch { return }
