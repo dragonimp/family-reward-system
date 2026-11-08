@@ -624,6 +624,7 @@
 "成员" = "Members";
 "绑定已成功，但凭据保存失败。请勿退出 App；请解锁手表后点击刷新重试保存。" = "Pairing succeeded, but credentials could not be saved. Keep the app open, unlock your watch, and tap Refresh to try saving again.";
 "仅年份" = "Year only";
+"暂无成员共享位置" = "No members are sharing their location";
 "活动访客" = "Activity guests";
 "原图大小不匹配。" = "The original-photo size does not match.";
 "获取设备码" = "Get device code";
@@ -772,6 +773,7 @@
 "生活分享" = "Life sharing";
 "申请记录" = "My requests";
 "打卡已保存，海拔 %.1f 米。" = "Check-in saved. Altitude: %.1f m.";
+"只显示当前成员位置" = "Show only current member locations";
 "这次想聊什么或一起做什么" = "What would you like to talk about or do together?";
 "保存记录" = "Save record";
 "支系" = "Branch";

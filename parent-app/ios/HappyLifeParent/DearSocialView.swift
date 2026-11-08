@@ -346,11 +346,13 @@ private struct DearActivityMapView: View {
     let points: [DearActivityMapPoint]
     let photos: [DearRecord]
     @State private var cameraPosition: MapCameraPosition = .automatic
+    @State private var membersOnly = false
     @State private var selectedPointID: String?
     @State private var resolvedPlaces: [String: String] = [:]
     @State private var selectedPhoto: DearRecord?
 
-    private var selectedPoint: DearActivityMapPoint? { points.first { $0.id == selectedPointID } }
+    private var visiblePoints: [DearActivityMapPoint] { membersOnly ? [] : points }
+    private var selectedPoint: DearActivityMapPoint? { visiblePoints.first { $0.id == selectedPointID } }
     private func thumbnailPath(_ photo: DearRecord) -> String {
         "/api/dear/social/tenants/\(spaceID)/activities/\(activityID)/native-photos/\(photo.id)/thumbnail"
     }
@@ -370,17 +372,26 @@ private struct DearActivityMapView: View {
 
     var body: some View {
         TimelineView(.periodic(from: .now, by: 1)) { tick in
+        let currentMembers = locations.members.filter { $0.expiresAt > tick.date }
         VStack(spacing: 0) {
+                Toggle(String(localized: "只显示当前成员位置", bundle: AgentIdentityLanguage.appBundle()), isOn: $membersOnly)
+                    .font(.subheadline).padding(.horizontal, 16).padding(.vertical, 10)
+                if !locations.status.isEmpty { Text(locations.status).font(.caption).foregroundStyle(.secondary).padding(8) }
+                if membersOnly && currentMembers.isEmpty && locations.status.isEmpty {
+                    Label(String(localized: "暂无成员共享位置", bundle: AgentIdentityLanguage.appBundle()), systemImage: "person.2")
+                        .font(.caption).foregroundStyle(.secondary).padding(8)
+                }
                 Map(position: $cameraPosition) {
-                    ForEach(locations.members.filter { $0.expiresAt > tick.date }) { member in
+                    ForEach(currentMembers) { member in
                         Annotation(member.name, coordinate: member.coordinate) {
                             VStack(spacing: 3) {
                                 Image(systemName: "person.circle.fill").font(.title).foregroundStyle(.blue).background(.white, in: Circle())
+                                Text(member.name).font(.caption.weight(.semibold)).padding(3).background(.regularMaterial, in: Capsule())
                                 Text(member.observedAt, style: .time).font(.caption2).padding(3).background(.regularMaterial, in: Capsule())
                             }
                         }
                     }
-                    ForEach(points) { point in
+                    ForEach(visiblePoints) { point in
                         Annotation("", coordinate: point.coordinate) {
                             Button { selectedPointID = point.id } label: {
                                 VStack(spacing: 4) {
@@ -417,7 +428,8 @@ private struct DearActivityMapView: View {
                 }
                 .mapControls { MapCompass(); MapScaleView() }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .task(id: points.map { "\($0.id):\($0.coordinate.latitude):\($0.coordinate.longitude)" }.joined(separator: "|")) {
+                .task(id: String(membersOnly) + points.map { "\($0.id):\($0.coordinate.latitude):\($0.coordinate.longitude)" }.joined(separator: "|")) {
+                    guard !membersOnly else { return }
                     for point in points where point.placeName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                         if Task.isCancelled { return }
                         if let name = await PhotoPlaceNames.shared.name(latitude: point.coordinate.latitude, longitude: point.coordinate.longitude), !Task.isCancelled {
@@ -442,7 +454,7 @@ private struct DearActivityMapView: View {
                 }
                 .padding(12)
             }
-            if !photos.isEmpty {
+            if !membersOnly && !photos.isEmpty {
                 HStack {
                     Text(String(localized: "活动照片与视频", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))).font(.subheadline.bold())
                     Spacer()
@@ -467,7 +479,8 @@ private struct DearActivityMapView: View {
                 }
                 .frame(height: 112)
             }
-            List(points) { point in
+            if !membersOnly {
+            List(visiblePoints) { point in
                 Button {
                     selectedPointID = point.id
                     cameraPosition = .region(MKCoordinateRegion(center: point.coordinate,
@@ -481,7 +494,8 @@ private struct DearActivityMapView: View {
                     } icon: { Image(systemName: point.systemImage) }
                 }
             }
-            .frame(height: min(CGFloat(points.count) * 70 + 16, 220))
+            .frame(height: min(CGFloat(visiblePoints.count) * 70 + 16, 220))
+            }
         }
         }
         .navigationTitle(String(localized: "\(title) · 地图", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)))
@@ -496,11 +510,13 @@ private struct DearActivityMapView: View {
                                      onDeleted: { _, _ in })
         }
         .onAppear { fitAllPoints() }
+        .onChange(of: membersOnly) { _, _ in selectedPointID = nil; fitAllPoints() }
         .onChange(of: locations.members.map(\.id)) { _, _ in fitAllPoints() }
+        .onChange(of: locations.members.map { "\($0.id):\($0.coordinate.latitude):\($0.coordinate.longitude)" }) { _, _ in if membersOnly { fitAllPoints() } }
     }
 
     private func fitAllPoints() {
-        let coordinates = points.map(\.coordinate) + locations.members.map(\.coordinate)
+        let coordinates = visiblePoints.map(\.coordinate) + locations.members.filter { $0.expiresAt > Date() }.map(\.coordinate)
         guard let first = coordinates.first else { return }
         let latitudes = coordinates.map(\.latitude)
         let longitudes = coordinates.map(\.longitude)

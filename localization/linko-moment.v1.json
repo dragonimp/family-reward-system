@@ -6220,6 +6220,16 @@
       "zh-Hans": "重试同步运动记录",
       "en": "Retry workout sync",
       "iosKey": "重试同步运动记录"
+    },
+    "moment.t928928151a3a": {
+      "iosKey": "只显示当前成员位置",
+      "zh-Hans": "只显示当前成员位置",
+      "en": "Show only current member locations"
+    },
+    "moment.t6edd1c8cce96": {
+      "iosKey": "暂无成员共享位置",
+      "zh-Hans": "暂无成员共享位置",
+      "en": "No members are sharing their location"
     }
   }
 }
