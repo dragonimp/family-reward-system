@@ -337,3 +337,20 @@ struct MomentDraftStore {
         if let file = file(draft) { try? FileManager.default.removeItem(at: file) }
     }
 }
+
+// Only activity browsing data may be reused offline, never live locations,
+// invitations, transfer tickets, device state or connection credentials.
+enum ActivityOfflineReadPolicy {
+    static func allows(_ path: String) -> Bool {
+        guard !path.contains("?"), !path.contains("#") else { return false }
+        let parts = path.split(separator: "/").map(String.init)
+        guard parts.count >= 4, Array(parts.prefix(3)) == ["api", "dear", "social"] else { return false }
+        let resource = Array(parts.dropFirst(3))
+        if resource == ["me"] || resource == ["tenants"] || resource == ["activities", "joined"] || resource == ["spaces", "mine"] { return true }
+        guard resource.count >= 3, ["spaces", "tenants"].contains(resource[0]), UUID(uuidString: resource[1]) != nil else { return false }
+        if resource.count == 3 { return ["activities", "members"].contains(resource[2]) }
+        guard resource[0] == "tenants", resource[2] == "activities", UUID(uuidString: resource[3]) != nil else { return false }
+        if resource.count == 4 { return true }
+        return Array(resource.dropFirst(4)) == ["live", "photos"] || resource.count == 5 && ["moments", "checkins", "members"].contains(resource[4])
+    }
+}

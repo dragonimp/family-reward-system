@@ -120,12 +120,11 @@ private actor PhotoPreviewLoader {
     func call(_ path: String, method: String = "GET", body: [String: Any]? = nil, timeout: TimeInterval = 30) async throws -> Any {
         let account = identity.accountIdentifier
         var cacheURL: URL?
-        if method == "GET", path.hasPrefix("/api/dear/social/"), !path.hasSuffix("/locations"), let account, identity.isAuthenticated {
+        if method == "GET", ActivityOfflineReadPolicy.allows(path), account != nil, identity.isAuthenticated {
             let directory = try photoSource.draftStore().root.appendingPathComponent("responses")
             try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
             let key = SHA256.hash(data: Data(path.utf8)).map { String(format: "%02x", $0) }.joined()
             cacheURL = directory.appendingPathComponent(key)
-            _ = account
         }
         if let cacheURL {
             photoSource.start()

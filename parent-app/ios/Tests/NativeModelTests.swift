@@ -2,6 +2,13 @@ import Foundation
 @main struct NativeModelTests {
     static func require(_ condition: @autoclosure () throws -> Bool) throws { let result = try condition(); precondition(result) }
     static func main() throws {
+        let cachedRoute = "/api/dear/social/tenants/" + UUID().uuidString + "/activities/" + UUID().uuidString
+        precondition(ActivityOfflineReadPolicy.allows(cachedRoute + "/live/photos"))
+        precondition(ActivityOfflineReadPolicy.allows("/api/dear/social/activities/joined"))
+        for suffix in ["/locations", "/location-sharing", "/photo-requests", "/native-photos/" + UUID().uuidString + "/relay", "/members?token=secret"] {
+            precondition(!ActivityOfflineReadPolicy.allows(cachedRoute + suffix))
+        }
+        precondition(!ActivityOfflineReadPolicy.allows("/api/dear/social/connect-configuration"))
         let draftBase = URL(fileURLWithPath: ProcessInfo.processInfo.environment["ATLAS_BUILD_WORK"] ?? NSTemporaryDirectory()).appendingPathComponent("draft-check-" + UUID().uuidString)
         defer { try? FileManager.default.removeItem(at: draftBase) }
         try FileManager.default.createDirectory(at: draftBase, withIntermediateDirectories: true)
