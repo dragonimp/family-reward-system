@@ -61,3 +61,16 @@ AI对话、家族族谱和家庭成员复用现有正式站内页面。扫码入
 iOS与Android初步编译通过。正式构建/发布及上线结果另行追加。编译、签名、平台可获取与真机菜单操作/真实设备同步分开验收，不将API模拟设备结果写成真机验收。
 
 安卓位置共享离开模块或进入后台时，租约和开关一起关闭；回到页面不会显示错误的“仍在共享”状态。1.0.18（27）作为首个已验证中间包保留在Atlas，最终分发采用1.0.19（28）。
+
+
+## 发布与收尾结果
+
+- iOS 1.3.45（245），源码a38844584092e8439f3786be87ac83f663487752；Atlas版本febb1246-5bcc-40b7-acea-78ea7bcb1885。TestFlight尝试56236e79-7ac2-4b57-8dcd-c271ee3cd0cc，Apple构建d45410e2-16e1-4c6b-8a23-b3c3bde35a6f，已VALID/testflight_visible。
+- 已通过正式材料API补充中英文测试说明，操作b1367e93-2c61-4a44-b4ee-d722b5e6ef4e；独立读回HTTP200、ready=true、issues=[]，包括目标构建图标。未提交外部Beta或App Store审核。
+- iOS邀请同步21f53623-17b2-4099-95ce-b7c5b6bd4f26 verified。Android最终1.0.19（28），源码34b637376073bf1c3f7c7711c46806aee33a687e，Atlas版本8d4ac2fd-cb63-40ee-ae7d-9284094c37ba；APK SHA256 8772353ef00e28cd6c15b4950ddfad8f11f737e28a431b2d70032fc4707d8fe0，原正式签名及manifest校验通过。邀请绑定3f41c53f-ff2a-41e7-993b-87819bd960e2 verified，公开邀请数据读回iOS1.3.45（245）/Android1.0.19（28）。
+- API版本20261109-003340-activity-a388445，Atlas版本af0f5007-734a-444a-8175-2df0934f1ba7；部署429638f1-3543-4aae-b220-9c2e4ce5ec41 complete=true/stored/exitCode=0。日志、运行指针和健康独立读回；设置接口未登录返回401。
+- 生产迁移先备份并核对pg_restore清单，账本20261109-account-module-preferences-v1，SHA256 7319624d626d6d31fb256a804fbd5fc86917c90b1e1e501973de45699739d1ed，新表归属family_reward_app。迁移没有批量写入用户设置，原始表为空；首次设备同步由已认证用户请求完成。
+- 同步API14项检查通过，干饭推荐/日期/GUID/二维码模型检查通过；iOS/Android正式签名包成功，前端lint/build与配套267项HTTP/WebSocket通过。
+- Android1.0.18中间包已在自有ARM64模拟器升级安装、动态解析launcher并冷启动，Status:ok、崩溃缓冲为空。界面停在首次隐私确认，未进入登录后菜单；没有替用户确认隐私协议，也没有宣称菜单截图或真实双设备同步验收。最终1.0.19仅做增量正式构建与签名/版本校验，未重复称已安装实测。
+- 模拟器已退出，adb无设备；QA子脚本exitCode=0，但外层首次因后代进程释放延迟记录cleanupDeferred，原错误保留，后续核对工作目录已不存在且无自有模拟器进程。该清理状态不改写为UI验收成功。
+- 14个正式制品182,370,492字节已从Atlas重新下载并核对SHA256/大小。清理本地7个重复包182,368,937字节，正式包及符号包可由Atlas恢复；保留精简回执、QA启动记录、受限数据库备份及独立迁移。没有新增worktree，原未跟踪application/ocr_recipe.py未提交或删除。
