@@ -91,6 +91,7 @@ public sealed class MomentActivityPanel : ContentView
         title.Add(MomentStyle.IconButton("消息", "消息通知", () => _ = owner.Navigation.PushAsync(new MomentInboxPage(store))), 2, 0); header.Content = title;
         if (status.Parent is Layout previous) previous.Children.Remove(status);
         var stack = new VerticalStackLayout { Spacing = 10 };
+        if (!showJoined) stack.Add(MomentStyle.Card(MomentStyle.MenuRow("好友关系 · 跨空间", "家庭成员", () => _ = ShowFriendsAsync())));
         if (spaces.Count > 0 && !showJoined)
         {
             var picker = new Picker { Title = "我的空间", FontSize = 18, TextColor = MomentStyle.Accent };
@@ -170,7 +171,12 @@ public sealed class MomentActivityPanel : ContentView
         async Task LoadMembers() { try { var value = await store.CallAsync(scope.Api + "/members"); if (activity?.Id == selected.Id) memberCount.Text = value.GetArrayLength() + " 位成员"; } catch { } }
         var sharing = new VerticalStackLayout { Spacing = 4 };
         var shareRow = new Grid { ColumnDefinitions = new ColumnDefinitionCollection { new(GridLength.Star), new(GridLength.Auto) } };
-        shareRow.Add(new Label { Text = "共享我的位置", FontSize = 17, VerticalTextAlignment = TextAlignment.Center });
+        shareRow.Add(MomentStyle.MenuRow("共享我的位置", "附近", () => _ = OpenSharedMapAsync()));
+        async Task OpenSharedMapAsync() {
+            if (!locations.Sharing) await locations.Start(scope);
+            if (sharingToggle != null) sharingToggle.IsToggled = locations.Sharing;
+            await owner.Navigation.PushAsync(new MomentActivityMapPage(store, scope, selected.Text("title")));
+        }
         sharingToggle = new Switch { IsToggled = locations.Sharing };
         sharingToggle.Toggled += async (_, e) => { if (e.Value && !locations.Sharing) await locations.Start(scope); else if (!e.Value && locations.Sharing) await locations.Stop(); };
         shareRow.Add(sharingToggle, 1); sharing.Add(shareRow); sharing.Add(MomentStyle.Divider());
@@ -179,13 +185,18 @@ public sealed class MomentActivityPanel : ContentView
         var actions = new Grid { ColumnSpacing = 4 }; var names = new[] { "分享", "拍照", "拍视频", "打卡", "创建运动" };
         for (var i = 0; i < names.Length; i++) {
             actions.ColumnDefinitions.Add(new ColumnDefinition(GridLength.Star)); var action = names[i];
-            var button = MomentStyle.Action(action, () => _ = ActivityAction(scope, selected, action)); button.MinimumWidthRequest = 0; button.FontSize = 12; button.Padding = new Thickness(3, 6); button.BackgroundColor = Color.FromArgb("#E2F6F7"); actions.Add(button, i);
+            var icon = action == "创建运动" ? "运动" : action;
+            var button = MomentStyle.IconButton(icon, action, () => _ = ActivityAction(scope, selected, action)); actions.Add(button, i);
         }
         var photos = new VerticalStackLayout { Spacing = 10 }; photos.Add(actions); photos.Add(MomentStyle.Divider());
-        var modes = new[] { "大图", "紧凑", "网格 · 每行5张" };
-        var modeHost = new ContentView();
-        void Modes() { modeHost.Content = MomentStyle.Segmented(modes, Array.IndexOf(modes, mode), index => { mode = modes[index]; Modes(); RenderFeed(scope); }); }
-        Modes(); photos.Add(modeHost); section.Add(MomentStyle.Card(photos)); section.Add(MomentStyle.Caption("活动动态 · 照片、打卡与日常")); section.Add(status);
+        section.Add(MomentStyle.Card(photos));
+        var feedTitle = new Grid { ColumnDefinitions = new ColumnDefinitionCollection { new(GridLength.Star), new(GridLength.Auto) } };
+        feedTitle.Add(MomentStyle.Caption("活动动态"));
+        feedTitle.Add(MomentStyle.IconButton("展示样式", "展示样式", async () => {
+            var selectedMode = await owner.DisplayActionSheetAsync("展示样式", "取消", null, "大图", "紧凑", "网格 · 每行5张");
+            if (selectedMode is "大图" or "紧凑" or "网格 · 每行5张") { mode = selectedMode; RenderFeed(scope); }
+        }), 1);
+        section.Add(feedTitle); section.Add(status);
         controls.Content = section;
         feed = []; RenderFeed(scope);
         await RunAsync(async ct =>
@@ -210,6 +221,44 @@ public sealed class MomentActivityPanel : ContentView
         list.ItemsLayout = grid ? new GridItemsLayout(5, ItemsLayoutOrientation.Vertical) { HorizontalItemSpacing = 3, VerticalItemSpacing = 8 } : new LinearItemsLayout(ItemsLayoutOrientation.Vertical) { ItemSpacing = 10 };
         body.Content = Refresh(list, () => { if (activity is { } selected) _ = OpenActivityAsync(selected); });
     }
+    private async Task ShowFriendsAsync()
+    {
+        var rows = new VerticalStackLayout { Padding = 16, Spacing = 12 };
+        var page = new ContentPage { Title = "好友关系 · 跨空间", Content = new ScrollView { Content = rows }, BackgroundColor = MomentStyle.Background };
+        var error = MomentStyle.Caption("");
+        var username = new Entry { Placeholder = "用户名", Keyboard = Keyboard.Create(KeyboardFlags.None) };
+        var list = new VerticalStackLayout { Spacing = 12 };
+        var sessionVersion = store.SessionVersion;
+        rows.Add(username);
+        rows.Add(MomentStyle.Action("添加好友", async () => {
+            var target = username.Text?.Trim(); if (string.IsNullOrEmpty(target)) return;
+            await Change(Api + "relationships/requests", HttpMethod.Post, new { targetUsername = target });
+        }));
+        rows.Add(error); rows.Add(list);
+        async Task Reload() {
+            var friends = MomentRecord.List(await store.CallAsync(Api + "relationships"));
+            if (sessionVersion != store.SessionVersion) { list.Clear(); return; }
+            list.Clear();
+            foreach (var friend in friends) {
+                var card = new VerticalStackLayout { Spacing = 6 };
+                card.Add(new Label { Text = friend.Text("peerName"), FontSize = 17 });
+                card.Add(MomentStyle.Caption(friend.Text("status") == "accepted" ? "朋友" : friend.Text("direction") == "incoming" ? "邀请你成为朋友" : "等待对方确认"));
+                if (friend.Text("status") == "pending" && friend.Text("direction") == "incoming")
+                    card.Add(MomentStyle.Action("接受", () => _ = Change(Api + $"relationships/{friend.Id:D}/accept", HttpMethod.Post, new { })));
+                card.Add(MomentStyle.Action(friend.Text("status") == "accepted" ? "解除" : "移除", () => _ = Change(Api + $"relationships/{friend.Id:D}", HttpMethod.Delete, null)));
+                list.Add(MomentStyle.Card(card));
+            }
+            if (friends.Count == 0) list.Add(MomentStyle.Caption("还没有好友关系或申请。"));
+        }
+        async Task Change(string path, HttpMethod method, object? payload) {
+            if (sessionVersion != store.SessionVersion) return;
+            try { error.Text = ""; await store.CallAsync(path, method, payload); username.Text = ""; await Reload(); }
+            catch (Exception e) { error.Text = e is FamilyApiException ? e.Message : "好友操作未完成，请重试。"; }
+        }
+        await owner.Navigation.PushAsync(page);
+        try { await Reload(); } catch { error.Text = "好友关系暂时无法读取，请重试。"; }
+    }
+
     private async Task ActivityAction(MomentScope scope, MomentRecord selected, string action)
     {
         if (action == "创建运动") createExercise(scope, selected.Text("title"));

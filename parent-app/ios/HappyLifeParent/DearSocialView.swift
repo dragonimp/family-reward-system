@@ -347,7 +347,10 @@ private struct DearActivityMapView: View {
     let points: [DearActivityMapPoint]
     let photos: [DearRecord]
     @State private var cameraPosition: MapCameraPosition = .automatic
-    @State private var membersOnly = false
+    var startSharingOnOpen = false
+    var initialMembersOnly = true
+    @State private var initializedMap = false
+    @State private var membersOnly = true
     @State private var selectedPointID: String?
     @State private var resolvedPlaces: [String: String] = [:]
     @State private var selectedPhoto: DearRecord?
@@ -510,7 +513,11 @@ private struct DearActivityMapView: View {
                                      spaceID: spaceID, activityID: activityID, allowsDeletion: false,
                                      onDeleted: { _, _ in })
         }
-        .onAppear { locations.mapVisible = true; fitAllPoints() }
+        .onAppear {
+            locations.mapVisible = true
+            if !initializedMap { membersOnly = initialMembersOnly; if startSharingOnOpen { locations.setSharing(true) }; initializedMap = true }
+            fitAllPoints()
+        }
         .onDisappear { locations.mapVisible = false }
         .onChange(of: membersOnly) { _, _ in selectedPointID = nil; fitAllPoints() }
         .onChange(of: locations.members.map(\.id)) { _, _ in fitAllPoints() }
@@ -545,6 +552,7 @@ private struct DearTimelineEntry: Identifiable {
 struct DearSocialView: View {
     @Environment(\.scenePhase) private var scenePhase
     @StateObject private var locations = MomentActivityLocations()
+    @State private var showingLocationMap = false
     @State private var refreshingActivityList = false
     @State private var exerciseArchive = ExerciseArchive()
     @State private var exerciseRevision = UUID()
@@ -592,6 +600,7 @@ struct DearSocialView: View {
     @State private var spaceMembers: [DearRecord] = []
     @State private var showingSpaceMembers = false
     @State private var relationships: [DearRecord] = []
+    @State private var friendUsername = ""
     @State private var invitations: [DearRecord] = []
     @State private var spaceId = ""
     @State private var activityId = ""
@@ -666,6 +675,9 @@ struct DearSocialView: View {
                             }
                         }
                     }
+                }
+                Section {
+                    NavigationLink { relationshipsPage } label: { Label(String(localized: "好友关系 · 跨空间", bundle: AgentIdentityLanguage.appBundle()), systemImage: "person.2") }
                 }
                 Section(String(localized: "我的空间", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) {
                     if visibleSpaces.isEmpty { Text(String(localized: "请用右上角“…”新增个人空间。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) .foregroundStyle(.secondary) }
@@ -752,27 +764,6 @@ struct DearSocialView: View {
                         }.textCase(nil)
                     }
                 }
-                Section(String(localized: "好友关系 · 跨空间", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) {
-                    DisclosureGroup(String(localized: "查看好友与申请", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) {
-                        if relationships.isEmpty { Text(String(localized: "还没有好友关系或申请。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) .foregroundStyle(.secondary) }
-                        ForEach(relationships) { relation in
-                            HStack {
-                                VStack(alignment: .leading) {
-                                    Text(relation.text("peerName"))
-                                    Text(relation.text("status") == "accepted" ? String(localized: "朋友", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)) : relation.text("direction") == "incoming" ? String(localized: "邀请你成为朋友", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)) : String(localized: "等待对方确认", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)))
-                                        .font(.caption).foregroundStyle(.secondary)
-                                }
-                                Spacer()
-                                if relation.text("status") == "pending" && relation.text("direction") == "incoming" {
-                                    Button(String(localized: "接受", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) { run { try await acceptFriend(relation) } }.disabled(busy)
-                                }
-                                Button(relation.text("status") == "accepted" ? String(localized: "解除", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)) : String(localized: "移除", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), role: .destructive) {
-                                    run { try await removeFriend(relation) }
-                                }.disabled(busy)
-                            }
-                        }
-                    }
-                }
                 if showLogout {
                     Section { Link(String(localized: "隐私政策与支持", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), destination: URL(string: "https://happylife.ai.impx.net/legal/linko-family-privacy.html")!) }
                 }
@@ -817,7 +808,7 @@ struct DearSocialView: View {
                             Text(String(localized: "先邀请对方加入本空间的活动，再从活动访客设为空间成员。空间成员可查看本空间的所有原生活动；收藏活动仍遵循原活动权限。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)))
                                 .font(.footnote).foregroundStyle(.secondary)
                         }
-                        ForEach(spaceMembers) { member in
+                        ForEach(spaceMembers, id: \.subject) { member in
                             HStack {
                                 Text(member.text("displayName"))
                                 Spacer()
@@ -838,7 +829,7 @@ struct DearSocialView: View {
                     .toolbar { ToolbarItem(placement: .topBarTrailing) { Button(String(localized: "完成", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) { showingSpaceMembers = false } } }
                 }
             }
-            .onChange(of: activityId) { _, _ in if showingActivity { locations.activate(store: store, tenant: activityTenantId, activity: activityId) }; photos = []; moments = []; checkIns = []; activityMembers = []; run { try await loadDetails() } }
+            .onChange(of: activityId) { _, _ in showingLocationMap = false; if showingActivity { locations.activate(store: store, tenant: activityTenantId, activity: activityId) }; photos = []; moments = []; checkIns = []; activityMembers = []; run { try await loadDetails() } }
             .alert(String(localized: "新增空间", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), isPresented: $showingSpaceCreate) {
                 TextField(String(localized: "空间名称", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), text: $spaceName)
                 Button(String(localized: "取消", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), role: .cancel) { }
@@ -1059,17 +1050,13 @@ struct DearSocialView: View {
     }
 
     private func activityPhotoTile(_ title: String, icon: String, selected: Bool = false) -> some View {
-        HStack(spacing: 4) {
-            Image(systemName: icon).font(.body).accessibilityHidden(true)
-            Text(title).font(.caption).multilineTextAlignment(.center)
-                .fixedSize(horizontal: false, vertical: true)
-        }
+        Image(systemName: icon).font(.body)
         .frame(maxWidth: .infinity, minHeight: 36, maxHeight: .infinity)
         .padding(.vertical, 4)
         .foregroundStyle(selected ? Color.white : Color.teal)
         .background(selected ? Color.teal : Color.teal.opacity(0.10), in: RoundedRectangle(cornerRadius: 8))
         .contentShape(RoundedRectangle(cornerRadius: 8))
-        .accessibilityElement(children: .combine)
+        .accessibilityLabel(title)
     }
 
     private func activityLayoutButton(_ mode: String, title: String, icon: String) -> some View {
@@ -1120,11 +1107,6 @@ struct DearSocialView: View {
                     }
                 }.buttonStyle(.borderless).disabled(busy)
             }
-            HStack(spacing: 8) {
-                activityLayoutButton("grid", title: String(localized: "大图", bundle: AgentIdentityLanguage.appBundle()), icon: "rectangle")
-                activityLayoutButton("list", title: String(localized: "紧凑", bundle: AgentIdentityLanguage.appBundle()), icon: "list.bullet")
-                activityLayoutButton("tiles", title: String(localized: "网格 · 每行5张", bundle: AgentIdentityLanguage.appBundle()), icon: "square.grid.3x3")
-            }.buttonStyle(.plain).fixedSize(horizontal: false, vertical: true)
             if selectingPhotoDownloads {
                 Text("已选 \(selectedPhotoIDs.count) 项").font(.caption).foregroundStyle(.secondary)
                 HStack {
@@ -1171,7 +1153,7 @@ struct DearSocialView: View {
     }
 
     private var activityTimelineSection: some View {
-        Section(photoViewMode == "tiles" ? "照片与视频" : "活动动态 · 照片、打卡与日常") {
+        Section {
             if photoViewMode == "tiles" {
                 ForEach(Array(photoGridRows.enumerated()), id: \.offset) { _, row in
                     HStack(alignment: .top, spacing: 4) {
@@ -1218,6 +1200,17 @@ struct DearSocialView: View {
                 if busy { ProgressView("正在异步加载活动照片与动态…").font(.subheadline) }
                 else { Text("还没有动态，拍照、写日常或打卡，留下活动的第一刻。").foregroundStyle(.secondary).font(.subheadline) }
             }
+        } header: {
+            HStack {
+                Text(String(localized: "活动动态", bundle: AgentIdentityLanguage.appBundle()))
+                Spacer()
+                Menu {
+                    Button(String(localized: "大图", bundle: AgentIdentityLanguage.appBundle()), systemImage: "rectangle") { photoViewMode = "grid" }
+                    Button(String(localized: "紧凑", bundle: AgentIdentityLanguage.appBundle()), systemImage: "list.bullet") { photoViewMode = "list" }
+                    Button(String(localized: "网格 · 每行5张", bundle: AgentIdentityLanguage.appBundle()), systemImage: "square.grid.3x3") { photoViewMode = "tiles" }
+                } label: { Image(systemName: "slider.horizontal.3") }
+                .accessibilityLabel(String(localized: "展示样式", bundle: AgentIdentityLanguage.appBundle()))
+            }.textCase(nil)
         }
     }
 
@@ -1233,7 +1226,16 @@ struct DearSocialView: View {
                     }.padding(.vertical, 4)
                 }
                 Section {
-                    Toggle(String(localized: "共享我的位置", bundle: AgentIdentityLanguage.appBundle()), isOn: Binding(get: { locations.sharing }, set: { locations.setSharing($0) }))
+                    HStack(spacing: 12) {
+                        Button { showingLocationMap = true } label: {
+                            HStack {
+                                Label(String(localized: "共享我的位置", bundle: AgentIdentityLanguage.appBundle()), systemImage: "location.fill")
+                                Spacer()
+                                Image(systemName: "chevron.right").font(.caption.weight(.semibold)).foregroundStyle(.secondary).accessibilityHidden(true)
+                            }
+                        }.buttonStyle(.plain)
+                        Toggle(String(localized: "共享我的位置", bundle: AgentIdentityLanguage.appBundle()), isOn: Binding(get: { locations.sharing }, set: { locations.setSharing($0) })).labelsHidden()
+                    }
                     NavigationLink {
                         DearActivityMapView(locations: locations, store: store, title: selectedActivity.text("title"), spaceID: activityTenantId, activityID: activityId,
                                             points: DearActivityMapPoint.points(checkIns: checkIns, photos: photos), photos: photos)
@@ -1267,6 +1269,10 @@ struct DearSocialView: View {
             if changed || rows.contains(where: { ($0["thumbnailAvailable"] as? Bool) == false }) {
                 try? await loadPhotos()
             }
+        }
+        .navigationDestination(isPresented: $showingLocationMap) {
+            DearActivityMapView(locations: locations, store: store, title: selectedActivity?.text("title") ?? "", spaceID: activityTenantId, activityID: activityId,
+                                points: DearActivityMapPoint.points(checkIns: checkIns, photos: photos), photos: photos, startSharingOnOpen: true)
         }
         .navigationTitle(selectedActivity?.text("title") ?? "活动详情")
         .navigationBarTitleDisplayMode(.inline)
@@ -1408,7 +1414,7 @@ struct DearSocialView: View {
                     }
                     let points = DearActivityMapPoint.points(checkIns: checkIns, photos: photos)
                     NavigationLink {
-                        DearActivityMapView(locations: locations, store: store, title: selectedActivity?.text("title") ?? "活动地图", spaceID: activityTenantId, activityID: activityId, points: points, photos: photos)
+                        DearActivityMapView(locations: locations, store: store, title: selectedActivity?.text("title") ?? "活动地图", spaceID: activityTenantId, activityID: activityId, points: points, photos: photos, initialMembersOnly: false)
                     } label: { Label("活动地图", systemImage: "map") }
                 } label: { Image(systemName: "ellipsis").accessibilityLabel("更多活动操作") }
     }
@@ -1796,6 +1802,45 @@ struct DearSocialView: View {
         try await loadMembers()
         notice = String(localized: "已将成员移出活动。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))
     }
+    private var relationshipsPage: some View {
+        List {
+            if !error.isEmpty { Text(error).foregroundStyle(.red) }
+            if !notice.isEmpty { Text(notice).foregroundStyle(.teal) }
+            Section(String(localized: "添加好友", bundle: AgentIdentityLanguage.appBundle())) {
+                TextField(String(localized: "用户名", bundle: AgentIdentityLanguage.appBundle()), text: $friendUsername).textInputAutocapitalization(.never).autocorrectionDisabled()
+                Button(String(localized: "申请好友", bundle: AgentIdentityLanguage.appBundle())) { run { try await requestFriendUsername() } }.disabled(busy || friendUsername.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+            }
+            Section(String(localized: "查看好友与申请", bundle: AgentIdentityLanguage.appBundle())) {
+                        if relationships.isEmpty { Text(String(localized: "还没有好友关系或申请。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) .foregroundStyle(.secondary) }
+                        ForEach(relationships) { relation in
+                            HStack {
+                                VStack(alignment: .leading) {
+                                    Text(relation.text("peerName"))
+                                    Text(relation.text("status") == "accepted" ? String(localized: "朋友", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)) : relation.text("direction") == "incoming" ? String(localized: "邀请你成为朋友", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)) : String(localized: "等待对方确认", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)))
+                                        .font(.caption).foregroundStyle(.secondary)
+                                }
+                                Spacer()
+                                if relation.text("status") == "pending" && relation.text("direction") == "incoming" {
+                                    Button(String(localized: "接受", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) { run { try await acceptFriend(relation) } }.disabled(busy)
+                                }
+                                Button(relation.text("status") == "accepted" ? String(localized: "解除", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)) : String(localized: "移除", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), role: .destructive) {
+                                    run { try await removeFriend(relation) }
+                                }.disabled(busy)
+                            }
+                        }
+            }
+        }
+        .navigationTitle(String(localized: "好友关系 · 跨空间", bundle: AgentIdentityLanguage.appBundle()))
+        .task { do { try await loadRelationships() } catch { self.error = momentDisplayError(error) } }
+    }
+    private func requestFriendUsername() async throws {
+        let username = friendUsername.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !username.isEmpty else { return }
+        _ = try await store.call(base + "relationships/requests", method: "POST", body: ["targetUsername": username])
+        friendUsername = ""; try await loadRelationships()
+        notice = String(localized: "好友申请已发出。", bundle: AgentIdentityLanguage.appBundle())
+    }
+
     private func loadRelationships() async throws {
         relationships = try DearRecord.list(await store.call(base + "relationships"))
     }
