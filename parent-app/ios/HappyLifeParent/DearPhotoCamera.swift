@@ -2,6 +2,9 @@ import AgentIdentity
 import AVFoundation
 import UIKit
 import Vision
+import CoreLocation
+import ImageIO
+import UniformTypeIdentifiers
 
 private enum DearCompositionAdvice: Equatable {
     case looking, clipped, groupBalance, portraitHeight, subjectPlacement, ready
@@ -224,8 +227,96 @@ private final class DearPhotoCapture: NSObject, AVCaptureVideoDataOutputSampleBu
     }
 }
 
+enum DearCaptureGeography {
+    static func valid(_ location: CLLocation, at date: Date = Date()) -> Bool {
+        CLLocationCoordinate2DIsValid(location.coordinate) && location.horizontalAccuracy >= 0 &&
+            location.horizontalAccuracy <= 100 && abs(location.timestamp.timeIntervalSince(date)) <= 15
+    }
+
+    static func tag(_ data: Data, location: CLLocation?) throws -> Data {
+        guard let location else { return data }
+        guard let source = CGImageSourceCreateWithData(data as CFData, nil),
+              let type = CGImageSourceGetType(source) else { throw CocoaError(.fileReadCorruptFile) }
+        var gps: [String: Any] = [
+            kCGImagePropertyGPSLatitude as String: abs(location.coordinate.latitude),
+            kCGImagePropertyGPSLatitudeRef as String: location.coordinate.latitude < 0 ? "S" : "N",
+            kCGImagePropertyGPSLongitude as String: abs(location.coordinate.longitude),
+            kCGImagePropertyGPSLongitudeRef as String: location.coordinate.longitude < 0 ? "W" : "E",
+            kCGImagePropertyGPSHPositioningError as String: location.horizontalAccuracy
+        ]
+        if location.verticalAccuracy >= 0, location.altitude.isFinite, (-12000...100000).contains(location.altitude) {
+            gps[kCGImagePropertyGPSAltitude as String] = abs(location.altitude)
+            gps[kCGImagePropertyGPSAltitudeRef as String] = location.altitude < 0 ? 1 : 0
+        }
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.timeZone = TimeZone(secondsFromGMT: 0)
+        formatter.dateFormat = "yyyy:MM:dd"
+        gps[kCGImagePropertyGPSDateStamp as String] = formatter.string(from: location.timestamp)
+        formatter.dateFormat = "HH:mm:ss.SSS"
+        gps[kCGImagePropertyGPSTimeStamp as String] = formatter.string(from: location.timestamp)
+        let output = NSMutableData()
+        guard let destination = CGImageDestinationCreateWithData(output, type, 1, nil) else { throw CocoaError(.fileWriteUnknown) }
+        CGImageDestinationAddImageFromSource(destination, source, 0, [kCGImagePropertyGPSDictionary: gps] as CFDictionary)
+        guard CGImageDestinationFinalize(destination) else { throw CocoaError(.fileWriteUnknown) }
+        return output as Data
+    }
+
+    static func location(in url: URL) -> CLLocation? {
+        guard let source = CGImageSourceCreateWithURL(url as CFURL, nil),
+              let props = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [String: Any],
+              let gps = props[kCGImagePropertyGPSDictionary as String] as? [String: Any],
+              let latitude = gps[kCGImagePropertyGPSLatitude as String] as? Double,
+              let longitude = gps[kCGImagePropertyGPSLongitude as String] as? Double else { return nil }
+        let lat = gps[kCGImagePropertyGPSLatitudeRef as String] as? String == "S" ? -latitude : latitude
+        let lon = gps[kCGImagePropertyGPSLongitudeRef as String] as? String == "W" ? -longitude : longitude
+        let altitude = gps[kCGImagePropertyGPSAltitude as String] as? Double
+        let signedAltitude = gps[kCGImagePropertyGPSAltitudeRef as String] as? Int == 1 ? -(altitude ?? 0) : altitude ?? 0
+        return CLLocation(coordinate: CLLocationCoordinate2D(latitude: lat, longitude: lon), altitude: signedAltitude,
+                          horizontalAccuracy: gps[kCGImagePropertyGPSHPositioningError as String] as? Double ?? 100,
+                          verticalAccuracy: altitude == nil ? -1 : 0, timestamp: Date())
+    }
+}
+
+private final class DearCameraLocation: NSObject, CLLocationManagerDelegate {
+    private let manager = CLLocationManager()
+    private(set) var location: CLLocation?
+    private var active = false
+    var denied: Bool { manager.authorizationStatus == .denied || manager.authorizationStatus == .restricted }
+    var changed: (() -> Void)?
+    override init() {
+        super.init()
+        manager.delegate = self
+        manager.desiredAccuracy = kCLLocationAccuracyBest
+        manager.distanceFilter = kCLDistanceFilterNone
+    }
+    func start() {
+        active = true
+        switch manager.authorizationStatus {
+        case .notDetermined: manager.requestWhenInUseAuthorization()
+        case .authorizedAlways, .authorizedWhenInUse: manager.startUpdatingLocation()
+        default: location = nil
+        }
+        changed?()
+    }
+    func stop() { active = false; manager.stopUpdatingLocation() }
+    func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) { if active { start() } }
+    func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
+        guard active else { return }
+        location = locations.last(where: { DearCaptureGeography.valid($0) })
+        changed?()
+    }
+    func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {
+        location = nil
+        changed?()
+    }
+}
+
 final class DearPhotoCameraController: UIViewController {
     private let completion: (Result<(URL, Bool)?, Error>) -> Void
+    private let recordLocation: Bool
+    private let locator = DearCameraLocation()
+    private let locationLabel = UILabel()
     private let camera = DearPhotoCapture()
     private lazy var preview = AVCaptureVideoPreviewLayer(session: camera.session)
     private let grid = CAShapeLayer()
@@ -253,7 +344,8 @@ final class DearPhotoCameraController: UIViewController {
     private var pendingAdvice: DearCompositionAdvice?
     private var clearStaleFrame: DispatchWorkItem?
 
-    init(completion: @escaping (Result<(URL, Bool)?, Error>) -> Void) {
+    init(recordLocation: Bool = false, completion: @escaping (Result<(URL, Bool)?, Error>) -> Void) {
+        self.recordLocation = recordLocation
         self.completion = completion
         super.init(nibName: nil, bundle: nil)
     }
@@ -350,6 +442,23 @@ final class DearPhotoCameraController: UIViewController {
         }
         NotificationCenter.default.addObserver(self, selector: #selector(sessionFailed(_:)),
                                                name: AVCaptureSession.runtimeErrorNotification, object: camera.session)
+        if recordLocation {
+            locationLabel.font = .preferredFont(forTextStyle: .caption1)
+            locationLabel.textColor = .white
+            locationLabel.backgroundColor = UIColor.black.withAlphaComponent(0.75)
+            locationLabel.textAlignment = .center
+            locationLabel.numberOfLines = 2
+            locationLabel.translatesAutoresizingMaskIntoConstraints = false
+            view.addSubview(locationLabel)
+            NSLayoutConstraint.activate([
+                locationLabel.topAnchor.constraint(equalTo: guide.bottomAnchor, constant: 8),
+                locationLabel.centerXAnchor.constraint(equalTo: safe.centerXAnchor),
+                locationLabel.widthAnchor.constraint(lessThanOrEqualTo: safe.widthAnchor, constant: -32),
+                locationLabel.heightAnchor.constraint(greaterThanOrEqualToConstant: 28)
+            ])
+            locator.changed = { [weak self] in self?.updateLocationLabel() }
+            updateLocationLabel()
+        }
         updateControls()
         camera.prepare { [weak self] prepared in
             guard let self, !self.finished else { return }
@@ -362,11 +471,13 @@ final class DearPhotoCameraController: UIViewController {
 
     override func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
+        if recordLocation { locator.start() }
         if ready, data == nil, !finished { camera.run(true) }
     }
 
     override func viewWillDisappear(_ animated: Bool) {
         super.viewWillDisappear(animated)
+        locator.stop()
         camera.run(false)
         clearStaleFrame?.cancel()
     }
@@ -573,8 +684,30 @@ final class DearPhotoCameraController: UIViewController {
         gesture.scale = 1
     }
 
-    @objc private func takePhoto() {
+    private func updateLocationLabel() {
+        if let location = locator.location, DearCaptureGeography.valid(location) {
+            locationLabel.text = location.verticalAccuracy >= 0 && location.altitude.isFinite && (-12000...100000).contains(location.altitude)
+                ? String(format: String(localized: "位置已获取 · 海拔 %.1f 米", bundle: AgentIdentityLanguage.appBundle()), location.altitude)
+                : String(localized: "位置已获取 · 海拔暂未获取", bundle: AgentIdentityLanguage.appBundle())
+        } else {
+            locationLabel.text = locator.denied
+                ? String(localized: "位置访问未获授权，请在系统设置中开启。", bundle: AgentIdentityLanguage.appBundle())
+                : String(localized: "等待定位，请保持位置权限开启", bundle: AgentIdentityLanguage.appBundle())
+        }
+    }
+
+    @objc private func takePhoto() { capturePhoto(allowMissingLocation: false) }
+
+    private func capturePhoto(allowMissingLocation: Bool) {
         guard shutter.isEnabled, data == nil else { return }
+        let location = recordLocation ? locator.location.flatMap { DearCaptureGeography.valid($0) ? $0 : nil } : nil
+        if recordLocation, location == nil, !allowMissingLocation {
+            let alert = UIAlertController(title: nil, message: String(localized: "尚未获取有效定位，可稍后重试或选择不记录位置拍摄。", bundle: AgentIdentityLanguage.appBundle()), preferredStyle: .alert)
+            alert.addAction(UIAlertAction(title: String(localized: "取消", bundle: AgentIdentityLanguage.appBundle()), style: .cancel))
+            alert.addAction(UIAlertAction(title: String(localized: "不记录位置拍摄", bundle: AgentIdentityLanguage.appBundle()), style: .default) { [weak self] _ in self?.capturePhoto(allowMissingLocation: true) })
+            present(alert, animated: true)
+            return
+        }
         takingPhoto = true
         refreshAnalysis()
         camera.takePhoto(flash: flashMode) { [weak self] data in
@@ -587,7 +720,9 @@ final class DearPhotoCameraController: UIViewController {
                 self.present(alert, animated: true)
                 return
             }
-            self.data = data
+            do { self.data = try DearCaptureGeography.tag(data, location: location) }
+            catch { self.finish(.failure(error)); return }
+            self.locationLabel.isHidden = true
             self.review.image = image
             self.camera.run(false)
             self.refreshAnalysis()
@@ -597,6 +732,8 @@ final class DearPhotoCameraController: UIViewController {
     @objc private func retakePhoto() {
         data = nil
         review.image = nil
+        locationLabel.isHidden = !recordLocation
+        updateLocationLabel()
         refreshAnalysis()
         camera.run(true)
     }
@@ -615,6 +752,7 @@ final class DearPhotoCameraController: UIViewController {
     private func finish(_ result: Result<(URL, Bool)?, Error>) {
         guard !finished else { return }
         finished = true
+        locator.stop()
         camera.run(false)
         clearStaleFrame?.cancel()
         completion(result)

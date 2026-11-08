@@ -16,11 +16,12 @@ struct DearCamera: UIViewControllerRepresentable {
         var id: String { rawValue }
     }
     let mode: Mode
+    var recordLocation = false
     let completion: (Result<(URL, Bool)?, Error>) -> Void
 
     func makeCoordinator() -> Coordinator { Coordinator(completion: completion) }
     func makeUIViewController(context: Context) -> UIViewController {
-        if mode == .photo { return DearPhotoCameraController(completion: completion) }
+        if mode == .photo { return DearPhotoCameraController(recordLocation: recordLocation, completion: completion) }
         let picker = UIImagePickerController()
         picker.sourceType = .camera
         picker.mediaTypes = [UTType.movie.identifier]
@@ -1166,7 +1167,7 @@ struct DearSocialView: View {
         .sheet(isPresented: $showingCheckIn) { checkInSheet }
         .sheet(isPresented: $showingMomentCreate) { momentCreateSheet }
         .fullScreenCover(item: $cameraMode, onDismiss: { shareCapturedMedia() }) { mode in
-            DearCamera(mode: mode) { result in
+            DearCamera(mode: mode, recordLocation: true) { result in
                 switch result {
                 case .success(let media):
                     if let (url, video) = media, let target = cameraTarget {
@@ -1302,11 +1303,13 @@ struct DearSocialView: View {
                     throw APIError.message("登录状态已变化，拍摄内容未共享。请另存到相册，再使用当前账号选择共享。")
                 }
                 if !capture.savedToLibrary {
+                    let photoLocation = capture.video ? nil : DearCaptureGeography.location(in: capture.url)
                     try await PHPhotoLibrary.shared().performChanges {
                         if capture.video {
                             PHAssetChangeRequest.creationRequestForAssetFromVideo(atFileURL: capture.url)
                         } else {
-                            PHAssetChangeRequest.creationRequestForAssetFromImage(atFileURL: capture.url)
+                            let request = PHAssetChangeRequest.creationRequestForAssetFromImage(atFileURL: capture.url)
+                            request?.location = photoLocation
                         }
                     }
                     capturedMedia?.savedToLibrary = true

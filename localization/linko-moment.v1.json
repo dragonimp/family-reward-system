@@ -5380,6 +5380,31 @@
       "zh-Hans": "请先结束当前运动，再从活动创建运动。",
       "en": "Finish the current workout before creating one from an activity.",
       "iosKey": "请先结束当前运动，再从活动创建运动。"
+    },
+    "moment.camera_location_ready": {
+      "zh-Hans": "位置已获取 · 海拔 %.1f 米",
+      "en": "Location ready · Altitude %.1f m",
+      "iosKey": "位置已获取 · 海拔 %.1f 米"
+    },
+    "moment.camera_altitude_missing": {
+      "zh-Hans": "位置已获取 · 海拔暂未获取",
+      "en": "Location ready · Altitude unavailable",
+      "iosKey": "位置已获取 · 海拔暂未获取"
+    },
+    "moment.camera_locating": {
+      "zh-Hans": "等待定位，请保持位置权限开启",
+      "en": "Waiting for location. Keep location access enabled.",
+      "iosKey": "等待定位，请保持位置权限开启"
+    },
+    "moment.camera_location_unavailable": {
+      "zh-Hans": "尚未获取有效定位，可稍后重试或选择不记录位置拍摄。",
+      "en": "A valid location is not available yet. Try again later or take the photo without location.",
+      "iosKey": "尚未获取有效定位，可稍后重试或选择不记录位置拍摄。"
+    },
+    "moment.camera_skip_location": {
+      "zh-Hans": "不记录位置拍摄",
+      "en": "Take photo without location",
+      "iosKey": "不记录位置拍摄"
     }
   }
 }

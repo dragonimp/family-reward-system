@@ -1155,3 +1155,8 @@
 "创建运动" = "Create workout";
 "徒步" = "Hiking";
 "取消关联" = "Unlink activity";
+"位置已获取 · 海拔 %.1f 米" = "Location ready · Altitude %.1f m";
+"位置已获取 · 海拔暂未获取" = "Location ready · Altitude unavailable";
+"等待定位，请保持位置权限开启" = "Waiting for location. Keep location access enabled.";
+"尚未获取有效定位，可稍后重试或选择不记录位置拍摄。" = "A valid location is not available yet. Try again later or take the photo without location.";
+"不记录位置拍摄" = "Take photo without location";
