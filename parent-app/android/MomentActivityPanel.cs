@@ -167,7 +167,7 @@ public sealed class MomentActivityPanel : ContentView
         summary.Add(MomentStyle.Caption("▦ " + MomentDates.ActivityLabel(selected)));
         var memberCount = MomentStyle.Caption("成员"); summary.Add(memberCount, 1); section.Add(MomentStyle.Card(summary));
         _ = LoadMembers();
-        async Task LoadMembers() { try { var value = await store.CallAsync(scope.Api + "/members"); if (activity?.Id == selected.Id) memberCount.Text = MomentRecord.List(value).Count + " 位成员"; } catch { } }
+        async Task LoadMembers() { try { var value = await store.CallAsync(scope.Api + "/members"); if (activity?.Id == selected.Id) memberCount.Text = value.GetArrayLength() + " 位成员"; } catch { } }
         var sharing = new VerticalStackLayout { Spacing = 4 };
         var shareRow = new Grid { ColumnDefinitions = new ColumnDefinitionCollection { new(GridLength.Star), new(GridLength.Auto) } };
         shareRow.Add(new Label { Text = "共享我的位置", FontSize = 17, VerticalTextAlignment = TextAlignment.Center });
