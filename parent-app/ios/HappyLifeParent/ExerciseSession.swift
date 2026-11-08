@@ -14,6 +14,12 @@ struct ExerciseArchive: Codable {
     var uploaded: [UUID]?
     var pendingDeletions: [UUID]?
 
+    func activityRecords(tenantID: UUID, activityID: UUID) -> [ExerciseSession] {
+        ([active].compactMap { $0 } + history).filter {
+            $0.activity?.tenantID == tenantID && $0.activity?.id == activityID && !(pendingDeletions ?? []).contains($0.id)
+        }.sorted { $0.startedAt == $1.startedAt ? $0.id.uuidString < $1.id.uuidString : $0.startedAt > $1.startedAt }
+    }
+
     func write(to file: URL) throws {
         try FileManager.default.createDirectory(at: file.deletingLastPathComponent(), withIntermediateDirectories: true)
         let encoder = JSONEncoder(); encoder.dateEncodingStrategy = .iso8601

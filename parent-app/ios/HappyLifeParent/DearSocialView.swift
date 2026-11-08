@@ -2,6 +2,7 @@ import AgentIdentity
 import SwiftUI
 import AgentIdentity
 import CoreLocation
+import CryptoKit
 import PhotosUI
 import CoreTransferable
 import UniformTypeIdentifiers
@@ -534,16 +535,19 @@ private struct DearActivityMapView: View {
 
 private struct DearTimelineEntry: Identifiable {
     let id: String
-    enum Kind { case photo, moment, checkIn }
+    enum Kind { case photo, moment, checkIn, exercise }
     let kind: Kind
     var checkIn: Bool { kind == .checkIn }
     let record: DearRecord
+    var exercise: ExerciseSession? = nil
 }
 
 struct DearSocialView: View {
     @Environment(\.scenePhase) private var scenePhase
     @StateObject private var locations = MomentActivityLocations()
     @State private var refreshingActivityList = false
+    @State private var exerciseArchive = ExerciseArchive()
+    @State private var exerciseRevision = UUID()
     @ObservedObject var store: FamilyStore
     var showLogout = false
     @State private var showingAnonymousShares = false
@@ -860,7 +864,7 @@ struct DearSocialView: View {
             if phase == .active && showingActivity { locations.activate(store: store, tenant: activityTenantId, activity: activityId) }
             else if phase == .background { locations.stop() }
         }
-        .onChange(of: store.identity.accountIdentifier) { _, _ in locations.stop() }
+        .onChange(of: store.identity.accountIdentifier) { _, _ in locations.stop(); exerciseArchive = ExerciseArchive() }
     }
 
     @ViewBuilder private func photoLink(_ photo: DearRecord) -> some View {
@@ -1145,10 +1149,21 @@ struct DearSocialView: View {
     }
 
     private var activityTimeline: [DearTimelineEntry] {
-        let shared = moments.map { DearTimelineEntry(id: "moment:" + $0.id, kind: .moment, record: $0) }
+        let records: [ExerciseSession]
+        if let tenant = UUID(uuidString: activityTenantId), let activity = UUID(uuidString: activityId) {
+            records = exerciseArchive.activityRecords(tenantID: tenant, activityID: activity)
+        } else { records = [] }
+        let published = Set(records.compactMap { exerciseArchive.activityShares?[$0.id] })
+        let shared = moments.filter { row in
+            !(UUID(uuidString: row.id).map { published.contains($0) } ?? false) && !records.contains { UUID(uuidString: row.text("requestId")) == $0.id }
+        }.map { DearTimelineEntry(id: "moment:" + $0.id, kind: .moment, record: $0) }
+        let exercises = records.map { record in
+            DearTimelineEntry(id: "exercise:" + record.id.uuidString, kind: .exercise,
+                record: DearRecord(data: ["id": record.id.uuidString, "createdAt": ISO8601DateFormatter().string(from: record.startedAt)]), exercise: record)
+        }
         let located = checkIns.map { DearTimelineEntry(id: "checkin:" + $0.id, kind: .checkIn, record: $0) }
         let media = photos.map { DearTimelineEntry(id: "photo:" + $0.id, kind: .photo, record: $0) }
-        return (shared + located + media).sorted {
+        return (shared + located + media + exercises).sorted {
             let left = $0.record.sortDate
             let right = $1.record.sortDate
             return left == right ? $0.id < $1.id : left > right
@@ -1166,7 +1181,12 @@ struct DearSocialView: View {
                 }
             }
             ForEach(activityTimeline.filter { photoViewMode != "tiles" || $0.kind != .photo }, id: \.id) { entry in
-                if entry.kind == .photo {
+                if let exercise = entry.exercise {
+                    ActivityExerciseTimelineRow(record: exercise) {
+                        store.pendingExerciseContinuation = exercise.id
+                        showingActivity = false
+                    }
+                } else if entry.kind == .photo {
                     photoTimelineRow(entry.record)
                 } else {
                 VStack(alignment: .leading, spacing: 8) {
@@ -1226,6 +1246,17 @@ struct DearSocialView: View {
         }
         .listStyle(.insetGrouped)
         .onAppear { locations.activate(store: store, tenant: activityTenantId, activity: activityId) }
+        .onReceive(NotificationCenter.default.publisher(for: .exerciseRecordsChanged)) { _ in exerciseRevision = UUID() }
+        .task(id: activityTenantId + activityId + (store.profile?.text("unifiedUserId") ?? "") + exerciseRevision.uuidString) {
+            guard let owner = store.profile?.text("unifiedUserId"), !owner.isEmpty else { return }
+            let snapshot = await Task.detached(priority: .utility) {
+                let key = SHA256.hash(data: Data(owner.utf8)).map { String(format: "%02x", $0) }.joined()
+                let file = ExerciseSession.archiveURL(userID: key)
+                return (try? ExerciseSession.syncDecoder().decode(ExerciseArchive.self, from: Data(contentsOf: file))) ?? ExerciseArchive()
+            }.value
+            guard !Task.isCancelled else { return }
+            exerciseArchive = snapshot
+        }
         .readablePage()
         .task(id: activityTenantId + activityId + photos.map(\.id).joined()) {
             let tenant = activityTenantId, activity = activityId, rows = photos.map(\.data)

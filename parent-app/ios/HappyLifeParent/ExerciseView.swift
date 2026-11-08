@@ -660,3 +660,29 @@ struct ActivityExerciseRecords: View {
         records = ([archive.active].compactMap { $0 } + archive.history).filter { $0.activity?.id == id }
     }
 }
+
+
+struct ActivityExerciseTimelineRow: View {
+    let record: ExerciseSession
+    let onContinue: () -> Void
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Label(exerciseKindTitle(record.kind), systemImage: "figure.hiking").font(.headline)
+            Text(record.startedAt, style: .date).font(.caption).foregroundStyle(.secondary)
+            Text(record.startedAt, style: .time).font(.caption).foregroundStyle(.secondary)
+            Text("\(record.distanceText) · \(ExerciseSession.clock(record.duration(at: record.endedAt ?? .now)))")
+            if record.endedAt == nil {
+                Text(record.running ? String(localized: "进行中", bundle: AgentIdentityLanguage.appBundle()) : String(localized: "已暂停", bundle: AgentIdentityLanguage.appBundle())).font(.caption).foregroundStyle(.teal)
+            }
+            if !record.routePoints.isEmpty {
+                NavigationLink {
+                    ExerciseRouteMap(points: record.routePoints, live: record.endedAt == nil)
+                        .navigationTitle(exerciseKindTitle(record.kind))
+                } label: { Label(String(localized: "查看完整轨迹", bundle: AgentIdentityLanguage.appBundle()), systemImage: "map") }
+            }
+            if record.endedAt != nil {
+                Button(String(localized: "继续", bundle: AgentIdentityLanguage.appBundle()), action: onContinue).buttonStyle(.borderless)
+            }
+        }.padding(.vertical, 6)
+    }
+}

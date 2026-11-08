@@ -130,6 +130,15 @@ import Foundation
         var unfinished = elevated; unfinished.endedAt = nil
         do { _ = try ExerciseDeliveryEnvelope.decode(encoder.encode(ExerciseDeliveryEnvelope(owner: envelope.owner, record: unfinished))); preconditionFailure("unfinished delivery accepted") } catch { }
         print("PASS: negative altitude and accuracy roundtrip, durable delivery replay, conflict preservation and incomplete delivery rejection")
+        let tenant = UUID(), activity = UUID()
+        var linked = session; linked.activity = ExerciseActivity(tenantID: tenant, id: activity, title: "Trip")
+        var live = linked; live.id = UUID(); live.startedAt = start.addingTimeInterval(100); live.endedAt = nil
+        var otherTenant = linked; otherTenant.id = UUID(); otherTenant.activity = ExerciseActivity(tenantID: UUID(), id: activity, title: "Other")
+        var feed = ExerciseArchive(); feed.active = live; feed.history = [linked, otherTenant]
+        precondition(feed.activityRecords(tenantID: UUID(uuidString: tenant.uuidString.lowercased())!, activityID: activity).map(\.id) == [live.id, linked.id])
+        feed.pendingDeletions = [linked.id]
+        precondition(feed.activityRecords(tenantID: tenant, activityID: activity).map(\.id) == [live.id])
+        print("PASS: activity feed includes active and completed workouts, sorts by start, isolates tenant and excludes pending deletions")
         print("PASS: continuation preserves completed record and excludes stopped time")
         print("PASS: distance totals, pause exclusion, persistence, legacy archive compatibility")
         print("PASS: pause/resume, interval steps, completed immutability, restart persistence, local time across midnight")
