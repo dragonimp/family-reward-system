@@ -5406,10 +5406,20 @@
       "en": "Take photo without location",
       "iosKey": "不记录位置拍摄"
     },
-    "moment.camera.composition_capture": {
-      "zh-Hans": "实时构图拍照",
-      "en": "Live composition camera",
-      "iosKey": "实时构图拍照"
+    "moment.camera_zoom": {
+      "iosKey": "变焦倍率",
+      "zh-Hans": "变焦倍率",
+      "en": "Zoom"
+    },
+    "moment.camera_exposure": {
+      "iosKey": "曝光补偿",
+      "zh-Hans": "曝光补偿",
+      "en": "Exposure compensation"
+    },
+    "moment.camera_focus_lock": {
+      "iosKey": "自动曝光/对焦锁定",
+      "zh-Hans": "自动曝光/对焦锁定",
+      "en": "AE/AF lock"
     }
   }
 }

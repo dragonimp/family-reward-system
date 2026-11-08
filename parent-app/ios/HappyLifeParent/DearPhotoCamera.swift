@@ -61,6 +61,18 @@ private struct DearCompositionFrame {
     }
 }
 
+private struct DearCameraControls {
+    let minimum: CGFloat
+    let maximum: CGFloat
+    let zoom: CGFloat
+    let wideFactor: CGFloat
+    let presets: [CGFloat]
+    let exposure: Float
+    let minExposure: Float
+    let maxExposure: Float
+    let locked: Bool
+}
+
 private final class DearPhotoCapture: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate, AVCapturePhotoCaptureDelegate {
     let session = AVCaptureSession()
     private let queue = DispatchQueue(label: "moment.activity.camera", qos: .userInitiated)
@@ -75,16 +87,52 @@ private final class DearPhotoCapture: NSObject, AVCaptureVideoDataOutputSampleBu
     private var photoCompletion: ((Data?) -> Void)?
     private var photoData: Data?
     var onFrame: ((Int, DearCompositionFrame) -> Void)?
+    var onControls: ((DearCameraControls) -> Void)?
+
+    private static func device(position: AVCaptureDevice.Position) -> AVCaptureDevice? {
+        let types: [AVCaptureDevice.DeviceType] = position == .back
+            ? [.builtInTripleCamera, .builtInDualWideCamera, .builtInDualCamera, .builtInWideAngleCamera]
+            : [.builtInWideAngleCamera]
+        return types.compactMap { AVCaptureDevice.default($0, for: .video, position: position) }.first
+    }
+
+    private static func wideFactor(_ device: AVCaptureDevice) -> CGFloat {
+        if device.constituentDevices.contains(where: { $0.deviceType == .builtInUltraWideCamera }),
+           let first = device.virtualDeviceSwitchOverVideoZoomFactors.first { return CGFloat(first.doubleValue) }
+        return 1
+    }
+
+    private func publishControls() {
+        guard let device = input?.device else { return }
+        let wide = Self.wideFactor(device)
+        let minimum = device.minAvailableVideoZoomFactor
+        let maximum = min(device.maxAvailableVideoZoomFactor, device.activeFormat.videoMaxZoomFactor)
+        let candidates = [minimum, wide, wide * 2] + device.virtualDeviceSwitchOverVideoZoomFactors.map { CGFloat($0.doubleValue) }
+        let presets = Array(Set(candidates.filter { $0 >= minimum && $0 <= maximum })).sorted()
+        let state = DearCameraControls(minimum: minimum, maximum: maximum, zoom: device.videoZoomFactor,
+            wideFactor: wide, presets: presets, exposure: device.exposureTargetBias,
+            minExposure: device.minExposureTargetBias, maxExposure: device.maxExposureTargetBias,
+            locked: device.focusMode == .locked && device.exposureMode == .locked)
+        DispatchQueue.main.async { [weak self] in self?.onControls?(state) }
+    }
+
+    private func resetControls() {
+        guard let device = input?.device, (try? device.lockForConfiguration()) != nil else { return }
+        defer { device.unlockForConfiguration() }
+        device.videoZoomFactor = min(max(Self.wideFactor(device), device.minAvailableVideoZoomFactor), device.maxAvailableVideoZoomFactor)
+        device.setExposureTargetBias(min(max(0, device.minExposureTargetBias), device.maxExposureTargetBias))
+    }
 
     func prepare(_ completion: @escaping (Bool) -> Void) {
         queue.async {
             let prepared = self.configure()
+            if prepared { self.resetControls(); self.publishControls() }
             DispatchQueue.main.async { completion(prepared) }
         }
     }
 
     private func configure() -> Bool {
-        guard let device = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: .back)
+        guard let device = Self.device(position: .back)
                 ?? AVCaptureDevice.default(for: .video),
               let input = try? AVCaptureDeviceInput(device: device) else { return false }
         session.beginConfiguration()
@@ -132,7 +180,7 @@ private final class DearPhotoCapture: NSObject, AVCaptureVideoDataOutputSampleBu
             self.videoOutput.setSampleBufferDelegate(nil, queue: nil)
             if let previous = self.input {
                 let next: AVCaptureDevice.Position = previous.device.position == .front ? .back : .front
-                if let device = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: next),
+                if let device = Self.device(position: next),
                    let replacement = try? AVCaptureDeviceInput(device: device) {
                     self.session.beginConfiguration()
                     self.session.removeInput(previous)
@@ -145,15 +193,22 @@ private final class DearPhotoCapture: NSObject, AVCaptureVideoDataOutputSampleBu
                     self.session.commitConfiguration()
                 }
             }
+            self.resetControls()
+            self.publishControls()
             let mirrored = self.input?.device.position == .front
             DispatchQueue.main.async { completion(mirrored) }
         }
     }
 
-    func focus(at point: CGPoint) {
+    func focus(at point: CGPoint, lock: Bool = false) {
         queue.async {
             guard let device = self.input?.device, (try? device.lockForConfiguration()) != nil else { return }
-            defer { device.unlockForConfiguration() }
+            defer { device.unlockForConfiguration(); self.publishControls() }
+            if lock {
+                if device.isFocusModeSupported(.locked) { device.focusMode = .locked }
+                if device.isExposureModeSupported(.locked) { device.exposureMode = .locked }
+                return
+            }
             if device.isFocusPointOfInterestSupported, device.isFocusModeSupported(.autoFocus) {
                 device.focusPointOfInterest = point
                 device.focusMode = .autoFocus
@@ -165,12 +220,21 @@ private final class DearPhotoCapture: NSObject, AVCaptureVideoDataOutputSampleBu
         }
     }
 
-    func zoom(by scale: CGFloat) {
+    func zoom(by scale: CGFloat = 1, to factor: CGFloat? = nil) {
         queue.async {
-            guard let device = self.input?.device, (try? device.lockForConfiguration()) != nil else { return }
-            defer { device.unlockForConfiguration() }
-            let limit = min(device.maxAvailableVideoZoomFactor, 8)
-            device.videoZoomFactor = min(max(device.videoZoomFactor * scale, device.minAvailableVideoZoomFactor), limit)
+            guard scale.isFinite, scale > 0, factor?.isFinite != false,
+                  let device = self.input?.device, (try? device.lockForConfiguration()) != nil else { return }
+            defer { device.unlockForConfiguration(); self.publishControls() }
+            let maximum = min(device.maxAvailableVideoZoomFactor, device.activeFormat.videoMaxZoomFactor)
+            device.videoZoomFactor = min(max(factor ?? device.videoZoomFactor * scale, device.minAvailableVideoZoomFactor), maximum)
+        }
+    }
+
+    func exposure(_ value: Float) {
+        queue.async {
+            guard value.isFinite, let device = self.input?.device, (try? device.lockForConfiguration()) != nil else { return }
+            defer { device.unlockForConfiguration(); self.publishControls() }
+            device.setExposureTargetBias(min(max(value, device.minExposureTargetBias), device.maxExposureTargetBias))
         }
     }
 
@@ -279,10 +343,9 @@ enum DearCaptureGeography {
     }
 }
 
-final class DearCameraLocation: NSObject, CLLocationManagerDelegate {
+private final class DearCameraLocation: NSObject, CLLocationManagerDelegate {
     private let manager = CLLocationManager()
     private(set) var location: CLLocation?
-    private var history: [CLLocation] = []
     private var active = false
     var denied: Bool { manager.authorizationStatus == .denied || manager.authorizationStatus == .restricted }
     var changed: (() -> Void)?
@@ -305,15 +368,8 @@ final class DearCameraLocation: NSObject, CLLocationManagerDelegate {
     func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) { if active { start() } }
     func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
         guard active else { return }
-        let valid = locations.filter { DearCaptureGeography.valid($0) }
-        history.append(contentsOf: valid)
-        if history.count > 1800 { history.removeFirst(history.count - 1800) }
-        location = valid.last
+        location = locations.last(where: { DearCaptureGeography.valid($0) })
         changed?()
-    }
-    func location(at date: Date) -> CLLocation? {
-        history.filter { abs($0.timestamp.timeIntervalSince(date)) <= 5 }
-            .min { abs($0.timestamp.timeIntervalSince(date)) < abs($1.timestamp.timeIntervalSince(date)) }
     }
     func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {
         location = nil
@@ -332,6 +388,14 @@ final class DearPhotoCameraController: UIViewController {
     private let outlines = CAShapeLayer()
     private let review = UIImageView()
     private let adviceLabel = UILabel()
+    private let zoomPanel = UIStackView()
+    private let zoomButtons = UIStackView()
+    private let zoomValue = UILabel()
+    private let zoomSlider = UISlider()
+    private let exposureSlider = UISlider()
+    private let exposureButton = UIButton(type: .system)
+    private let lockLabel = UILabel()
+    private var controlState: DearCameraControls?
     private let shutter = UIButton(type: .system)
     private let switchLens = UIButton(type: .system)
     private let guide = UIButton(type: .system)
@@ -419,8 +483,47 @@ final class DearPhotoCameraController: UIViewController {
         adviceLabel.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(adviceLabel)
 
+        configure(exposureButton, String(localized: "曝光补偿", bundle: AgentIdentityLanguage.appBundle()), icon: "plusminus.circle", action: #selector(toggleExposure))
+        zoomPanel.axis = .vertical
+        zoomPanel.spacing = 2
+        zoomPanel.backgroundColor = UIColor.black.withAlphaComponent(0.65)
+        zoomPanel.layer.cornerRadius = 12
+        zoomPanel.isLayoutMarginsRelativeArrangement = true
+        zoomPanel.layoutMargins = UIEdgeInsets(top: 2, left: 12, bottom: 2, right: 12)
+        zoomButtons.distribution = .fillEqually
+        zoomValue.font = .monospacedDigitSystemFont(ofSize: 12, weight: .medium)
+        zoomValue.textColor = .white
+        zoomValue.textAlignment = .center
+        zoomSlider.minimumValue = 0
+        zoomSlider.maximumValue = 1
+        zoomSlider.accessibilityLabel = String(localized: "变焦倍率", bundle: AgentIdentityLanguage.appBundle())
+        zoomSlider.addTarget(self, action: #selector(slideZoom), for: .valueChanged)
+        exposureSlider.accessibilityLabel = String(localized: "曝光补偿", bundle: AgentIdentityLanguage.appBundle())
+        exposureSlider.addTarget(self, action: #selector(slideExposure), for: .valueChanged)
+        exposureSlider.isHidden = true
+        for item in [zoomButtons, zoomValue, zoomSlider, exposureSlider] { zoomPanel.addArrangedSubview(item) }
+        zoomPanel.translatesAutoresizingMaskIntoConstraints = false
+        view.addSubview(zoomPanel)
+        lockLabel.text = String(localized: "自动曝光/对焦锁定", bundle: AgentIdentityLanguage.appBundle())
+        lockLabel.font = .preferredFont(forTextStyle: .caption1)
+        lockLabel.textColor = .systemYellow
+        lockLabel.backgroundColor = UIColor.black.withAlphaComponent(0.7)
+        lockLabel.isHidden = true
+        lockLabel.translatesAutoresizingMaskIntoConstraints = false
+        view.addSubview(lockLabel)
         let safe = view.safeAreaLayoutGuide
+        let zoomWidth = zoomPanel.widthAnchor.constraint(equalToConstant: 320)
+        zoomWidth.priority = .defaultHigh
         NSLayoutConstraint.activate([
+            zoomWidth,
+            zoomPanel.bottomAnchor.constraint(equalTo: shutter.topAnchor, constant: -8),
+            zoomPanel.centerXAnchor.constraint(equalTo: safe.centerXAnchor),
+            zoomPanel.widthAnchor.constraint(lessThanOrEqualTo: safe.widthAnchor, constant: -64),
+            zoomPanel.widthAnchor.constraint(lessThanOrEqualToConstant: 360),
+            exposureButton.centerXAnchor.constraint(equalTo: shutter.centerXAnchor, constant: 68),
+            exposureButton.centerYAnchor.constraint(equalTo: shutter.centerYAnchor),
+            lockLabel.topAnchor.constraint(equalTo: guide.bottomAnchor, constant: 42),
+            lockLabel.centerXAnchor.constraint(equalTo: safe.centerXAnchor),
             cancel.leadingAnchor.constraint(equalTo: safe.leadingAnchor, constant: 12),
             cancel.topAnchor.constraint(equalTo: safe.topAnchor, constant: 8),
             guide.trailingAnchor.constraint(equalTo: safe.trailingAnchor, constant: -12),
@@ -437,7 +540,7 @@ final class DearPhotoCameraController: UIViewController {
             retake.centerYAnchor.constraint(equalTo: shutter.centerYAnchor),
             usePhoto.trailingAnchor.constraint(equalTo: safe.trailingAnchor, constant: -16),
             usePhoto.centerYAnchor.constraint(equalTo: shutter.centerYAnchor),
-            adviceLabel.bottomAnchor.constraint(equalTo: shutter.topAnchor, constant: -8),
+            adviceLabel.bottomAnchor.constraint(equalTo: zoomPanel.topAnchor, constant: -6),
             adviceLabel.leadingAnchor.constraint(equalTo: safe.leadingAnchor, constant: 32),
             adviceLabel.trailingAnchor.constraint(equalTo: safe.trailingAnchor, constant: -32),
             adviceLabel.heightAnchor.constraint(greaterThanOrEqualToConstant: 32)
@@ -447,6 +550,8 @@ final class DearPhotoCameraController: UIViewController {
         focusGesture.cancelsTouchesInView = false
         view.addGestureRecognizer(focusGesture)
         view.addGestureRecognizer(UIPinchGestureRecognizer(target: self, action: #selector(zoom(_:))))
+        view.addGestureRecognizer(UILongPressGestureRecognizer(target: self, action: #selector(lockFocus(_:))))
+        camera.onControls = { [weak self] in self?.showControls($0) }
         camera.onFrame = { [weak self] in self?.display($1, generation: $0) }
         for name in [AVCaptureSession.wasInterruptedNotification, AVCaptureSession.interruptionEndedNotification,
                      AVCaptureSession.didStartRunningNotification, AVCaptureSession.didStopRunningNotification] {
@@ -612,6 +717,13 @@ final class DearPhotoCameraController: UIViewController {
         switchLens.isEnabled = shutter.isEnabled
         flash.isHidden = reviewing || mirrored || AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: .back)?.hasFlash != true
         flash.isEnabled = shutter.isEnabled
+        zoomPanel.isHidden = reviewing
+        zoomSlider.isEnabled = shutter.isEnabled
+        zoomButtons.isUserInteractionEnabled = shutter.isEnabled
+        exposureButton.isHidden = reviewing
+        exposureButton.isEnabled = shutter.isEnabled
+        exposureSlider.isEnabled = shutter.isEnabled
+        lockLabel.isHidden = reviewing || controlState?.locked != true
         guide.isHidden = reviewing
         guide.isEnabled = ready
         guide.accessibilityTraits = guideEnabled ? [.button, .selected] : [.button]
@@ -720,6 +832,49 @@ final class DearPhotoCameraController: UIViewController {
         guard view.hitTest(point, with: nil) === view,
               preview.layerRectConverted(fromMetadataOutputRect: CGRect(x: 0, y: 0, width: 1, height: 1)).contains(point) else { return }
         camera.focus(at: preview.captureDevicePointConverted(fromLayerPoint: point))
+    }
+
+    private func showControls(_ state: DearCameraControls) {
+        let previous = controlState
+        controlState = state
+        zoomValue.text = String(format: "%.1f×", state.zoom / state.wideFactor)
+        zoomSlider.accessibilityValue = zoomValue.text
+        if state.maximum > state.minimum {
+            zoomSlider.value = Float(log(state.zoom / state.minimum) / log(state.maximum / state.minimum))
+        }
+        exposureSlider.minimumValue = state.minExposure
+        exposureSlider.maximumValue = state.maxExposure
+        exposureSlider.value = state.exposure
+        exposureButton.accessibilityValue = String(format: "%+.1f EV", state.exposure)
+        if previous?.presets != state.presets || previous?.wideFactor != state.wideFactor {
+            zoomButtons.arrangedSubviews.forEach { zoomButtons.removeArrangedSubview($0); $0.removeFromSuperview() }
+            for factor in state.presets {
+                let button = UIButton(type: .system)
+                button.setTitle(String(format: "%g×", Double(factor / state.wideFactor)), for: .normal)
+                button.tintColor = .white
+                button.addAction(UIAction { [weak self] _ in self?.camera.zoom(to: factor) }, for: .touchUpInside)
+                button.heightAnchor.constraint(greaterThanOrEqualToConstant: 44).isActive = true
+                zoomButtons.addArrangedSubview(button)
+            }
+        }
+        for (view, factor) in zip(zoomButtons.arrangedSubviews, state.presets) {
+            (view as? UIButton)?.tintColor = abs(factor - state.zoom) < 0.02 ? .systemYellow : .white
+        }
+        updateControls()
+    }
+
+    @objc private func slideZoom() {
+        guard shutter.isEnabled, let state = controlState else { return }
+        camera.zoom(to: state.minimum * pow(state.maximum / state.minimum, CGFloat(zoomSlider.value)))
+    }
+    @objc private func toggleExposure() { exposureSlider.isHidden.toggle() }
+    @objc private func slideExposure() { if shutter.isEnabled { camera.exposure(exposureSlider.value) } }
+
+    @objc private func lockFocus(_ gesture: UILongPressGestureRecognizer) {
+        guard gesture.state == .began, shutter.isEnabled else { return }
+        let point = gesture.location(in: view)
+        guard view.hitTest(point, with: nil) === view else { return }
+        camera.focus(at: preview.captureDevicePointConverted(fromLayerPoint: point), lock: true)
     }
 
     @objc private func zoom(_ gesture: UIPinchGestureRecognizer) {

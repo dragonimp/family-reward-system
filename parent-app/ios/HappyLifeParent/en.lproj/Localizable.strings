@@ -1160,4 +1160,6 @@
 "等待定位，请保持位置权限开启" = "Waiting for location. Keep location access enabled.";
 "尚未获取有效定位，可稍后重试或选择不记录位置拍摄。" = "A valid location is not available yet. Try again later or take the photo without location.";
 "不记录位置拍摄" = "Take photo without location";
-"实时构图拍照" = "Live composition camera";
+"变焦倍率" = "Zoom";
+"曝光补偿" = "Exposure compensation";
+"自动曝光/对焦锁定" = "AE/AF lock";

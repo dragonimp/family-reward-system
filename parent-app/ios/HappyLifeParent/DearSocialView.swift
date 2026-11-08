@@ -12,7 +12,7 @@ import MapKit
 
 struct DearCamera: UIViewControllerRepresentable {
     enum Mode: String, Identifiable {
-        case photo, composition, video
+        case photo, video
         var id: String { rawValue }
     }
     let mode: Mode
@@ -21,50 +21,31 @@ struct DearCamera: UIViewControllerRepresentable {
 
     func makeCoordinator() -> Coordinator { Coordinator(completion: completion) }
     func makeUIViewController(context: Context) -> UIViewController {
-        if mode == .composition { return DearPhotoCameraController(recordLocation: recordLocation, completion: completion) }
+        if mode == .photo { return DearPhotoCameraController(recordLocation: recordLocation, completion: completion) }
         let picker = UIImagePickerController()
         picker.sourceType = .camera
-        picker.mediaTypes = [mode == .video ? UTType.movie.identifier : UTType.image.identifier]
-        picker.cameraCaptureMode = mode == .video ? .video : .photo
-        if mode == .photo, recordLocation { context.coordinator.locator.start() }
+        picker.mediaTypes = [UTType.movie.identifier]
+        picker.cameraCaptureMode = .video
         picker.videoQuality = .typeHigh
         picker.videoMaximumDuration = 180
         picker.delegate = context.coordinator
         return picker
     }
     func updateUIViewController(_ controller: UIViewController, context: Context) { }
-    static func dismantleUIViewController(_ controller: UIViewController, coordinator: Coordinator) { coordinator.locator.stop() }
 
     final class Coordinator: NSObject, UIImagePickerControllerDelegate, UINavigationControllerDelegate {
         let completion: (Result<(URL, Bool)?, Error>) -> Void
-        let locator = DearCameraLocation()
-        private let captureTimeZone = TimeZone.current
         init(completion: @escaping (Result<(URL, Bool)?, Error>) -> Void) { self.completion = completion }
-        func imagePickerControllerDidCancel(_ picker: UIImagePickerController) { locator.stop(); completion(.success(nil)) }
+        func imagePickerControllerDidCancel(_ picker: UIImagePickerController) { completion(.success(nil)) }
         func imagePickerController(_ picker: UIImagePickerController, didFinishPickingMediaWithInfo info: [UIImagePickerController.InfoKey: Any]) {
             do {
-                defer { locator.stop() }
-                if let source = info[.mediaURL] as? URL {
-                    let url = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".mov")
-                    try FileManager.default.copyItem(at: source, to: url)
-                    completion(.success((url, true)))
-                } else if let image = info[.originalImage] as? UIImage, let data = image.jpegData(compressionQuality: 0.95) {
-                    let metadata = info[.mediaMetadata] as? [String: Any]
-                    let exif = metadata?[kCGImagePropertyExifDictionary as String] as? [String: Any]
-                    let dateText = exif?[kCGImagePropertyExifDateTimeOriginal as String] as? String
-                    let formatter = DateFormatter()
-                    formatter.locale = Locale(identifier: "en_US_POSIX")
-                    formatter.timeZone = captureTimeZone
-                    formatter.dateFormat = "yyyy:MM:dd HH:mm:ss"
-                    let date = dateText.flatMap { formatter.date(from: $0) }
-                    let location = date.flatMap { locator.location(at: $0) }
-                    let tagged = try DearCaptureGeography.tag(data, location: location)
-                    let url = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".jpg")
-                    try tagged.write(to: url, options: .atomic)
-                    completion(.success((url, false)))
-                } else {
+                guard let source = info[.mediaURL] as? URL else {
                     throw APIError.message(String(localized: "无法读取拍摄内容，请重试。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)))
                 }
+                let url = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".mov")
+                // The camera's temporary URL is only valid during this callback.
+                try FileManager.default.copyItem(at: source, to: url)
+                completion(.success((url, true)))
             } catch { completion(.failure(error)) }
         }
     }
@@ -1020,7 +1001,6 @@ struct DearSocialView: View {
                 Spacer()
                 Menu {
                     Button { Task { await openCamera(.photo) } } label: { Label("拍照", systemImage: "camera") }
-                    Button { Task { await openCamera(.composition) } } label: { Label(String(localized: "实时构图拍照", bundle: AgentIdentityLanguage.appBundle()), systemImage: "viewfinder") }
                     Button { Task { await openCamera(.video) } } label: { Label("录制视频", systemImage: "video") }
                 } label: { Image(systemName: "camera").font(.title3).accessibilityLabel("拍摄并分享") }
             }.disabled(busy || requestingCamera || capturedMedia != nil || batchDeleting || batchDownloading)
