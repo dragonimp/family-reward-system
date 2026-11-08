@@ -297,8 +297,6 @@ public sealed class FamilyPage : ContentPage
         content.Add(Heading(child.Text("name"), 23));
         content.Add(Card(new Label { Text = $"积分 {child.Number("score")}  ·  零用钱 ¥{child.Number("cash")}  ·  物品 {child.Number("items")}", FontSize = 17 }));
         content.Add(Button("记录奖励或扣分", () => _ = AddReward(child), true));
-        content.Add(Button("手表配对", () => _ = PairWatch(child)));
-        content.Add(Button("生成孩子手表授权码", () => _ = GenerateWatchCode(child)));
         content.Add(Heading("奖励规则", 20));
         foreach (var rule in store.Rules.Take(30))
         {
@@ -364,7 +362,7 @@ public sealed class FamilyPage : ContentPage
             MomentStyle.Row("消息中心", action: () => _ = Navigation.PushAsync(new MomentInboxPage(store))),
             MomentStyle.Row("修改密码", action: () => _ = AgentIdentity.Maui.InAppWebLinks.OpenAsync(new Uri("https://auth.ai.xmkurt.com/personal/info?section=password"), BrowserLaunchMode.SystemPreferred)));
         if (store.AccountProfileError is { } profileError) content.Add(new Label { Text = profileError, FontSize = 12 });
-        Section("应用与设置", MomentStyle.Row("栏目启用", action: SectionSettings), MomentStyle.Row("家庭与成员", action: () => SelectTab("管理")), MomentStyle.Row("刷新资料", action: () => _ = Run(store.LoadAsync)));
+        Section("应用与设置", MomentStyle.Row("连接手表", action: WatchConnections), MomentStyle.Row("栏目启用", action: SectionSettings), MomentStyle.Row("家庭与成员", action: () => SelectTab("管理")), MomentStyle.Row("刷新资料", action: () => _ = Run(store.LoadAsync)));
         Section("帮助与隐私",
             MomentStyle.Row("隐私政策", action: () => _ = Navigation.PushModalAsync(new PrivacyPolicyPage())),
             MomentStyle.Row("用户协议", action: () => _ = Navigation.PushAsync(new AtlasInformationPage(false, "termsUrl"))),
@@ -476,6 +474,20 @@ public sealed class FamilyPage : ContentPage
         if (!await DisplayAlertAsync("确认批准", $"批准 {request.Text("childName")} 的申请？", "批准", "取消")) return;
         await Mutate(() => store.CallAsync($"/api/reward-requests/{request.Id}/approve", HttpMethod.Post,
             new { familyGroupId = request.Int("familyGroupId"), reviewNote = note }), uncertainWrite: true);
+    }
+
+    private void WatchConnections()
+    {
+        var rows = new VerticalStackLayout { Spacing = 12, Padding = 16 };
+        rows.Add(MomentStyle.Caption("手表默认使用配对手机当前账号；下方用于孩子手表绑定。"));
+        foreach (var child in store.Children)
+        {
+            rows.Add(Heading(child.Text("name"), 20));
+            rows.Add(Button("连接手表", () => _ = PairWatch(child)));
+            rows.Add(Button("生成孩子手表授权码", () => _ = GenerateWatchCode(child)));
+        }
+        if (store.Children.Count == 0) rows.Add(new Label { Text = "暂无孩子" });
+        _ = Navigation.PushAsync(new ContentPage { Title = "连接手表", Content = new ScrollView { Content = rows } });
     }
 
     private async Task PairWatch(FamilyRecord child)
