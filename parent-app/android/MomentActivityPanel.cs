@@ -195,7 +195,7 @@ public sealed class MomentActivityPanel : ContentView
         else if (choice is "在浏览器分享照片或打卡" or "活动管理与邀请") await OpenWebAsync(scope.Web);
         else if (choice == "刷新") await OpenActivityAsync(selected);
     }
-    internal static async Task OpenWebAsync(Uri url) => await Browser.Default.OpenAsync(url, BrowserLaunchMode.SystemPreferred);
+    internal static async Task OpenWebAsync(Uri url) => await AgentIdentity.Maui.InAppWebLinks.OpenAsync(url);
     private static View Empty(string title, string detail) => new VerticalStackLayout { Padding = new Thickness(20, 32), Spacing = 10, Children = { MomentStyle.Title(title, 20), MomentStyle.Caption(detail) } };
     private static RefreshView Refresh(CollectionView list, Action reload)
     {

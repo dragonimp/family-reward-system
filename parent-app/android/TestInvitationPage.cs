@@ -103,7 +103,7 @@ public sealed class TestInvitationPage : ContentPage
                 using var loginHttp = new HttpClient { BaseAddress = Origin, Timeout = TimeSpan.FromSeconds(30) };
                 var login = new NativeLoginClient(loginHttp);
                 var result = await login.LoginSessionAsync(
-                    async (url, ct) => { await Launcher.Default.OpenAsync(url); ct.ThrowIfCancellationRequested(); return true; },
+                    async (url, ct) => { var opened = await Browser.Default.OpenAsync(url, BrowserLaunchMode.SystemPreferred); ct.ThrowIfCancellationRequested(); return opened; },
                     code => MainThread.BeginInvokeOnMainThread(() => description.Text = $"本次登录验证码：{code}"),
                     false, loginCancellation.Token);
                 await session.SaveAsync(result, loginCancellation.Token);

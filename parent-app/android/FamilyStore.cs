@@ -67,9 +67,9 @@ public sealed class FamilyStore
         var result = await identity.LoginSessionAsync(
             async (url, ct) =>
             {
-                await Launcher.Default.OpenAsync(url);
+                var opened = await Browser.Default.OpenAsync(url, BrowserLaunchMode.SystemPreferred);
                 ct.ThrowIfCancellationRequested();
-                return true;
+                return opened;
             },
             code => { DisplayCode = code; MainThread.BeginInvokeOnMainThread(() => showCode(code)); },
             register,
