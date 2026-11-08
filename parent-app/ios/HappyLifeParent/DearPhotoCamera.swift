@@ -109,14 +109,15 @@ private final class DearPhotoCapture: NSObject, AVCaptureVideoDataOutputSampleBu
         }
     }
 
-    func update(angle: CGFloat, mirrored: Bool, analyze: Bool, generation: Int) {
+    func update(angle: CGFloat, captureAngle: CGFloat, mirrored: Bool, analyze: Bool, generation: Int) {
         queue.async {
             self.generation = generation
             self.lastAnalysis = CACurrentMediaTime()
             self.videoOutput.setSampleBufferDelegate(nil, queue: nil)
             for output in [self.videoOutput as AVCaptureOutput, self.photoOutput] {
                 guard let connection = output.connection(with: .video) else { continue }
-                if connection.isVideoRotationAngleSupported(angle) { connection.videoRotationAngle = angle }
+                let rotation = output === self.photoOutput ? captureAngle : angle
+                if connection.isVideoRotationAngleSupported(rotation) { connection.videoRotationAngle = rotation }
                 if connection.isVideoMirroringSupported {
                     connection.automaticallyAdjustsVideoMirroring = false
                     connection.isVideoMirrored = mirrored
@@ -337,6 +338,10 @@ final class DearPhotoCameraController: UIViewController {
     private var flashMode: AVCaptureDevice.FlashMode = .auto
     private var finished = false
     private var angle: CGFloat = 90
+    private var captureAngle: CGFloat = 90
+    private var rotationCoordinator: AVCaptureDevice.RotationCoordinator?
+    private var previewRotationObservation: NSKeyValueObservation?
+    private var captureRotationObservation: NSKeyValueObservation?
     private var generation = 0
     private var data: Data?
     private var boxes: [CGRect] = []
@@ -464,6 +469,7 @@ final class DearPhotoCameraController: UIViewController {
             guard let self, !self.finished else { return }
             guard prepared else { self.finish(.failure(self.cameraError)); return }
             self.ready = true
+            self.configureRotation()
             self.refreshAnalysis()
             self.camera.run(true)
         }
@@ -485,18 +491,47 @@ final class DearPhotoCameraController: UIViewController {
     override func viewDidLayoutSubviews() {
         super.viewDidLayoutSubviews()
         preview.frame = view.bounds
-        let nextAngle: CGFloat
-        switch view.window?.windowScene?.interfaceOrientation {
-        case .landscapeRight: nextAngle = 0
-        case .landscapeLeft: nextAngle = 180
-        case .portraitUpsideDown: nextAngle = 270
-        default: nextAngle = 90
-        }
-        if angle != nextAngle {
-            angle = nextAngle
-            refreshAnalysis()
-        }
+        updateRotation()
         drawGuide()
+    }
+
+    override var supportedInterfaceOrientations: UIInterfaceOrientationMask { .allButUpsideDown }
+    override var shouldAutorotate: Bool { true }
+
+    override func viewWillTransition(to size: CGSize, with coordinator: UIViewControllerTransitionCoordinator) {
+        super.viewWillTransition(to: size, with: coordinator)
+        coordinator.animate(alongsideTransition: { [weak self] _ in
+            self?.view.setNeedsLayout()
+            self?.view.layoutIfNeeded()
+        }, completion: { [weak self] _ in
+            self?.updateRotation()
+            self?.drawGuide()
+        })
+    }
+
+    private func configureRotation() {
+        previewRotationObservation = nil
+        captureRotationObservation = nil
+        guard let input = camera.session.inputs.compactMap({ $0 as? AVCaptureDeviceInput }).first else { return }
+        let coordinator = AVCaptureDevice.RotationCoordinator(device: input.device, previewLayer: preview)
+        rotationCoordinator = coordinator
+        previewRotationObservation = coordinator.observe(\.videoRotationAngleForHorizonLevelPreview, options: [.new]) { [weak self] _, _ in
+            self?.updateRotation()
+        }
+        captureRotationObservation = coordinator.observe(\.videoRotationAngleForHorizonLevelCapture, options: [.new]) { [weak self] _, _ in
+            self?.updateRotation()
+        }
+        updateRotation()
+    }
+
+    private func updateRotation() {
+        guard let rotationCoordinator, !takingPhoto, data == nil else { return }
+        let nextPreview = rotationCoordinator.videoRotationAngleForHorizonLevelPreview
+        let nextCapture = rotationCoordinator.videoRotationAngleForHorizonLevelCapture
+        guard angle != nextPreview || captureAngle != nextCapture else { return }
+        angle = nextPreview
+        captureAngle = nextCapture
+        refreshAnalysis()
     }
 
     private func configure(_ button: UIButton, _ title: String, icon: String?, action: Selector?) {
@@ -553,7 +588,7 @@ final class DearPhotoCameraController: UIViewController {
             }
         }
         if ready {
-            camera.update(angle: angle, mirrored: mirrored, analyze: analyzing, generation: generation)
+            camera.update(angle: angle, captureAngle: captureAngle, mirrored: mirrored, analyze: analyzing, generation: generation)
         }
         updateControls()
         drawGuide()
@@ -666,6 +701,7 @@ final class DearPhotoCameraController: UIViewController {
             guard let self, !self.finished else { return }
             self.mirrored = mirrored
             self.switching = false
+            self.configureRotation()
             self.refreshAnalysis()
         }
     }
@@ -732,6 +768,7 @@ final class DearPhotoCameraController: UIViewController {
     @objc private func retakePhoto() {
         data = nil
         review.image = nil
+        updateRotation()
         locationLabel.isHidden = !recordLocation
         updateLocationLabel()
         refreshAnalysis()
