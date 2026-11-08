@@ -153,7 +153,7 @@ final class WatchStore: ObservableObject {
     func refreshMenu() async {
         do {
             let value: [String: Any]
-            let phone = activityTransport.reachable ? try? await activityTransport.request(["action": "modulePreferences"]) : nil
+            let phone: [String: Any]? = activityTransport.reachable ? (try? await activityTransport.request(["action": "modulePreferences"])) : nil
             if let phone {
                 value = phone
             } else {
