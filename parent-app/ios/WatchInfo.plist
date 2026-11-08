@@ -28,5 +28,13 @@
 	<string>net.impx.happylife</string>
 	<key>WKRunsIndependentlyOfCompanionApp</key>
 	<true/>
+	<key>NSHealthShareUsageDescription</key>
+	<string>读取您授权的心率、活动能量、步数、距离和手表体能训练，用于显示本次运动数据。</string>
+	<key>NSHealthUpdateUsageDescription</key>
+	<string>将手表上记录的运动保存到 Apple 健康，并同步到您配对的 iPhone。</string>
+	<key>WKBackgroundModes</key>
+	<array>
+		<string>workout-processing</string>
+	</array>
 </dict>
 </plist>

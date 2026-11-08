@@ -3,6 +3,7 @@ import SwiftUI
 
 @main
 struct HappyLifeWatchApp: App {
+    @StateObject private var workout = WatchWorkout()
     @StateObject private var store: WatchStore
     @StateObject private var language: AgentIdentityLanguageStore
     init() {
@@ -14,7 +15,7 @@ struct HappyLifeWatchApp: App {
 
     var body: some Scene {
         WindowGroup {
-            WatchHomeView().environmentObject(store).environmentObject(language).environment(\.locale, language.locale)
+            WatchHomeView().environmentObject(workout).environmentObject(store).environmentObject(language).environment(\.locale, language.locale)
                 .task { await store.start(); await language.refresh() }
                 .onChange(of: scenePhase) { _, phase in
                     if phase == .active && store.ready && store.token != nil && store.pairing == nil { Task { await store.refresh() } }
@@ -30,6 +31,7 @@ struct WatchHomeView: View {
     var body: some View {
         NavigationStack {
             List {
+                NavigationLink(String(localized: "运动", bundle: AgentIdentityLanguage.appBundle()), destination: WatchWorkoutView())
                 if !store.ready {
                     Button(String(localized: "读取设备凭据", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) { Task { await store.start() } }
                 } else if store.token == nil {

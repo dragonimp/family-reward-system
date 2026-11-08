@@ -83,6 +83,10 @@ private actor PhotoPreviewLoader {
         get { photoTransfers.progress }
         set { photoTransfers.updateProgress(newValue) }
     }
+    @Published var pendingExerciseContinuation: UUID?
+    @Published var watchMetricsUpdatedAt: Date?
+    @Published var watchExerciseMetrics: [String: Double] = [:]
+    var watchExerciseActivity: ExerciseActivity?
     @Published var pendingExerciseActivity: ExerciseActivity?
     @Published var pendingActivityLink: MomentActivityLink?
     @Published var profile: Record?
@@ -292,6 +296,7 @@ private actor PhotoPreviewLoader {
     }
     func logout() {
         pendingExerciseActivity = nil
+        pendingExerciseContinuation = nil; watchExerciseActivity = nil; watchExerciseMetrics = [:]; watchMetricsUpdatedAt = nil
         Task { await photoPreviews.clear() }
         DearShareInbox.clearCatalog()
         notifications.reset(token: identity.accessToken)
@@ -340,6 +345,18 @@ extension FamilyStore: WCSessionDelegate {
         guard identity.isAuthenticated else { throw APIError.message(String(localized: "请先在配对的 iPhone 上登录 Linko Moment。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) }
         let base = "/api/dear/social/tenants"
         switch message["action"] as? String {
+        case "exerciseLive":
+            guard let owner = message["owner"] as? String,
+                  (UUID(uuidString: owner)?.uuidString ?? owner) == (UUID(uuidString: profile?.text("unifiedUserId") ?? "")?.uuidString ?? profile?.text("unifiedUserId") ?? "") else { throw APIError.message(String(localized: "手表运动账号不匹配。", bundle: AgentIdentityLanguage.appBundle())) }
+            watchMetricsUpdatedAt = Date()
+            watchExerciseMetrics = (message["metrics"] as? [String: Double] ?? [:]).filter { ["heart", "energy", "distance"].contains($0.key) && $0.value.isFinite && $0.value >= 0 }
+            return ["received": true]
+        case "exerciseContext":
+            var result: [String: Any] = ["userID": profile?.text("unifiedUserId") ?? ""]
+            if let activity = watchExerciseActivity {
+                result["activity"] = try JSONSerialization.jsonObject(with: JSONEncoder().encode(activity))
+            }
+            return result
         case "photoTransferStatus":
             let id = try watchUUID(message, key: "operationId")
             return ["status": photoTransferStatuses[id] ?? "waiting"]

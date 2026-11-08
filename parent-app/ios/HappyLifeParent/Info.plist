@@ -17,7 +17,9 @@
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>在活动拍照、打卡或搜索附近餐厅时获取位置；开启运动地图后记录并同步轨迹。仅当您主动开启活动位置共享时，向当前活动成员显示位置，离开活动或进入后台即停止。</string>
 	<key>UIBackgroundModes</key>
-	<array><string>location</string></array>
+	<array>
+		<string>location</string>
+	</array>
 	<key>CFBundleDevelopmentRegion</key>
 	<string>zh_CN</string>
 	<key>CFBundleDisplayName</key>
@@ -78,5 +80,7 @@
 	</array>
 	<key>NSLocalNetworkUsageDescription</key>
 	<string>通过 Linko Connect 与活动成员的设备连接，传输您共享的照片和视频原文件。</string>
+	<key>NSHealthShareUsageDescription</key>
+	<string>读取您授权的心率、活动能量、步数、距离和手表体能训练，用于显示本次运动数据。</string>
 </dict>
 </plist>

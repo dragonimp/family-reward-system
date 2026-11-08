@@ -680,6 +680,7 @@ struct DearSocialView: View {
                         if allActivities.isEmpty && !activityLoading && activityError.isEmpty { Text(String(localized: "还没有活动", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))).foregroundStyle(.secondary) }
                         else {
                             ForEach(allActivities) { item in
+                                VStack(alignment: .leading, spacing: 8) {
                                 HStack {
                                     Button {
                                         activityId = item.id
@@ -711,6 +712,8 @@ struct DearSocialView: View {
                                         }
                                     } label: { Image(systemName: "ellipsis.circle").accessibilityLabel(String(localized: "管理\(item.text("title"))", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) }
                                     .disabled(busy)
+                                }
+                                ActivityExerciseRecords(activityID: item.id)
                                 }
                             }
                         }

@@ -69,6 +69,8 @@ else:
         candidates = [p for p in profiles if p['Entitlements'].get('application-identifier') == team + '.' + bundle]
         if bundle in (base, base + '.share'):
             candidates = [p for p in candidates if 'group.' + base in p['Entitlements'].get('com.apple.security.application-groups', [])]
+        if bundle in (base, base + '.watchkitapp'):
+            candidates = [p for p in candidates if p['Entitlements'].get('com.apple.developer.healthkit') is True]
         if bundle == base:
             candidates = [p for p in candidates if p['Entitlements'].get('aps-environment') == 'production']
         if not candidates:

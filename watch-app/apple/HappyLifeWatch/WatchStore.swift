@@ -1,5 +1,6 @@
 import AgentIdentityLocalization
 import SwiftUI
+import HealthKit
 #if canImport(WatchConnectivity)
 import WatchConnectivity
 #endif
@@ -109,6 +110,12 @@ final class WatchStore: ObservableObject {
     @Published var message: String?
     private let api: WatchAPI
     private let activityTransport = WatchActivityTransport()
+    func exerciseMetrics(owner: String, values: [String: Double]) async {
+        _ = try? await activityTransport.request(["action": "exerciseLive", "owner": owner, "metrics": values])
+    }
+    func exerciseContext() async throws -> [String: Any] {
+        try await activityTransport.request(["action": "exerciseContext"])
+    }
     // Watch pairing is a device credential; it does not prove the paired phone's account owns this Watch identity.
     lazy var languagePreferences = AgentIdentityLanguageStore(applicationKey: "net.impx.happylife.parent.watchkitapp",
         load: { nil }, save: { _ in })
@@ -444,5 +451,144 @@ final class WatchStore: ObservableObject {
             catch { message = watchDisplayError(error) }
         }
         catch { message = watchDisplayError(error) }
+    }
+}
+
+@MainActor final class WatchWorkout: NSObject, ObservableObject, HKWorkoutSessionDelegate, HKLiveWorkoutBuilderDelegate {
+    @Published var running = false
+    @Published var active = false
+    @Published var saving = false
+    @Published var heart: Double?
+    @Published var energy: Double?
+    @Published var distance: Double?
+    @Published var message: String?
+    var onMetrics: ((String, [String: Double]) -> Void)?
+    private var collectionEnded = false
+    private var metadataAdded = false
+    private let health = HKHealthStore()
+    private var session: HKWorkoutSession?
+    private var builder: HKLiveWorkoutBuilder?
+    private var owner = ""
+    private var activity: [String: Any]?
+    private var id = UUID()
+    private var kind = "徒步"
+    private var starts: [Date] = []
+    private var stops: [Date] = []
+    func start(kind: String, context: [String: Any]) async {
+        guard !active, !saving, HKHealthStore.isHealthDataAvailable(), let user = context["userID"] as? String, !user.isEmpty else { message = String(localized: "请先在配对 iPhone 登录并连接健康数据。", bundle: AgentIdentityLanguage.appBundle()); return }
+        do {
+            let read: Set<HKObjectType> = [HKQuantityType(.heartRate), HKQuantityType(.activeEnergyBurned), HKQuantityType(.distanceWalkingRunning), HKQuantityType(.stepCount)]
+            try await health.requestAuthorization(toShare: [HKObjectType.workoutType()], read: read)
+            guard health.authorizationStatus(for: .workoutType()) == .sharingAuthorized else { message = String(localized: "请允许保存体能训练后重试。", bundle: AgentIdentityLanguage.appBundle()); return }
+            let config = HKWorkoutConfiguration()
+            config.activityType = kind == "徒步" ? .hiking : kind == "慢跑" ? .running : .walking
+            config.locationType = .outdoor
+            let session = try HKWorkoutSession(healthStore: health, configuration: config)
+            let builder = session.associatedWorkoutBuilder()
+            builder.dataSource = HKLiveWorkoutDataSource(healthStore: health, workoutConfiguration: config)
+            session.delegate = self; builder.delegate = self
+            self.session = session; self.builder = builder; self.owner = UUID(uuidString: user)?.uuidString ?? user
+            activity = context["activity"] as? [String: Any]; self.kind = kind; id = UUID(); starts = [Date()]; stops = []
+            heart = nil; energy = nil; distance = nil; message = nil; collectionEnded = false; metadataAdded = false
+            session.startActivity(with: starts[0]); active = true; running = true
+            try await builder.beginCollection(at: starts[0])
+        } catch { session?.end(); active = false; running = false; message = String(localized: "运动启动失败：\(error.localizedDescription)", bundle: AgentIdentityLanguage.appBundle()) }
+    }
+    func duration(at now: Date) -> TimeInterval {
+        starts.enumerated().reduce(0) { $0 + max(0, (stops.indices.contains($1.offset) ? stops[$1.offset] : now).timeIntervalSince($1.element)) }
+    }
+    func toggle() {
+        guard active, !saving, let session else { return }
+        if running { stops.append(Date()); session.pause() } else { starts.append(Date()); session.resume() }
+        running.toggle()
+    }
+    func finish() async {
+        guard active, !saving, let session, let builder else { return }
+        saving = true
+        defer { saving = false }
+        let end = stops.count == starts.count ? stops.last! : Date()
+        if stops.count < starts.count { stops.append(end) }
+        running = false; if session.state != .ended { session.end() }
+        do {
+            if !collectionEnded { try await builder.endCollection(at: end); collectionEnded = true }
+            let formatter = ISO8601DateFormatter()
+            let intervals: [[String: Any]] = zip(starts, stops).enumerated().map { index, pair in
+                var row: [String: Any] = ["start": formatter.string(from: pair.0), "end": formatter.string(from: pair.1)]
+                if let distance { row["distanceMeters"] = index == 0 ? distance : 0 }
+                return row
+            }
+            var record: [String: Any] = ["id": id.uuidString, "kind": kind, "startedAt": formatter.string(from: starts[0]), "endedAt": formatter.string(from: end), "intervals": intervals]
+            if let activity { record["activity"] = activity }
+            let text = String(data: try JSONSerialization.data(withJSONObject: record), encoding: .utf8)!
+            if !metadataAdded { try await builder.addMetadata(["net.impx.moment.owner": owner, "net.impx.moment.record": text]); metadataAdded = true }
+            _ = try await builder.finishWorkout()
+            onMetrics?(owner, [:])
+            active = false; self.session = nil; self.builder = nil
+            message = String(localized: "已保存到 Apple 健康，iPhone 同步后可查看。", bundle: AgentIdentityLanguage.appBundle())
+        } catch { message = String(localized: "保存未完成，请保留页面重试：\(error.localizedDescription)", bundle: AgentIdentityLanguage.appBundle()) }
+    }
+    nonisolated func workoutSession(_ workoutSession: HKWorkoutSession, didChangeTo toState: HKWorkoutSessionState, from fromState: HKWorkoutSessionState, date: Date) {
+        Task { @MainActor in
+            if toState == .paused || toState == .ended {
+                if self.running, self.stops.count < self.starts.count { self.stops.append(date) }
+                self.running = false
+            } else if toState == .running && !self.running {
+                if self.stops.count == self.starts.count { self.starts.append(date) }
+                self.running = true
+            }
+        }
+    }
+    nonisolated func workoutSession(_ workoutSession: HKWorkoutSession, didFailWithError error: Error) {
+        Task { @MainActor in self.running = false; self.message = String(localized: "运动会话异常：\(error.localizedDescription)", bundle: AgentIdentityLanguage.appBundle()) }
+    }
+    nonisolated func workoutBuilderDidCollectEvent(_ workoutBuilder: HKLiveWorkoutBuilder) { }
+    nonisolated func workoutBuilder(_ workoutBuilder: HKLiveWorkoutBuilder, didCollectDataOf collectedTypes: Set<HKSampleType>) {
+        Task { @MainActor in
+            guard self.active, self.running else { return }
+            self.heart = workoutBuilder.statistics(for: HKQuantityType(.heartRate))?.mostRecentQuantity()?.doubleValue(for: HKUnit.count().unitDivided(by: .minute()))
+            self.energy = workoutBuilder.statistics(for: HKQuantityType(.activeEnergyBurned))?.sumQuantity()?.doubleValue(for: .kilocalorie())
+            self.distance = workoutBuilder.statistics(for: HKQuantityType(.distanceWalkingRunning))?.sumQuantity()?.doubleValue(for: .meter())
+            var values: [String: Double] = [:]
+            if let heart = self.heart { values["heart"] = heart }
+            if let energy = self.energy { values["energy"] = energy }
+            if let distance = self.distance { values["distance"] = distance }
+            self.onMetrics?(self.owner, values)
+        }
+    }
+}
+
+struct WatchWorkoutView: View {
+    @EnvironmentObject private var workout: WatchWorkout
+    @EnvironmentObject private var store: WatchStore
+    @State private var kind = "徒步"
+    @State private var connecting = false
+    @State private var error: String?
+    var body: some View {
+        List {
+            if workout.active {
+                Text(workout.running ? String(localized: "运动中", bundle: AgentIdentityLanguage.appBundle()) : String(localized: "已暂停", bundle: AgentIdentityLanguage.appBundle()))
+                TimelineView(.periodic(from: .now, by: 1)) { context in
+                    let seconds = Int(workout.duration(at: context.date))
+                    Text(String(format: "%02d:%02d:%02d", seconds / 3600, seconds / 60 % 60, seconds % 60)).monospacedDigit()
+                }
+                if let heart = workout.heart { Text(String(format: String(localized: "心率 %.0f 次/分", bundle: AgentIdentityLanguage.appBundle()), heart)) }
+                if let energy = workout.energy { Text(String(format: String(localized: "%.0f 千卡", bundle: AgentIdentityLanguage.appBundle()), energy)) }
+                if let distance = workout.distance { Text(String(format: String(localized: "%.2f 公里", bundle: AgentIdentityLanguage.appBundle()), distance / 1000)) }
+                Button(workout.running ? String(localized: "暂停", bundle: AgentIdentityLanguage.appBundle()) : String(localized: "继续", bundle: AgentIdentityLanguage.appBundle())) { workout.toggle() }.disabled(workout.saving)
+                Button(String(localized: "结束并保存", bundle: AgentIdentityLanguage.appBundle())) { Task { await workout.finish() } }.disabled(workout.saving)
+            } else {
+                Picker(String(localized: "运动", bundle: AgentIdentityLanguage.appBundle()), selection: $kind) { ForEach(["徒步", "散步", "慢跑"], id: \.self) { Text($0) } }
+                Button(String(localized: "开始\(kind)", bundle: AgentIdentityLanguage.appBundle())) { Task {
+                    connecting = true; error = nil
+                    defer { connecting = false }
+                    workout.onMetrics = { owner, values in Task { await store.exerciseMetrics(owner: owner, values: values) } }
+                    do { await workout.start(kind: kind, context: try await store.exerciseContext()) }
+                    catch { self.error = error.localizedDescription }
+                } }.disabled(connecting)
+                Text(String(localized: "开始前连接已登录的 iPhone，运动中可独立采集健康数据。活动关联以 iPhone 最近选择的活动为准。", bundle: AgentIdentityLanguage.appBundle())).font(.footnote)
+            }
+            if let text = error ?? workout.message { Text(text).font(.footnote) }
+            if connecting || workout.saving { ProgressView() }
+        }.navigationTitle(String(localized: "运动", bundle: AgentIdentityLanguage.appBundle()))
     }
 }

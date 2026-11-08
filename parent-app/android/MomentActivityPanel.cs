@@ -37,6 +37,7 @@ public sealed class MomentActivityPanel : ContentView
         if (session != store.SessionVersion) { Reset(); session = store.SessionVersion; }
         if (!loaded) await ReloadAsync();
         else if (needsRefresh) { if (activity is { } selected) await OpenActivityAsync(selected); else await ReloadAsync(); }
+        else if (activity == null) RenderRoot();
     }
     public void Deactivate() { if (loading != null) needsRefresh = true; revision++; loading?.Cancel(); loading?.Dispose(); loading = null; }
     public void Reset() { Deactivate(); loaded = false; spaces = []; activities = []; joined = []; activity = null; space = Guid.Empty; thumbnails.Clear(); body.Content = null; }
@@ -104,7 +105,7 @@ public sealed class MomentActivityPanel : ContentView
         var items = (showJoined ? joined : activities).OrderByDescending(a => MomentDates.ActivityDate(a)).ThenByDescending(a => a.Created).ToList();
         var list = new CollectionView { ItemsSource = items, SelectionMode = SelectionMode.None, EmptyView = Empty("还没有活动", space == Guid.Empty ? "创建空间或在完整活动页接受邀请。" : "点击活动列表右侧的新增，记录一次相聚。"), ItemTemplate = new DataTemplate(() =>
         {
-            var row = new ActivityRow();
+            var row = new ActivityRow(store.Profile?.Text("unifiedUserId") ?? "");
             row.Opened += item => _ = OpenActivityAsync(item);
             return row;
         }) };
@@ -204,15 +205,17 @@ public sealed class MomentActivityPanel : ContentView
     }
     private sealed class ActivityRow : ContentView
     {
-        private readonly Label title = MomentStyle.Title("", 18), date = MomentStyle.Caption("");
+        private readonly Label title = MomentStyle.Title("", 18), date = MomentStyle.Caption(""), exercise = MomentStyle.Caption("");
+        private readonly string userID;
         public event Action<MomentRecord>? Opened;
-        public ActivityRow()
+        public ActivityRow(string userID)
         {
-            var stack = new VerticalStackLayout { Spacing = 6 }; stack.Add(title); stack.Add(date);
+            this.userID = userID;
+            var stack = new VerticalStackLayout { Spacing = 6 }; stack.Add(title); stack.Add(date); stack.Add(exercise);
             Content = MomentStyle.Card(stack); Margin = new Thickness(0, 0, 0, 10);
             var tap = new TapGestureRecognizer(); tap.Tapped += (_, _) => { if (BindingContext is MomentRecord item) Opened?.Invoke(item); }; GestureRecognizers.Add(tap);
         }
-        protected override void OnBindingContextChanged() { base.OnBindingContextChanged(); if (BindingContext is MomentRecord item) { title.Text = item.Text("title"); date.Text = MomentDates.ActivityLabel(item); } }
+        protected override void OnBindingContextChanged() { base.OnBindingContextChanged(); if (BindingContext is MomentRecord item) { title.Text = item.Text("title"); date.Text = MomentDates.ActivityLabel(item); exercise.Text = ExercisePanel.ActivitySummary(userID, item.Id); exercise.IsVisible = !string.IsNullOrEmpty(exercise.Text); } }
     }
 }
 

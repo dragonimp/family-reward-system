@@ -4,6 +4,7 @@ import CoreMotion
 import CryptoKit
 import MapKit
 import CoreLocation
+import HealthKit
 
 @MainActor final class ExerciseStore: NSObject, ObservableObject, CLLocationManagerDelegate {
     @Published private var archive = ExerciseArchive()
@@ -20,6 +21,7 @@ import CoreLocation
     private weak var api: FamilyStore?
     private let userID: String
     private var syncAgain = false
+    private var lastNotice = Date.distantPast
     private let pedometer = CMPedometer()
     private let file: URL
     private var generation = UUID()
@@ -52,6 +54,9 @@ import CoreLocation
         guard readable else { return }
         do {
             try archive.write(to: file)
+            if Date().timeIntervalSince(lastNotice) >= 5 || active == nil {
+                lastNotice = Date(); NotificationCenter.default.post(name: .exerciseRecordsChanged, object: nil)
+            }
         } catch { message = String(localized: "运动记录尚未保存：\(error.localizedDescription)。请保留页面并重试保存。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)) }
     }
     func retrySave() { guard readable else { return }; message = nil; save() }
@@ -70,6 +75,19 @@ import CoreLocation
         let now = Date()
         archive.active = ExerciseSession(kind: kind, startedAt: now, intervals: [ExerciseInterval(start: now)], activity: activity, routeEnabled: map)
         save(); observe(); updateLocationTracking()
+    }
+    func continueRecord(_ record: ExerciseSession) {
+        guard readable, active == nil, !busy, history.contains(where: { $0.id == record.id }) else { return }
+        archive.active = record.continuation(at: Date())
+        save(); observe(); updateLocationTracking()
+    }
+    func importWatchRecords(_ records: [ExerciseSession]) {
+        guard readable else { return }
+        for record in records where !(archive.importedWatchIDs ?? []).contains(record.id) {
+            if !archive.history.contains(where: { $0.id == record.id }) && !(archive.pendingDeletions ?? []).contains(record.id) { archive.history.append(record) }
+            archive.importedWatchIDs = (archive.importedWatchIDs ?? []) + [record.id]
+        }
+        archive.history.sort { $0.startedAt > $1.startedAt }; save()
     }
     func resume() {
         guard readable, !busy else { return }
@@ -261,6 +279,7 @@ struct ExerciseView: View {
     @StateObject private var exercise: ExerciseStore
     @EnvironmentObject private var family: FamilyStore
     @Environment(\.scenePhase) private var phase
+    @StateObject private var health = ExerciseHealth()
     @State private var mapMode = false
     @State private var selectedRoute: ExerciseSession?
     @State private var kind = "散步"
@@ -338,6 +357,20 @@ struct ExerciseView: View {
                         Button(String(localized: "打开系统设置", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) { if let url = URL(string: UIApplication.openSettingsURLString) { UIApplication.shared.open(url) } }
                     }
                 }
+                Section(String(localized: "健康与手表", bundle: AgentIdentityLanguage.appBundle())) {
+                    if !family.watchExerciseMetrics.isEmpty {
+                        Text(String(localized: "手表运动数据", bundle: AgentIdentityLanguage.appBundle())).font(.headline)
+                        if let updated = family.watchMetricsUpdatedAt { Text(updated, style: .time).font(.caption).foregroundStyle(.secondary) }
+                        if let value = family.watchExerciseMetrics["heart"] { Text(String(format: String(localized: "心率 %.0f 次/分", bundle: AgentIdentityLanguage.appBundle()), value)) }
+                        if let value = family.watchExerciseMetrics["energy"] { Text(String(format: String(localized: "活动能量 %.0f 千卡", bundle: AgentIdentityLanguage.appBundle()), value)) }
+                        if let value = family.watchExerciseMetrics["distance"] { Text(String(format: String(localized: "距离 %.2f 公里", bundle: AgentIdentityLanguage.appBundle()), value / 1000)) }
+                    }
+                    Button(String(localized: "连接 Apple 健康与手表数据", bundle: AgentIdentityLanguage.appBundle())) { Task { await refreshHealth(request: true) } }
+                    if let status = health.message { Text(status).font(.caption).foregroundStyle(.secondary) }
+                    if let heart = health.heartRate { Text(String(format: String(localized: "平均心率 %.0f 次/分", bundle: AgentIdentityLanguage.appBundle()), heart)) }
+                    if let energy = health.energy { Text(String(format: String(localized: "活动能量 %.0f 千卡", bundle: AgentIdentityLanguage.appBundle()), energy)) }
+                    Text(String(localized: "健康数据由系统授权读取。手表运动保存后同步到 iPhone；未授权或尚未同步时不显示测量值。", bundle: AgentIdentityLanguage.appBundle())).font(.caption).foregroundStyle(.secondary)
+                }
                 Section {
                     if exercise.history.isEmpty {
                         ContentUnavailableView(String(localized: "还没有运动记录", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), systemImage: "figure.walk", description: Text(String(localized: "完成一次运动后，时长、步数和公里数会保存在这里。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))))
@@ -352,6 +385,7 @@ struct ExerciseView: View {
                                     Label(String(localized: "删除", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), systemImage: "trash")
                                 }.buttonStyle(.borderless).disabled(exercise.busy)
                             }
+                            Button(String(localized: "继续\(item.kind)", bundle: AgentIdentityLanguage.appBundle())) { exercise.continueRecord(item) }.buttonStyle(.borderless).disabled(exercise.active != nil || exercise.busy)
                             if let linked = item.activity { Text(linked.title).font(.subheadline).foregroundStyle(.secondary) }
                             Text(exerciseDistanceTitle(item)).font(.headline).monospacedDigit()
                             if !item.routePoints.isEmpty {
@@ -405,17 +439,27 @@ struct ExerciseView: View {
                     exercise.connect(family)
                     mapMode = exercise.active?.routeEnabled == true
                     receiveActivity()
-                    await exercise.refresh(); await exercise.sync()
+                    if let id = family.pendingExerciseContinuation, let record = exercise.history.first(where: { $0.id == id }) { exercise.continueRecord(record); family.pendingExerciseContinuation = nil }
+                    await exercise.refresh(); await refreshHealth(); await exercise.sync()
+                }
+                .onChange(of: family.pendingExerciseContinuation) { _, value in
+                    if let id = value, let record = exercise.history.first(where: { $0.id == id }) { exercise.continueRecord(record); family.pendingExerciseContinuation = nil }
                 }
                 .onChange(of: family.pendingExerciseActivity) { _, _ in receiveActivity() }
                 .onChange(of: family.profile?.text("unifiedUserId")) { _, _ in activity = nil; exercise.accountDidChange() }
                 .onChange(of: mapMode) { _, value in if value { exercise.enableRoute() } }
                 .onChange(of: phase) { _, value in
-                    if value == .active { Task { await exercise.refresh(); await exercise.sync() } }
+                    if value == .active { Task { await exercise.refresh(); await refreshHealth(); await exercise.sync() } }
                     else { exercise.stopObserving() }
                 }
                 .onDisappear { exercise.stopObserving() }
         }
+    }
+    private func refreshHealth(request: Bool = false) async {
+        if request { await health.authorize() }
+        let records = await health.watchRecords(userID: family.profile?.text("unifiedUserId") ?? "")
+        exercise.importWatchRecords(records)
+        if let record = exercise.active ?? exercise.history.first { await health.read(record) }
     }
     private func receiveActivity() {
         guard let pending = family.pendingExerciseActivity else { return }
@@ -425,6 +469,7 @@ struct ExerciseView: View {
             return
         }
         activity = pending
+        family.watchExerciseActivity = pending
         kind = "徒步"
         mapMode = true
     }
@@ -489,4 +534,77 @@ private func exerciseDistanceTitle(_ session: ExerciseSession) -> String {
     }
     let format = String(localized: "%.2f 公里", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))
     return String(format: format, locale: Locale(identifier: AgentIdentityLanguage.current), distance / 1000)
+}
+
+extension Notification.Name { static let exerciseRecordsChanged = Notification.Name("moment.exerciseRecordsChanged") }
+
+@MainActor final class ExerciseHealth: ObservableObject {
+    private let store = HKHealthStore()
+    @Published var heartRate: Double?
+    @Published var energy: Double?
+    @Published var message: String?
+    func authorize() async {
+        guard HKHealthStore.isHealthDataAvailable() else { message = String(localized: "此设备不支持 Apple 健康。", bundle: AgentIdentityLanguage.appBundle()); return }
+        do {
+            let types: Set<HKObjectType> = [HKObjectType.workoutType(), HKQuantityType(.heartRate), HKQuantityType(.activeEnergyBurned), HKQuantityType(.stepCount), HKQuantityType(.distanceWalkingRunning)]
+            try await store.requestAuthorization(toShare: [], read: types)
+            message = String(localized: "已完成授权请求，数据以系统实际允许读取的项目为准。", bundle: AgentIdentityLanguage.appBundle())
+        } catch { message = String(localized: "健康授权未完成：\(error.localizedDescription)", bundle: AgentIdentityLanguage.appBundle()) }
+    }
+    func read(_ record: ExerciseSession) async {
+        guard HKHealthStore.isHealthDataAvailable() else { return }
+        heartRate = nil; energy = nil
+        let predicates = record.intervals.map { HKQuery.predicateForSamples(withStart: $0.start, end: $0.end ?? Date(), options: .strictStartDate) }
+        guard !predicates.isEmpty else { return }
+        let predicate = NSCompoundPredicate(orPredicateWithSubpredicates: predicates)
+        heartRate = await value(.heartRate, predicate: predicate, options: .discreteAverage, unit: HKUnit.count().unitDivided(by: .minute()))
+        energy = await value(.activeEnergyBurned, predicate: predicate, options: .cumulativeSum, unit: .kilocalorie())
+        if heartRate == nil && energy == nil { message = String(localized: "暂无可读取的健康数据；请检查授权并等待手表同步。", bundle: AgentIdentityLanguage.appBundle()) }
+    }
+    private func value(_ identifier: HKQuantityTypeIdentifier, predicate: NSPredicate, options: HKStatisticsOptions, unit: HKUnit) async -> Double? {
+        await withCheckedContinuation { continuation in
+            store.execute(HKStatisticsQuery(quantityType: HKQuantityType(identifier), quantitySamplePredicate: predicate, options: options) { _, statistics, _ in
+                let quantity = options == .cumulativeSum ? statistics?.sumQuantity() : statistics?.averageQuantity()
+                continuation.resume(returning: quantity?.doubleValue(for: unit))
+            })
+        }
+    }
+    func watchRecords(userID: String) async -> [ExerciseSession] {
+        guard HKHealthStore.isHealthDataAvailable(), !userID.isEmpty else { return [] }
+        let owner = UUID(uuidString: userID)?.uuidString ?? userID
+        let predicate = HKQuery.predicateForObjects(withMetadataKey: "net.impx.moment.owner", allowedValues: [owner])
+        let samples: [HKSample] = await withCheckedContinuation { continuation in
+            store.execute(HKSampleQuery(sampleType: .workoutType(), predicate: predicate, limit: HKObjectQueryNoLimit, sortDescriptors: nil) { _, samples, _ in continuation.resume(returning: samples ?? []) })
+        }
+        return samples.compactMap { sample in
+            guard let workout = sample as? HKWorkout, let text = workout.metadata?["net.impx.moment.record"] as? String,
+                  let data = text.data(using: .utf8), let record = try? ExerciseSession.syncDecoder().decode(ExerciseSession.self, from: data), record.endedAt != nil else { return nil }
+            return record
+        }
+    }
+}
+
+struct ActivityExerciseRecords: View {
+    @EnvironmentObject private var family: FamilyStore
+    let activityID: String
+    @State private var records: [ExerciseSession] = []
+    var body: some View {
+        VStack(alignment: .leading, spacing: 5) {
+            ForEach(records) { record in
+                HStack {
+                    Label("\(record.kind) · \(record.distanceText) · \(ExerciseSession.clock(record.duration(at: record.endedAt ?? .now)))", systemImage: "figure.hiking")
+                    if record.endedAt != nil {
+                        Button(String(localized: "继续", bundle: AgentIdentityLanguage.appBundle())) { family.pendingExerciseContinuation = record.id }.buttonStyle(.borderless)
+                    } else { Text(record.running ? String(localized: "进行中", bundle: AgentIdentityLanguage.appBundle()) : String(localized: "已暂停", bundle: AgentIdentityLanguage.appBundle())) }
+                }.font(.caption).foregroundStyle(.teal)
+            }
+        }.task { reload() }.onReceive(NotificationCenter.default.publisher(for: .exerciseRecordsChanged)) { _ in reload() }
+    }
+    private func reload() {
+        guard let id = UUID(uuidString: activityID), let owner = family.profile?.text("unifiedUserId"), !owner.isEmpty else { records = []; return }
+        let hash = SHA256.hash(data: Data(owner.utf8)).map { String(format: "%02x", $0) }.joined()
+        let url = ExerciseSession.archiveURL(userID: hash)
+        guard let data = try? Data(contentsOf: url), let archive = try? ExerciseSession.syncDecoder().decode(ExerciseArchive.self, from: data) else { records = []; return }
+        records = ([archive.active].compactMap { $0 } + archive.history).filter { $0.activity?.id == id }
+    }
 }

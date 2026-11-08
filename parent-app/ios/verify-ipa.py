@@ -46,6 +46,7 @@ with tempfile.TemporaryDirectory(prefix="happylife-parent-ipa-") as directory:
     assert entitlements["application-identifier"] == "JQPH54K7SD." + expected
     assert entitlements.get("get-task-allow") is False
     assert entitlements.get("aps-environment") == "production"
+    assert entitlements.get("com.apple.developer.healthkit") is True
     assert group in entitlements.get("com.apple.security.application-groups", [])
     profile = plistlib.loads(subprocess.run(
         ["security", "cms", "-D", "-i", str(app / "embedded.mobileprovision")],
@@ -72,6 +73,9 @@ with tempfile.TemporaryDirectory(prefix="happylife-parent-ipa-") as directory:
     we = plistlib.loads(subprocess.run(["codesign", "-d", "--entitlements", ":-", str(watch)], capture_output=True, check=True).stdout)
     assert we["application-identifier"] == "JQPH54K7SD." + wi["CFBundleIdentifier"]
     assert we.get("get-task-allow") is False
+    assert we.get("com.apple.developer.healthkit") is True
+    assert wi.get("NSHealthShareUsageDescription") and wi.get("NSHealthUpdateUsageDescription")
+    assert "workout-processing" in wi.get("WKBackgroundModes", [])
     wp = plistlib.loads(subprocess.run(["security", "cms", "-D", "-i", str(watch / "embedded.mobileprovision")], capture_output=True, check=True).stdout)
     assert wp["Entitlements"]["application-identifier"] == we["application-identifier"]
     assert wp["ExpirationDate"].replace(tzinfo=datetime.timezone.utc) > datetime.datetime.now(datetime.timezone.utc)

@@ -39,7 +39,7 @@ base=net.impx.happylife
 # This supplies the team's identity to the archive; export must still embed
 # an App Store provisioning profile for this app before it is distributable.
 codesign --force --sign "$APPLE_SIGNING_IDENTITY" --keychain "$APPLE_SIGNING_KEYCHAIN" \
-  --identifier "$base.watchkitapp" "$app/Watch/Linko Moment Watch.app"
+  --entitlements "$PWD/WatchHealth.entitlements" --identifier "$base.watchkitapp" "$app/Watch/Linko Moment Watch.app"
 codesign --force --sign "$APPLE_SIGNING_IDENTITY" --keychain "$APPLE_SIGNING_KEYCHAIN" \
   --entitlements "$PWD/HappyLifeShare/HappyLifeShare.entitlements" \
   --identifier "$base.share" "$app/PlugIns/Linko Moment Share.appex"

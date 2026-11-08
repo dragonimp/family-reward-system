@@ -432,6 +432,11 @@ final class DearPhotoCameraController: UIViewController {
     private let lockLabel = UILabel()
     private var controlState: DearCameraControls?
     private let shutter = UIButton(type: .system)
+    private var portraitControls: [NSLayoutConstraint] = []
+    private var landscapeControls: [NSLayoutConstraint] = []
+    private var controlsLandscape = false
+    private var controlsOrientation: UIDeviceOrientation = .portrait
+    private let cameraControls = UIView()
     private let switchLens = UIButton(type: .system)
     private let guide = UIButton(type: .system)
     private let flash = UIButton(type: .system)
@@ -489,6 +494,10 @@ final class DearPhotoCameraController: UIViewController {
             review.leadingAnchor.constraint(equalTo: view.leadingAnchor), review.trailingAnchor.constraint(equalTo: view.trailingAnchor)
         ])
 
+        cameraControls.backgroundColor = .clear
+        view.addSubview(cameraControls)
+        UIDevice.current.beginGeneratingDeviceOrientationNotifications()
+        NotificationCenter.default.addObserver(self, selector: #selector(deviceOrientationChanged), name: UIDevice.orientationDidChangeNotification, object: nil)
         let cancel = UIButton(type: .system)
         configure(cancel, String(localized: "取消", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), icon: "xmark", action: #selector(close))
         let guideTitle = String(localized: "构图建议", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))
@@ -516,7 +525,7 @@ final class DearPhotoCameraController: UIViewController {
         adviceLabel.layer.cornerRadius = 10
         adviceLabel.clipsToBounds = true
         adviceLabel.translatesAutoresizingMaskIntoConstraints = false
-        view.addSubview(adviceLabel)
+        cameraControls.addSubview(adviceLabel)
 
         configure(exposureButton, String(localized: "曝光补偿", bundle: AgentIdentityLanguage.appBundle()), icon: "plusminus.circle", action: #selector(toggleExposure))
         zoomPanel.axis = .vertical
@@ -538,18 +547,18 @@ final class DearPhotoCameraController: UIViewController {
         exposureSlider.isHidden = true
         for item in [zoomButtons, zoomValue, zoomSlider, exposureSlider] { zoomPanel.addArrangedSubview(item) }
         zoomPanel.translatesAutoresizingMaskIntoConstraints = false
-        view.addSubview(zoomPanel)
+        cameraControls.addSubview(zoomPanel)
         lockLabel.text = String(localized: "自动曝光/对焦锁定", bundle: AgentIdentityLanguage.appBundle())
         lockLabel.font = .preferredFont(forTextStyle: .caption1)
         lockLabel.textColor = .systemYellow
         lockLabel.backgroundColor = UIColor.black.withAlphaComponent(0.7)
         lockLabel.isHidden = true
         lockLabel.translatesAutoresizingMaskIntoConstraints = false
-        view.addSubview(lockLabel)
-        let safe = view.safeAreaLayoutGuide
+        cameraControls.addSubview(lockLabel)
+        let safe = cameraControls.safeAreaLayoutGuide
         let zoomWidth = zoomPanel.widthAnchor.constraint(equalToConstant: 320)
         zoomWidth.priority = .defaultHigh
-        NSLayoutConstraint.activate([
+        portraitControls = [
             zoomWidth,
             zoomPanel.bottomAnchor.constraint(equalTo: shutter.topAnchor, constant: -8),
             zoomPanel.centerXAnchor.constraint(equalTo: safe.centerXAnchor),
@@ -579,7 +588,24 @@ final class DearPhotoCameraController: UIViewController {
             adviceLabel.leadingAnchor.constraint(equalTo: safe.leadingAnchor, constant: 32),
             adviceLabel.trailingAnchor.constraint(equalTo: safe.trailingAnchor, constant: -32),
             adviceLabel.heightAnchor.constraint(greaterThanOrEqualToConstant: 32)
-        ])
+        ]
+        landscapeControls = [
+            cancel.leadingAnchor.constraint(equalTo: safe.leadingAnchor, constant: 12), cancel.topAnchor.constraint(equalTo: safe.topAnchor, constant: 8),
+            guide.leadingAnchor.constraint(equalTo: cancel.trailingAnchor, constant: 8), guide.centerYAnchor.constraint(equalTo: cancel.centerYAnchor),
+            shutter.trailingAnchor.constraint(equalTo: safe.trailingAnchor, constant: -12), shutter.centerYAnchor.constraint(equalTo: safe.centerYAnchor),
+            shutter.widthAnchor.constraint(equalToConstant: 64), shutter.heightAnchor.constraint(equalToConstant: 64),
+            flash.centerXAnchor.constraint(equalTo: shutter.centerXAnchor), flash.topAnchor.constraint(equalTo: safe.topAnchor, constant: 8),
+            switchLens.centerXAnchor.constraint(equalTo: shutter.centerXAnchor), switchLens.bottomAnchor.constraint(equalTo: safe.bottomAnchor, constant: -8),
+            exposureButton.trailingAnchor.constraint(equalTo: shutter.leadingAnchor, constant: -8), exposureButton.centerYAnchor.constraint(equalTo: shutter.centerYAnchor),
+            zoomPanel.bottomAnchor.constraint(equalTo: safe.bottomAnchor, constant: -8), zoomPanel.centerXAnchor.constraint(equalTo: safe.centerXAnchor, constant: -32),
+            zoomPanel.widthAnchor.constraint(equalToConstant: 280), zoomPanel.widthAnchor.constraint(lessThanOrEqualTo: safe.widthAnchor, constant: -190),
+            adviceLabel.bottomAnchor.constraint(equalTo: zoomPanel.topAnchor, constant: -6), adviceLabel.leadingAnchor.constraint(equalTo: safe.leadingAnchor, constant: 24),
+            adviceLabel.trailingAnchor.constraint(equalTo: exposureButton.leadingAnchor, constant: -12), adviceLabel.heightAnchor.constraint(greaterThanOrEqualToConstant: 32),
+            lockLabel.topAnchor.constraint(equalTo: guide.bottomAnchor, constant: 40), lockLabel.centerXAnchor.constraint(equalTo: safe.centerXAnchor),
+            retake.leadingAnchor.constraint(equalTo: safe.leadingAnchor, constant: 16), retake.bottomAnchor.constraint(equalTo: safe.bottomAnchor, constant: -8),
+            usePhoto.trailingAnchor.constraint(equalTo: safe.trailingAnchor, constant: -16), usePhoto.bottomAnchor.constraint(equalTo: safe.bottomAnchor, constant: -8)
+        ]
+        NSLayoutConstraint.activate(portraitControls)
 
         let focusGesture = UITapGestureRecognizer(target: self, action: #selector(focus(_:)))
         focusGesture.cancelsTouchesInView = false
@@ -602,7 +628,7 @@ final class DearPhotoCameraController: UIViewController {
             locationLabel.textAlignment = .center
             locationLabel.numberOfLines = 2
             locationLabel.translatesAutoresizingMaskIntoConstraints = false
-            view.addSubview(locationLabel)
+            cameraControls.addSubview(locationLabel)
             NSLayoutConstraint.activate([
                 locationLabel.topAnchor.constraint(equalTo: guide.bottomAnchor, constant: 8),
                 locationLabel.centerXAnchor.constraint(equalTo: safe.centerXAnchor),
@@ -639,10 +665,35 @@ final class DearPhotoCameraController: UIViewController {
     override func viewDidLayoutSubviews() {
         super.viewDidLayoutSubviews()
         preview.frame = view.bounds
+        layoutCameraControls()
         updateRotation()
         drawGuide()
     }
 
+    @objc private func deviceOrientationChanged() {
+        view.setNeedsLayout()
+    }
+    private func layoutCameraControls() {
+        let deviceOrientation = UIDevice.current.orientation
+        if deviceOrientation.isPortrait || deviceOrientation.isLandscape { controlsOrientation = deviceOrientation }
+        let orientation = controlsOrientation
+        let physicalLandscape = orientation == .landscapeLeft || orientation == .landscapeRight
+        let hostLandscape = view.bounds.width > view.bounds.height
+        cameraControls.transform = .identity
+        if physicalLandscape && !hostLandscape {
+            cameraControls.bounds = CGRect(origin: .zero, size: CGSize(width: view.bounds.height, height: view.bounds.width))
+            cameraControls.center = CGPoint(x: view.bounds.midX, y: view.bounds.midY)
+            cameraControls.transform = CGAffineTransform(rotationAngle: orientation == .landscapeLeft ? .pi / 2 : -.pi / 2)
+        } else {
+            cameraControls.frame = view.bounds
+        }
+        let landscape = cameraControls.bounds.width > cameraControls.bounds.height
+        if controlsLandscape != landscape {
+            NSLayoutConstraint.deactivate(controlsLandscape ? landscapeControls : portraitControls)
+            controlsLandscape = landscape
+            NSLayoutConstraint.activate(landscape ? landscapeControls : portraitControls)
+        }
+    }
     override var supportedInterfaceOrientations: UIInterfaceOrientationMask { .allButUpsideDown }
     override var shouldAutorotate: Bool { true }
 
@@ -693,7 +744,7 @@ final class DearPhotoCameraController: UIViewController {
         button.accessibilityLabel = title
         if let action { button.addTarget(self, action: action, for: .touchUpInside) }
         button.translatesAutoresizingMaskIntoConstraints = false
-        view.addSubview(button)
+        cameraControls.addSubview(button)
         button.heightAnchor.constraint(greaterThanOrEqualToConstant: 44).isActive = true
         button.widthAnchor.constraint(greaterThanOrEqualToConstant: 44).isActive = true
     }

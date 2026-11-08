@@ -11,6 +11,7 @@ public sealed class ExercisePanel : ContentView
 {
     public sealed record ActivityLink(Guid TenantID, Guid Id, string Title);
     private ActivityLink? pendingActivity;
+    private Workout? previousWorkout;
     public sealed class Workout
     {
         public ActivityLink? Activity { get; set; }
@@ -78,6 +79,7 @@ public sealed class ExercisePanel : ContentView
     public void LinkActivity(MomentScope scope, string title) {
         if (archive.Active != null) { notice.Text = "请先结束当前运动，再从活动创建运动。"; return; }
         pendingActivity = new(scope.Tenant, scope.Activity, title);
+        previousWorkout = archive.History.FirstOrDefault(item => item.Activity?.Id == scope.Activity && item.Activity.TenantID == scope.Tenant);
         Render();
     }
     public void Show() { timer.Start(); Update(); }
@@ -137,6 +139,24 @@ public sealed class ExercisePanel : ContentView
         if (archive.Active is { } completed) archive.History.Insert(0, completed);
         archive.Active = null; Save(); Render();
     }
+    private async Task Continue(Workout item)
+    {
+        if (archive.Active != null || !readable || starting) return;
+        pendingActivity = item.Activity;
+        // A new segment preserves the completed record and excludes the stopped time.
+        await Start(item.Kind);
+    }
+    internal static string ActivitySummary(string userID, Guid activityID)
+    {
+        try {
+            var key = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(userID)));
+            var path = Path.Combine(FileSystem.AppDataDirectory, $"exercise-{key}.json");
+            if (!File.Exists(path)) return "";
+            var saved = JsonSerializer.Deserialize<Archive>(File.ReadAllText(path));
+            var records = (saved?.History ?? []).Concat(saved?.Active is { } active ? new[] { active } : []).Where(item => item.Activity?.Id == activityID).ToList();
+            return string.Join("\n", records.Select(item => $"{item.Kind} · {item.DistanceText} · {TimeSpan.FromSeconds(item.Duration):hh\\:mm\\:ss}"));
+        } catch { return "运动记录暂无法读取"; }
+    }
     private async Task DeleteRecord(Workout item)
     {
         if (!readable || Window?.Page is not { } page || !archive.History.Contains(item)) return;
@@ -179,6 +199,7 @@ public sealed class ExercisePanel : ContentView
             var strideLabel = new Label { Text = $"{stepLengthCm:F0} 厘米/步" };
             stride.ValueChanged += (_, e) => { stepLengthCm = e.NewValue; strideLabel.Text = $"{stepLengthCm:F0} 厘米/步"; };
             body.Add(stride); body.Add(strideLabel);
+            if (previousWorkout is { } previous) body.Add(Action($"继续上次{previous.Kind}", () => _ = Continue(previous)));
             foreach (var kind in pendingActivity != null ? new[] { "徒步", "散步", "慢跑", "自由运动" } : new[] { "散步", "慢跑", "徒步", "自由运动" }) body.Add(Action($"开始{kind}", () => _ = Start(kind)));
         }
         body.Add(new Label { Text = "请保持应用在前台。锁屏或切到后台时自动暂停，回到应用后可继续；暂停期间不计时、不计步、不累计距离。公里数按步数乘本次步长估算，默认 70 厘米/步，可在开始前调整；非 GPS 测距。计步可能稍有延迟。", FontSize = 13 });
@@ -191,6 +212,8 @@ public sealed class ExercisePanel : ContentView
             var row = new VerticalStackLayout { Spacing = 6 };
             if (item.Activity is { } linkedActivity) row.Add(new Label { Text = linkedActivity.Title });
             row.Add(new Label { Text = $"{item.Kind} · {item.DistanceText} · {item.StartedAt.ToLocalTime():yyyy-MM-dd HH:mm}\n{TimeSpan.FromSeconds(item.Seconds):hh\\:mm\\:ss} · {(item.HasSteps ? $"{item.Steps} 步" : "步数未完整获取")}" });
+            var resume = new Button { Text = $"继续{item.Kind}", IsEnabled = archive.Active == null };
+            resume.Clicked += (_, _) => _ = Continue(item); row.Add(resume);
             var delete = new Button { Text = "删除记录", TextColor = Colors.Red, BackgroundColor = Colors.Transparent };
             delete.Clicked += (_, _) => _ = DeleteRecord(item);
             row.Add(delete);

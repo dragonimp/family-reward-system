@@ -187,6 +187,7 @@ struct FamilyRoot: View {
             }
             AccountView(store: store).tabItem { Label(String(localized: "我的", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), systemImage: "person.crop.circle") }.badge(notifications.unreadCount).tag(4)
         }
+        .onChange(of: store.pendingExerciseContinuation) { _, value in if value != nil { exerciseEnabled = true; selectedTab = 3 } }
         .onChange(of: store.pendingExerciseActivity) { _, value in if value != nil { exerciseEnabled = true; selectedTab = 3 } }
         .onAppear { if store.pendingActivityLink != nil { activitiesEnabled = true; selectedTab = 2 } }
         .onChange(of: store.pendingActivityLink?.id) { _, id in if id != nil { activitiesEnabled = true; selectedTab = 2 } }

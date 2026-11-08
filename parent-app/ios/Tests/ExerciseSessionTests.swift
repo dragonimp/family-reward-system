@@ -104,6 +104,11 @@ import Foundation
         let oldRecord = try decoder.decode(ExerciseSession.self, from: JSONSerialization.data(withJSONObject: legacyJSON))
         precondition(oldRecord.steps == 18 && oldRecord.distanceMeters == nil && oldRecord.distanceText == "距离未获取")
         precondition(ExerciseSession(kind: "散步", startedAt: start, intervals: [ExerciseInterval(start: start, distanceMeters: 0)]).distanceText == "0.00 公里")
+        let continued = distanceSession.continuation(at: start.addingTimeInterval(3600))
+        precondition(continued.id != distanceSession.id && continued.endedAt == nil && continued.running)
+        precondition(continued.duration(at: start.addingTimeInterval(3610)) == 10)
+        precondition(continued.activity == distanceSession.activity && distanceSession.endedAt != nil)
+        print("PASS: continuation preserves completed record and excludes stopped time")
         print("PASS: distance totals, pause exclusion, persistence, legacy archive compatibility")
         print("PASS: pause/resume, interval steps, completed immutability, restart persistence, local time across midnight")
     }

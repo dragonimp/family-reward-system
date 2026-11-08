@@ -56,12 +56,18 @@
 "导航" = "Directions";
 "用户身份尚未就绪，请重新登录后重试。" = "Your identity is not ready. Sign in again to retry.";
 "记录没有保存成功，请重试。原记录已保留。" = "Could not save. Existing records are preserved. Please try again.";
+"关于我们" = "About us";
+"应用介绍" = "About the app";
+"版本信息" = "Version information";
+"构建号" = "Build number";
+"APP 备案号" = "APP filing number";
+"Linko Moment 帮助家庭记录生活、分享照片与活动，并一起管理孩子的成长和日常事务。" = "Linko Moment helps families capture everyday life, share photos and activities, and manage children’s growth and daily routines together.";
 "无法读取拍摄内容，请重试。" = "Could not read the capture. Please try again.";
 "主体太靠边，稍退一步或移动镜头" = "Subject near the edge. Step back or reframe.";
 "闪光灯" = "Flash";
 "自动" = "Auto";
-"开启" = "On";
 "关闭闪光灯" = "Off";
+"开启" = "On";
 "切换相机" = "Switch camera";
 "让大家靠近画面中间，两侧留空" = "Center the group and leave room on both sides.";
 "寻找主体中，可参考九宫格构图" = "Looking for a subject. Use the grid as a guide.";
@@ -71,6 +77,14 @@
 "拍照" = "Take photo";
 "试着让主体靠近一个九宫格交点" = "Try placing the subject near a grid intersection.";
 "使用照片" = "Use photo";
+"位置已获取 · 海拔暂未获取" = "Location ready · Altitude unavailable";
+"曝光补偿" = "Exposure compensation";
+"自动曝光/对焦锁定" = "AE/AF lock";
+"等待定位，请保持位置权限开启" = "Waiting for location. Keep location access enabled.";
+"位置已获取 · 海拔 %.1f 米" = "Location ready · Altitude %.1f m";
+"尚未获取有效定位，可稍后重试或选择不记录位置拍摄。" = "A valid location is not available yet. Try again later or take the photo without location.";
+"不记录位置拍摄" = "Take photo without location";
+"变焦倍率" = "Zoom";
 "此设备不支持距离估算" = "Distance estimates are unavailable on this device";
 "完成一次运动后，时长、步数和公里数会保存在这里。" = "Finish a workout to save its duration, steps and distance here.";
 "终点" = "Finish";
@@ -96,15 +110,25 @@
 "运动距离，%@" = "Workout distance, %@";
 "显示模式" = "View";
 "同步未完成，本机记录已保留：%@" = "Sync incomplete. Your local records are safe: %@";
+"关联活动" = "Linked activity";
 "距离由系统计步估算。地图模式使用 GPS 记录轨迹，暂停时停止定位。" = "Distance is estimated from steps. Map mode records GPS routes and stops location updates while paused.";
 "删除失败，运动记录已保留，请稍后重试。" = "Could not delete the workout. It is still saved; try again later.";
 "查看轨迹" = "View route";
+"请先结束当前运动，再从活动创建运动。" = "Finish the current workout before creating one from an activity.";
 "本次轨迹已达记录上限，计时与计步继续。" = "Route recording limit reached. Timer and steps continue.";
+"创建运动" = "Create workout";
 "同步" = "Sync";
 "未开启定位，可在系统设置中允许位置访问。计时与计步仍可使用。" = "Location is off. Allow location access in Settings. Timer and steps still work.";
 "服务器分页无效，请稍后重试。" = "Invalid server response. Try again later.";
 "正在获取 GPS 信号" = "Waiting for GPS signal";
 "成长" = "Growth";
+"徒步" = "Hiking";
+"取消关联" = "Unlink activity";
+"紧凑" = "Compact";
+"网格 · 每行5张" = "Grid · 5 per row";
+"大图" = "Large";
+"录制视频" = "Record video";
+"分享照片 / 视频" = "Share photos / videos";
 "日期（当地日历）" = "Date (local calendar)";
 "我们的互动" = "Our interactions";
 "应用与设置" = "App and settings";
@@ -154,7 +178,10 @@
 "类别" = "Category";
 "记录奖励 / 扣分" = "Record reward / Deduct points";
 "让眼睛靠近画面上方三分线，头顶留一点空间，避开杂乱背景。" = "Place the eyes near the upper third, leave some room above the head, and keep the background simple.";
+"手表运动实时数据" = "Watch workout data";
+"已保存到本机，联网后自动同步到活动。" = "Saved on this device. It will sync to the activity when online.";
 "修改孩子资料" = "Edit child profile";
+"心率 %.0f 次/分" = "Heart rate %.0f bpm";
 "iPhone视频.mp4" = "iPhone video.mp4";
 "已提交，等待家长确认" = "Submitted. Waiting for a parent’s confirmation.";
 "我的好友" = "My friends";
@@ -165,8 +192,10 @@
 "配偶" = "Spouse";
 "积分" = "Points";
 "想聊什么" = "What would you like to talk about?";
+"持有链接的人可在有效期内匿名浏览照片与视频。成员位置不包含在分享中。" = "Anyone with the link can browse photos and videos until it expires. Live member locations are excluded.";
 "请先返回“我的”登录用户中心。" = "Return to My and sign in to User Center first.";
 "方向" = "Direction";
+"生成匿名分享链接" = "Create anonymous share link";
 "活动读取失败：%@" = "Unable to load activities: %@";
 "公共规则" = "Shared rules";
 "约定内容" = "Commitment description";
@@ -182,6 +211,7 @@
 "人像" = "Portrait";
 "现金 %@ · 物品 %lld" = "Cash %@ · Items %lld";
 "只有活动组织者可以修改基本信息。" = "Only the activity organizer can edit its details.";
+"暂无可读取的健康数据；请检查授权并等待手表同步。" = "No health data is available. Check permissions and wait for Watch sync.";
 "辈分（可选）" = "Generation (optional)";
 "截止时间" = "Deadline";
 "无法读取相册中的原文件。" = "Unable to read the original file from your photo library.";
@@ -229,7 +259,9 @@
 "当前只支持 MP4 或 MOV 视频。" = "Only MP4 and MOV videos are supported.";
 "照片与视频 · %@" = "Photos and videos · %@";
 "创建活动" = "Create activity";
+"拍视频" = "Record video";
 "计步暂不可用：%@。计时仍可使用。" = "Step counting unavailable: %@. The timer is still available.";
+"栏目启用" = "Enabled sections";
 "定位失败：%@" = "Unable to get location: %@";
 "北纬" = "North";
 "部分运动已超过系统计步保留期，步数无法完整获取。" = "Some exercise is older than the system’s step-count retention period, so complete step counts are unavailable.";
@@ -243,6 +275,7 @@
 "想和家长说" = "Talk to a parent";
 "无法处理照片预览。" = "Could not process the photo preview.";
 "授权码" = "Authorization code";
+"气象站" = "Weather station";
 "亲属" = "Relative";
 "原文件完整性校验失败。" = "The original file failed integrity verification.";
 "家长" = "Parent";
@@ -267,6 +300,7 @@
 "未通过" = "Declined";
 "前往用户中心注销账号？" = "Open User Center to delete your account?";
 "请刷新获取积分" = "Refresh to get your points";
+"画面有些倾斜，转动手机让地平线保持水平" = "The scene is tilted. Rotate your phone to level the horizon.";
 "对方确认加入后才能查看这场活动的分享。" = "The recipient must confirm joining before they can view this activity’s shares.";
 "欢迎使用 Linko Moment" = "Welcome to Linko Moment";
 "亲子互动" = "Parent–child connection";
@@ -287,6 +321,8 @@
 "七天后完成复盘" = "Review after seven days";
 "备注（仅成员可见）" = "Notes (members only)";
 "只有空间所有者可以修改名称。" = "Only the space owner can change its name.";
+"已过期" = "Expired";
+"已失效" = "Inactive";
 "查找" = "Find";
 "家长扫码绑定二维码" = "Parent pairing QR code";
 "活动名称" = "Activity name";
@@ -327,6 +363,7 @@
 "空间名称" = "Space name";
 "发送邀请" = "Send invitation";
 "写心愿" = "Make a wish";
+"撤销此分享链接？" = "Revoke this share link?";
 "退出登录" = "Sign out";
 "照片预览读取失败（%lld），请刷新相册。" = "Unable to load photo preview (%lld). Refresh the album.";
 "关闭时仅自己和管理员可见。开启后，审核通过才会出现在公开墙，其他用户可点赞或点踩。" = "When off, only you and administrators can see this. When on, it appears on the public wall after approval, where others can vote up or down.";
@@ -352,11 +389,13 @@
 "活动邀请暂时无法读取：%@" = "Unable to load activity invitations: %@";
 "活动照片与视频" = "Activity photos and videos";
 "暂无成长统计" = "No growth statistics";
+"气温待查询或更新" = "Temperature lookup or update pending";
 "已通过" = "Approved";
 "关闭" = "Close";
 "获取当前位置" = "Get current location";
 "不填写" = "Not provided";
 "已添加好友" = "Friend added";
+"平均心率 %.0f 次/分" = "Average heart rate %.0f bpm";
 "新建约定" = "New commitment";
 "更新你的空间名称。" = "Update your space’s name.";
 " 件" = " items";
@@ -371,8 +410,10 @@
 "暂无预览，请在 iPhone 查看" = "No preview available. View on your iPhone.";
 "正在检查新版本" = "Checking for a new version";
 "开始运动" = "Start exercise";
+"站点距离（公里）" = "Station distance (km)";
 "记录按当前账号保存在此手机，暂不跨设备同步。" = "Records are saved for the current account on this phone and do not sync between devices yet.";
 "创建对话失败。" = "Could not create the chat.";
+"气温数据时间" = "Weather data time";
 "同行共创" = "Co-creators";
 "读取中" = "Loading";
 "正在加载照片" = "Loading photo";
@@ -380,6 +421,7 @@
 "简介（仅成员可见）" = "Description (members only)";
 "暂无记录" = "No records";
 "我的提议" = "My suggestion";
+"请允许保存体能训练后重试。" = "Allow saving workouts and try again.";
 "想要安慰" = "I need comfort";
 "生成好友码" = "Create friend code";
 "有活动成员正在请求原图，请保持 App 打开直到传输完成。" = "An activity member is requesting an original photo. Keep the app open until the transfer finishes.";
@@ -387,6 +429,7 @@
 "赞成 %lld" = "%lld votes for";
 "%lld年%lld月%lld日" = "%lld/%lld/%lld";
 "好友关系 · 跨空间" = "Friendships · Across spaces";
+"此设备不支持 Apple 健康。" = "Apple Health is unavailable on this device.";
 "退出" = "Leave";
 "收藏到当前空间" = "Save to current space";
 "已接收部分与本机原文件不匹配，请重新获取。" = "The received portion does not match the original on this device. Fetch it again.";
@@ -416,6 +459,7 @@
 "信用分" = "Credit score";
 "男" = "Male";
 "只有活动创建者可以移除其他成员。" = "Only the activity creator can remove other members.";
+"手表运动账号不匹配。" = "The Watch workout belongs to a different account.";
 "用户协议" = "User agreement";
 "设备已解绑" = "Device unlinked";
 "每日成长记录数量" = "Daily growth record count";
@@ -429,6 +473,7 @@
 "原图传输顺序无效。" = "The original-photo transfer sequence is invalid.";
 "归档" = "Archive";
 "通知、照片与位置权限" = "Notification, photo, and location permissions";
+"开始前连接已登录的 iPhone，运动中可独立采集健康数据。活动关联以 iPhone 最近选择的活动为准。" = "Connect the signed-in iPhone before starting. Health recording then runs independently. Uses the activity most recently selected on iPhone.";
 "听见彼此，留出陪伴时间。互动记录不计积分、不评分。" = "Listen to each other and make time together. Connection records do not award points or scores.";
 "当前已是 App Store 最新版本" = "You have the latest App Store version";
 "分享已删除，本机副本暂未清理；App 会继续重试。" = "The share was deleted, but the local copy could not be removed yet. The app will keep trying.";
@@ -461,6 +506,7 @@
 "族谱名称" = "Family-tree name";
 "删除“%@”" = "Delete “%@”";
 "只有活动组织者可以删除活动。" = "Only the activity organizer can delete the activity.";
+"气温 %.1f °C" = "Air temperature %.1f °C";
 "未获得运动与健身权限，可在系统设置中开启；计时仍可使用。" = "Motion and Fitness permission has not been granted. Enable it in Settings. The timer remains available.";
 "父母的兄弟姐妹" = "Parents’ siblings";
 " · 已包含" = " · Included";
@@ -492,8 +538,10 @@
 "你的姓名" = "Your name";
 " · 我" = " · Me";
 "用户中心账号：" = "User Center account: ";
+"健康数据由系统授权读取。手表运动保存后同步到 iPhone；未授权或尚未同步时不显示测量值。" = "Health data requires system permission. Saved Watch workouts appear after iPhone sync. Unavailable measurements remain empty.";
 "刷新记录" = "Refresh requests";
 "请输入 2–50 字的名称或姓氏" = "Enter a name or surname of 2–50 characters";
+"手表运动数据" = "Watch workout data";
 "手表上显示的配对码" = "Pairing code shown on the watch";
 "点右上角“完成”后自动保存。" = "Saved automatically when you tap Done at the top right.";
 "核对并重试同一笔记录" = "Review and retry the same record";
@@ -525,11 +573,13 @@
 "暂无会话" = "No chats yet";
 "还没有分享的日常。" = "No daily moments have been shared yet.";
 "奖励审批" = "Reward approvals";
+"已完成授权请求，数据以系统实际允许读取的项目为准。" = "Permission request completed. Only data allowed by the system can be read.";
 "基础功能" = "Basic features";
 "正在保存…" = "Saving…";
 "当前位置" = "Current location";
 "对话" = "Chat";
 "申请奖励" = "Request a reward";
+"健康授权未完成：%@" = "Health authorization failed: %@";
 "待家长确认" = "Awaiting parent confirmation";
 "发布日常" = "Post a moment";
 "原文件接收进度" = "Original file transfer progress";
@@ -541,6 +591,7 @@
 "活动访客" = "Activity guests";
 "原图大小不匹配。" = "The original-photo size does not match.";
 "获取设备码" = "Get device code";
+"分享照片与视频链接" = "Share album link";
 "无法读取最新积分记录。" = "Could not load the latest point records.";
 "删除我的记录" = "Delete my record";
 "一起想办法" = "Let’s find a solution together";
@@ -555,6 +606,7 @@
 "正在读取已有活动…" = "Loading existing activities…";
 "共享照片" = "Shared photos";
 "刷新相册" = "Refresh album";
+"未取得可靠拍摄时间，暂不填气温" = "No reliable capture time is available; temperature is left blank";
 "加入分享" = "Add to shares";
 "修改空间名称" = "Rename space";
 "确认逾期" = "Confirm overdue";
@@ -568,6 +620,8 @@
 "隐私政策未配置" = "Privacy policy is not configured";
 "保存基本信息" = "Save details";
 "补救待确认" = "Remedy awaiting confirmation";
+"距离 %.2f 公里" = "Distance %.2f km";
+"保存未完成，请保留页面重试：%@" = "Saving is incomplete. Keep this screen open and retry: %@";
 "回复：%@" = "Reply: %@";
 "默认填写当前位置地址" = "Use the current address by default";
 "家族成员" = "Family members";
@@ -575,6 +629,7 @@
 "管理 · %@" = "Manage · %@";
 "我的规则" = "My rules";
 "此设备不支持扫描，请返回手动输入手表设备码。" = "This device does not support scanning. Go back and enter the watch device code manually.";
+"站点海拔（米）" = "Station elevation (m)";
 "内容" = "Content";
 "添加" = "Add";
 "成员资料" = "Member profile";
@@ -586,11 +641,13 @@
 "物品" = "Items";
 "继续" = "Resume";
 "关系已移除。" = "Connection removed.";
+"连接 Apple 健康与手表数据" = "Connect Apple Health and Watch data";
 "选择族谱" = "Select family tree";
 "扫描手表二维码" = "Scan watch QR code";
 "请在日历中选定生日后保存。" = "Select a birthday in the calendar before saving.";
 "%@的打卡" = "%@’s check-in";
 "介绍你与家族的关系（可选）" = "Describe your connection to the family (optional)";
+"分享" = "Share";
 "多选下载原文件" = "Download original files";
 "未填写" = "Not provided";
 "申请加入「%@」" = "Request to join “%@”";
@@ -598,8 +655,11 @@
 "原图请求回执无效。" = "The original-photo request receipt is invalid.";
 "此设备不支持计步，可继续使用运动计时。" = "Step counting is not supported on this device. You can still use the exercise timer.";
 "群组名称" = "Group name";
+"刷新气温" = "Refresh temperature";
+"健康与手表" = "Health and Watch";
 "仅向你要绑定的孩子提供此授权码。" = "Give this authorization code only to the child you intend to link.";
 "登录并生成邀请" = "Sign in and create invitation";
+"已存本机 · 待同步" = "Saved locally · Pending sync";
 "待办与记录" = "Tasks and records";
 "无法确认用户名。" = "Unable to confirm the username.";
 "已归档" = "Archived";
@@ -621,6 +681,7 @@
 "专心陪伴时间" = "Focused time together";
 "照片预览无法读取。" = "Unable to load the photo preview.";
 "删除空间「%@」？" = "Delete space “%@”?";
+"重试同步" = "Retry sync";
 "重新定位" = "Locate again";
 "确认申请" = "Confirm request";
 "家庭成员" = "Family members";
@@ -635,6 +696,7 @@
 "把画面想成九宫格，让主体靠近交点，视线方向多留一点空间。" = "Imagine a three-by-three grid. Place the subject near an intersection and leave room in the direction they are looking.";
 "请先绑定手表。" = "Pair your watch first.";
 "年和月" = "Year and month";
+"风景构图：参考三分线安排天空与地面，突出前景" = "Landscape: use the thirds grid to balance sky and ground and highlight the foreground.";
 "好友关系暂时无法读取：%@" = "Unable to load friendships: %@";
 "暂停" = "Pause";
 "显示方式" = "Display";
@@ -643,8 +705,10 @@
 "复制链接" = "Copy link";
 "生日" = "Birthday";
 "已复制" = "Copied";
+"匿名分享照片与视频" = "Share photos and videos anonymously";
 "手表活动请求无效。" = "The watch activity request is invalid.";
 "我说" = "I said";
+"Meteostat 及其数据提供方 · CC BY 4.0" = "Meteostat and its data providers · CC BY 4.0";
 "确认完成" = "Confirm completion";
 "Linko Moment" = "Linko Moment";
 "帮助与隐私" = "Help and privacy";
@@ -663,8 +727,10 @@
 "这次想聊什么或一起做什么" = "What would you like to talk about or do together?";
 "保存记录" = "Save record";
 "支系" = "Branch";
+"运动启动失败：%@" = "Unable to start workout: %@";
 "原图传输格式无效。" = "The original-photo transfer format is invalid.";
 "确认删除活动" = "Delete this activity?";
+"继续%@" = "Continue %@";
 "刷新日常" = "Refresh moments";
 "手表与 iPhone 的照片传输尚未就绪。" = "Photo transfer between the watch and iPhone is not ready yet.";
 "%lld年%lld月" = "%lld/%lld";
@@ -695,6 +761,7 @@
 "创建空间" = "Create space";
 "续传原文件已发生变化。" = "The original file to resume has changed.";
 "请先在 iPhone 上登录 Linko Moment。" = "Sign in to Linko Moment on your iPhone first.";
+"未记录拍摄地点，无法查询气温" = "No capture location is available for a temperature lookup";
 "当前权益" = "Current benefits";
 "请先在“我的”登录用户中心。" = "Sign in to User Center in My first.";
 "我们的话" = "Our conversations";
@@ -704,6 +771,7 @@
 "分享到 Linko Moment" = "Share to Linko Moment";
 "还没有孩子" = "No children yet";
 "连续天数" = "Consecutive days";
+"匿名分享链接" = "Anonymous share links";
 "虚拟群组 · 一起成长" = "Shared group · Growing together";
 "服务地址必须使用 HTTPS" = "The service address must use HTTPS.";
 "分享原文件" = "Share original file";
@@ -716,12 +784,14 @@
 "我的孩子" = "My children";
 "记录" = "Records";
 "修改姓名与备注" = "Change name and notes";
+"运动会话异常：%@" = "Workout session error: %@";
 "运动项目" = "Exercise type";
 "预览尚未就绪，点开可重试" = "Preview is not ready. Open it to retry.";
 "已共享 %lld 项；请保持此 iPhone 可以响应原文件请求。" = "Shared %lld items. Keep this iPhone available to respond to original file requests.";
 "正在读取成员…" = "Loading members…";
 "搜索已加载的孩子、内容、类别" = "Search loaded children, content, or categories";
 "注册用户中心账号" = "Create a User Center account";
+"撤销链接" = "Revoke link";
 "请输入会话名称。" = "Enter a chat name.";
 "想记录谁" = "Who is this about?";
 "奖励" = "Reward";
@@ -739,12 +809,16 @@
 "%@ 积分 · ¥%@" = "%@ points · ¥%@";
 "性别" = "Gender";
 "还没有打卡记录。" = "No check-ins yet.";
+"关闭全屏" = "Close full screen";
 "保留扣分" = "Keep deduction";
 "信用分数据格式不正确" = "The credit-score data format is invalid";
 "活动列表无效。" = "Invalid activity list.";
 "待确认" = "Awaiting confirmation";
+"过期时间" = "Expires";
 "我的群组" = "My groups";
 "运动" = "Exercise";
+"%.0f 千卡" = "%.0f kcal";
+"请先在配对 iPhone 登录并连接健康数据。" = "Sign in on the paired iPhone and connect Health data first.";
 "请填写不超过 200 字的空间名称。" = "Enter a space name of up to 200 characters.";
 "设备码 · 10 分钟内有效" = "Device code · valid for 10 minutes";
 "获取选中原文件" = "Get selected original files";
@@ -781,6 +855,7 @@
 "审核通过后公开展示" = "Make public after approval";
 "无法读取或保存分享文件，请重试。" = "Unable to read or save shared files. Try again.";
 "物品名称" = "Item name";
+"活动能量 %.0f 千卡" = "Active energy %.0f kcal";
 "动一动，记录自己的节奏" = "Move and find your own pace";
 "提交意见" = "Submit feedback";
 "我" = "Me";
@@ -853,6 +928,7 @@
 "添加规则" = "Add rule";
 "地点未记录" = "No location recorded";
 "申请公开 · 待审核" = "Public access requested · Awaiting review";
+"已生成的链接" = "Created links";
 "活动照片" = "Activity photos";
 "暂无记录，孩子也可以从手表发起。" = "No records yet. Children can also start an activity from their watch.";
 "iPhone视频.mov" = "iPhone video.mov";
@@ -863,9 +939,11 @@
 "正在获取原文件…" = "Getting original files…";
 "暖心时刻" = "Warm moments";
 "新空间名称" = "New space name";
+"该地点或时段暂无气温资料" = "No temperature data for this place and time";
 "包含不支持的文件类型。" = "Unsupported file type included.";
 "解除" = "Unlink";
 "零用钱" = "Pocket money";
+"查询时间" = "Queried at";
 "创建" = "Create";
 "好友申请已发出。" = "Friend request sent.";
 "用户反馈" = "User feedback";
@@ -920,8 +998,10 @@
 "%lld" = "%lld";
 "备注" = "Notes";
 "用户中心用户名" = "User Center username";
+"全屏查看照片" = "View photo full screen";
 "查看" = "View";
 "%@%@%@" = "%@%@%@";
+"设为活动封面" = "Set as activity cover";
 "退出 Linko Moment？" = "Sign out of Linko Moment?";
 "进行中" = "In progress";
 "取消收藏" = "Remove from saved";
@@ -970,14 +1050,17 @@
 "西经" = "West";
 "孩子姓名" = "Child’s name";
 "请先获取当前位置。" = "Get your current location first.";
+"活动封面已更新，分享页将使用这项照片或视频的预览图。" = "Activity cover updated. The share page will use this photo or video preview.";
 "版本升级" = "Version updates";
 "正在更新…" = "Updating…";
+"地平线已水平，可参考三分线安排天空与地面" = "Horizon is level. Use the thirds grid to balance sky and ground.";
 "还没有打卡记录" = "No check-ins yet";
 "添加家族成员" = "Add family member";
 "留空时使用上方地址作为备注。" = "Leave blank to use the address above as the note.";
 "已保存，爸爸妈妈会看到这份温暖" = "Saved. Your parents will see this warm moment.";
 "信用分数据格式不正确。" = "The credit-score data format is invalid.";
 "网络连接失败，请检查网络后重试。" = "The network connection failed. Check your connection and try again.";
+"共享我的位置" = "Share my location";
 "从孩子详情中记录奖励与扣分。" = "Record rewards and deductions from the child’s details.";
 "无法扫描" = "Unable to scan";
 "已完成绑定" = "Pairing complete";
@@ -993,6 +1076,7 @@
 "净支持 %lld" = "Net support %lld";
 "请家长先配置家庭成员" = "Ask a parent to set up family members first.";
 "已暂停" = "Paused";
+"附近气象站资料，可能包含模型补全；不是手机测温。" = "Nearby station data may include model-filled values. This is not a phone temperature measurement.";
 "告诉家长" = "Tell a parent";
 "无法读取所选视频。" = "Unable to read the selected video.";
 "iPhone照片" = "iPhone photo";
@@ -1022,6 +1106,7 @@
 "暂不可用" = "Temporarily unavailable";
 "群组" = "Groups";
 "吵架后的重连" = "Reconnect after an argument";
+"气温来源与时间" = "Temperature source and time";
 "东经" = "East";
 "应用资料来源不正确。" = "The app information came from an unexpected source.";
 "提示" = "Notice";
@@ -1034,10 +1119,12 @@
 "创建或加入一个群组，开始共同记录成长。" = "Create or join a group to start recording growth together.";
 "吵架后重连" = "Reconnect after an argument";
 "已关联到‘我的’中的家庭成员" = "Linked to family members in My";
+"已保存到 Apple 健康，iPhone 同步后可查看。" = "Saved to Apple Health. It will appear on iPhone after sync.";
 "待审核申请" = "Requests awaiting review";
 "已加入共同活动，可收藏到自己的空间。" = "You have joined the shared activity and can save it to your own space.";
 "另一张照片正在共享，请稍后重试。" = "Another photo is being shared. Please try again later.";
 "打卡已更新。" = "Check-in updated.";
+"活动记录" = "Activity record";
 "打卡详情" = "Check-in details";
 "用户中心登录" = "Sign in with User Center";
 "添加好友" = "Add friend";
@@ -1057,110 +1144,10 @@
 "已将成员移出活动。" = "Member removed from activity.";
 "验证并解绑" = "Verify and unlink";
 "互动记录" = "Connection records";
+"已撤销" = "Revoked";
 "请先在配对的 iPhone 上登录 Linko Moment。" = "Sign in to Linko Moment on the paired iPhone first.";
 "空间已创建。" = "Space created.";
 "确认移出" = "Confirm removal";
 "暂无排行" = "No rankings yet";
 "仅可删除没有其他成员、照片或日常记录的活动。" = "Only activities without other members, photos, or moments can be deleted.";
 "活动与照片" = "Activities and photos";
-
-"关联活动" = "Linked activity";
-"请先结束当前运动，再从活动创建运动。" = "Finish the current workout before creating one from an activity.";
-"创建运动" = "Create workout";
-"徒步" = "Hiking";
-"取消关联" = "Unlink activity";
-"位置已获取 · 海拔 %.1f 米" = "Location ready · Altitude %.1f m";
-"位置已获取 · 海拔暂未获取" = "Location ready · Altitude unavailable";
-"等待定位，请保持位置权限开启" = "Waiting for location. Keep location access enabled.";
-"尚未获取有效定位，可稍后重试或选择不记录位置拍摄。" = "A valid location is not available yet. Try again later or take the photo without location.";
-"不记录位置拍摄" = "Take photo without location";
-"变焦倍率" = "Zoom";
-"曝光补偿" = "Exposure compensation";
-"自动曝光/对焦锁定" = "AE/AF lock";
-"分享照片 / 视频" = "Share photos / videos";
-"录制视频" = "Record video";
-"大图" = "Large";
-"紧凑" = "Compact";
-"网格 · 每行5张" = "Grid · 5 per row";
-
-"栏目启用" = "Enabled sections";
-
-"分享" = "Share";
-
-"拍视频" = "Record video";
-
-"风景构图：参考三分线安排天空与地面，突出前景" = "Landscape: use the thirds grid to balance sky and ground and highlight the foreground.";
-
-"地平线已水平，可参考三分线安排天空与地面" = "Horizon is level. Use the thirds grid to balance sky and ground.";
-
-"画面有些倾斜，转动手机让地平线保持水平" = "The scene is tilted. Rotate your phone to level the horizon.";
-
-"设为活动封面" = "Set as activity cover";
-
-"活动封面已更新，分享页将使用这项照片或视频的预览图。" = "Activity cover updated. The share page will use this photo or video preview.";
-
-"已保存到本机，联网后自动同步到活动。" = "Saved on this device. It will sync to the activity when online.";
-
-"已存本机 · 待同步" = "Saved locally · Pending sync";
-
-"重试同步" = "Retry sync";
-
-"活动记录" = "Activity record";
-
-"共享我的位置" = "Share my location";
-
-"匿名分享照片与视频" = "Share photos and videos anonymously";
-
-"全屏查看照片" = "View photo full screen";
-
-"过期时间" = "Expires";
-
-"生成匿名分享链接" = "Create anonymous share link";
-
-"分享照片与视频链接" = "Share album link";
-
-"持有链接的人可在有效期内匿名浏览照片与视频。成员位置不包含在分享中。" = "Anyone with the link can browse photos and videos until it expires. Live member locations are excluded.";
-
-"已生成的链接" = "Created links";
-
-"撤销链接" = "Revoke link";
-
-"已失效" = "Inactive";
-
-"匿名分享链接" = "Anonymous share links";
-
-"撤销此分享链接？" = "Revoke this share link?";
-
-"关闭全屏" = "Close full screen";
-
-"气温 %.1f °C" = "Air temperature %.1f °C";
-
-"气温来源与时间" = "Temperature source and time";
-
-"气象站" = "Weather station";
-
-"站点距离（公里）" = "Station distance (km)";
-
-"站点海拔（米）" = "Station elevation (m)";
-
-"气温数据时间" = "Weather data time";
-
-"查询时间" = "Queried at";
-
-"附近气象站资料，可能包含模型补全；不是手机测温。" = "Nearby station data may include model-filled values. This is not a phone temperature measurement.";
-
-"Meteostat 及其数据提供方 · CC BY 4.0" = "Meteostat and its data providers · CC BY 4.0";
-
-"该地点或时段暂无气温资料" = "No temperature data for this place and time";
-
-"气温待查询或更新" = "Temperature lookup or update pending";
-
-"刷新气温" = "Refresh temperature";
-
-"已过期" = "Expired";
-
-"已撤销" = "Revoked";
-
-"未记录拍摄地点，无法查询气温" = "No capture location is available for a temperature lookup";
-
-"未取得可靠拍摄时间，暂不填气温" = "No reliable capture time is available; temperature is left blank";

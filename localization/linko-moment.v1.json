@@ -5650,6 +5650,121 @@
       "zh-Hans": "未取得可靠拍摄时间，暂不填气温",
       "en": "No reliable capture time is available; temperature is left blank",
       "iosKey": "未取得可靠拍摄时间，暂不填气温"
+    },
+    "moment.t80317b18aba7": {
+      "zh-Hans": "健康与手表",
+      "en": "Health and Watch",
+      "iosKey": "健康与手表"
+    },
+    "moment.t0dccbd875ba2": {
+      "zh-Hans": "手表运动实时数据",
+      "en": "Watch workout data",
+      "iosKey": "手表运动实时数据"
+    },
+    "moment.t0eb7c1cfa146": {
+      "zh-Hans": "心率 %.0f 次/分",
+      "en": "Heart rate %.0f bpm",
+      "iosKey": "心率 %.0f 次/分"
+    },
+    "moment.tb4298c5b9521": {
+      "zh-Hans": "活动能量 %.0f 千卡",
+      "en": "Active energy %.0f kcal",
+      "iosKey": "活动能量 %.0f 千卡"
+    },
+    "moment.t76d3579d2cfb": {
+      "zh-Hans": "距离 %.2f 公里",
+      "en": "Distance %.2f km",
+      "iosKey": "距离 %.2f 公里"
+    },
+    "moment.t7caa9db075ec": {
+      "zh-Hans": "连接 Apple 健康与手表数据",
+      "en": "Connect Apple Health and Watch data",
+      "iosKey": "连接 Apple 健康与手表数据"
+    },
+    "moment.t4109d73e84ac": {
+      "zh-Hans": "平均心率 %.0f 次/分",
+      "en": "Average heart rate %.0f bpm",
+      "iosKey": "平均心率 %.0f 次/分"
+    },
+    "moment.t61e25c49676e": {
+      "zh-Hans": "健康数据由系统授权读取。手表运动保存后同步到 iPhone；未授权或尚未同步时不显示测量值。",
+      "en": "Health data requires system permission. Saved Watch workouts appear after iPhone sync. Unavailable measurements remain empty.",
+      "iosKey": "健康数据由系统授权读取。手表运动保存后同步到 iPhone；未授权或尚未同步时不显示测量值。"
+    },
+    "moment.t948b7826167b": {
+      "zh-Hans": "继续%@",
+      "en": "Continue %@",
+      "iosKey": "继续%@"
+    },
+    "moment.t498d02d1163b": {
+      "zh-Hans": "此设备不支持 Apple 健康。",
+      "en": "Apple Health is unavailable on this device.",
+      "iosKey": "此设备不支持 Apple 健康。"
+    },
+    "moment.t6af021344044": {
+      "zh-Hans": "已完成授权请求，数据以系统实际允许读取的项目为准。",
+      "en": "Permission request completed. Only data allowed by the system can be read.",
+      "iosKey": "已完成授权请求，数据以系统实际允许读取的项目为准。"
+    },
+    "moment.t6c5506e1638e": {
+      "zh-Hans": "健康授权未完成：%@",
+      "en": "Health authorization failed: %@",
+      "iosKey": "健康授权未完成：%@"
+    },
+    "moment.t15825e135bd3": {
+      "zh-Hans": "暂无可读取的健康数据；请检查授权并等待手表同步。",
+      "en": "No health data is available. Check permissions and wait for Watch sync.",
+      "iosKey": "暂无可读取的健康数据；请检查授权并等待手表同步。"
+    },
+    "moment.t4fa78839dcbf": {
+      "zh-Hans": "手表运动账号不匹配。",
+      "en": "The Watch workout belongs to a different account.",
+      "iosKey": "手表运动账号不匹配。"
+    },
+    "moment.taa0ddf52aa3e": {
+      "zh-Hans": "请先在配对 iPhone 登录并连接健康数据。",
+      "en": "Sign in on the paired iPhone and connect Health data first.",
+      "iosKey": "请先在配对 iPhone 登录并连接健康数据。"
+    },
+    "moment.t47be685bf9ed": {
+      "zh-Hans": "请允许保存体能训练后重试。",
+      "en": "Allow saving workouts and try again.",
+      "iosKey": "请允许保存体能训练后重试。"
+    },
+    "moment.t9355f60ccc26": {
+      "zh-Hans": "运动启动失败：%@",
+      "en": "Unable to start workout: %@",
+      "iosKey": "运动启动失败：%@"
+    },
+    "moment.tf8bfd7bd55d5": {
+      "zh-Hans": "已保存到 Apple 健康，iPhone 同步后可查看。",
+      "en": "Saved to Apple Health. It will appear on iPhone after sync.",
+      "iosKey": "已保存到 Apple 健康，iPhone 同步后可查看。"
+    },
+    "moment.t76dec1835b7b": {
+      "zh-Hans": "保存未完成，请保留页面重试：%@",
+      "en": "Saving is incomplete. Keep this screen open and retry: %@",
+      "iosKey": "保存未完成，请保留页面重试：%@"
+    },
+    "moment.t9fb69fb48eac": {
+      "zh-Hans": "运动会话异常：%@",
+      "en": "Workout session error: %@",
+      "iosKey": "运动会话异常：%@"
+    },
+    "moment.ta9dfa7164be5": {
+      "zh-Hans": "%.0f 千卡",
+      "en": "%.0f kcal",
+      "iosKey": "%.0f 千卡"
+    },
+    "moment.t530f14b4e262": {
+      "zh-Hans": "开始前连接已登录的 iPhone，运动中可独立采集健康数据。活动关联以 iPhone 最近选择的活动为准。",
+      "en": "Connect the signed-in iPhone before starting. Health recording then runs independently. Uses the activity most recently selected on iPhone.",
+      "iosKey": "开始前连接已登录的 iPhone，运动中可独立采集健康数据。活动关联以 iPhone 最近选择的活动为准。"
+    },
+    "moment.t6256e46112a9": {
+      "zh-Hans": "手表运动数据",
+      "en": "Watch workout data",
+      "iosKey": "手表运动数据"
     }
   }
 }

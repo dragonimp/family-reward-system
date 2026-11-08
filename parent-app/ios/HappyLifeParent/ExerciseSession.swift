@@ -9,6 +9,7 @@ struct ExerciseActivity: Codable, Equatable, Identifiable {
 struct ExerciseArchive: Codable {
     var active: ExerciseSession?
     var history: [ExerciseSession] = []
+    var importedWatchIDs: [UUID]?
     var uploaded: [UUID]?
     var pendingDeletions: [UUID]?
 
@@ -77,6 +78,13 @@ struct ExerciseSession: Codable, Identifiable {
     mutating func resume(at now: Date) {
         guard !running, endedAt == nil else { return }
         intervals.append(ExerciseInterval(start: now))
+    }
+    func continuation(at now: Date) -> ExerciseSession {
+        ExerciseSession(kind: kind, startedAt: now, intervals: [ExerciseInterval(start: now)], activity: activity, routeEnabled: routeEnabled)
+    }
+    static func archiveURL(userID: String) -> URL {
+        // The caller supplies the same account hash used by ExerciseStore.
+        FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0].appendingPathComponent("Exercise/\(userID).json")
     }
     static func syncDecoder() -> JSONDecoder {
         let decoder = JSONDecoder()
