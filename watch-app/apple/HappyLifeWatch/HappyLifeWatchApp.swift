@@ -19,13 +19,33 @@ struct HappyLifeWatchApp: App {
                 .task { await store.start(); await language.refresh() }
                 .onChange(of: scenePhase) { _, phase in
                     if phase == .active { store.retryWorkoutSync() }
-                    if phase == .active && store.ready && store.token != nil && store.pairing == nil { Task { await store.refresh() } }
+
                 }
         }
     }
 }
 
 struct WatchHomeView: View {
+    @EnvironmentObject private var store: WatchStore
+    @EnvironmentObject private var language: AgentIdentityLanguageStore
+    var body: some View {
+        NavigationStack {
+            List {
+                Text(String(localized: "通过配对的 iPhone 使用已登录账号管理活动。", bundle: AgentIdentityLanguage.appBundle())).font(.footnote).foregroundStyle(.secondary)
+                NavigationLink(String(localized: "运动", bundle: AgentIdentityLanguage.appBundle()), destination: WatchWorkoutView())
+                NavigationLink(String(localized: "活动照片", bundle: AgentIdentityLanguage.appBundle()), destination: WatchSocialSpacesView())
+                NavigationLink(language.text("settings.application")) {
+                    List {
+                        NavigationLink(language.text("language.settings"), destination: WatchLanguageSettingsView())
+                        NavigationLink(String(localized: "孩子绑定与积分", bundle: AgentIdentityLanguage.appBundle()), destination: WatchChildView())
+                    }.navigationTitle(language.text("settings.application"))
+                }
+            }.navigationTitle("Linko Moment")
+        }
+    }
+}
+
+struct WatchChildView: View {
     @EnvironmentObject private var store: WatchStore
     @EnvironmentObject private var language: AgentIdentityLanguageStore
 
@@ -59,7 +79,6 @@ struct WatchHomeView: View {
                     NavigationLink(String(localized: "申请记录", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), destination: RequestsView())
                     NavigationLink(String(localized: "爸爸妈妈的闪光时刻", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), destination: WarmMomentView())
                     NavigationLink(String(localized: "亲子互动", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), destination: WatchConnectionsView())
-                    NavigationLink(String(localized: "活动照片", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), destination: WatchSocialSpacesView())
                     NavigationLink(String(localized: "今日鼓励", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), destination: GrowthView())
                     NavigationLink(String(localized: "我的好友", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), destination: FriendsView())
                     if store.settings?.friendLeaderboardEnabled == true {
@@ -76,7 +95,8 @@ struct WatchHomeView: View {
                 if store.busy { ProgressView(String(localized: "处理中", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) }
             }
             .disabled(store.busy)
-            .navigationTitle("Linko Moment")
+            .navigationTitle(String(localized: "孩子绑定与积分", bundle: AgentIdentityLanguage.appBundle()))
+            .task { if store.token != nil && store.pairing == nil { await store.refresh() } }
             .containerBackground(WatchTheme.colors(store.face).gradient, for: .navigation)
             .alert(String(localized: "提示", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), isPresented: Binding(get: { store.message != nil }, set: {
                 if !$0 { store.message = nil }

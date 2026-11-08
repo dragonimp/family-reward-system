@@ -200,7 +200,6 @@ final class WatchStore: ObservableObject {
                 self.pairing = try JSONDecoder().decode(PairingChallenge.self, from: Data(credential.dropFirst(8).utf8))
             } else { self.token = credential }
             self.ready = true
-            if self.token != nil && self.pairing == nil { try await self.load() }
         }
     }
 
@@ -305,7 +304,6 @@ final class WatchStore: ObservableObject {
     }
 
     func loadSocialSpaces() async {
-        guard token != nil else { return }
         socialLoading = true; socialError = nil
         defer { socialLoading = false }
         do {
@@ -354,7 +352,6 @@ final class WatchStore: ObservableObject {
     }
 
     func socialPreview(spaceID: String, activityID: String, photoID: String) async throws -> Data {
-        guard token != nil else { throw APIError(status: 401, message: String(localized: "请先绑定手表。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) }
         let reply = try await activityTransport.request(["action": "thumbnail", "spaceId": spaceID,
                                                          "activityId": activityID, "photoId": photoID])
         guard let data = reply["image"] as? Data, data.count <= 100_000 else {
@@ -365,7 +362,6 @@ final class WatchStore: ObservableObject {
 
     func socialRequest(_ action: String, spaceID: String? = nil, activityID: String? = nil,
                        fields: [String: Any] = [:]) async throws -> [String: Any] {
-        guard token != nil else { throw APIError(status: 401, message: String(localized: "请先绑定手表。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) }
         var message = fields
         message["action"] = action
         if let spaceID { message["spaceId"] = spaceID }
@@ -374,7 +370,6 @@ final class WatchStore: ObservableObject {
     }
 
     func shareSocialPhoto(_ data: Data, spaceID: String, activityID: String) async throws {
-        guard token != nil else { throw APIError(status: 401, message: String(localized: "请先绑定手表。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) }
         guard data.count > 0, data.count <= 50 * 1024 * 1024 else {
             throw APIError(status: 0, message: String(localized: "照片超过 50 MB，请选择较小的照片。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)))
         }
