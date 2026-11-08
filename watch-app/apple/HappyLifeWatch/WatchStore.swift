@@ -508,8 +508,14 @@ final class WatchStore: ObservableObject {
         defer { saving = false }
         let end = stops.count == starts.count ? stops.last! : Date()
         if stops.count < starts.count { stops.append(end) }
-        running = false; if session.state != .ended { session.end() }
+        running = false
+        if session.state != .stopped && session.state != .ended { session.stopActivity(with: end) }
         do {
+            let deadline = Date().addingTimeInterval(15)
+            while session.state != .stopped && session.state != .ended {
+                guard Date() < deadline else { throw CancellationError() }
+                try await Task.sleep(for: .milliseconds(100))
+            }
             if !collectionEnded { try await builder.endCollection(at: end); collectionEnded = true }
             distance = builder.statistics(for: HKQuantityType(.distanceWalkingRunning))?.sumQuantity()?.doubleValue(for: .meter()) ?? distance
             let formatter = ISO8601DateFormatter()
@@ -523,6 +529,7 @@ final class WatchStore: ObservableObject {
             let text = String(data: try JSONSerialization.data(withJSONObject: record), encoding: .utf8)!
             if !metadataAdded { try await builder.addMetadata(["net.impx.moment.owner": owner, "net.impx.moment.record": text]); metadataAdded = true }
             _ = try await builder.finishWorkout()
+            session.end()
             onMetrics?(owner, [:])
             active = false; self.session = nil; self.builder = nil
             message = String(localized: "已保存到 Apple 健康，iPhone 同步后可查看。", bundle: AgentIdentityLanguage.appBundle())
