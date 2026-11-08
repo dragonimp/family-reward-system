@@ -305,9 +305,11 @@ struct MomentDraftStore {
     }
     func save(_ draft: MomentLocalDraft) throws {
         let path = root.appendingPathComponent(draft.id.uuidString + ".json")
-        try JSONEncoder().encode(draft).write(to: path, options: .atomic)
+        let data = try JSONEncoder().encode(draft)
         #if os(iOS)
-        try FileManager.default.setAttributes([.protectionKey: FileProtectionType.completeUntilFirstUserAuthentication], ofItemAtPath: path.path)
+        try data.write(to: path, options: [.atomic, .completeFileProtectionUntilFirstUserAuthentication])
+        #else
+        try data.write(to: path, options: .atomic)
         #endif
     }
     func enqueue(_ entry: MomentLocalDraft, media: URL? = nil) throws -> MomentLocalDraft {

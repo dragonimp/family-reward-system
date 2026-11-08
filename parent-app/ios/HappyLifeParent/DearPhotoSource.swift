@@ -419,7 +419,7 @@ import UniformTypeIdentifiers
         } catch {
             // An ambiguous remote response must never revoke a possibly committed share.
             // The durable draft retains its original and stable ID for a safe retry.
-            if publishedID == nil { try? FileManager.default.removeItem(at: localURL) }
+            if publishedID == nil && !index.photos.contains(where: { $0.fileName == localName }) { try? FileManager.default.removeItem(at: localURL) }
             throw error
         }
     }

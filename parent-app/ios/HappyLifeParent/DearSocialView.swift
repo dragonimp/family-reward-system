@@ -370,11 +370,6 @@ private struct DearActivityMapView: View {
     var body: some View {
         TimelineView(.periodic(from: .now, by: 1)) { tick in
         VStack(spacing: 0) {
-            if points.isEmpty && locations.members.filter({ $0.expiresAt > tick.date }).isEmpty {
-                ContentUnavailableView(String(localized: "暂无地图位置", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), systemImage: "map",
-                                       description: Text(String(localized: "照片没有记录坐标时仍可在下方查看，但无法固定到地图上。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))))
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-            } else {
                 Map(position: $cameraPosition) {
                     ForEach(locations.members.filter { $0.expiresAt > tick.date }) { member in
                         Annotation(member.name, coordinate: member.coordinate) {
@@ -429,7 +424,6 @@ private struct DearActivityMapView: View {
                         }
                     }
                 }
-            }
             if let selectedPoint {
                 HStack(spacing: 10) {
                     if let photo = selectedPoint.photo {
@@ -491,6 +485,10 @@ private struct DearActivityMapView: View {
         }
         .navigationTitle(String(localized: "\(title) · 地图", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)))
         .navigationBarTitleDisplayMode(.inline)
+        .safeAreaInset(edge: .bottom) {
+            Toggle(String(localized: "共享我的位置", bundle: AgentIdentityLanguage.appBundle()), isOn: Binding(get: { locations.sharing }, set: { locations.setSharing($0) }))
+                .font(.subheadline).padding(.horizontal, 16).padding(.vertical, 10).background(.regularMaterial)
+        }
         .fullScreenCover(item: $selectedPhoto) { selectedPhoto in
                 DearPhotoGalleryView(store: store, photos: photos, initialPhotoID: selectedPhoto.id,
                                      spaceID: spaceID, activityID: activityID, allowsDeletion: false,
@@ -2633,6 +2631,8 @@ private struct MomentPendingActivityView: View {
                     }
                 }
             }
+        } else if !source.draftStatus.isEmpty {
+            Text(source.draftStatus).font(.caption).foregroundStyle(.secondary)
         }
     }
 }
@@ -2649,7 +2649,7 @@ private struct MomentDraftPreview: View {
     }
 }
 
-@MainActor private final class MomentActivityLocations: NSObject, ObservableObject, CLLocationManagerDelegate {
+@MainActor private final class MomentActivityLocations: NSObject, ObservableObject, @preconcurrency CLLocationManagerDelegate {
     struct Member: Identifiable {
         let id: String
         let name: String
