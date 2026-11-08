@@ -178,6 +178,12 @@ if (!string.IsNullOrWhiteSpace(releaseControlApplicationId))
 
 await VerifyDatabaseSchema(connectionString);
 app.MapRecipeEndpoints(connectionString);
+app.MapModulePreferences(connectionString, request =>
+{
+    if (!AgentIdentityAuthorizationExtensions.IsUserIdentity(request.HttpContext.User)) return null;
+    var owner = FirstClaim(request, ClaimTypes.NameIdentifier, "sub", "user_id", "uid");
+    return string.IsNullOrWhiteSpace(owner) ? null : Guid.TryParse(owner, out var id) ? id.ToString("D") : owner;
+});
 app.MapPersonalKitchen(connectionString, request =>
 {
     if (!AgentIdentityAuthorizationExtensions.IsUserIdentity(request.HttpContext.User)) return null;

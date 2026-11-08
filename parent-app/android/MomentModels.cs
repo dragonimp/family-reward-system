@@ -64,3 +64,14 @@ public readonly record struct MomentScope
     public Uri ShareUrl => new($"https://home.ai.impx.net/invite/activity/{Tenant:D}/{Activity:D}");
     public Uri Web => new($"https://happylife.ai.impx.net/dear/spaces/{Tenant:D}/activities/{Activity:D}");
 }
+
+public static class MomentLoginApproval
+{
+    public static Uri? Approval(string text)
+    {
+        if (!Uri.TryCreate(text, UriKind.Absolute, out var url) || url.Scheme != "https" || url.Host != "happylife.ai.impx.net" || !url.IsDefaultPort || url.UserInfo.Length != 0 || url.Fragment.Length != 0 || url.AbsolutePath != "/auth/native/approve") return null;
+        var parts = url.Query.TrimStart('?').Split('&').Select(x => x.Split('=', 2)).Where(x => x.Length == 2 && x[0] == "id").ToArray();
+        if (parts.Length != 1 || parts[0][1].Length != 64 || !parts[0][1].All(c => c is >= '0' and <= '9' or >= 'a' and <= 'f')) return null;
+        return url;
+    }
+}

@@ -107,6 +107,12 @@ private actor PhotoPreviewLoader {
     @Published var error: String?
     @Published var ledgerPage = 1
     @Published var ledgerTotal = 0
+    @Published var moduleSections: [String: Bool] = ["dining": true, "growth": true, "activities": true, "exercise": true]
+    @Published var modulePreferenceError: String?
+    @Published var modulePreferenceSaving = false
+    private var modulePreferenceVersion = 0
+    private var modulePreferenceOwner: String?
+    private var modulePreferenceReading = false
     private let photoPreviews = PhotoPreviewLoader()
     private var revision = UUID()
     private var lastRefresh = Date.distantPast
@@ -203,6 +209,58 @@ private actor PhotoPreviewLoader {
             guard current == revision, token == identity.accessToken else { throw CancellationError() }
         }
     }
+    private func moduleOwnerKey(_ owner: String) -> String {
+        let canonical = UUID(uuidString: owner)?.uuidString.lowercased() ?? owner
+        return "moment.modules.account." + SHA256.hash(data: Data(canonical.utf8)).map { String(format: "%02x", $0) }.joined()
+    }
+    func resetModulePreferences() {
+        modulePreferenceOwner = nil; modulePreferenceVersion = 0
+        moduleSections = ["dining": true, "growth": true, "activities": true, "exercise": true]
+        modulePreferenceError = nil
+    }
+    private func applyModules(_ value: [String: Any], owner: String) {
+        guard identity.accountIdentifier == owner, modulePreferenceOwner == owner,
+              let sections = value["sections"] as? [String: Bool], ["dining", "growth", "activities", "exercise"].allSatisfy({ sections[$0] != nil }),
+              let version = value["version"] as? Int, version >= modulePreferenceVersion else { return }
+        moduleSections = sections; modulePreferenceVersion = version
+        if let data = try? JSONSerialization.data(withJSONObject: value) { UserDefaults.standard.set(data, forKey: moduleOwnerKey(owner)) }
+    }
+    func refreshModulePreferences() async {
+        guard identity.isAuthenticated, let owner = identity.accountIdentifier, !modulePreferenceReading, !modulePreferenceSaving else { return }
+        modulePreferenceReading = true; defer { modulePreferenceReading = false }
+        if modulePreferenceOwner != owner {
+            resetModulePreferences(); modulePreferenceOwner = owner
+            if let data = UserDefaults.standard.data(forKey: moduleOwnerKey(owner)), let cached = try? JSONSerialization.jsonObject(with: data) as? [String: Any] { applyModules(cached, owner: owner) }
+        }
+        do {
+            guard var value = try await call("/api/user/module-preferences") as? [String: Any] else { return }
+            if value["initialized"] as? Bool != true {
+                var legacy: [String: Bool] = [:]
+                if UserDefaults.standard.string(forKey: "moment.modules.legacy-owner") == nil {
+                    for key in ["dining", "growth", "activities", "exercise"] { if UserDefaults.standard.object(forKey: "moment.sections." + key) != nil { legacy[key] = UserDefaults.standard.bool(forKey: "moment.sections." + key) } }
+                }
+                value = try await call("/api/user/module-preferences/bootstrap", method: "POST", body: ["sections": legacy]) as? [String: Any] ?? value
+            }
+            guard identity.accountIdentifier == owner else { return }
+            if UserDefaults.standard.string(forKey: "moment.modules.legacy-owner") == nil { UserDefaults.standard.set(moduleOwnerKey(owner), forKey: "moment.modules.legacy-owner") }
+            applyModules(value, owner: owner); modulePreferenceError = nil
+        } catch { if identity.accountIdentifier == owner { modulePreferenceError = "栏目设置暂未同步，当前显示本账号缓存。请稍后重试。" } }
+    }
+    func setModule(_ key: String, enabled: Bool) async {
+        guard !modulePreferenceSaving, ["dining", "growth", "activities", "exercise"].contains(key) else { return }
+        if modulePreferenceVersion == 0 { await refreshModulePreferences() }
+        guard let owner = identity.accountIdentifier, modulePreferenceOwner == owner, modulePreferenceVersion > 0 else { return }
+        modulePreferenceSaving = true; defer { modulePreferenceSaving = false }
+        do {
+            let value = try await call("/api/user/module-preferences", method: "PATCH", body: ["key": key, "enabled": enabled, "expectedVersion": modulePreferenceVersion]) as? [String: Any] ?? [:]
+            applyModules(value, owner: owner); modulePreferenceError = nil
+        } catch {
+            modulePreferenceSaving = false
+            await refreshModulePreferences()
+            if identity.accountIdentifier == owner { modulePreferenceError = "未确认保存：请检查网络并核对同步状态后再试。" }
+        }
+    }
+
     func load() async {
         guard identity.isAuthenticated else { return }
         revision = UUID()
@@ -297,6 +355,7 @@ private actor PhotoPreviewLoader {
         groupID = id; revision = UUID(); await load()
     }
     func logout() {
+        resetModulePreferences()
         captureInProgress = false
         exerciseStore?.accountDidChange(); exerciseStore = nil
         pendingExerciseActivity = nil

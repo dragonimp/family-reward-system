@@ -25,6 +25,13 @@ public sealed class FamilyPage : ContentPage
     public FamilyPage(FamilyStore store)
     {
         this.store = store;
+        store.ModulePreferencesChanged += () => MainThread.BeginInvokeOnMainThread(() => {
+            var selected = tab is "审批" or "记录" or "规则" or "管理" ? "带娃" : tab;
+            if (!SectionEnabled(selected)) SelectTab("我的"); else RenderNavigation();
+        });
+        var moduleTimer = Dispatcher.CreateTimer(); moduleTimer.Interval = TimeSpan.FromSeconds(10);
+        moduleTimer.Tick += async (_, _) => { if (store.Authenticated && Window?.Page != null) await store.RefreshModulePreferencesAsync(); };
+        moduleTimer.Start();
         Title = "Linko Moment";
         BackgroundColor = MomentStyle.Background;
         SafeAreaEdges = SafeAreaEdges.All;
@@ -42,39 +49,54 @@ public sealed class FamilyPage : ContentPage
     protected override async void OnAppearing()
     {
         base.OnAppearing();
-        if (Window != null) { Window.Stopped -= WindowStopped; Window.Stopped += WindowStopped; }
-        if (store.Authenticated) { if (tab == "活动" && activities != null) await activities.ShowAsync(); if (tab == "运动") exercise?.Show(); return; }
+        if (Window != null) { Window.Stopped -= WindowStopped; Window.Stopped += WindowStopped; Window.Resumed -= WindowResumed; Window.Resumed += WindowResumed; }
+        if (store.Authenticated) { await store.RefreshModulePreferencesAsync(); if (tab == "活动" && activities != null) await activities.ShowAsync(); if (tab == "运动") exercise?.Show(); return; }
         if (busy) return;
         await Run(store.RestoreAsync);
     }
 
+    private async void WindowResumed(object? sender, EventArgs e) { if (store.Authenticated) await store.RefreshModulePreferencesAsync(); }
     private void WindowStopped(object? sender, EventArgs e) { exercise?.Suspend(); dining?.Suspend(); activities?.Deactivate(); }
 
-    private static bool SectionEnabled(string name) => name == "我的" || Preferences.Default.Get("moment.sections." + name, name != "带娃");
+    private static string ModuleKey(string name) => name switch { "干饭" => "dining", "带娃" => "growth", "活动" => "activities", "运动" => "exercise", _ => "" };
+    private bool SectionEnabled(string name) => name == "我的" || store.ModuleEnabled(ModuleKey(name));
 
     private void SectionSettings()
     {
         var rows = new VerticalStackLayout { Padding = 20, Spacing = 16 };
-        foreach (var name in new[] { "干饭", "带娃", "活动", "运动" })
-        {
-            var toggle = new Switch { IsToggled = SectionEnabled(name) };
-            toggle.Toggled += (_, e) => { Preferences.Default.Set("moment.sections." + name, e.Value); Render(); };
+        var page = new ContentPage { Title = "栏目启用", Content = rows, BackgroundColor = MomentStyle.Background };
+        var toggles = new Dictionary<string, Switch>(); bool applying = false;
+        var status = MomentStyle.Caption("同一账号的所有设备同步栏目设置；“我的”始终保留。");
+        foreach (var name in new[] { "干饭", "带娃", "活动", "运动" }) {
+            var toggle = new Switch { IsToggled = SectionEnabled(name) }; toggles[name] = toggle;
+            toggle.Toggled += async (_, e) => {
+                if (applying) return;
+                foreach (var item in toggles.Values) item.IsEnabled = false;
+                try { await store.SetModuleAsync(ModuleKey(name), e.Value); }
+                catch (Exception error) { await page.DisplayAlertAsync("未保存", error.Message, "知道了"); }
+                finally { Apply(); foreach (var item in toggles.Values) item.IsEnabled = true; }
+            };
             var row = new Grid { ColumnDefinitions = new ColumnDefinitionCollection { new(GridLength.Star), new(GridLength.Auto) } };
-            row.Add(new Label { Text = name, VerticalOptions = LayoutOptions.Center }, 0, 0);
-            row.Add(toggle, 1, 0); rows.Add(row);
+            row.Add(new Label { Text = name, VerticalOptions = LayoutOptions.Center }); row.Add(toggle, 1); rows.Add(row);
         }
-        _ = Navigation.PushAsync(new ContentPage { Title = "栏目启用", Content = rows, BackgroundColor = MomentStyle.Background });
+        rows.Add(status);
+        void Apply() { applying = true; foreach (var p in toggles) p.Value.IsToggled = SectionEnabled(p.Key); applying = false; status.Text = store.ModulePreferenceError ?? "已同步至当前账号；“我的”始终保留。"; }
+        rows.Add(MomentStyle.Action("重新同步", async () => { await store.RefreshModulePreferencesAsync(); Apply(); }));
+        page.Appearing += async (_, _) => { store.ModulePreferencesChanged += Apply; await store.RefreshModulePreferencesAsync(); Apply(); };
+        page.Disappearing += (_, _) => store.ModulePreferencesChanged -= Apply;
+        _ = Navigation.PushAsync(page);
     }
 
     private void SelectTab(string name)
     {
-        if (name is "干饭" or "带娃" or "活动" or "运动") Preferences.Default.Set("moment.sections." + name, true);
+        if ((name is "干饭" or "带娃" or "活动" or "运动") && !SectionEnabled(name)) _ = EnableSectionAsync(name);
         if (name != "干饭") dining?.Suspend();
         if (name != "运动") exercise?.Suspend();
         if (name != "活动") activities?.Deactivate();
         tab = name; childId = null; Render();
         Dispatcher.Dispatch(() => _ = scroll.ScrollToAsync(0, 0, false));
     }
+    private async Task EnableSectionAsync(string name) { try { await store.SetModuleAsync(ModuleKey(name), true); } catch (Exception e) { await DisplayAlertAsync("栏目设置", e.Message, "知道了"); } }
     private void RenderNavigation()
     {
         bottom.Children.Clear();
@@ -91,7 +113,8 @@ public sealed class FamilyPage : ContentPage
             view.Add(new Label { Text = name, FontSize = 12, TextColor = active ? MomentStyle.Accent : Colors.Gray, HorizontalTextAlignment = TextAlignment.Center });
             var tap = new TapGestureRecognizer(); tap.Tapped += (_, _) => SelectTab(name); view.GestureRecognizers.Add(tap);
             SemanticProperties.SetDescription(view, name + (active ? "，已选中" : ""));
-            bottom.Add(view, column++, 0);
+            var item = MomentStyle.Card(view, new Thickness(2)); item.BackgroundColor = active ? Color.FromArgb("#E5E5EA") : Colors.Transparent;
+            bottom.Add(item, column++, 0);
         }
     }
     protected override bool OnBackButtonPressed()
@@ -355,22 +378,30 @@ public sealed class FamilyPage : ContentPage
             new AgentIdentity.Maui.UserCenterAccountRow {
                 Username = store.AccountProfile?.Username ?? store.Profile?.Text("username") ?? "",
                 DisplayName = store.AccountProfile?.DisplayName, IconEmoji = store.AccountProfile?.IconEmoji,
-                ProfileCommand = new Command(async () => await AgentIdentity.Maui.InAppWebLinks.OpenAsync(new Uri("https://auth.ai.xmkurt.com/personal/info"), BrowserLaunchMode.SystemPreferred)),
+                ProfileCommand = new Command(async () => await AgentIdentity.Maui.InAppWebLinks.OpenAsync(new Uri("https://auth.ai.xmkurt.com/personal/info"))),
                 LogoutCommand = new Command(async () => await Logout()) },
-            MomentStyle.Row("套餐权益", action: () => _ = Navigation.PushAsync(new SubscriptionBenefitsPage(store))),
-            MomentStyle.Row("语言设置", action: () => _ = Navigation.PushAsync(new AgentIdentity.Maui.LanguageSettingsPage(new Uri("https://auth.ai.xmkurt.com"), "happylife.ai", store.GetIdentityTokenAsync))),
-            MomentStyle.Row("消息中心", action: () => _ = Navigation.PushAsync(new MomentInboxPage(store))),
-            MomentStyle.Row("修改密码", action: () => _ = AgentIdentity.Maui.InAppWebLinks.OpenAsync(new Uri("https://auth.ai.xmkurt.com/personal/info?section=password"), BrowserLaunchMode.SystemPreferred)));
+            MomentStyle.MenuRow("修改密码", "修改密码", () => _ = OpenAccountWeb("/personal/info?section=password", true)),
+            MomentStyle.MenuRow("账号注销", "我的", () => _ = DeleteAccount()),
+            MomentStyle.MenuRow("套餐权益", "套餐权益", () => _ = Navigation.PushAsync(new SubscriptionBenefitsPage(store))),
+            MomentStyle.MenuRow("消息中心", "消息", () => _ = Navigation.PushAsync(new MomentInboxPage(store))),
+            MomentStyle.MenuRow("语言设置", "AI 对话", () => _ = Navigation.PushAsync(new AgentIdentity.Maui.LanguageSettingsPage(new Uri("https://auth.ai.xmkurt.com"), "happylife.ai", store.GetIdentityTokenAsync))));
         if (store.AccountProfileError is { } profileError) content.Add(new Label { Text = profileError, FontSize = 12 });
-        Section("应用与设置", MomentStyle.Row("连接手表", action: WatchConnections), MomentStyle.Row("栏目启用", action: SectionSettings), MomentStyle.Row("家庭与成员", action: () => SelectTab("管理")), MomentStyle.Row("刷新资料", action: () => _ = Run(store.LoadAsync)));
+        Section("应用与设置",
+            MomentStyle.MenuRow("连接手表", "连接手表", WatchConnections),
+            MomentStyle.MenuRow("扫码登录", "扫码登录", () => _ = MomentLoginScanner.OpenAsync(this)),
+            MomentStyle.MenuRow("栏目启用", "栏目启用", SectionSettings),
+            MomentStyle.MenuRow("AI 对话", "AI 对话", () => _ = OpenAccountWeb("/assistant")),
+            MomentStyle.MenuRow("家族族谱", "带娃", () => _ = OpenAccountWeb("/genealogy")),
+            MomentStyle.MenuRow("家庭成员", "带娃", () => _ = OpenAccountWeb("/my/family-members")),
+            MomentStyle.MenuRow("邀请家人", "分享", () => _ = FamilyMenuAsync()),
+            MomentStyle.MenuRow("通知、照片与位置权限", "设置", AppInfo.Current.ShowSettingsUI));
         Section("帮助与隐私",
-            MomentStyle.Row("隐私政策", action: () => _ = Navigation.PushModalAsync(new PrivacyPolicyPage())),
-            MomentStyle.Row("用户协议", action: () => _ = Navigation.PushAsync(new AtlasInformationPage(false, "termsUrl"))),
-            MomentStyle.Row("使用手册", action: () => _ = Navigation.PushAsync(new AtlasInformationPage(false, "userManualUrl"))),
-            MomentStyle.Row("关于我们", AppInfo.Current.VersionString, () => _ = Navigation.PushAsync(new MomentAboutPage(store))),
-            MomentStyle.Row("账号注销", action: () => _ = DeleteAccount()));
-
+            MomentStyle.MenuRow("隐私政策", "设置", () => _ = Navigation.PushModalAsync(new PrivacyPolicyPage())),
+            MomentStyle.MenuRow("用户协议", "设置", () => _ = Navigation.PushAsync(new AtlasInformationPage(false, "termsUrl"))),
+            MomentStyle.MenuRow("使用手册", "设置", () => _ = Navigation.PushAsync(new AtlasInformationPage(false, "userManualUrl"))),
+            MomentStyle.MenuRow("关于我们", "设置", () => _ = Navigation.PushAsync(new MomentAboutPage(store)), AppInfo.Current.VersionString));
     }
+    private static Task OpenAccountWeb(string path, bool identity = false) => AgentIdentity.Maui.InAppWebLinks.OpenAsync(new Uri((identity ? "https://auth.ai.xmkurt.com" : "https://happylife.ai.impx.net") + path));
 
     private async Task Logout()
     {

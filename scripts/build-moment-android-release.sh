@@ -35,8 +35,8 @@ dotnet publish "$source/parent-app/android/LinkoFamily.csproj" -f net10.0-androi
  -p:AndroidKeyStore=false \
  -o "$ATLAS_BUILD_WORK/publish" > "$ATLAS_BUILD_LOGS/android.log" 2>&1 || { tail -35 "$ATLAS_BUILD_LOGS/android.log"; exit 1; }
 apk="$(find "$ATLAS_BUILD_WORK/publish" -name '*-Signed.apk' -print -quit)"; [[ -n "$apk" ]]
-"$ANDROID_HOME/build-tools/36.0.0/apksigner" sign --ks "$signing/linko-dear-android-release.jks" --ks-key-alias linko-dear-parent --ks-pass "file:$signing/key-password"  --out "$ATLAS_BUILD_OUTPUT/Moment-Android-1.0.17-26.apk" "$apk"
-apk="$ATLAS_BUILD_OUTPUT/Moment-Android-1.0.17-26.apk"
+"$ANDROID_HOME/build-tools/36.0.0/apksigner" sign --ks "$signing/linko-dear-android-release.jks" --ks-key-alias linko-dear-parent --ks-pass "file:$signing/key-password"  --out "$ATLAS_BUILD_OUTPUT/Moment-Android-1.0.18-27.apk" "$apk"
+apk="$ATLAS_BUILD_OUTPUT/Moment-Android-1.0.18-27.apk"
 "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --verbose --print-certs "$apk" > "$ATLAS_BUILD_LOGS/signature.log"
 rg -qi '4596cdb1ea8a5eea1a2567c6800d2bf4f90f051198a5518beb13abb7ac359c83' "$ATLAS_BUILD_LOGS/signature.log"
 rg -q 'Verified using v2 scheme.*true' "$ATLAS_BUILD_LOGS/signature.log"
@@ -44,7 +44,7 @@ rg -q 'Verified using v2 scheme.*true' "$ATLAS_BUILD_LOGS/signature.log"
 python3 - "$ATLAS_BUILD_OUTPUT" "$ATLAS_BUILD_LOGS" "$commit" <<'PY'
 from pathlib import Path
 import sys,json,hashlib
-out,logs=map(Path,sys.argv[1:3]);m=(logs/'manifest.log').read_text();assert "name='net.impx.happylife'" in m and "versionName='1.0.17'" in m and "versionCode='26'" in m
-apk=out/'Moment-Android-1.0.17-26.apk';receipt={'sourceCommit':sys.argv[3],'version':'1.0.17','buildNumber':'26','sha256':hashlib.sha256(apk.read_bytes()).hexdigest(),'signatureVerified':True};(out/'build-receipt.json').write_text(json.dumps(receipt))
-(out/'bundle.json').write_text(json.dumps({'version':'1.0.17','activate':False,'sourceCommit':sys.argv[3],'releaseNotes':'手表连接、孩子手表配对及授权码入口统一移至我的应用与设置。','artifacts':[{'path':apk.name,'platform':'android','architecture':'arm64'},{'path':'build-receipt.json','platform':'release-metadata','architecture':'arm64'}]},ensure_ascii=False))
+out,logs=map(Path,sys.argv[1:3]);m=(logs/'manifest.log').read_text();assert "name='net.impx.happylife'" in m and "versionName='1.0.18'" in m and "versionCode='27'" in m
+apk=out/'Moment-Android-1.0.18-27.apk';receipt={'sourceCommit':sys.argv[3],'version':'1.0.18','buildNumber':'27','sha256':hashlib.sha256(apk.read_bytes()).hexdigest(),'signatureVerified':True};(out/'build-receipt.json').write_text(json.dumps(receipt))
+(out/'bundle.json').write_text(json.dumps({'version':'1.0.18','activate':False,'sourceCommit':sys.argv[3],'releaseNotes':'按iOS统一干饭、我的和活动详情菜单；栏目启用按账号同步，保留手表连接入口。','artifacts':[{'path':apk.name,'platform':'android','architecture':'arm64'},{'path':'build-receipt.json','platform':'release-metadata','architecture':'arm64'}]},ensure_ascii=False))
 PY

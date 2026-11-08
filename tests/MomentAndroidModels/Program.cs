@@ -22,4 +22,7 @@ Check(Row("""{"altitudeMeters":null}""").Number("altitudeMeters") == null, "abse
 Check(Row("""{"altitudeMeters":0}""").Number("altitudeMeters") == 0, "real zero altitude is retained");
 var scope = new MomentScope(id, id); Check(scope.Api.Contains(id.ToString("D")) && scope.Web.IsAbsoluteUri, "typed scope produces canonical public GUID routes");
 try { _ = Row("""{"sourceTenantId":"not-a-guid"}""").Tenant(id); throw new Exception("invalid scope accepted"); } catch (FamilyApiException) { Console.WriteLine("PASS malformed explicit tenant cannot fall back to another space"); }
+var qr = "https://happylife.ai.impx.net/auth/native/approve?id=" + new string('a',64);
+Check(MomentLoginApproval.Approval(qr) != null, "official login QR reaches existing approval flow");
+foreach (var bad in new[] { qr.Replace("https:","http:"), qr.Replace("happylife.ai.impx.net","attacker.example"), qr.Replace("/approve?","/other?"), qr.Replace(new string('a',64),new string('A',64)), qr + "&id=" + new string('b',64), qr + "#fragment" }) Check(MomentLoginApproval.Approval(bad) == null, "unsafe or ambiguous login QR is rejected");
 Console.WriteLine("Android Moment model checks completed");

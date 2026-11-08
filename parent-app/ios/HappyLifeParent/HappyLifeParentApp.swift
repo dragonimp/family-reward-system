@@ -90,7 +90,7 @@ extension View {
             store.pendingActivityLink = link
         }
     }.onChange(of: scenePhase) { _, phase in
-        if phase == .active { store.resumePhotoSharing(); Task { await store.language.refresh(); await store.refreshIfStale() } }
+        if phase == .active { store.resumePhotoSharing(); Task { await store.language.refresh(); await store.refreshModulePreferences(); await store.refreshIfStale() } }
         else { store.suspendPhotoSharing() }
     } } }
 }
@@ -101,10 +101,10 @@ struct FamilyRoot: View {
     @ObservedObject var identity: AgentIdentitySession
     @ObservedObject var notifications: MomentNotifications
     @State private var selectedTab = 0
-    @AppStorage("moment.sections.dining") private var diningEnabled = true
-    @AppStorage("moment.sections.growth") private var growthEnabled = false
-    @AppStorage("moment.sections.activities") private var activitiesEnabled = true
-    @AppStorage("moment.sections.exercise") private var exerciseEnabled = true
+    private var diningEnabled: Bool { get { store.moduleSections["dining"] ?? true } nonmutating set { Task { await store.setModule("dining", enabled: newValue) } } }
+    private var growthEnabled: Bool { get { store.moduleSections["growth"] ?? true } nonmutating set { Task { await store.setModule("growth", enabled: newValue) } } }
+    private var activitiesEnabled: Bool { get { store.moduleSections["activities"] ?? true } nonmutating set { Task { await store.setModule("activities", enabled: newValue) } } }
+    private var exerciseEnabled: Bool { get { store.moduleSections["exercise"] ?? true } nonmutating set { Task { await store.setModule("exercise", enabled: newValue) } } }
     var body: some View {
         Group {
             if !identity.isAuthenticated { login }
@@ -113,8 +113,15 @@ struct FamilyRoot: View {
         .environment(\.locale, language.locale)
         .environmentObject(store)
         .onChange(of: identity.accountIdentifier) { _, account in
+            store.resetModulePreferences()
             store.language.accountDidChange(account)
             Task { await store.language.refresh() }
+        }
+        .task(id: identity.accountIdentifier) {
+            while identity.isAuthenticated && !Task.isCancelled {
+                await store.refreshModulePreferences()
+                do { try await Task.sleep(for: .seconds(10)) } catch { break }
+            }
         }
         .task(id: identity.isAuthenticated) {
             store.language.accountDidChange(identity.isAuthenticated ? identity.accountIdentifier : nil)
@@ -635,7 +642,7 @@ struct AccountView: View {
                             WatchCodeScanner(loginOrigin: URL(string: "https://happylife.ai.impx.net")!) { payload in loginApprovalURL = URL(string: payload) }
                         }
 
-                    NavigationLink { MomentSectionSettings() } label: { Label(String(localized: "栏目启用", bundle: AgentIdentityLanguage.appBundle()), systemImage: "square.grid.2x2") }
+                    NavigationLink { MomentSectionSettings(store: store) } label: { Label(String(localized: "栏目启用", bundle: AgentIdentityLanguage.appBundle()), systemImage: "square.grid.2x2") }
                     NavigationLink { FamilyChatView(store: store) } label: {
                         Label(String(localized: "AI 对话", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), systemImage: "bubble.left.and.bubble.right.fill")
                     }
@@ -1363,16 +1370,17 @@ func momentDisplayError(_ error: Error) -> String {
 }
 
 private struct MomentSectionSettings: View {
-    @AppStorage("moment.sections.dining") private var dining = true
-    @AppStorage("moment.sections.growth") private var growth = false
-    @AppStorage("moment.sections.activities") private var activities = true
-    @AppStorage("moment.sections.exercise") private var exercise = true
+    @ObservedObject var store: FamilyStore
     var body: some View {
         Form {
-            Toggle(String(localized: "干饭", bundle: AgentIdentityLanguage.appBundle()), isOn: $dining)
-            Toggle(String(localized: "带娃", bundle: AgentIdentityLanguage.appBundle()), isOn: $growth)
-            Toggle(String(localized: "活动", bundle: AgentIdentityLanguage.appBundle()), isOn: $activities)
-            Toggle(String(localized: "运动", bundle: AgentIdentityLanguage.appBundle()), isOn: $exercise)
+            ForEach(["dining", "growth", "activities", "exercise"], id: \.self) { key in
+                Toggle(["dining": String(localized: "干饭", bundle: AgentIdentityLanguage.appBundle()), "growth": String(localized: "带娃", bundle: AgentIdentityLanguage.appBundle()), "activities": String(localized: "活动", bundle: AgentIdentityLanguage.appBundle()), "exercise": String(localized: "运动", bundle: AgentIdentityLanguage.appBundle())][key] ?? key,
+                       isOn: Binding(get: { store.moduleSections[key] ?? true }, set: { value in Task { await store.setModule(key, enabled: value) } }))
+            }.disabled(store.modulePreferenceSaving)
+            Text("同一账号的所有设备同步栏目设置；“我的”始终保留。").font(.footnote).foregroundStyle(.secondary)
+            if let error = store.modulePreferenceError { Text(error).foregroundStyle(.secondary) }
+            Button("重新同步") { Task { await store.refreshModulePreferences() } }
         }.navigationTitle(String(localized: "栏目启用", bundle: AgentIdentityLanguage.appBundle()))
+            .task { await store.refreshModulePreferences() }
     }
 }

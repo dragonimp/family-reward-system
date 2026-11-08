@@ -154,11 +154,12 @@ public static class DiningRecommendation {
         else if (mood == "spicy" && new[] { "川", "湘", "辣", "火锅", "chili", "sichuan", "hunan" }.Any(k => (place.Name + place.Category).Contains(k, StringComparison.OrdinalIgnoreCase))) value *= 4;
         return Math.Max(0.01, value);
     }
-    public static DiningPlace? Pick(IEnumerable<DiningPlace> places, string mood, DiningArchive archive, string? excluding, double? draw = null) {
+    public static DiningPlace? Pick(IEnumerable<DiningPlace> places, string mood, DiningArchive archive, string? excluding, double? draw = null, string selection = "recommended") {
         var unique = places.Where(p => !string.IsNullOrWhiteSpace(p.Name) && double.IsFinite(p.Latitude) && double.IsFinite(p.Longitude) && Math.Abs(p.Latitude) <= 90 && Math.Abs(p.Longitude) <= 180).DistinctBy(p => p.Id).ToList();
         var alternatives = unique.Where(p => p.Id != excluding).ToList();
         var candidates = alternatives.Count > 0 ? alternatives : unique;
-        var weights = candidates.Select(p => Weight(p, mood, archive)).ToList();
+        if (selection == "nearby") return candidates.OrderBy(p => p.DistanceMeters).FirstOrDefault();
+        var weights = candidates.Select(p => selection == "random" ? 1d : Weight(p, mood, archive)).ToList();
         var target = Math.Clamp(draw ?? Random.Shared.NextDouble(), 0, 0.999999) * weights.Sum();
         for (var i = 0; i < candidates.Count; i++) { target -= weights[i]; if (target < 0) return candidates[i]; }
         return candidates.LastOrDefault();

@@ -33,6 +33,59 @@ public sealed class FamilyStore
     public bool Authenticated { get; private set; }
     public long SessionVersion => Volatile.Read(ref generation);
     public Task<string?> GetIdentityTokenAsync(CancellationToken ct = default) => session.GetTokenAsync(ct);
+    public IReadOnlyDictionary<string, bool> ModuleSections { get; private set; } = ModuleDefaults();
+    public event Action? ModulePreferencesChanged;
+    public string? ModulePreferenceError { get; private set; }
+    public bool ModulePreferenceSaving { get; private set; }
+    private bool moduleReading;
+    private long moduleVersion;
+    private string? moduleOwner;
+    internal static Dictionary<string, bool> ModuleDefaults() => new() { ["dining"] = true, ["growth"] = true, ["activities"] = true, ["exercise"] = true };
+    private static string ModuleCacheKey(string owner) => "moment.modules.account." + Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(Guid.TryParse(owner, out var id) ? id.ToString("D") : owner)));
+    public bool ModuleEnabled(string key) => ModuleSections.TryGetValue(key, out var enabled) && enabled;
+    private void ApplyModules(JsonElement data, string owner, long attempt)
+    {
+        if (attempt != SessionVersion || !Authenticated || moduleOwner != owner) return;
+        var sections = data.GetProperty("sections"); var version = data.GetProperty("version").GetInt64(); if (version < moduleVersion) return;
+        var values = ModuleDefaults().Keys.ToDictionary(key => key, key => sections.GetProperty(key).GetBoolean());
+        var changed = values.Any(p => !ModuleSections.TryGetValue(p.Key, out var old) || old != p.Value);
+        ModuleSections = values; moduleVersion = version; Preferences.Default.Set(ModuleCacheKey(owner), data.GetRawText());
+        if (changed) ModulePreferencesChanged?.Invoke();
+    }
+    public async Task RefreshModulePreferencesAsync()
+    {
+        var owner = AccountProfile?.Subject ?? Profile?.Text("unifiedUserId");
+        if (!Authenticated || string.IsNullOrWhiteSpace(owner) || moduleReading || ModulePreferenceSaving) return;
+        moduleReading = true; var attempt = SessionVersion;
+        try {
+            if (moduleOwner != owner) {
+                moduleOwner = owner; moduleVersion = 0; ModuleSections = ModuleDefaults();
+                try { var cache = Preferences.Default.Get(ModuleCacheKey(owner), ""); if (cache.Length > 0) ApplyModules(JsonDocument.Parse(cache).RootElement, owner, attempt); } catch { }
+                ModulePreferencesChanged?.Invoke();
+            }
+            var data = await CallAsync("/api/user/module-preferences");
+            if (!data.GetProperty("initialized").GetBoolean()) {
+                var legacy = new Dictionary<string, bool>();
+                if (!Preferences.Default.ContainsKey("moment.modules.legacy-owner")) foreach (var pair in new[] { ("干饭", "dining"), ("带娃", "growth"), ("活动", "activities"), ("运动", "exercise") })
+                    if (Preferences.Default.ContainsKey("moment.sections." + pair.Item1)) legacy[pair.Item2] = Preferences.Default.Get("moment.sections." + pair.Item1, true);
+                data = await CallAsync("/api/user/module-preferences/bootstrap", HttpMethod.Post, new { sections = legacy });
+            }
+            if (attempt != SessionVersion) return;
+            if (!Preferences.Default.ContainsKey("moment.modules.legacy-owner")) Preferences.Default.Set("moment.modules.legacy-owner", ModuleCacheKey(owner));
+            ApplyModules(data, owner, attempt); ModulePreferenceError = null;
+        } catch { if (attempt == SessionVersion) ModulePreferenceError = "栏目设置暂未同步，当前显示本账号缓存。请稍后重试。"; }
+        finally { moduleReading = false; }
+    }
+    public async Task SetModuleAsync(string key, bool enabled)
+    {
+        if (ModulePreferenceSaving || !ModuleDefaults().ContainsKey(key)) return;
+        if (moduleVersion == 0) await RefreshModulePreferencesAsync();
+        if (moduleVersion == 0 || moduleOwner == null) throw new FamilyApiException(ModulePreferenceError ?? "请先同步栏目设置。");
+        var owner = moduleOwner; var attempt = SessionVersion; ModulePreferenceSaving = true;
+        try { var data = await CallAsync("/api/user/module-preferences", HttpMethod.Patch, new { key, enabled, expectedVersion = moduleVersion }); ApplyModules(data, owner, attempt); ModulePreferenceError = null; }
+        catch { ModulePreferenceSaving = false; await RefreshModulePreferencesAsync(); throw new FamilyApiException("未确认保存：请检查网络并核对同步状态后再试。"); }
+        finally { ModulePreferenceSaving = false; }
+    }
     public bool ParentReady => Profile is { } profile && profile.Text("role") == "parent" && !profile.Bool("needsRole");
     public string? DisplayCode { get; private set; }
     public FamilyRecord? Profile { get; private set; }
@@ -122,7 +175,7 @@ public sealed class FamilyStore
         CancelLogin();
         session.Clear();
         SecureStorage.Default.Remove(SessionKey);
-        Authenticated = false;
+        Authenticated = false; moduleOwner = null; moduleVersion = 0; ModuleSections = ModuleDefaults(); ModulePreferenceError = null;
         Profile = null; AccountProfile = null; AccountProfileError = null;
         GroupId = 0;
         Groups = []; Children = []; HomeChildren = []; GrowthReports = []; GrowthReportError = null; Rules = []; Requests = []; Transactions = [];
@@ -208,6 +261,7 @@ public sealed class FamilyStore
             AccountProfile = null; AccountProfileError = "用户中心资料暂不可用";
         }
         if (!ParentReady) return;
+        await RefreshModulePreferencesAsync();
         var groups = FamilyRecord.Array(await CallAsync("/api/family-groups"));
         if (current != generation) return;
         Groups = groups;

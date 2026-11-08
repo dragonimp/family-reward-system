@@ -10,12 +10,14 @@ public sealed class DiningPanel : ContentView
     private readonly ContentPage owner;
     private readonly VerticalStackLayout body = new() { Spacing = 20, Padding = new Thickness(20, 18, 20, 30) };
     private readonly string file;
+    private readonly ContentView modeHost = new();
     private DiningArchive archive = new();
     private readonly JsonSerializerOptions json = new() { PropertyNameCaseInsensitive = true };
     private List<DiningPlace> candidates = [];
     private DiningPlace? result;
     private Guid? circleId;
     private string mood = "automatic";
+    private string selection = "recommended";
     private string resultMood = "automatic";
     private bool busy, checkingIn, confirmed, readable = true;
     private bool Working => busy || checkingIn;
@@ -49,15 +51,12 @@ public sealed class DiningPanel : ContentView
         var outside = new ScrollView { Content = body };
         var cooking = new KitchenPanel(store, owner);
         var viewport = new ContentView { Content = outside };
-        var mode = new Picker { ItemsSource = new[] { "出去吃", "下厨房" }, SelectedIndex = 0, Title = "用餐方式" };
-        mode.SelectedIndexChanged += (_, _) =>
-        {
-            viewport.Content = mode.SelectedIndex == 1 ? cooking : outside;
-            if (mode.SelectedIndex == 1) _ = cooking.Load();
-        };
+        Border Modes(int index) => MomentStyle.Segmented(new[] { "出去吃", "下厨房" }, index, next => {
+            viewport.Content = next == 1 ? cooking : outside; modeHost.Content = Modes(next);
+            if (next == 1) _ = cooking.Load();
+        });
         var root = new Grid { RowDefinitions = new RowDefinitionCollection { new(GridLength.Auto), new(GridLength.Star) } };
-        root.Add(mode);
-        root.Add(viewport, 0, 1);
+        modeHost.Margin = new Thickness(16, 8); modeHost.Content = Modes(0); root.Add(modeHost); root.Add(viewport, 0, 1);
         Content = root;
         Render();
     }
@@ -75,46 +74,30 @@ public sealed class DiningPanel : ContentView
     private void Render()
     {
         body.Children.Clear();
-        var header = new Grid { ColumnDefinitions = new ColumnDefinitionCollection { new(GridLength.Star), new(GridLength.Auto) } };
-        header.Add(MomentStyle.Title("干饭", 30));
-        var menu = MomentStyle.Action("⋯", () => _ = Menu()); menu.IsEnabled = !Working;
-        SemanticProperties.SetDescription(menu, "干饭菜单"); header.Add(menu, 1, 0); body.Add(header);
-        body.Add(MomentStyle.Title("今天吃啥？", 32)); body.Add(MomentStyle.Caption("别纠结了，这顿我安排！"));
-        body.Add(MomentStyle.Caption(archive.Circles.FirstOrDefault(c => c.Id == circleId)?.Name ?? "当前位置附近"));
-        var tripPicker = new Picker { Title = "路程", ItemsSource = TripTitles, SelectedIndex = (int)trip, IsEnabled = !Working };
-        tripPicker.SelectedIndexChanged += (_, _) =>
-        {
-            if (Working || tripPicker.SelectedIndex < 0 || trip == (DiningTrip)tripPicker.SelectedIndex) return;
-            var next = (DiningTrip)tripPicker.SelectedIndex;
-            if (trip.Driving() != next.Driving()) routeTimes.Clear();
-            trip = next;
-            RefreshRecommendationAfterFilterChange();
-        };
-        var foodPicker = new Picker { Title = "食物类型", ItemsSource = FoodTitles, SelectedIndex = (int)food, IsEnabled = !Working };
-        foodPicker.SelectedIndexChanged += (_, _) =>
-        {
-            if (Working || foodPicker.SelectedIndex < 0 || food == (DiningFood)foodPicker.SelectedIndex) return;
-            food = (DiningFood)foodPicker.SelectedIndex;
-            RefreshRecommendationAfterFilterChange();
-        };
-        SemanticProperties.SetDescription(foodPicker, "食物类型");
-        SemanticProperties.SetDescription(tripPicker, "路程");
-        var filters = new Grid { ColumnSpacing = 8, ColumnDefinitions = new ColumnDefinitionCollection { new(GridLength.Star), new(GridLength.Star) } };
-        filters.Add(foodPicker);
-        filters.Add(tripPicker, 1, 0);
-        body.Add(filters);
-        var hero = new VerticalStackLayout { Spacing = 16 };
-        var rice = new Label { Text = "🍚", FontSize = 72, HorizontalTextAlignment = TextAlignment.Center };
-        hero.Add(rice);
-        if (busy) { hero.Add(new ActivityIndicator { IsRunning = true, Color = Colors.DarkOrange }); _ = rice.RotateToAsync(12, 250); }
-        var decide = MomentStyle.Action(busy ? "正在安排这顿饭…" : "🎲 帮我决定", () => _ = Decide(), true); decide.IsEnabled = !Working; decide.BackgroundColor = Colors.DarkOrange; hero.Add(decide);
-        hero.Add(MomentStyle.Caption("不选条件也可以，一键安排。")); if (result is null || busy) body.Add(MomentStyle.Card(hero));
-        var moods = new HorizontalStackLayout { Spacing = 8 };
-        foreach (var item in Moods) { var button = MomentStyle.Action(item.Title, () => { mood = item.Id; if (result != null) _ = Decide(); else Render(); }, mood == item.Id); button.IsEnabled = !Working; moods.Add(button); }
-        body.Add(new ScrollView { Orientation = ScrollOrientation.Horizontal, Content = moods });
-        var checkIn = MomentStyle.Action(checkingIn ? "正在查找附近餐厅…" : "到店打卡", () => _ = CheckInNearby());
-        checkIn.IsEnabled = !Working;
-        body.Add(checkIn);
+        var header = new Grid { ColumnDefinitions = new ColumnDefinitionCollection { new(44), new(GridLength.Star), new(44) } };
+        var title = MomentStyle.Title("干饭", 19); title.HorizontalTextAlignment = TextAlignment.Center; title.VerticalTextAlignment = TextAlignment.Center; header.Add(title, 1);
+        var menu = MomentStyle.IconButton("更多", "干饭菜单", () => _ = Menu()); menu.IsEnabled = !Working; header.Add(menu, 2); body.Add(header);
+        var shortcuts = new Grid { ColumnSpacing = 4 };
+        var items = new[] { ("推荐", "recommended", "automatic"), ("附近", "nearby", "automatic"), ("常去", "recommended", "familiar"), ("随机", "random", "automatic") };
+        for (var i = 0; i < items.Length; i++) {
+            shortcuts.ColumnDefinitions.Add(new ColumnDefinition(GridLength.Star)); var item = items[i];
+            var active = selection == item.Item2 && (item.Item2 != "recommended" || (mood == "familiar") == (item.Item3 == "familiar"));
+            var stack = new VerticalStackLayout { Spacing = 4, Padding = new Thickness(4, 7) }; stack.Add(MomentStyle.Icon(item.Item1, false));
+            stack.Add(new Label { Text = item.Item1, FontSize = 14, FontAttributes = FontAttributes.Bold, HorizontalTextAlignment = TextAlignment.Center, TextColor = MomentStyle.Ink });
+            var tile = MomentStyle.Card(stack, new Thickness(0)); tile.BackgroundColor = active ? Color.FromArgb("#FFF0E2") : Colors.Transparent; tile.IsEnabled = !Working;
+            var tap = new TapGestureRecognizer(); tap.Tapped += (_, _) => { selection = item.Item2; mood = item.Item3; _ = Decide(); }; tile.GestureRecognizers.Add(tap); shortcuts.Add(tile, i);
+        }
+        body.Add(MomentStyle.Card(shortcuts, new Thickness(4)));
+        var location = new Grid { ColumnDefinitions = new ColumnDefinitionCollection { new(GridLength.Star), new(GridLength.Auto) } };
+        var current = MomentStyle.Caption("◎ " + (archive.Circles.FirstOrDefault(c => c.Id == circleId)?.Name ?? "当前位置附近")); current.VerticalTextAlignment = TextAlignment.Center; location.Add(current);
+        var filter = MomentStyle.Action("☷ 筛选", () => _ = Filters()); filter.IsEnabled = !Working; location.Add(filter, 1); body.Add(location);
+        if (result is null || busy) {
+            var hero = new VerticalStackLayout { Spacing = 16 }; hero.Add(MomentStyle.Bowl());
+            var question = MomentStyle.Title("今天吃啥？", 28); question.HorizontalTextAlignment = TextAlignment.Center; hero.Add(question);
+            if (busy) hero.Add(new ActivityIndicator { IsRunning = true, Color = Colors.DarkOrange });
+            var decide = MomentStyle.Action(busy ? "正在安排这顿饭…" : "🎲 帮我决定", () => _ = Decide(), true); decide.IsEnabled = !Working; decide.BackgroundColor = Color.FromArgb("#FF8A20"); decide.CornerRadius = 28; hero.Add(decide);
+            var card = MomentStyle.Card(hero, new Thickness(24)); card.BackgroundColor = Color.FromArgb("#F4E9E2"); body.Add(card);
+        }
         if (result is { } place)
         {
             var card = new VerticalStackLayout { Spacing = 14 };
@@ -133,7 +116,7 @@ public sealed class DiningPanel : ContentView
             if (place.Rating is { } rating) card.Add(MomentStyle.Caption($"地图评分 {rating:0.#} / 5"));
             card.Add(new Label { Text = $"{(resultMeal is null ? FoodTitles[(int)food] : MealTitle(resultMeal))} · {Reason(place)}", FontSize = 15 });
             var confirmationOperation = resultOperation;
-            var confirm = MomentStyle.Action(confirmed ? "已选好，走，干饭！" : "✅ 就吃这家！", () =>
+            var confirm = MomentStyle.Action(confirmed ? "已选好，走，干饭！" : "就吃这家", () =>
             {
                 if (Working || confirmed || confirmationOperation != resultOperation || result?.Id != place.Id) return;
                 confirmed = SaveCheckIn(place, resultMood, confirmationOperation);
@@ -141,8 +124,8 @@ public sealed class DiningPanel : ContentView
             }, true);
             confirm.IsEnabled = !confirmed && !Working;
             card.Add(confirm);
-            var another = MomentStyle.Action("🎲 不行，再来一家！", () => _ = Decide()); another.IsEnabled = !Working; card.Add(another);
-            card.Add(MomentStyle.Action("🗺️ 带我过去！", () => _ = Navigate(place, trip.Driving())));
+            var another = MomentStyle.Action("换一家", () => _ = Decide()); another.IsEnabled = !Working; card.Add(another);
+            card.Add(MomentStyle.Action("带我过去", () => _ = Navigate(place, trip.Driving())));
             card.Add(MomentStyle.Action(archive.Favorites.Any(p => p.Id == place.Id) ? "♥ 已收藏" : "♡ 收藏餐厅", () => { Update(a => { if (a.Favorites.Any(p => p.Id == place.Id)) a.Favorites.RemoveAll(p => p.Id == place.Id); else a.Favorites.Add(place); }); Render(); }));
             body.Add(MomentStyle.Card(card));
         }
@@ -221,7 +204,7 @@ public sealed class DiningPanel : ContentView
                 message = "餐段已切换，请重新推荐。";
                 return;
             }
-            var next = DiningRecommendation.Pick(eligible, mood, archive, result?.Id);
+            var next = DiningRecommendation.Pick(eligible, mood, archive, result?.Id, selection: selection);
             if (next is null)
             {
                 result = null;
@@ -411,10 +394,29 @@ public sealed class DiningPanel : ContentView
         var url = "https://uri.amap.com/navigation?to=" + FormattableString.Invariant($"{place.Longitude:F6},{place.Latitude:F6},") + Uri.EscapeDataString(place.Name) + (driving ? "&mode=car" : "&mode=walk") + "&coordinate=gaode&src=linkomoment&callnative=1";
         await AgentIdentity.Maui.InAppWebLinks.OpenAsync(new Uri(url), BrowserLaunchMode.SystemPreferred);
     }
+    private async Task Filters()
+    {
+        var rows = new VerticalStackLayout { Padding = 20, Spacing = 14 };
+        var page = new ContentPage { Title = "筛选", SafeAreaEdges = SafeAreaEdges.All, BackgroundColor = MomentStyle.Background, Content = rows };
+        var foodChoice = new Picker { Title = "食物类型", ItemsSource = FoodTitles, SelectedIndex = (int)food };
+        var tripChoice = new Picker { Title = "路程", ItemsSource = TripTitles, SelectedIndex = (int)trip };
+        var moodChoice = new Picker { Title = "口味偏好", ItemsSource = Moods.Select(m => m.Title).ToArray(), SelectedIndex = Array.FindIndex(Moods, m => m.Id == mood) };
+        rows.Add(MomentStyle.Caption("食物类型")); rows.Add(foodChoice); rows.Add(MomentStyle.Caption("路程")); rows.Add(tripChoice); rows.Add(MomentStyle.Caption("口味偏好")); rows.Add(moodChoice);
+        page.ToolbarItems.Add(new ToolbarItem("完成", null, async () => {
+            if (foodChoice.SelectedIndex < 0 || tripChoice.SelectedIndex < 0 || moodChoice.SelectedIndex < 0) return;
+            var changed = food != (DiningFood)foodChoice.SelectedIndex || trip != (DiningTrip)tripChoice.SelectedIndex;
+            if (trip.Driving() != ((DiningTrip)tripChoice.SelectedIndex).Driving()) routeTimes.Clear();
+            food = (DiningFood)foodChoice.SelectedIndex; trip = (DiningTrip)tripChoice.SelectedIndex; mood = Moods[moodChoice.SelectedIndex].Id; selection = "recommended";
+            await page.Navigation.PopModalAsync();
+            if (changed) RefreshRecommendationAfterFilterChange(); else if (result != null) await Decide(); else Render();
+        }));
+        await owner.Navigation.PushModalAsync(new NavigationPage(page));
+    }
     private async Task Menu()
     {
-        var choice = await owner.DisplayActionSheetAsync("干饭", "取消", null, "干饭记录与收藏", "我的生活圈", "重新定位");
-        if (choice == "干饭记录与收藏") await Records();
+        var choice = await owner.DisplayActionSheetAsync("干饭", "取消", null, "到店打卡", "干饭记录与收藏", "我的生活圈", "重新定位");
+        if (choice == "到店打卡") await CheckInNearby();
+        else if (choice == "干饭记录与收藏") await Records();
         else if (choice == "我的生活圈") await Circles();
         else if (choice == "重新定位") { circleId = null; candidates = []; result = null; confirmed = false; Render(); }
     }

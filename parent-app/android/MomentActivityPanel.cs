@@ -21,12 +21,16 @@ public sealed class MomentActivityPanel : ContentView
     private long session = -1;
     private int revision;
     private bool loaded, showJoined, needsRefresh;
-    private string mode = "动态";
+    private string mode = "大图";
+    private readonly MomentActivityLocations locations;
+    private Switch? sharingToggle;
     private List<MomentFeedItem> feed = [];
 
     public MomentActivityPanel(FamilyStore store, Page owner, Action authenticationChanged, Action<MomentScope, string> createExercise)
     {
         this.createExercise = createExercise;
+        locations = new MomentActivityLocations(store);
+        locations.Status += text => MainThread.BeginInvokeOnMainThread(() => { status.Text = text; if (sharingToggle != null && !locations.Sharing) sharingToggle.IsToggled = false; });
         this.store = store; this.owner = owner; this.authenticationChanged = authenticationChanged;
         thumbnails = new MomentThumbnails(store);
         layout.Add(header, 0, 0); layout.Add(controls, 0, 1); layout.Add(body, 0, 2);
@@ -39,7 +43,7 @@ public sealed class MomentActivityPanel : ContentView
         else if (needsRefresh) { if (activity is { } selected) await OpenActivityAsync(selected); else await ReloadAsync(); }
         else if (activity == null) RenderRoot();
     }
-    public void Deactivate() { if (loading != null) needsRefresh = true; revision++; loading?.Cancel(); loading?.Dispose(); loading = null; }
+    public void Deactivate(bool stopLocation = true) { if (stopLocation) _ = locations.Stop(); if (loading != null) needsRefresh = true; revision++; loading?.Cancel(); loading?.Dispose(); loading = null; }
     public void Reset() { Deactivate(); loaded = false; spaces = []; activities = []; joined = []; activity = null; space = Guid.Empty; thumbnails.Clear(); body.Content = null; }
     public bool Back()
     {
@@ -48,7 +52,7 @@ public sealed class MomentActivityPanel : ContentView
     }
     private async Task RunAsync(Func<CancellationToken, Task> action)
     {
-        Deactivate(); var current = ++revision; var account = store.SessionVersion;
+        Deactivate(stopLocation:false); var current = ++revision; var account = store.SessionVersion;
         var cancellation = loading = new CancellationTokenSource();
         status.Text = "正在异步加载…";
         try { await action(cancellation.Token); if (current == revision && Current(cancellation.Token)) needsRefresh = false; }
@@ -150,22 +154,39 @@ public sealed class MomentActivityPanel : ContentView
     }
     private async Task OpenActivityAsync(MomentRecord selected)
     {
+        if (activity?.Id != selected.Id) await locations.Stop();
         activity = selected;
         var scope = new MomentScope(selected.Tenant(space), selected.Id);
         var top = new Grid { ColumnDefinitions = new ColumnDefinitionCollection { new(GridLength.Auto), new(GridLength.Star), new(GridLength.Auto) } };
         top.Add(MomentStyle.Action("‹", () => Back()), 0, 0);
         top.Add(MomentStyle.Title(selected.Text("title"), 24), 1, 0);
         top.Add(MomentStyle.Action("⋯", () => _ = ActivityMenuAsync(scope, selected)), 2, 0); header.Content = top;
-        var buttons = new HorizontalStackLayout { Spacing = 3 };
-        foreach (var style in new[] { "动态", "紧凑", "网格 5" }) buttons.Add(MomentStyle.Action(style, () =>
-        {
-            mode = style;
-            foreach (var button in buttons.Children.OfType<Button>()) { button.BackgroundColor = button.Text == mode ? MomentStyle.Accent : Colors.Transparent; button.TextColor = button.Text == mode ? Colors.White : MomentStyle.Accent; }
-            RenderFeed(scope);
-        }, mode == style));
         if (status.Parent is Layout previous) previous.Children.Remove(status);
-        var section = new VerticalStackLayout { Spacing = 5 };
-        section.Add(MomentStyle.Caption(MomentDates.ActivityLabel(selected))); section.Add(buttons); section.Add(status); controls.Content = section;
+        var section = new VerticalStackLayout { Spacing = 12 };
+        var summary = new Grid { ColumnDefinitions = new ColumnDefinitionCollection { new(GridLength.Star), new(GridLength.Auto) } };
+        summary.Add(MomentStyle.Caption("▦ " + MomentDates.ActivityLabel(selected)));
+        var memberCount = MomentStyle.Caption("成员"); summary.Add(memberCount, 1); section.Add(MomentStyle.Card(summary));
+        _ = LoadMembers();
+        async Task LoadMembers() { try { var value = await store.CallAsync(scope.Api + "/members"); if (activity?.Id == selected.Id) memberCount.Text = MomentRecord.List(value).Count + " 位成员"; } catch { } }
+        var sharing = new VerticalStackLayout { Spacing = 4 };
+        var shareRow = new Grid { ColumnDefinitions = new ColumnDefinitionCollection { new(GridLength.Star), new(GridLength.Auto) } };
+        shareRow.Add(new Label { Text = "共享我的位置", FontSize = 17, VerticalTextAlignment = TextAlignment.Center });
+        sharingToggle = new Switch { IsToggled = locations.Sharing };
+        sharingToggle.Toggled += async (_, e) => { if (e.Value && !locations.Sharing) await locations.Start(scope); else if (!e.Value && locations.Sharing) await locations.Stop(); };
+        shareRow.Add(sharingToggle, 1); sharing.Add(shareRow); sharing.Add(MomentStyle.Divider());
+        sharing.Add(MomentStyle.MenuRow("活动地图", "附近", () => _ = owner.Navigation.PushAsync(new MomentActivityMapPage(store, scope, selected.Text("title"))))); section.Add(MomentStyle.Card(sharing));
+        section.Add(MomentStyle.Caption("照片分享"));
+        var actions = new Grid { ColumnSpacing = 4 }; var names = new[] { "分享", "拍照", "拍视频", "打卡", "创建运动" };
+        for (var i = 0; i < names.Length; i++) {
+            actions.ColumnDefinitions.Add(new ColumnDefinition(GridLength.Star)); var action = names[i];
+            var button = MomentStyle.Action(action, () => _ = ActivityAction(scope, selected, action)); button.MinimumWidthRequest = 0; button.FontSize = 12; button.Padding = new Thickness(3, 6); button.BackgroundColor = Color.FromArgb("#E2F6F7"); actions.Add(button, i);
+        }
+        var photos = new VerticalStackLayout { Spacing = 10 }; photos.Add(actions); photos.Add(MomentStyle.Divider());
+        var modes = new[] { "大图", "紧凑", "网格 · 每行5张" };
+        var modeHost = new ContentView();
+        void Modes() { modeHost.Content = MomentStyle.Segmented(modes, Array.IndexOf(modes, mode), index => { mode = modes[index]; Modes(); RenderFeed(scope); }); }
+        Modes(); photos.Add(modeHost); section.Add(MomentStyle.Card(photos)); section.Add(MomentStyle.Caption("活动动态 · 照片、打卡与日常")); section.Add(status);
+        controls.Content = section;
         feed = []; RenderFeed(scope);
         await RunAsync(async ct =>
         {
@@ -183,11 +204,23 @@ public sealed class MomentActivityPanel : ContentView
     }
     private void RenderFeed(MomentScope scope)
     {
-        var grid = mode == "网格 5"; var expanded = mode == "动态";
-        var items = (mode == "动态" ? feed : feed.Where(item => item.Kind == "photo")).ToList();
+        var grid = mode == "网格 · 每行5张"; var expanded = mode == "大图";
+        var items = (grid ? feed.Where(item => item.Kind == "photo") : feed).ToList();
         var list = new CollectionView { SelectionMode = SelectionMode.None, ItemsSource = items, EmptyView = Empty("还没有动态", "在右上角更多菜单中分享照片、写日常或打卡。"), ItemTemplate = new DataTemplate(() => new MomentFeedRow(store, owner, thumbnails, grid, scope, () => { if (activity is { } current) _ = OpenActivityAsync(current); }, feed.Where(p => p.Kind == "photo").ToList(), expanded)) };
         list.ItemsLayout = grid ? new GridItemsLayout(5, ItemsLayoutOrientation.Vertical) { HorizontalItemSpacing = 3, VerticalItemSpacing = 8 } : new LinearItemsLayout(ItemsLayoutOrientation.Vertical) { ItemSpacing = 10 };
         body.Content = Refresh(list, () => { if (activity is { } selected) _ = OpenActivityAsync(selected); });
+    }
+    private async Task ActivityAction(MomentScope scope, MomentRecord selected, string action)
+    {
+        if (action == "创建运动") createExercise(scope, selected.Text("title"));
+        else if (action == "打卡") { await MomentActivityLocations.CheckIn(store, owner, scope); if (activity?.Id == selected.Id) await OpenActivityAsync(selected); }
+        else {
+            // Original-file sharing remains owned by the existing shared Moment web
+            // component; do not introduce a second Android photo/transfer authority.
+            var detail = action == "分享" ? "选择照片或视频并共享原文件" : action == "拍照" ? "拍摄照片后选择该照片共享" : "拍摄视频后选择该视频共享";
+            if (await owner.DisplayAlertAsync(action, "在应用内完整活动页" + detail + "。", "继续", "取消")) await OpenWebAsync(scope.Web);
+            needsRefresh = true;
+        }
     }
     private async Task ActivityMenuAsync(MomentScope scope, MomentRecord selected)
     {

@@ -22,6 +22,8 @@ Check(DiningRecommendation.Weight(old, "familiar", archive) > DiningRecommendati
 Check(DiningRecommendation.Weight(fresh, "fresh", archive) > DiningRecommendation.Weight(old, "fresh", archive), "fresh mode favors unseen choices");
 Check(DiningRecommendation.Pick([old, fresh], "automatic", archive, "a", 0)?.Id == "b", "reroll skips only current choice");
 Check(DiningRecommendation.Pick([old], "automatic", archive, "a", 0)?.Id == "a", "one restaurant is not excluded forever");
+Check(DiningRecommendation.Pick([old with { DistanceMeters = 2000 }, fresh with { DistanceMeters = 100 }], "familiar", archive, null, 0, "nearby")?.Id == fresh.Id, "nearby shortcut chooses the closest eligible place regardless of habit weight");
+Check(DiningRecommendation.Pick([old, fresh], "familiar", archive, null, .75, "random")?.Id == fresh.Id, "random shortcut uses equal weights like iOS");
 Check(DiningRecommendation.Pick([], "automatic", archive, null) is null, "empty search never fabricates a restaurant");
 Check(DiningRecommendation.Pick([old with { Latitude = double.NaN }], "automatic", archive, null) is null, "invalid coordinates are rejected");
 Check(DiningRecommendation.Weight(old, "budget", archive) > DiningRecommendation.Weight(old with { Cost = 200 }, "budget", archive), "real price affects budget mode");
