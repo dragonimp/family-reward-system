@@ -992,18 +992,42 @@ struct DearSocialView: View {
         }
     }
 
+    private func activityPhotoTile(_ title: String, icon: String, selected: Bool = false) -> some View {
+        VStack(spacing: 6) {
+            Image(systemName: icon).font(.title2).accessibilityHidden(true)
+            Text(title).font(.caption).multilineTextAlignment(.center)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .frame(maxWidth: .infinity, minHeight: 66, maxHeight: .infinity)
+        .padding(.vertical, 8)
+        .foregroundStyle(selected ? Color.white : Color.teal)
+        .background(selected ? Color.teal : Color.teal.opacity(0.10), in: RoundedRectangle(cornerRadius: 12))
+        .contentShape(RoundedRectangle(cornerRadius: 12))
+        .accessibilityElement(children: .combine)
+    }
+
+    private func activityLayoutButton(_ mode: String, title: String, icon: String) -> some View {
+        Button { photoViewMode = mode } label: {
+            activityPhotoTile(title, icon: icon, selected: photoViewMode == mode)
+        }.accessibilityAddTraits(photoViewMode == mode ? [.isSelected] : [])
+    }
+
     private var activityPhotoSection: some View {
         Section {
-            HStack {
+            HStack(spacing: 8) {
                 PhotosPicker(selection: $selectedPhotos, maxSelectionCount: 50, matching: .any(of: [.images, .videos]), preferredItemEncoding: .current) {
-                    Label("分享照片 / 视频", systemImage: "photo.badge.plus")
-                }.buttonStyle(.borderedProminent).tint(.teal)
-                Spacer()
-                Menu {
-                    Button { Task { await openCamera(.photo) } } label: { Label("拍照", systemImage: "camera") }
-                    Button { Task { await openCamera(.video) } } label: { Label("录制视频", systemImage: "video") }
-                } label: { Image(systemName: "camera").font(.title3).accessibilityLabel("拍摄并分享") }
-            }.disabled(busy || requestingCamera || capturedMedia != nil || batchDeleting || batchDownloading)
+                    activityPhotoTile(String(localized: "分享照片 / 视频", bundle: AgentIdentityLanguage.appBundle()), icon: "photo.badge.plus")
+                }
+                Button { Task { await openCamera(.photo) } } label: {
+                    activityPhotoTile(String(localized: "拍照", bundle: AgentIdentityLanguage.appBundle()), icon: "camera")
+                }
+                Button { Task { await openCamera(.video) } } label: {
+                    activityPhotoTile(String(localized: "录制视频", bundle: AgentIdentityLanguage.appBundle()), icon: "video")
+                }
+            }
+            .buttonStyle(.plain)
+            .fixedSize(horizontal: false, vertical: true)
+            .disabled(busy || requestingCamera || capturedMedia != nil || batchDeleting || batchDownloading)
             if let capturedMedia {
                 Text(capturedMedia.savedToLibrary ? "已保存到系统相册，尚未共享到活动。" : "拍摄内容尚未保存并共享，请重试。")
                     .font(.caption).foregroundStyle(.secondary)
@@ -1017,11 +1041,11 @@ struct DearSocialView: View {
                     }
                 }.buttonStyle(.borderless).disabled(busy)
             }
-            Picker("展现样式", selection: $photoViewMode) {
-                Label("大图", systemImage: "rectangle").tag("grid")
-                Label("紧凑", systemImage: "list.bullet").tag("list")
-                Label("网格 · 每行5张", systemImage: "square.grid.3x3").tag("tiles")
-            }.pickerStyle(.menu)
+            HStack(spacing: 8) {
+                activityLayoutButton("grid", title: String(localized: "大图", bundle: AgentIdentityLanguage.appBundle()), icon: "rectangle")
+                activityLayoutButton("list", title: String(localized: "紧凑", bundle: AgentIdentityLanguage.appBundle()), icon: "list.bullet")
+                activityLayoutButton("tiles", title: String(localized: "网格 · 每行5张", bundle: AgentIdentityLanguage.appBundle()), icon: "square.grid.3x3")
+            }.buttonStyle(.plain).fixedSize(horizontal: false, vertical: true)
             if selectingPhotoDownloads {
                 Text("已选 \(selectedPhotoIDs.count) 项").font(.caption).foregroundStyle(.secondary)
                 HStack {
