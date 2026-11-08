@@ -5475,6 +5475,16 @@
       "zh-Hans": "画面有些倾斜，转动手机让地平线保持水平",
       "en": "The scene is tilted. Rotate your phone to level the horizon.",
       "iosKey": "画面有些倾斜，转动手机让地平线保持水平"
+    },
+    "moment.tdc050e83eeee": {
+      "zh-Hans": "设为活动封面",
+      "en": "Set as activity cover",
+      "iosKey": "设为活动封面"
+    },
+    "moment.te5d04a491fd0": {
+      "zh-Hans": "活动封面已更新，分享页将使用这项照片或视频的预览图。",
+      "en": "Activity cover updated. The share page will use this photo or video preview.",
+      "iosKey": "活动封面已更新，分享页将使用这项照片或视频的预览图。"
     }
   }
 }

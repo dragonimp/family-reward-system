@@ -865,8 +865,17 @@ struct DearSocialView: View {
             .accessibilityLabel("\(nickname)，\(photo.text("originalFileName"))，\(photo.dateText("createdAt"))")
     }
 
+    private func setActivityCover(_ photo: DearRecord) async throws {
+        _ = try await store.call(base + "tenants/\(activityTenantId)/activities/\(activityId)/cover", method: "PUT", body: ["photoId": photo.id])
+        notice = String(localized: "活动封面已更新，分享页将使用这项照片或视频的预览图。", bundle: AgentIdentityLanguage.appBundle())
+    }
+
     private func photoActions(_ photo: DearRecord) -> some View {
         HStack(spacing: 16) {
+            if selectedActivity?.flag("canEdit") == true {
+                Button(String(localized: "设为活动封面", bundle: AgentIdentityLanguage.appBundle())) { run { try await setActivityCover(photo) } }
+                    .disabled(busy || !photo.flag("thumbnailAvailable"))
+            }
             if photo.flag("canDelete") {
                 Button("删除分享", role: .destructive) { photoToDelete = photo }
                     .disabled(busy || batchDeleting || batchDownloading)
@@ -941,6 +950,10 @@ struct DearSocialView: View {
         }.buttonStyle(.plain).disabled(batchDownloading || batchDeleting)
         .accessibilityLabel("\(nickname)，\(photo.text("originalFileName"))")
         .contextMenu {
+            if selectedActivity?.flag("canEdit") == true {
+                Button { run { try await setActivityCover(photo) } } label: { Label(String(localized: "设为活动封面", bundle: AgentIdentityLanguage.appBundle()), systemImage: "photo") }
+                    .disabled(busy || !photo.flag("thumbnailAvailable"))
+            }
             if photo.flag("canDelete") { Button("删除分享", role: .destructive) { photoToDelete = photo } }
         }
     }
