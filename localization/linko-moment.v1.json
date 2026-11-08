@@ -5770,6 +5770,431 @@
       "iosKey": "%.0f 步",
       "zh-Hans": "%.0f 步",
       "en": "%.0f steps"
+    },
+    "moment.t1a87f93506e3": {
+      "iosKey": "用餐方式",
+      "en": "Dining mode",
+      "zh-Hans": "用餐方式"
+    },
+    "moment.t635ebe58f539": {
+      "iosKey": "出去吃",
+      "en": "Eat out",
+      "zh-Hans": "出去吃"
+    },
+    "moment.tdcc2b308d626": {
+      "iosKey": "下厨房",
+      "en": "Cook at home",
+      "zh-Hans": "下厨房"
+    },
+    "moment.ta3758965d03a": {
+      "iosKey": "今天做什么？",
+      "en": "What shall we cook?",
+      "zh-Hans": "今天做什么？"
+    },
+    "moment.tc104e20eccd1": {
+      "iosKey": "加载菜谱分类",
+      "en": "Load recipe categories",
+      "zh-Hans": "加载菜谱分类"
+    },
+    "moment.tda6335529c85": {
+      "iosKey": "随机选一道",
+      "en": "Pick a recipe",
+      "zh-Hans": "随机选一道"
+    },
+    "moment.t05436365021d": {
+      "iosKey": "人份",
+      "en": "servings",
+      "zh-Hans": "人份"
+    },
+    "moment.tc5219be22e67": {
+      "iosKey": "查看做法",
+      "en": "View recipe",
+      "zh-Hans": "查看做法"
+    },
+    "moment.tb4145d2ca535": {
+      "iosKey": "换一道",
+      "en": "Try another recipe",
+      "zh-Hans": "换一道"
+    },
+    "moment.t1f492c077cd4": {
+      "iosKey": "食材",
+      "en": "Ingredients",
+      "zh-Hans": "食材"
+    },
+    "moment.t24dfae3c1e7a": {
+      "iosKey": "准备工作",
+      "en": "Preparation",
+      "zh-Hans": "准备工作"
+    },
+    "moment.t15a032deba09": {
+      "iosKey": "制作步骤",
+      "en": "Method",
+      "zh-Hans": "制作步骤"
+    },
+    "moment.t684cbfad835f": {
+      "iosKey": "注意事项",
+      "en": "Notes",
+      "zh-Hans": "注意事项"
+    },
+    "moment.tee465c43c035": {
+      "iosKey": "步骤插画暂未提供",
+      "en": "Step illustration unavailable",
+      "zh-Hans": "步骤插画暂未提供"
+    },
+    "moment.tff2abbfa7d3d": {
+      "iosKey": "菜谱分类正在准备，请稍后再试。",
+      "en": "Recipe categories are not available yet. Try again later.",
+      "zh-Hans": "菜谱分类正在准备，请稍后再试。"
+    },
+    "moment.t42b6fa183fd5": {
+      "iosKey": "菜谱暂时无法加载，请重试。",
+      "en": "Recipes could not be loaded. Try again.",
+      "zh-Hans": "菜谱暂时无法加载，请重试。"
+    },
+    "moment.tc6459446fa22": {
+      "iosKey": "菜谱资料不完整，请换一道。",
+      "en": "This recipe is incomplete. Try another one.",
+      "zh-Hans": "菜谱资料不完整，请换一道。"
+    },
+    "moment.tf1d593ed05f7": {
+      "iosKey": "这个分类暂时没有可用菜谱，或网络连接失败。请重试。",
+      "en": "No recipe is available in this category, or the network request failed. Try again.",
+      "zh-Hans": "这个分类暂时没有可用菜谱，或网络连接失败。请重试。"
+    },
+    "moment.t1452deafc6d9": {
+      "iosKey": "推荐",
+      "en": "For you",
+      "zh-Hans": "推荐"
+    },
+    "moment.t263fa7d8fffd": {
+      "iosKey": "附近",
+      "en": "Nearby",
+      "zh-Hans": "附近"
+    },
+    "moment.t1c17c290f814": {
+      "iosKey": "常去",
+      "en": "Usuals",
+      "zh-Hans": "常去"
+    },
+    "moment.t75ca4f921437": {
+      "iosKey": "随机",
+      "en": "Random",
+      "zh-Hans": "随机"
+    },
+    "moment.tb5f15473fdc0": {
+      "iosKey": "筛选",
+      "en": "Filters",
+      "zh-Hans": "筛选"
+    },
+    "moment.tb7a0aa810ab6": {
+      "iosKey": "口味偏好",
+      "en": "Preferences",
+      "zh-Hans": "口味偏好"
+    },
+    "moment.td9309f8434c7": {
+      "iosKey": "就吃这家",
+      "en": "Choose this place",
+      "zh-Hans": "就吃这家"
+    },
+    "moment.tdf606d65d6b7": {
+      "iosKey": "换一家",
+      "en": "Try another",
+      "zh-Hans": "换一家"
+    },
+    "moment.tfcab2a2728ca": {
+      "iosKey": "带我过去",
+      "en": "Directions",
+      "zh-Hans": "带我过去"
+    },
+    "moment.tb95fc9c5f77c": {
+      "iosKey": "优先挑选符合当前条件的近处餐厅。",
+      "en": "Picked a nearby restaurant that fits your filters.",
+      "zh-Hans": "优先挑选符合当前条件的近处餐厅。"
+    },
+    "moment.t8f3232e9694d": {
+      "iosKey": "从符合当前条件的餐厅中随机挑选。",
+      "en": "Randomly picked from restaurants that fit your filters.",
+      "zh-Hans": "从符合当前条件的餐厅中随机挑选。"
+    },
+    "moment.t5574d9765327": {
+      "iosKey": "食物类型",
+      "en": "Food type",
+      "zh-Hans": "食物类型"
+    },
+    "moment.t14fa1062e125": {
+      "iosKey": "智能推荐",
+      "en": "Smart recommendation",
+      "zh-Hans": "智能推荐"
+    },
+    "moment.tae65a2c1b9b7": {
+      "iosKey": "面食",
+      "en": "Noodles & dumplings",
+      "zh-Hans": "面食"
+    },
+    "moment.te233a13a49e5": {
+      "iosKey": "米饭",
+      "en": "Rice dishes",
+      "zh-Hans": "米饭"
+    },
+    "moment.t8d56ca5e36ec": {
+      "iosKey": "火锅",
+      "en": "Hot pot",
+      "zh-Hans": "火锅"
+    },
+    "moment.t5691a276aac2": {
+      "iosKey": "烧烤",
+      "en": "Barbecue",
+      "zh-Hans": "烧烤"
+    },
+    "moment.t9e23ed7f17b2": {
+      "iosKey": "甜品饮品",
+      "en": "Desserts & drinks",
+      "zh-Hans": "甜品饮品"
+    },
+    "moment.tc09273b11aa8": {
+      "iosKey": "2 公里内",
+      "en": "Within 2 km",
+      "zh-Hans": "2 公里内"
+    },
+    "moment.t9e3fc0fd4240": {
+      "iosKey": "附近暂时没有符合所选食物类型的餐厅。",
+      "en": "No nearby restaurants match the selected food type.",
+      "zh-Hans": "附近暂时没有符合所选食物类型的餐厅。"
+    },
+    "moment.t78a9a3546e33": {
+      "iosKey": "已获取当前位置",
+      "en": "Current location acquired",
+      "zh-Hans": "已获取当前位置"
+    },
+    "moment.t54781e9e57e0": {
+      "iosKey": "地址（可修改）",
+      "en": "Address (editable)",
+      "zh-Hans": "地址（可修改）"
+    },
+    "moment.t3451df3eaa98": {
+      "iosKey": "已记录定位，暂无地址",
+      "en": "Location saved · Address unavailable",
+      "zh-Hans": "已记录定位，暂无地址"
+    },
+    "moment.tf7ce130eb681": {
+      "iosKey": "手动填写餐厅",
+      "en": "Enter a restaurant manually",
+      "zh-Hans": "手动填写餐厅"
+    },
+    "moment.t89891acd1048": {
+      "iosKey": "餐厅名称",
+      "en": "Restaurant name",
+      "zh-Hans": "餐厅名称"
+    },
+    "moment.t145fdf789f56": {
+      "iosKey": "正在定位…",
+      "en": "Finding your location…",
+      "zh-Hans": "正在定位…"
+    },
+    "moment.t8bf8702d38e7": {
+      "iosKey": "无法获取当前位置，请检查定位权限后重试。",
+      "en": "Could not get your current location. Check location permission and try again.",
+      "zh-Hans": "无法获取当前位置，请检查定位权限后重试。"
+    },
+    "moment.t1cc64ffb180d": {
+      "iosKey": "路程",
+      "en": "Travel time",
+      "zh-Hans": "路程"
+    },
+    "moment.t0c857566dba8": {
+      "iosKey": "不限路程",
+      "en": "Any travel time",
+      "zh-Hans": "不限路程"
+    },
+    "moment.t9efe656fd530": {
+      "iosKey": "走路 5 分钟内",
+      "en": "Up to 5 min walk",
+      "zh-Hans": "走路 5 分钟内"
+    },
+    "moment.te76a4f91c63e": {
+      "iosKey": "走路 10 分钟内",
+      "en": "Up to 10 min walk",
+      "zh-Hans": "走路 10 分钟内"
+    },
+    "moment.t3ba3c910c488": {
+      "iosKey": "开车 10 分钟内",
+      "en": "Up to 10 min drive",
+      "zh-Hans": "开车 10 分钟内"
+    },
+    "moment.t14a49359a6ec": {
+      "iosKey": "开车 20 分钟内",
+      "en": "Up to 20 min drive",
+      "zh-Hans": "开车 20 分钟内"
+    },
+    "moment.tb562c528f590": {
+      "iosKey": "预计开车约 %@ 分钟",
+      "en": "About %@ min by car",
+      "zh-Hans": "预计开车约 %@ 分钟"
+    },
+    "moment.t68ab71e2568b": {
+      "iosKey": "预计步行约 %@ 分钟",
+      "en": "About %@ min on foot",
+      "zh-Hans": "预计步行约 %@ 分钟"
+    },
+    "moment.t72f242a4da94": {
+      "iosKey": "暂未找到能确认符合路程上限的餐厅。可以放宽上限后重试。",
+      "en": "No restaurants could be confirmed within this travel time. Try a longer limit.",
+      "zh-Hans": "暂未找到能确认符合路程上限的餐厅。可以放宽上限后重试。"
+    },
+    "moment.t8b6434928fb2": {
+      "iosKey": "早餐推荐",
+      "en": "Breakfast pick",
+      "zh-Hans": "早餐推荐"
+    },
+    "moment.t715f7d7ccf74": {
+      "iosKey": "午餐推荐",
+      "en": "Lunch pick",
+      "zh-Hans": "午餐推荐"
+    },
+    "moment.tb65785f26222": {
+      "iosKey": "下午茶推荐",
+      "en": "Afternoon tea pick",
+      "zh-Hans": "下午茶推荐"
+    },
+    "moment.t0c70e4a11d94": {
+      "iosKey": "晚餐推荐",
+      "en": "Dinner pick",
+      "zh-Hans": "晚餐推荐"
+    },
+    "moment.t004569ed13bc": {
+      "iosKey": "餐段已切换，请重新推荐。",
+      "en": "It is a different mealtime now. Ask for a new pick.",
+      "zh-Hans": "餐段已切换，请重新推荐。"
+    },
+    "moment.t62697dd7e36a": {
+      "iosKey": "附近暂时没有适合当前餐段的餐厅。试试其他生活圈，或稍后重新定位。",
+      "en": "No nearby places match this mealtime. Try another area or refresh your location later.",
+      "zh-Hans": "附近暂时没有适合当前餐段的餐厅。试试其他生活圈，或稍后重新定位。"
+    },
+    "moment.tda1b4450a292": {
+      "iosKey": "到店打卡",
+      "en": "Restaurant check-in",
+      "zh-Hans": "到店打卡"
+    },
+    "moment.tc96064bccbaa": {
+      "iosKey": "打卡成功，已记入干饭记录。",
+      "en": "Checked in. Saved to dining history.",
+      "zh-Hans": "打卡成功，已记入干饭记录。"
+    },
+    "moment.tb3b103b37b53": {
+      "iosKey": "定位精度不足，请开启精确位置后重试。",
+      "en": "Location is too approximate. Enable Precise Location and try again.",
+      "zh-Hans": "定位精度不足，请开启精确位置后重试。"
+    },
+    "moment.t518502a80125": {
+      "iosKey": "当前位置 500 米内未找到餐厅。",
+      "en": "No restaurants found within 500 meters of your current location.",
+      "zh-Hans": "当前位置 500 米内未找到餐厅。"
+    },
+    "moment.tdebb46d22141": {
+      "iosKey": "无法读取附近餐厅，请检查定位权限或网络后重试。",
+      "en": "Could not find nearby restaurants. Check your location permission and internet connection, then try again.",
+      "zh-Hans": "无法读取附近餐厅，请检查定位权限或网络后重试。"
+    },
+    "moment.t21cabe8fc87f": {
+      "iosKey": "累计打卡 %lld 次",
+      "en": "Total check-ins: %lld",
+      "zh-Hans": "累计打卡 %lld 次"
+    },
+    "moment.tb2c5983d3013": {
+      "iosKey": "正在查找附近餐厅…",
+      "en": "Finding nearby restaurants…",
+      "zh-Hans": "正在查找附近餐厅…"
+    },
+    "moment.taff6c60c6493": {
+      "iosKey": "餐厅类型（选填）",
+      "en": "Restaurant type (optional)",
+      "zh-Hans": "餐厅类型（选填）"
+    },
+    "moment.t374a09670a00": {
+      "iosKey": "返回附近餐厅",
+      "en": "Back to nearby restaurants",
+      "zh-Hans": "返回附近餐厅"
+    },
+    "moment.tb171cae62aa6": {
+      "iosKey": "请选择你所在的餐厅",
+      "en": "Choose the restaurant you are at",
+      "zh-Hans": "请选择你所在的餐厅"
+    },
+    "moment.t4a85ba2a3d13": {
+      "iosKey": "约 %@ 米",
+      "en": "About %@ m away",
+      "zh-Hans": "约 %@ 米"
+    },
+    "moment.ta71aa9ed7813": {
+      "iosKey": "重新查找",
+      "en": "Search again",
+      "zh-Hans": "重新查找"
+    },
+    "moment.t6db470d06f66": {
+      "iosKey": "这家店在你的干饭记录里，熟悉的味道值得再试。",
+      "en": "This restaurant is in your dining history. A familiar favorite is worth another visit.",
+      "zh-Hans": "这家店在你的干饭记录里，熟悉的味道值得再试。"
+    },
+    "moment.t33e49babfaa3": {
+      "iosKey": "暂无菜系或主打餐品信息。",
+      "en": "Cuisine and specialties are unavailable.",
+      "zh-Hans": "暂无菜系或主打餐品信息。"
+    },
+    "moment.t4233a2fe2539": {
+      "iosKey": "地图分类显示，这家店属于%@。",
+      "en": "Map listing: %@.",
+      "zh-Hans": "地图分类显示，这家店属于%@。"
+    },
+    "moment.t30c13ad0e43c": {
+      "iosKey": "从店名看，这家店可能供应%@。",
+      "en": "The name suggests this restaurant serves %@.",
+      "zh-Hans": "从店名看，这家店可能供应%@。"
+    },
+    "moment.td3e68f60be3a": {
+      "iosKey": "人均消费暂无数据",
+      "en": "Price per person unavailable",
+      "zh-Hans": "人均消费暂无数据"
+    },
+    "moment.t7334d9384db4": {
+      "iosKey": "人均约%@ · 高德地图参考价",
+      "en": "About %@ per person · Amap estimate",
+      "zh-Hans": "人均约%@ · 高德地图参考价"
+    },
+    "moment.t5e9962201833": {
+      "iosKey": "按地图提供的人均价格挑选，实际消费以店家为准。",
+      "en": "Picked using the listed price per person. Actual prices may vary.",
+      "zh-Hans": "按地图提供的人均价格挑选，实际消费以店家为准。"
+    },
+    "moment.tacf711bc18d3": {
+      "iosKey": "按附近距离或以往选择推荐。",
+      "en": "Picked using distance or your previous choices.",
+      "zh-Hans": "按附近距离或以往选择推荐。"
+    },
+    "moment.tda554ce64349": {
+      "iosKey": "附近餐厅来自 Apple 地图，菜系及人均可由高德地图补充。搜索位置仅用于本次查询，习惯与记录保存在当前账号的本机空间。",
+      "en": "Restaurants are from Apple Maps, with cuisine and pricing from Amap where available. Location is used for this search. Your preferences and history stay on this device.",
+      "zh-Hans": "附近餐厅来自 Apple 地图，菜系及人均可由高德地图补充。搜索位置仅用于本次查询，习惯与记录保存在当前账号的本机空间。"
+    },
+    "moment.t1e17ad782a2a": {
+      "iosKey": "带娃",
+      "en": "Parenting",
+      "zh-Hans": "带娃"
+    },
+    "moment.tb50b836a4b0a": {
+      "iosKey": "带娃管理菜单",
+      "en": "Parenting management menu",
+      "zh-Hans": "带娃管理菜单"
+    },
+    "moment.t4984aa333519": {
+      "iosKey": "带娃管理",
+      "en": "Parenting management",
+      "zh-Hans": "带娃管理"
+    },
+    "moment.tce0680b0c86d": {
+      "iosKey": "不选分类，随便做一道",
+      "en": "Leave categories unselected to pick anything",
+      "zh-Hans": "不选分类，随便做一道"
     }
   }
 }
