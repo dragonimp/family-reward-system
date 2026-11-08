@@ -5405,6 +5405,11 @@
       "zh-Hans": "不记录位置拍摄",
       "en": "Take photo without location",
       "iosKey": "不记录位置拍摄"
+    },
+    "moment.camera.composition_capture": {
+      "zh-Hans": "实时构图拍照",
+      "en": "Live composition camera",
+      "iosKey": "实时构图拍照"
     }
   }
 }

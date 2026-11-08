@@ -279,9 +279,10 @@ enum DearCaptureGeography {
     }
 }
 
-private final class DearCameraLocation: NSObject, CLLocationManagerDelegate {
+final class DearCameraLocation: NSObject, CLLocationManagerDelegate {
     private let manager = CLLocationManager()
     private(set) var location: CLLocation?
+    private var history: [CLLocation] = []
     private var active = false
     var denied: Bool { manager.authorizationStatus == .denied || manager.authorizationStatus == .restricted }
     var changed: (() -> Void)?
@@ -304,8 +305,15 @@ private final class DearCameraLocation: NSObject, CLLocationManagerDelegate {
     func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) { if active { start() } }
     func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
         guard active else { return }
-        location = locations.last(where: { DearCaptureGeography.valid($0) })
+        let valid = locations.filter { DearCaptureGeography.valid($0) }
+        history.append(contentsOf: valid)
+        if history.count > 1800 { history.removeFirst(history.count - 1800) }
+        location = valid.last
         changed?()
+    }
+    func location(at date: Date) -> CLLocation? {
+        history.filter { abs($0.timestamp.timeIntervalSince(date)) <= 5 }
+            .min { abs($0.timestamp.timeIntervalSince(date)) < abs($1.timestamp.timeIntervalSince(date)) }
     }
     func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {
         location = nil
