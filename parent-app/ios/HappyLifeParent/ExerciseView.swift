@@ -27,6 +27,8 @@ import HealthKit
     private let userID: String
     private var syncAgain = false
     private var lastNotice = Date.distantPast
+    private var lastSensorSave = Date.distantPast
+    private let persistence = DispatchQueue(label: "net.impx.happylife.exercise.persistence", qos: .utility)
     private let pedometer = CMPedometer()
     private let file: URL
     private var generation = UUID()
@@ -55,10 +57,29 @@ import HealthKit
 
     deinit { locator.stopUpdatingLocation(); pedometer.stopUpdates() }
 
-    @discardableResult private func save() -> Bool {
+    @discardableResult private func save(sensorUpdate: Bool = false) -> Bool {
         guard readable else { return false }
+        if sensorUpdate {
+            guard Date().timeIntervalSince(lastSensorSave) >= 5 else { return true }
+            lastSensorSave = Date()
+            let snapshot = archive, target = file
+            persistence.async { [weak self] in
+                do {
+                    try snapshot.write(to: target)
+                    Task { @MainActor in NotificationCenter.default.post(name: .exerciseRecordsChanged, object: nil) }
+                }
+                catch {
+                    let detail = error.localizedDescription
+                    Task { @MainActor [weak self] in
+                        self?.message = String(localized: "运动记录尚未保存：\(detail)。请保留页面并重试保存。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))
+                    }
+                }
+            }
+            return true
+        }
         do {
-            try archive.write(to: file)
+            let snapshot = archive, target = file
+            try persistence.sync { try snapshot.write(to: target) }
             if Date().timeIntervalSince(lastNotice) >= 5 || active == nil {
                 lastNotice = Date(); NotificationCenter.default.post(name: .exerciseRecordsChanged, object: nil)
             }
@@ -69,7 +90,7 @@ import HealthKit
 
     func deleteRecord(id: UUID) {
         guard readable, !busy, archive.history.contains(where: { $0.id == id }) else { return }
-        do { try archive.deleteHistoryRecord(id: id, file: file)
+        do { try persistence.sync { try archive.deleteHistoryRecord(id: id, file: file) }
             Task { await sync() } }
         catch {
             message = String(localized: "删除失败，运动记录已保留，请稍后重试。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))
@@ -177,7 +198,7 @@ import HealthKit
                 locationMessage = String(localized: "正在记录轨迹", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))
             }
         }
-        if changed { save() }
+        if changed { save(sensorUpdate: true) }
         else if let last = locations.last, last.horizontalAccuracy > 65 { locationMessage = String(localized: "定位精度不足，可在系统设置中开启精确位置。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)) }
         if (active?.route?.count ?? 0) >= 20_000 { stopLocationTracking(); locationMessage = String(localized: "本次轨迹已达记录上限，计时与计步继续。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)) }
     }
@@ -261,7 +282,7 @@ import HealthKit
                 if let data {
                     self.archive.active?.intervals[index].steps = data.numberOfSteps.intValue
                     self.archive.active?.intervals[index].distanceMeters = data.distance?.doubleValue
-                    self.save()
+                    self.save(sensorUpdate: true)
                 }
                 if let error { self.message = String(localized: "计步暂不可用：\(error.localizedDescription)。计时仍可使用。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)) }
             }

@@ -371,7 +371,7 @@ private struct DearActivityMapView: View {
 
 
     var body: some View {
-        TimelineView(.periodic(from: .now, by: 1)) { tick in
+        TimelineView(.periodic(from: .now, by: 15)) { tick in
         let currentMembers = locations.members.filter { $0.expiresAt > tick.date }
         VStack(spacing: 0) {
                 Toggle(String(localized: "只显示当前成员位置", bundle: AgentIdentityLanguage.appBundle()), isOn: $membersOnly)
@@ -509,7 +509,8 @@ private struct DearActivityMapView: View {
                                      spaceID: spaceID, activityID: activityID, allowsDeletion: false,
                                      onDeleted: { _, _ in })
         }
-        .onAppear { fitAllPoints() }
+        .onAppear { locations.mapVisible = true; fitAllPoints() }
+        .onDisappear { locations.mapVisible = false }
         .onChange(of: membersOnly) { _, _ in selectedPointID = nil; fitAllPoints() }
         .onChange(of: locations.members.map(\.id)) { _, _ in fitAllPoints() }
         .onChange(of: locations.members.map { "\($0.id):\($0.coordinate.latitude):\($0.coordinate.longitude)" }) { _, _ in if membersOnly { fitAllPoints() } }
@@ -542,6 +543,7 @@ private struct DearTimelineEntry: Identifiable {
 struct DearSocialView: View {
     @Environment(\.scenePhase) private var scenePhase
     @StateObject private var locations = MomentActivityLocations()
+    @State private var refreshingActivityList = false
     @ObservedObject var store: FamilyStore
     var showLogout = false
     @State private var showingAnonymousShares = false
@@ -849,7 +851,7 @@ struct DearSocialView: View {
             } message: { Text(String(localized: "仅可删除没有活动、其他成员或分享记录的空间。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) }
         }
         .onDisappear { locations.stop() }
-        .onReceive(store.photoSource.$networkAvailable.removeDuplicates().filter { $0 }) { _ in Task { await refresh() } }
+        .onReceive(store.photoSource.$networkAvailable.removeDuplicates().dropFirst().filter { $0 }) { _ in Task { await refresh() } }
         .onChange(of: showingActivity) { _, shown in
             if shown { locations.activate(store: store, tenant: activityTenantId, activity: activityId) }
             else { locations.stop() }
@@ -1571,6 +1573,9 @@ struct DearSocialView: View {
         }
     }
     private func refresh() async {
+        guard !refreshingActivityList else { return }
+        refreshingActivityList = true
+        defer { refreshingActivityList = false }
         do { try await load() }
         catch is CancellationError {} catch { self.error = momentDisplayError(error) }
     }
@@ -2698,6 +2703,7 @@ private struct MomentDraftPreview: View {
     @Published private(set) var sharing = false
     @Published private(set) var members: [Member] = []
     @Published private(set) var status = ""
+    var mapVisible = false
     private let manager = CLLocationManager()
     private weak var store: FamilyStore?
     private var path = ""
@@ -2707,7 +2713,7 @@ private struct MomentDraftPreview: View {
     private var worker: Task<Void, Never>?
     private var generation = UUID()
     override init() {
-        super.init(); manager.delegate = self; manager.desiredAccuracy = kCLLocationAccuracyBest; manager.distanceFilter = kCLDistanceFilterNone
+        super.init(); manager.delegate = self; manager.desiredAccuracy = kCLLocationAccuracyNearestTenMeters; manager.distanceFilter = 10
     }
     func activate(store: FamilyStore, tenant: String, activity: String) {
         guard UUID(uuidString: tenant) != nil, UUID(uuidString: activity) != nil else { return }
@@ -2717,8 +2723,8 @@ private struct MomentDraftPreview: View {
         let expected = generation
         worker = Task {
             while !Task.isCancelled, expected == generation {
-                await refresh(expected: expected)
-                try? await Task.sleep(for: .seconds(5))
+                if sharing || mapVisible { await refresh(expected: expected) }
+                do { try await Task.sleep(for: .seconds(5)) } catch { return }
             }
         }
     }
@@ -2747,7 +2753,7 @@ private struct MomentDraftPreview: View {
     }
     private func refresh(expected: UUID) async {
         guard let store, account == store.identity.accountIdentifier, expected == generation else { return }
-        members = members.filter { $0.expiresAt > Date() }
+        if members.contains(where: { $0.expiresAt <= Date() }) { members.removeAll { $0.expiresAt <= Date() } }
         do {
             if sharing, let location, location.horizontalAccuracy >= 0, location.horizontalAccuracy <= 1000,
                abs(location.timestamp.timeIntervalSinceNow) <= 30 {
@@ -2766,11 +2772,14 @@ private struct MomentDraftPreview: View {
             }
             let rows = try DearRecord.list(await store.call(path + "/locations", timeout: 8))
             guard expected == generation else { return }
-            members = rows.compactMap { row in
+            let updated: [Member] = rows.compactMap { row in
                 guard let observed = ActivityListDate.parse(row.text("observedAt")), let expires = ActivityListDate.parse(row.text("expiresAt")), expires > Date() else { return nil }
                 return Member(id: row.text("subject"), name: row.text("name"), coordinate: CLLocationCoordinate2D(latitude: row.number("latitude"), longitude: row.number("longitude")), observedAt: observed, expiresAt: expires)
             }
-            status = ""
+            if updated.count != members.count || zip(updated, members).contains(where: { a, b in
+                a.id != b.id || a.name != b.name || a.coordinate.latitude != b.coordinate.latitude || a.coordinate.longitude != b.coordinate.longitude || a.observedAt != b.observedAt || a.expiresAt != b.expiresAt
+            }) { members = updated }
+            if !status.isEmpty { status = "" }
         } catch {
             guard expected == generation else { return }
             lease = nil; status = momentDisplayError(error)
