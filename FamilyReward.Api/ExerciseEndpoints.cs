@@ -105,16 +105,34 @@ internal sealed class ExerciseRecordStore(string root)
         try { var bytes = File.ReadAllBytes(file); return File.Exists(Path.Combine(folder, Key(id) + ".deleted")) ? null : bytes; }
         catch (FileNotFoundException) { return null; } catch (DirectoryNotFoundException) { return null; }
     }
+    private static bool SameMeasurement(ExerciseEndpoints.Record left, ExerciseEndpoints.Record right) =>
+        left.Id == right.Id && left.Kind == right.Kind && left.StartedAt == right.StartedAt && left.EndedAt == right.EndedAt &&
+        left.Intervals.SequenceEqual(right.Intervals) && (left.RouteEnabled ?? false) == (right.RouteEnabled ?? false) &&
+        (left.Route ?? []).SequenceEqual(right.Route ?? []) && left.Activity == right.Activity;
+
     public async Task<bool> Put(string owner, ExerciseEndpoints.Record record, CancellationToken ct) {
         var folder = Folder(owner); await using var held = await Lock(folder, ct);
         if (File.Exists(Path.Combine(folder, Key(record.Id) + ".deleted"))) return false;
         var bytes = JsonSerializer.SerializeToUtf8Bytes(record, Json); var file = Path.Combine(folder, Key(record.Id) + ".json");
-        if (File.Exists(file)) { var existing = await File.ReadAllBytesAsync(file, ct); return bytes.SequenceEqual(existing); }
+        var replacing = File.Exists(file);
+        if (replacing) {
+            var existingBytes = await File.ReadAllBytesAsync(file, ct);
+            if (bytes.SequenceEqual(existingBytes)) return true;
+            ExerciseEndpoints.Record? existing;
+            try { existing = JsonSerializer.Deserialize<ExerciseEndpoints.Record>(existingBytes, Json); }
+            catch (JsonException) { return false; }
+            if (existing is null || !SameMeasurement(existing, record)) return false;
+            // An optional derived summary may arrive later through phone/Watch delivery.
+            // Keep the first non-empty snapshot and never overwrite measured data.
+            if (record.ActivityText is null || record.ActivityText == existing.ActivityText) return true;
+            if (existing.ActivityText is not null) return false;
+            bytes = JsonSerializer.SerializeToUtf8Bytes(existing with { ActivityText = record.ActivityText }, Json);
+        }
         var temp = Path.Combine(folder, Guid.NewGuid().ToString("N") + ".tmp");
         try {
             await File.WriteAllBytesAsync(temp, bytes, ct);
             if (!OperatingSystem.IsWindows()) File.SetUnixFileMode(temp, UnixFileMode.UserRead | UnixFileMode.UserWrite);
-            File.Move(temp, file); return true;
+            File.Move(temp, file, overwrite: replacing); return true;
         } finally { if (File.Exists(temp)) File.Delete(temp); }
     }
     public async Task Delete(string owner, Guid id, CancellationToken ct) {
