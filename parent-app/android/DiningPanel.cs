@@ -117,7 +117,7 @@ public sealed class DiningPanel : ContentView
             if (!syncTimer.IsRunning) { syncTimer.Tick -= SyncTick; syncTimer.Tick += SyncTick; syncTimer.Start(); }
             _ = SyncAsync();
         };
-        Unloaded += (_, _) => { syncTimer?.Stop(); syncCancellation?.Cancel(); };
+        Unloaded += (_, _) => { syncTimer?.Stop(); };
         Render();
     }
     private void SyncTick(object? sender, EventArgs e) => _ = SyncAsync();
@@ -514,8 +514,10 @@ public sealed class DiningPanel : ContentView
             if (message is not null) rows.Add(MomentStyle.Caption(message));
         }
         void RefreshRecords() => Fill();
-        page.Appearing += (_, _) => { Synced -= RefreshRecords; Synced += RefreshRecords; _ = SyncAsync(); };
-        page.Disappearing += (_, _) => Synced -= RefreshRecords;
+        var recordsTimer = Dispatcher.CreateTimer(); recordsTimer.Interval = TimeSpan.FromSeconds(30);
+        recordsTimer.Tick += (_, _) => _ = SyncAsync();
+        page.Appearing += (_, _) => { Synced -= RefreshRecords; Synced += RefreshRecords; recordsTimer.Start(); _ = SyncAsync(); };
+        page.Disappearing += (_, _) => { Synced -= RefreshRecords; recordsTimer.Stop(); };
         Fill(); await owner.Navigation.PushAsync(page);
     }
     private async Task Circles()
