@@ -53,7 +53,7 @@ internal sealed class MomentThumbnail : ContentView
         Loaded += (_, _) => { cache.Originals.Changed += OriginalChanged; _ = LoadAsync(); };
         Unloaded += (_, _) => { cache.Originals.Changed -= OriginalChanged; loading?.Cancel(); image.Source = null; };
     }
-    private void OriginalChanged() { image.Source = null; _ = LoadAsync(); }
+    private void OriginalChanged() { loading?.Cancel(); image.Source = null; _ = LoadAsync(); }
     public void Bind(MomentFeedItem next)
     {
         loading?.Cancel(); item = next; image.Source = null;
