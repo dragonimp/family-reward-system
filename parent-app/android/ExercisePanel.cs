@@ -212,7 +212,7 @@ public sealed partial class ExercisePanel : ContentView
     }
     private void Update()
     {
-        clock.Text = TimeSpan.FromSeconds(archive.Active?.Duration ?? 0).ToString(@"hh\:mm\:ss");
+        clock.Text = ExercisePresentation.Clock(archive.Active?.Duration ?? 0);
         distance.Text = archive.Active?.DistanceText ?? "0.00 公里";
         steps.Text = archive.Active is { HasSteps: true } active ? $"{active.Steps} 步" : "步数待获取";
         altitudeLabel.IsVisible = archive.Active?.RouteEnabled == true || archive.Active?.Route.Count > 0;
@@ -241,7 +241,7 @@ public sealed partial class ExercisePanel : ContentView
     private async Task ShowRoute(Workout item)
     {
         if (Window?.Page is not { } owner) return;
-        var map = new ExerciseRouteView(); map.Update(item.Route, false, true);
+        var map = new ExerciseRouteView(expanded: true); map.Update(item.Route, false, true);
         var page = new ContentPage { Title = item.Kind, BackgroundColor = MomentStyle.Background, SafeAreaEdges = SafeAreaEdges.All, Content = map };
         page.ToolbarItems.Add(new ToolbarItem("完成", null, async () => await owner.Navigation.PopModalAsync()));
         await owner.Navigation.PushModalAsync(new NavigationPage(page));
@@ -293,7 +293,7 @@ public sealed partial class ExercisePanel : ContentView
         foreach (var item in archive.History.OrderByDescending(x => x.StartedAt)) {
             var row = new VerticalStackLayout { Spacing = 8 };
             var top = new Grid { ColumnDefinitions = new ColumnDefinitionCollection { new(GridLength.Star), new(GridLength.Auto), new(GridLength.Auto) }, ColumnSpacing = 8 };
-            top.Add(MomentStyle.Title(item.Kind, 17)); top.Add(MomentStyle.Caption(TimeSpan.FromSeconds(item.Seconds).ToString(@"hh\:mm\:ss")), 1);
+            top.Add(MomentStyle.Title(item.Kind, 17)); top.Add(MomentStyle.Caption(ExercisePresentation.Clock(item.Seconds)), 1);
             var delete = MomentStyle.Action("删除", () => _ = DeleteRecord(item)); delete.TextColor = Colors.Red; top.Add(delete, 2); row.Add(top);
             var resume = MomentStyle.Action("继续" + item.Kind, () => _ = Continue(item)); resume.IsEnabled = archive.Active == null && !starting; row.Add(resume);
             if (item.Activity is { } linkedActivity) row.Add(MomentStyle.Caption(linkedActivity.Title));

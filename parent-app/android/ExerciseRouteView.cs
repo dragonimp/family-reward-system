@@ -9,8 +9,9 @@ internal sealed class ExerciseRouteView : ContentView
     readonly WebView map = new() { HeightRequest = 300 };
     readonly Label state = MomentStyle.Caption("地图加载中…");
     string route = "[]"; bool live, ready; int revision;
-    public ExerciseRouteView()
+    public ExerciseRouteView(bool expanded = false)
     {
+        if (expanded) { map.HeightRequest = -1; map.MinimumHeightRequest = 300; }
         var grid = new Grid { RowDefinitions = new RowDefinitionCollection { new(GridLength.Star), new(GridLength.Auto) } };
         grid.Add(map); grid.Add(state, 0, 1); Content = grid;
         map.Navigated += async (_, e) => { ready = e.Result == WebNavigationResult.Success; if (ready) { if (route == "[]") state.Text = "开启地图模式并开始运动后，GPS 轨迹会显示在这里。"; await Draw(); } else state.Text = "地图暂未加载，请检查网络。轨迹记录不受影响。"; };

@@ -10,3 +10,6 @@ Check(ExerciseRouteGeometry.Segments([Point(0),Point(65)]).Count==2,"stale GPS g
 Check(ExerciseRouteGeometry.Segments([Point(0),Point(5,latitude:double.NaN),Point(10)]).Count==2,"invalid coordinates split geometry and never reach the renderer");
 Check(ExerciseRouteGeometry.Segments([Point(5),Point(4)]).Count==2,"reversed timestamps cannot join route segments");
 Check(ExerciseRouteGeometry.Segments([Point(0),Point(60)]).Count==1,"one minute boundary stays connected");
+
+Check(ExercisePresentation.Clock(26*3600+61)=="26:01:01","long workouts do not wrap their hours at midnight");
+Check(ExercisePresentation.Clock(-1)=="00:00:00"&&ExercisePresentation.Clock(double.NaN)=="00:00:00","invalid durations never leak into exercise labels");

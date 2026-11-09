@@ -13,3 +13,12 @@ public static class ExerciseRouteGeometry
         return result;
     }
 }
+
+public static class ExercisePresentation
+{
+    public static string Clock(double duration)
+    {
+        var seconds = double.IsFinite(duration) ? (long)Math.Max(0, duration) : 0;
+        return $"{seconds / 3600:00}:{seconds / 60 % 60:00}:{seconds % 60:00}";
+    }
+}
