@@ -12,6 +12,7 @@ public sealed class MomentActivityPanel : ContentView
     private readonly Action authenticationChanged;
     private readonly Grid layout = new() { RowDefinitions = new RowDefinitionCollection { new(GridLength.Auto), new(GridLength.Auto), new(GridLength.Star) }, Padding = new Thickness(16, 12, 16, 0), RowSpacing = 10 };
     private readonly ContentView header = new(), controls = new(), body = new();
+    private View? activityFeedHeader;
     private readonly Label status = MomentStyle.Caption("");
     private readonly MomentThumbnails thumbnails;
     private List<MomentRecord> spaces = [], activities = [], joined = [];
@@ -83,6 +84,8 @@ public sealed class MomentActivityPanel : ContentView
     });
     private void RenderRoot()
     {
+        DetachFeedHeader(); activityFeedHeader = null;
+        controls.IsVisible = true; Grid.SetRow(body, 2); Grid.SetRowSpan(body, 1);
         activity = null;
         var title = new Grid { ColumnDefinitions = new ColumnDefinitionCollection { new(GridLength.Star), new(GridLength.Auto), new(GridLength.Auto) } };
         if (showJoined) title.Add(new HorizontalStackLayout { Spacing = 6, Children = { MomentStyle.Action("‹", () => Back()), MomentStyle.Title("已参加的活动", 26) } });
@@ -197,7 +200,11 @@ public sealed class MomentActivityPanel : ContentView
             if (selectedMode is "大图" or "紧凑" or "网格 · 每行5张") { mode = selectedMode; RenderFeed(scope); }
         }), 1);
         section.Add(feedTitle); section.Add(status);
-        controls.Content = section;
+        // The activity summary and actions scroll with the feed, rather than
+        // reserving the upper half of the viewport above a second scroll area.
+        controls.Content = null; controls.IsVisible = false;
+        Grid.SetRow(body, 1); Grid.SetRowSpan(body, 2);
+        activityFeedHeader = section;
         feed = []; RenderFeed(scope);
         await RunAsync(async ct =>
         {
@@ -213,11 +220,17 @@ public sealed class MomentActivityPanel : ContentView
             feed = rows; status.Text = ""; RenderFeed(scope);
         });
     }
+    private void DetachFeedHeader()
+    {
+        if (body.Content is RefreshView { Content: CollectionView previous }) previous.Header = null;
+    }
     private void RenderFeed(MomentScope scope)
     {
+        // A native view can have only one parent, including when changing layout.
+        DetachFeedHeader();
         var grid = mode == "网格 · 每行5张"; var expanded = mode == "大图";
         var items = (grid ? feed.Where(item => item.Kind == "photo") : feed).ToList();
-        var list = new CollectionView { SelectionMode = SelectionMode.None, ItemsSource = items, EmptyView = Empty("还没有动态", "在右上角更多菜单中分享照片、写日常或打卡。"), ItemTemplate = new DataTemplate(() => new MomentFeedRow(store, owner, thumbnails, grid, scope, () => { if (activity is { } current) _ = OpenActivityAsync(current); }, feed.Where(p => p.Kind == "photo").ToList(), expanded)) };
+        var list = new CollectionView { Header = activityFeedHeader, SelectionMode = SelectionMode.None, ItemsSource = items, EmptyView = Empty("还没有动态", "在右上角更多菜单中分享照片、写日常或打卡。"), ItemTemplate = new DataTemplate(() => new MomentFeedRow(store, owner, thumbnails, grid, scope, () => { if (activity is { } current) _ = OpenActivityAsync(current); }, feed.Where(p => p.Kind == "photo").ToList(), expanded)) };
         list.ItemsLayout = grid ? new GridItemsLayout(5, ItemsLayoutOrientation.Vertical) { HorizontalItemSpacing = 3, VerticalItemSpacing = 8 } : new LinearItemsLayout(ItemsLayoutOrientation.Vertical) { ItemSpacing = 10 };
         body.Content = Refresh(list, () => { if (activity is { } selected) _ = OpenActivityAsync(selected); });
     }
