@@ -20,9 +20,11 @@ sdk_root="$ATLAS_BUILD_WORK/android-sdk"
 mkdir -p "$sdk_root/AgentIdentity" "$sdk_root/Atlas"
 for dependency in AgentIdentity Atlas MyVnc; do
   if [[ "$dependency" == AgentIdentity ]]; then repository="$identity"; elif [[ "$dependency" == Atlas ]]; then repository="$atlas"; else repository="$HOME/Projects/MyVnc"; fi
-  sdk_commit="$(git -C "$repository" rev-parse HEAD)"
-  sdk_remote="$(git -C "$repository" ls-remote origin refs/heads/main | cut -f1)"
-  [[ "$sdk_commit" == "$sdk_remote" ]] || { echo "$dependency SDK is not published main"; exit 1; }
+  # Other project tasks may have unpublished commits in their primary checkout.
+  # Consume the exact published SDK commit without modifying their worktree.
+  sdk_commit="$(git -C "$repository" ls-remote origin refs/heads/main | cut -f1)"
+  [[ "$sdk_commit" =~ ^[a-f0-9]{40}$ ]] || { echo "$dependency published SDK is unavailable"; exit 1; }
+  git -C "$repository" cat-file -e "$sdk_commit^{commit}" 2>/dev/null || git -C "$repository" fetch -q --no-tags origin "$sdk_commit"
   mkdir -p "$sdk_root/$dependency"
   git -C "$repository" archive "$sdk_commit" | tar -x -C "$sdk_root/$dependency"
   printf '%s %s\n' "$dependency" "$sdk_commit" >> "$ATLAS_BUILD_OUTPUT/android-sdk-dependencies.txt"
@@ -31,7 +33,7 @@ native="$HOME/Projects/MyVnc/artifacts/native-rtc/android-arm64"
 python3 - "$HOME/Projects/MyVnc" "$native" "$ATLAS_BUILD_OUTPUT" <<'NATIVE'
 from pathlib import Path
 import subprocess,hashlib,json,sys
-repo,native,out=map(Path,sys.argv[1:]);commit=subprocess.check_output(['git','-C',str(repo),'rev-parse','HEAD'],text=True).strip()
+repo,native,out=map(Path,sys.argv[1:]);commit=next(line.split()[1] for line in (out/'android-sdk-dependencies.txt').read_text().splitlines() if line.startswith('MyVnc '))
 built=(native/'source-commit.txt').read_text().strip()
 subprocess.run(['git','-C',str(repo),'merge-base','--is-ancestor',built,commit],check=True)
 assert (native/'native-version.txt').read_text().splitlines()[0]=='android-arm64'
