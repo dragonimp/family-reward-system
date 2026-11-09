@@ -150,6 +150,7 @@
 "空间列表无效。" = "Invalid space list.";
 "照片传输超时，请让配对的 iPhone 保持连接后重试。" = "Photo transfer timed out. Keep your paired iPhone connected and try again.";
 "确认删除空间" = "Confirm space deletion";
+"百度地图" = "Baidu Maps";
 "登录已过期。" = "Your session has expired.";
 "共 %lld 条" = "%lld total";
 "新建本人记录" = "Create my person record";
@@ -265,6 +266,7 @@
 "无法保存接收的原文件。" = "Could not save the received original file.";
 "族谱" = "Family tree";
 "通过" = "Approve";
+"高德地图" = "Amap";
 "当前群组" = "Current group";
 "照片会以配对 iPhone 的账号共享；原图留在 iPhone，获取原图时请保持 iPhone 上的 Linko Moment 打开。" = "Photos are shared using the paired iPhone’s account. Originals stay on the iPhone. Keep Linko Moment open on the iPhone during original file transfers.";
 "食材" = "Ingredients";
@@ -539,6 +541,7 @@
 "气温 %.1f °C" = "Air temperature %.1f °C";
 "未获得运动与健身权限，可在系统设置中开启；计时仍可使用。" = "Motion and Fitness permission has not been granted. Enable it in Settings. The timer remains available.";
 "父母的兄弟姐妹" = "Parents’ siblings";
+"请先安装或启用所选地图，也可以重新选择其他地图。" = "Install or enable the selected map app, or choose another map.";
 " · 已包含" = " · Included";
 "App Store 暂无可用版本" = "No version is available in the App Store";
 "开始一段互动" = "Start a connection activity";
@@ -641,6 +644,7 @@
 "用户协议未配置" = "User agreement is not configured";
 "根据已有关系推导" = "Inferred from existing relationships";
 "还没有运动记录" = "No exercise records yet";
+"无法打开所选地图，请重试或选择其他地图。" = "Unable to open the selected map. Try again or choose another map.";
 "正在读取已有活动…" = "Loading existing activities…";
 "共享照片" = "Shared photos";
 "暂未找到能确认符合路程上限的餐厅。可以放宽上限后重试。" = "No restaurants could be confirmed within this travel time. Try a longer limit.";
@@ -1191,6 +1195,7 @@
 "记录守约与责任行为，与可兑换积分分别计算。" = "Tracks commitments and responsibility separately from redeemable points.";
 " 元" = " CNY";
 " 如网络中断，请先检查记录再重试。" = " If the connection is interrupted, check the records before trying again.";
+"苹果地图" = "Apple Maps";
 "已完成" = "Completed";
 "守约信用分" = "Commitment credit score";
 "暂不可用" = "Temporarily unavailable";
@@ -1246,16 +1251,11 @@
 "活动与照片" = "Activities and photos";
 
 "孩子绑定与积分" = "Child pairing and points";
-
 "扫码登录" = "Scan to sign in";
 "使用手机扫描二维码，在用户中心确认登录。也可使用 Linko Moment 手机端“扫码登录”。" = "Scan with your phone and confirm through User Center. You can also use Scan to sign in in Linko Moment on iPhone.";
 "扫描手表登录二维码，核对配对码后确认登录。" = "Scan the Watch sign-in QR code and verify the pairing code before confirming.";
-
 "暂无孩子" = "No children yet";
 "手表默认使用配对手机当前账号；下方用于孩子手表绑定与设备管理。" = "Watch uses the account on the paired iPhone by default. Use the options below to pair and manage a child’s watch.";
-
 "请到“我的”中打开孩子绑定。" = "Open My to pair a child’s watch.";
-
 "查找附近餐厅" = "Find nearby restaurants";
-
 "展示样式" = "Display style";

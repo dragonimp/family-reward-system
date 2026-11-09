@@ -6230,6 +6230,31 @@
       "iosKey": "暂无成员共享位置",
       "zh-Hans": "暂无成员共享位置",
       "en": "No members are sharing their location"
+    },
+    "moment.t1ecb3ba10a16": {
+      "zh-Hans": "高德地图",
+      "en": "Amap",
+      "iosKey": "高德地图"
+    },
+    "moment.t0750c665574f": {
+      "zh-Hans": "百度地图",
+      "en": "Baidu Maps",
+      "iosKey": "百度地图"
+    },
+    "moment.tf248f58cb9c2": {
+      "zh-Hans": "苹果地图",
+      "en": "Apple Maps",
+      "iosKey": "苹果地图"
+    },
+    "moment.t5a3402938a1c": {
+      "zh-Hans": "请先安装或启用所选地图，也可以重新选择其他地图。",
+      "en": "Install or enable the selected map app, or choose another map.",
+      "iosKey": "请先安装或启用所选地图，也可以重新选择其他地图。"
+    },
+    "moment.t71edf55c6f7c": {
+      "zh-Hans": "无法打开所选地图，请重试或选择其他地图。",
+      "en": "Unable to open the selected map. Try again or choose another map.",
+      "iosKey": "无法打开所选地图，请重试或选择其他地图。"
     }
   }
 }

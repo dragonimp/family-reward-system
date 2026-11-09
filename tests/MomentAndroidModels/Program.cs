@@ -26,3 +26,14 @@ var qr = "https://happylife.ai.impx.net/auth/native/approve?id=" + new string('a
 Check(MomentLoginApproval.Approval(qr) != null, "official login QR reaches existing approval flow");
 foreach (var bad in new[] { qr.Replace("https:","http:"), qr.Replace("happylife.ai.impx.net","attacker.example"), qr.Replace("/approve?","/other?"), qr.Replace(new string('a',64),new string('A',64)), qr + "&id=" + new string('b',64), qr + "#fragment" }) Check(MomentLoginApproval.Approval(bad) == null, "unsafe or ambiguous login QR is rejected");
 Console.WriteLine("Android Moment model checks completed");
+
+var expiry = DateTimeOffset.UtcNow.AddHours(1).ToUnixTimeMilliseconds();
+string Request(string transport = "connect-datachannel-v1", double length = 42, string? sha = null, long? expires = null) => System.Text.Json.JsonSerializer.Serialize(new { id = id.ToString("D").ToUpperInvariant(), transport, length, sha256 = sha ?? new string('A', 64), expiresAt = expires ?? expiry });
+var manifest = MomentOriginalContract.Manifest(Row(Request()));
+Check(manifest.Length == 42 && manifest.Sha256 == new string('A', 64), "native original manifest accepts valid identity and uppercase SHA");
+foreach (var invalid in new[] { Request(transport: "legacy"), Request(length: 0), Request(length: 0.5), Request(length: 524288001), Request(sha: new string('z', 64)), Request(expires: 1) }) {
+    try { MomentOriginalContract.Manifest(Row(invalid)); throw new Exception("invalid original grant accepted"); }
+    catch (FamilyApiException) { Console.WriteLine("PASS invalid original manifest rejected"); }
+}
+Check(MomentOriginalContract.Suffix("image/heic") == ".heic" && MomentOriginalContract.Suffix("video/quicktime") == ".mov", "original file MIME keeps the original format");
+try { MomentOriginalContract.Suffix("text/html"); throw new Exception("non-media accepted"); } catch (FamilyApiException) { Console.WriteLine("PASS non-media original rejected"); }

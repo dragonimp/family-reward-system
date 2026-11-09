@@ -390,9 +390,21 @@ public sealed class DiningPanel : ContentView
     }
     private async Task Navigate(DiningPlace place, bool driving = false)
     {
-        // GCJ-02 is passed to the provider that owns it; don't hand it to a WGS84 system navigator.
-        var url = "https://uri.amap.com/navigation?to=" + FormattableString.Invariant($"{place.Longitude:F6},{place.Latitude:F6},") + Uri.EscapeDataString(place.Name) + (driving ? "&mode=car" : "&mode=walk") + "&coordinate=gaode&src=linkomoment&callnative=1";
-        await AgentIdentity.Maui.InAppWebLinks.OpenAsync(new Uri(url), BrowserLaunchMode.SystemPreferred);
+        var choice = await owner.DisplayActionSheetAsync("选择地图", "取消", null, "高德地图", "百度地图");
+        if (choice is not ("高德地图" or "百度地图")) return;
+        var lat = place.Latitude.ToString("F6", System.Globalization.CultureInfo.InvariantCulture);
+        var lon = place.Longitude.ToString("F6", System.Globalization.CultureInfo.InvariantCulture);
+        var name = Uri.EscapeDataString(place.Name);
+        // Restaurant discovery returns GCJ-02. Both schemes declare that contract.
+        var url = choice == "高德地图"
+            ? $"amapuri://route/plan/?sourceApplication=LinkoMoment&dlat={lat}&dlon={lon}&dname={name}&dev=0&t={(driving ? 0 : 2)}"
+            : $"baidumap://map/direction?destination=latlng:{lat},{lon}|name:{name}&coord_type=gcj02&mode={(driving ? "driving" : "walking")}&src=android.net.impx.happylife";
+        try
+        {
+            if (await Launcher.Default.CanOpenAsync(url) && await Launcher.Default.OpenAsync(url)) return;
+        }
+        catch { }
+        await owner.DisplayAlertAsync("无法打开地图", $"请先安装或启用{choice}，也可以重新选择其他地图。", "知道了");
     }
     private async Task Filters()
     {

@@ -338,7 +338,32 @@ import CryptoKit
         let minutes = ceil(seconds / 60).formatted()
         return driving ? diningText("预计开车约 \(minutes) 分钟") : diningText("预计步行约 \(minutes) 分钟")
     }
-    func navigate(_ place: DiningPlace, driving: Bool = false) {
+    func navigate(_ place: DiningPlace, driving: Bool = false, provider: String = "apple") {
+        if provider != "apple" {
+            // MapKit and manual locations are WGS84; explicitly declare GPS input.
+            let gps = place.provider != "amap"
+            var components = URLComponents()
+            components.scheme = provider == "amap" ? "iosamap" : "baidumap"
+            components.host = provider == "amap" ? "path" : "map"
+            if provider == "amap" {
+                components.queryItems = [URLQueryItem(name: "sourceApplication", value: "LinkoMoment"),
+                    URLQueryItem(name: "dlat", value: String(place.latitude)), URLQueryItem(name: "dlon", value: String(place.longitude)),
+                    URLQueryItem(name: "dname", value: place.name), URLQueryItem(name: "dev", value: gps ? "1" : "0"),
+                    URLQueryItem(name: "t", value: driving ? "0" : "2")]
+            } else {
+                components.path = "/direction"
+                components.queryItems = [URLQueryItem(name: "destination", value: "latlng:\(place.latitude),\(place.longitude)|name:\(place.name)"),
+                    URLQueryItem(name: "coord_type", value: gps ? "wgs84" : "gcj02"),
+                    URLQueryItem(name: "mode", value: driving ? "driving" : "walking"), URLQueryItem(name: "src", value: "ios.net.impx.happylife")]
+            }
+            guard let url = components.url, UIApplication.shared.canOpenURL(url) else {
+                message = String(localized: "请先安装或启用所选地图，也可以重新选择其他地图。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)); return
+            }
+            UIApplication.shared.open(url, options: [:]) { [weak self] opened in
+                if !opened { Task { @MainActor in self?.message = String(localized: "无法打开所选地图，请重试或选择其他地图。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)) } }
+            }
+            return
+        }
         let item = MKMapItem(placemark: MKPlacemark(coordinate: CLLocationCoordinate2D(latitude: place.latitude, longitude: place.longitude))); item.name = place.name
         item.openInMaps(launchOptions: [MKLaunchOptionsDirectionsModeKey: driving ? MKLaunchOptionsDirectionsModeDriving : MKLaunchOptionsDirectionsModeWalking])
     }
@@ -516,7 +541,11 @@ struct DiningView: View {
                 Button { Task { await model.decide() } } label: {
                     Label(diningText("换一家"), systemImage: "arrow.clockwise").frame(maxWidth: .infinity)
                 }
-                Button { model.navigate(place, driving: model.trip.driving) } label: {
+                Menu {
+                    Button(String(localized: "高德地图", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) { model.navigate(place, driving: model.trip.driving, provider: "amap") }
+                    Button(String(localized: "百度地图", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) { model.navigate(place, driving: model.trip.driving, provider: "baidu") }
+                    Button(String(localized: "苹果地图", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) { model.navigate(place, driving: model.trip.driving) }
+                } label: {
                     Label(diningText("带我过去"), systemImage: "map").frame(maxWidth: .infinity)
                 }
             }.buttonStyle(.bordered).controlSize(.large)
@@ -600,7 +629,11 @@ struct DiningView: View {
             List {
                 Section(String(localized: "我的收藏", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) {
                     ForEach(model.archive.favorites) { place in
-                        HStack { VStack(alignment: .leading) { Text(place.name); Text(place.address).font(.caption).foregroundStyle(.secondary) }; Spacer(); Button(String(localized: "导航", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) { model.navigate(place) } }
+                        HStack { VStack(alignment: .leading) { Text(place.name); Text(place.address).font(.caption).foregroundStyle(.secondary) }; Spacer(); Menu(String(localized: "导航", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) {
+                            Button(String(localized: "高德地图", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) { model.navigate(place, driving: model.trip.driving, provider: "amap") }
+                            Button(String(localized: "百度地图", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) { model.navigate(place, driving: model.trip.driving, provider: "baidu") }
+                            Button(String(localized: "苹果地图", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) { model.navigate(place, driving: model.trip.driving) }
+                        } }
                     }
                     if model.archive.favorites.isEmpty { Text(String(localized: "还没有收藏餐厅", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) }
                 }

@@ -7,6 +7,7 @@ internal sealed class MomentThumbnails(FamilyStore store)
     private readonly Dictionary<string, byte[]> cache = [];
     private readonly Queue<string> order = new();
     private long bytes;
+    public MomentOriginals Originals => store.Originals;
     public void Clear() { lock (gate) { cache.Clear(); order.Clear(); bytes = 0; } }
     public async Task<byte[]> GetAsync(MomentFeedItem item, CancellationToken ct)
     {
@@ -49,9 +50,10 @@ internal sealed class MomentThumbnail : ContentView
         var layout = new Grid { BackgroundColor = Color.FromArgb("#E7E9ED") };
         placeholder.HorizontalTextAlignment = TextAlignment.Center; placeholder.VerticalTextAlignment = TextAlignment.Center;
         layout.Add(placeholder); layout.Add(image); Content = layout;
-        Loaded += (_, _) => _ = LoadAsync();
-        Unloaded += (_, _) => { loading?.Cancel(); image.Source = null; };
+        Loaded += (_, _) => { cache.Originals.Changed += OriginalChanged; _ = LoadAsync(); };
+        Unloaded += (_, _) => { cache.Originals.Changed -= OriginalChanged; loading?.Cancel(); image.Source = null; };
     }
+    private void OriginalChanged() { image.Source = null; _ = LoadAsync(); }
     public void Bind(MomentFeedItem next)
     {
         loading?.Cancel(); item = next; image.Source = null;
@@ -61,6 +63,7 @@ internal sealed class MomentThumbnail : ContentView
     private async Task LoadAsync()
     {
         if (item is not { } current || image.Source != null) return;
+        if (cache.Originals.Cached(current) is { } original && !current.Record.Text("contentType").StartsWith("video/", StringComparison.Ordinal)) { image.Source = ImageSource.FromFile(original); return; }
         loading?.Cancel(); var token = loading = new CancellationTokenSource();
         try
         {
@@ -144,6 +147,10 @@ internal sealed class MomentPhotoPage : ContentPage
     private MomentFeedItem item;
     private readonly IReadOnlyList<MomentFeedItem> gallery;
     private readonly Label fileName = MomentStyle.Title("", 18), source = new(), place = MomentStyle.Caption(""), time = MomentStyle.Caption(""), device = MomentStyle.Caption(""), position = MomentStyle.Caption("");
+    private readonly Button fetchOriginal, saveOriginal, shareOriginal, openOriginal;
+    private readonly Label transferStatus = MomentStyle.Caption("");
+    private CancellationTokenSource? transfer;
+    private bool originalBusy, originalSaved;
     private int selection;
     private readonly VerticalStackLayout comments = new() { Spacing = 10 };
     private readonly Label error = MomentStyle.Caption("");
@@ -193,6 +200,7 @@ internal sealed class MomentPhotoPage : ContentPage
         carousel.PositionChanged += async (_, e) =>
         {
             if (e.CurrentPosition < 0 || e.CurrentPosition >= this.gallery.Count) return;
+            transfer?.Cancel(); originalBusy = false; originalSaved = false;
             loading?.Cancel(); selection++; busy = false; skip = 0; hasMore = false; comments.Children.Clear();
             this.item = this.gallery[e.CurrentPosition]; UpdateInfo(e.CurrentPosition); await LoadCommentsAsync(true);
         };
@@ -201,8 +209,12 @@ internal sealed class MomentPhotoPage : ContentPage
         paging.Add(position); paging.Add(MomentStyle.Action("下一张 ›", () => carousel.Position = Math.Min(this.gallery.Count - 1, carousel.Position + 1)));
         var body = new VerticalStackLayout { Padding = 16, Spacing = 14 };
         body.Add(carousel); body.Add(paging); body.Add(fileName); body.Add(source); body.Add(place); body.Add(time); body.Add(device);
-        body.Add(MomentStyle.Action("获取原文件", () => _ = MomentActivityPanel.OpenWebAsync(this.item.Scope.Web), true));
-        body.Add(MomentStyle.Caption("原文件可从共享设备或服务器缓存获取。"));
+        fetchOriginal = MomentStyle.Action("获取原文件", () => _ = FetchOriginalAsync(), true);
+        saveOriginal = MomentStyle.Action("保存到相册", () => _ = UseOriginalAsync(true));
+        shareOriginal = MomentStyle.Action("分享原文件", () => _ = UseOriginalAsync(false));
+        openOriginal = MomentStyle.Action("打开原文件", () => _ = OpenOriginalAsync());
+        body.Add(fetchOriginal); body.Add(transferStatus);
+        body.Add(new HorizontalStackLayout { Spacing = 8, Children = { saveOriginal, shareOriginal, openOriginal } });
         body.Add(MomentStyle.Title("照片点评", 20)); body.Add(MomentStyle.Action("发表点评", () => _ = PostAsync()));
         body.Add(error); body.Add(comments);
         body.Add(MomentStyle.Action("加载更多点评", () => _ = LoadCommentsAsync(false)));
@@ -215,9 +227,69 @@ internal sealed class MomentPhotoPage : ContentPage
         place.Text = MomentFeedRow.Place(item.Record); time.Text = MomentDates.LocalTime(item.Record);
         device.Text = "来源设备：" + string.Join(" · ", new[] { item.Record.Text("sourceDeviceName"), item.Record.Text("sourceDeviceModel"), item.Record.Text("sourceDevicePlatform") }.Where(s => s.Length > 0));
         position.Text = $"{index + 1} / {gallery.Count}";
+        transferStatus.Text = ""; UpdateOriginalActions();
     }
     protected override async void OnAppearing() { base.OnAppearing(); await LoadCommentsAsync(true); }
-    protected override void OnDisappearing() { selection++; loading?.Cancel(); busy = false; base.OnDisappearing(); }
+    protected override void OnDisappearing() { transfer?.Cancel(); originalBusy = false; selection++; loading?.Cancel(); busy = false; base.OnDisappearing(); }
+    private void UpdateOriginalActions()
+    {
+        var available = store.Originals.Cached(item) != null;
+        fetchOriginal.IsVisible = !available; fetchOriginal.IsEnabled = !originalBusy;
+        fetchOriginal.Text = originalBusy ? "正在获取原文件…" : "获取原文件";
+        saveOriginal.IsVisible = shareOriginal.IsVisible = openOriginal.IsVisible = available;
+        saveOriginal.IsEnabled = !originalBusy && !originalSaved;
+        saveOriginal.Text = originalSaved ? "已保存到相册" : "保存到相册";
+        shareOriginal.IsEnabled = openOriginal.IsEnabled = !originalBusy;
+    }
+    private async Task FetchOriginalAsync()
+    {
+        if (originalBusy) return;
+        var current = selection; var account = store.SessionVersion; var selected = item;
+        transfer?.Cancel(); using var cancellation = transfer = new CancellationTokenSource();
+        bool Active() => current == selection && account == store.SessionVersion && !cancellation.IsCancellationRequested;
+        originalBusy = true; UpdateOriginalActions();
+        try
+        {
+            var progress = new Progress<double>(value => { if (Active()) transferStatus.Text = $"正在接收原文件：{value * 100:0}%"; });
+            await store.Originals.DownloadAsync(selected, text => { if (Active()) transferStatus.Text = text; }, progress, cancellation.Token);
+            if (Active()) transferStatus.Text = "原文件已获取，可以查看、保存或分享。";
+        }
+        catch (OperationCanceledException) { }
+        catch (Exception exception) { if (Active()) transferStatus.Text = exception is FamilyApiException ? exception.Message : "原文件获取未完成，请重试。分享者可能需要保持 App 打开。"; }
+        finally { if (transfer == cancellation) { transfer = null; originalBusy = false; if (current == selection) UpdateOriginalActions(); } }
+    }
+    private async Task UseOriginalAsync(bool save)
+    {
+        if (originalBusy || store.Originals.Cached(item) is not { } file) return;
+        var current = selection; var account = store.SessionVersion;
+        var selected = item; using var cancellation = transfer = new CancellationTokenSource();
+        originalBusy = true; UpdateOriginalActions();
+        try
+        {
+            if (save) await MomentMediaLibrary.SaveAsync(file, selected.Record.Text("contentType"), selected.Record.Text("originalFileName"), cancellation.Token);
+            else await Share.Default.RequestAsync(new ShareFileRequest("分享原文件", new ShareFile(file, selected.Record.Text("contentType"))));
+            if (save && current == selection && account == store.SessionVersion && !cancellation.IsCancellationRequested && OperatingSystem.IsAndroidVersionAtLeast(29)) originalSaved = true;
+        }
+        catch (OperationCanceledException) { }
+        catch { if (current == selection && account == store.SessionVersion) transferStatus.Text = "操作未完成，请重试。"; }
+        finally { if (transfer == cancellation) { transfer = null; originalBusy = false; if (current == selection) UpdateOriginalActions(); } }
+    }
+    private async Task OpenOriginalAsync()
+    {
+        if (store.Originals.Cached(item) is not { } file) return;
+        if (item.Record.Text("contentType").StartsWith("video/", StringComparison.Ordinal))
+        {
+            try { await Launcher.Default.OpenAsync(new OpenFileRequest("原视频", new ReadOnlyFile(file, item.Record.Text("contentType")))); }
+            catch { transferStatus.Text = "未找到可打开此视频的应用，可以分享原文件。"; }
+            return;
+        }
+        var photo = new Image { Source = ImageSource.FromFile(file), Aspect = Aspect.AspectFit };
+        var page = new ContentPage { BackgroundColor = Colors.Black, SafeAreaEdges = SafeAreaEdges.All };
+        var grid = new Grid { RowDefinitions = new RowDefinitionCollection { new(GridLength.Star), new(GridLength.Auto) } };
+        grid.Add(photo); grid.Add(MomentStyle.Action("关闭", async () => await Navigation.PopModalAsync()), 0, 1); page.Content = grid;
+        var pinch = new PinchGestureRecognizer(); pinch.PinchUpdated += (_, e) => { if (e.Status == GestureStatus.Running && double.IsFinite(e.Scale)) photo.Scale = Math.Clamp(photo.Scale * e.Scale, 1, 4); }; photo.GestureRecognizers.Add(pinch);
+        await Navigation.PushModalAsync(page);
+    }
     private async Task LoadCommentsAsync(bool reset)
     {
         if (busy || !reset && !hasMore) return;

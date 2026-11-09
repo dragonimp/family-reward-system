@@ -9,8 +9,8 @@
     <Nullable>enable</Nullable>
     <ApplicationTitle>Linko Moment</ApplicationTitle>
     <ApplicationId>net.impx.happylife</ApplicationId>
-    <ApplicationDisplayVersion>1.0.22</ApplicationDisplayVersion>
-    <ApplicationVersion>31</ApplicationVersion>
+    <ApplicationDisplayVersion>1.0.23</ApplicationDisplayVersion>
+    <ApplicationVersion>32</ApplicationVersion>
     <SupportedOSPlatformVersion>26</SupportedOSPlatformVersion>
     <AgentIdentityNativeClientProject Condition="'$(AgentIdentityNativeClientProject)' == ''">$(MSBuildThisFileDirectory)../../../AgentIdentity/src/AgentIdentity.NativeClient/AgentIdentity.NativeClient.csproj</AgentIdentityNativeClientProject>
   </PropertyGroup>
@@ -27,4 +27,13 @@
   <PropertyGroup><AtlasSdkRoot Condition="'$(AtlasSdkRoot)' == ''">$(MSBuildThisFileDirectory)../../../Atlas</AtlasSdkRoot></PropertyGroup>
   <ItemGroup><ProjectReference Include="$(AtlasSdkRoot)/sdk/Atlas.Releases.Maui/Atlas.Releases.Maui.csproj" /></ItemGroup>
   <ItemGroup><ProjectReference Include="$([System.IO.Path]::GetDirectoryName('$(AgentIdentityNativeClientProject)'))/../AgentIdentity.Maui/AgentIdentity.Maui.csproj" /></ItemGroup>
+  <PropertyGroup><MyVncSdkRoot Condition="'$(MyVncSdkRoot)' == ''">$(MSBuildThisFileDirectory)../../../MyVnc</MyVncSdkRoot><MyVncNativeRoot Condition="'$(MyVncNativeRoot)' == ''">$(MyVncSdkRoot)/artifacts/native-rtc/android-arm64</MyVncNativeRoot></PropertyGroup>
+  <ItemGroup>
+    <Compile Include="$(MyVncSdkRoot)/sdk/MyVnc.Realtime.Client/RealtimeFileTransfer.cs" Link="Connect/RealtimeFileTransfer.cs" />
+    <Compile Include="$(MyVncSdkRoot)/sdk/MyVnc.Realtime.Client/RealtimeFileRelay.cs" Link="Connect/RealtimeFileRelay.cs" />
+    <AndroidNativeLibrary Include="$(MyVncNativeRoot)/libmyvnc-rtc.so" Abi="arm64-v8a" />
+    <MauiAsset Include="$(MyVncNativeRoot)/licenses/**" LogicalName="ConnectLicenses/%(RecursiveDir)%(Filename)%(Extension)" />
+    <MauiAsset Include="$(MyVncNativeRoot)/NOTICE.txt" LogicalName="ConnectLicenses/NOTICE.txt" />
+    <MauiAsset Include="$(MyVncNativeRoot)/source-commit.txt" LogicalName="ConnectLicenses/source-commit.txt" />
+  </ItemGroup>
 </Project>

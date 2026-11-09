@@ -16,8 +16,11 @@ public sealed class FamilyStore
     private CancellationTokenSource? loginCancellation;
     private int generation;
 
+    internal MomentOriginals Originals { get; }
+
     public FamilyStore()
     {
+        Originals = new MomentOriginals(this);
         session = new NativeSessionHandler(Origin,
             () => SecureStorage.Default.GetAsync(SessionKey),
             value => value is null ? ClearStoredSessionAsync() : SecureStorage.Default.SetAsync(SessionKey, value));
