@@ -604,6 +604,7 @@ struct DiningView: View {
                     }
                 }
                 .accessibilityAddTraits(.isModal)
+                .accessibilityAction(.escape) { navigationPlace = nil }
             }
         }
     }
