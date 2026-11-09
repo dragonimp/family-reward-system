@@ -180,7 +180,7 @@ public sealed class FamilyPage : ContentPage
                 {
                     exercise?.Suspend(); exercise = new ExercisePanel(store, user); exerciseUser = user;
                 }
-                content.Add(exercise); exercise.Show(); break;
+                viewport.Content = exercise; exercise.Show(); break;
             case "我的": AccountContent(); break;
             default: FamilyContent(); break;
         }

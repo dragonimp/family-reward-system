@@ -25,7 +25,7 @@ public sealed partial class ExercisePanel
     private bool OwnSession(long generation) => api.SessionVersion == generation && DiningAccount.Identity(api.Profile?.Text("unifiedUserId") ?? "") == DiningAccount.Identity(userID);
     private object WireRecord(Workout item) => item.SourceRecord is { } source ? source : JsonSerializer.SerializeToElement(new {
         id = item.SyncId, kind = item.Kind, startedAt = item.StartedAt, endedAt = item.EndedAt,
-        intervals = item.Intervals, activity = item.Activity, activityText = item.ActivityText, routeEnabled = item.Route.Count > 0, route = item.Route
+        intervals = item.Intervals, activity = item.Activity, activityText = item.ActivityText, routeEnabled = item.RouteEnabled || item.Route.Count > 0, route = item.Route
     }, Wire);
     private static string SharedText(Workout item)
     {
@@ -39,7 +39,7 @@ public sealed partial class ExercisePanel
         if (syncing || !readable) return;
         var generation = api.SessionVersion;
         if (!OwnSession(generation)) return;
-        syncing = true;
+        syncing = true; Update();
         try {
             foreach (var id in archive.PendingDeletions.ToArray()) {
                 await api.CallAsync($"/api/exercise/records/{id:D}", HttpMethod.Delete);
@@ -75,6 +75,7 @@ public sealed partial class ExercisePanel
                 item.HasSteps = intervals.Count > 0 && intervals.All(i => i.Steps != null); item.Steps = intervals.Sum(i => i.Steps ?? 0);
                 if (intervals.Count > 0 && intervals.All(i => i.DistanceMeters != null)) item.DistanceOverride = intervals.Sum(i => i.DistanceMeters ?? 0);
                 if (raw.TryGetProperty("activity", out var activity) && activity.ValueKind == JsonValueKind.Object) item.Activity = JsonSerializer.Deserialize<ActivityLink>(activity, Wire);
+                item.RouteEnabled = raw.TryGetProperty("routeEnabled", out var enabled) && enabled.ValueKind == JsonValueKind.True;
                 if (raw.TryGetProperty("route", out var route) && route.ValueKind == JsonValueKind.Array) item.Route = JsonSerializer.Deserialize<List<WorkoutPoint>>(route, Wire) ?? [];
                 archive.History.Add(item); archive.Uploaded.Add(item.SyncId); Save();
             }
@@ -90,9 +91,9 @@ public sealed partial class ExercisePanel
                 } catch (Exception error) { if (!OwnSession(generation)) return; activityError = "活动动态待重试：" + error.Message; }
             }
             archive.History = archive.History.OrderByDescending(x => x.StartedAt).ToList(); Save(); Render();
-            notice.Text = activityError ?? (archive.History.Any(x => x.Intervals.Count == 0 || x.Intervals[0].Start != x.StartedAt) ? "新记录已同步；旧记录保留本机总时长，并发布到关联活动。" : "运动已同步到当前账号及关联活动。");
-        } catch (Exception error) { if (OwnSession(generation)) notice.Text = "同步未完成，本机记录已保留：" + error.Message; }
-        finally { syncing = false; }
+            syncStatus.Text = activityError ?? (archive.History.Any(x => x.Intervals.Count == 0 || x.Intervals[0].Start != x.StartedAt) ? "新记录已同步；旧记录保留本机总时长，并发布到关联活动。" : "运动已同步到当前账号及关联活动。");
+        } catch (Exception error) { if (OwnSession(generation)) syncStatus.Text = "同步未完成，本机记录已保留：" + error.Message; }
+        finally { syncing = false; Update(); }
     }
     private void StartLocation()
     {

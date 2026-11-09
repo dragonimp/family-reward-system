@@ -53,8 +53,8 @@ dotnet publish "$source/parent-app/android/LinkoFamily.csproj" -f net10.0-androi
  -p:AndroidKeyStore=false \
  -o "$ATLAS_BUILD_WORK/publish" > "$ATLAS_BUILD_LOGS/android.log" 2>&1 || { tail -35 "$ATLAS_BUILD_LOGS/android.log"; exit 1; }
 apk="$(find "$ATLAS_BUILD_WORK/publish" -name '*-Signed.apk' -print -quit)"; [[ -n "$apk" ]]
-"$ANDROID_HOME/build-tools/36.0.0/apksigner" sign --ks "$signing/linko-dear-android-release.jks" --ks-key-alias linko-dear-parent --ks-pass "file:$signing/key-password"  --out "$ATLAS_BUILD_OUTPUT/Moment-Android-1.0.23-32.apk" "$apk"
-apk="$ATLAS_BUILD_OUTPUT/Moment-Android-1.0.23-32.apk"
+"$ANDROID_HOME/build-tools/36.0.0/apksigner" sign --ks "$signing/linko-dear-android-release.jks" --ks-key-alias linko-dear-parent --ks-pass "file:$signing/key-password"  --out "$ATLAS_BUILD_OUTPUT/Moment-Android-1.0.24-33.apk" "$apk"
+apk="$ATLAS_BUILD_OUTPUT/Moment-Android-1.0.24-33.apk"
 "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --verbose --print-certs "$apk" > "$ATLAS_BUILD_LOGS/signature.log"
 rg -qi '4596cdb1ea8a5eea1a2567c6800d2bf4f90f051198a5518beb13abb7ac359c83' "$ATLAS_BUILD_LOGS/signature.log"
 rg -q 'Verified using v2 scheme.*true' "$ATLAS_BUILD_LOGS/signature.log"
@@ -62,7 +62,7 @@ rg -q 'Verified using v2 scheme.*true' "$ATLAS_BUILD_LOGS/signature.log"
 python3 - "$ATLAS_BUILD_OUTPUT" "$ATLAS_BUILD_LOGS" "$commit" <<'PY'
 from pathlib import Path
 import sys,json,hashlib
-out,logs=map(Path,sys.argv[1:3]);m=(logs/'manifest.log').read_text();assert "name='net.impx.happylife'" in m and "versionName='1.0.23'" in m and "versionCode='32'" in m
-apk=out/'Moment-Android-1.0.23-32.apk';receipt={'sourceCommit':sys.argv[3],'version':'1.0.23','buildNumber':'32','sha256':hashlib.sha256(apk.read_bytes()).hexdigest(),'signatureVerified':True};(out/'build-receipt.json').write_text(json.dumps(receipt))
-(out/'bundle.json').write_text(json.dumps({'version':'1.0.23','activate':False,'sourceCommit':sys.argv[3],'releaseNotes':'干饭记录、收藏和偏好按账号跨设备合并同步；活动首页整页滚动、原文件原生接收；干饭导航支持选择地图。','artifacts':[{'path':'connect-native-receipt.json','platform':'sdk-metadata','architecture':'arm64'},{'path':apk.name,'platform':'android','architecture':'arm64'},{'path':'build-receipt.json','platform':'release-metadata','architecture':'arm64'}]},ensure_ascii=False))
+out,logs=map(Path,sys.argv[1:3]);m=(logs/'manifest.log').read_text();assert "name='net.impx.happylife'" in m and "versionName='1.0.24'" in m and "versionCode='33'" in m
+apk=out/'Moment-Android-1.0.24-33.apk';receipt={'sourceCommit':sys.argv[3],'version':'1.0.24','buildNumber':'33','sha256':hashlib.sha256(apk.read_bytes()).hexdigest(),'signatureVerified':True};(out/'build-receipt.json').write_text(json.dumps(receipt))
+(out/'bundle.json').write_text(json.dumps({'version':'1.0.24','activate':False,'sourceCommit':sys.argv[3],'releaseNotes':'运动按iOS布局对齐：数据/地图切换、运动项目选择、历史轨迹查看和底部同步栏；维护设置收入更多菜单。','artifacts':[{'path':'connect-native-receipt.json','platform':'sdk-metadata','architecture':'arm64'},{'path':apk.name,'platform':'android','architecture':'arm64'},{'path':'build-receipt.json','platform':'release-metadata','architecture':'arm64'}]},ensure_ascii=False))
 PY
