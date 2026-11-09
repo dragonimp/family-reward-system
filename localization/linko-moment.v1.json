@@ -6280,6 +6280,26 @@
       "zh-Hans": "记录、收藏与偏好按账号跨设备同步；离线修改联网后自动合并。",
       "en": "Records, favorites and preferences sync across devices for your account. Offline changes merge when online.",
       "iosKey": "记录、收藏与偏好按账号跨设备同步；离线修改联网后自动合并。"
+    },
+    "moment.t8ee227af7ea7": {
+      "zh-Hans": "选择导航地图",
+      "en": "Choose a navigation map",
+      "iosKey": "选择导航地图"
+    },
+    "moment.t154a68b29417": {
+      "zh-Hans": "打开高德地图规划路线",
+      "en": "Plan a route in Amap",
+      "iosKey": "打开高德地图规划路线"
+    },
+    "moment.t8e710f0a556e": {
+      "zh-Hans": "打开百度地图规划路线",
+      "en": "Plan a route in Baidu Maps",
+      "iosKey": "打开百度地图规划路线"
+    },
+    "moment.t9358561e3195": {
+      "zh-Hans": "使用系统地图规划路线",
+      "en": "Plan a route in Apple Maps",
+      "iosKey": "使用系统地图规划路线"
     }
   }
 }

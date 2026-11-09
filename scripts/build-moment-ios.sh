@@ -27,9 +27,9 @@ connect,identity,native,output,atlas=map(Path,sys.argv[1:])
 receipts={}
 packages={'connect':('MyVnc','sdk/MyVnc.Realtime.Apple'),'identity':('AgentIdentity','packages/AgentIdentity-iOS'),'atlas':('Atlas','packages/Atlas-Releases-Apple')}
 for key,path,scope in [('connect',connect,['sdk/MyVnc.Realtime.Apple','native/rtc']),('identity',identity,['packages/AgentIdentity-iOS']),('atlas',atlas,['packages/Atlas-Releases-Apple'])]:
-    commit=subprocess.check_output(['git','-C',str(path),'rev-parse','HEAD'],text=True).strip()
-    remote=subprocess.check_output(['git','-C',str(path),'ls-remote','origin','refs/heads/main'],text=True).split()[0]
-    assert commit==remote, key+' source is not pushed main'
+    commit=subprocess.check_output(['git','-C',str(path),'ls-remote','origin','refs/heads/main'],text=True).split()[0]
+    if subprocess.run(['git','-C',str(path),'cat-file','-e',commit+'^{commit}'],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL).returncode:
+        subprocess.run(['git','-C',str(path),'fetch','-q','--no-tags','origin',commit],check=True)
     # Archive the pushed commit below; concurrent working-tree edits are excluded.
     receipts[key]=commit
     # Freeze only the public SDK inputs; unrelated concurrent app work stays outside the archive.

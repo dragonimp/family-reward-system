@@ -626,12 +626,8 @@ struct DiningView: View {
                 Button { Task { await model.decide() } } label: {
                     Label(diningText("换一家"), systemImage: "arrow.clockwise").frame(maxWidth: .infinity)
                 }
-                Menu {
-                    Button(String(localized: "高德地图", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) { model.navigate(place, driving: model.trip.driving, provider: "amap") }
-                    Button(String(localized: "百度地图", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) { model.navigate(place, driving: model.trip.driving, provider: "baidu") }
-                    Button(String(localized: "苹果地图", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) { model.navigate(place, driving: model.trip.driving) }
-                } label: {
-                    Label(diningText("带我过去"), systemImage: "map").frame(maxWidth: .infinity)
+                DiningNavigationPicker { provider in
+                    model.navigate(place, driving: model.trip.driving, provider: provider)
                 }
             }.buttonStyle(.bordered).controlSize(.large)
         }.padding(18).frame(maxWidth: .infinity, alignment: .leading)
@@ -885,5 +881,70 @@ private struct DiningCheckInSheet: View {
             restaurantAddress = ""
             manual = true
         }
+    }
+}
+
+
+// A native Menu does not honor per-row typography. Keep the existing trigger,
+// and use a compact popover so all provider names have an explicit 18 pt size.
+private struct DiningNavigationPicker: View {
+    let select: (String) -> Void
+    @State private var presented = false
+
+    var body: some View {
+        Button { presented = true } label: {
+            Label(diningText("带我过去"), systemImage: "map").frame(maxWidth: .infinity)
+        }
+        .popover(isPresented: $presented, attachmentAnchor: .rect(.bounds), arrowEdge: .bottom) {
+            VStack(spacing: 0) {
+                Text(diningText("选择导航地图"))
+                    .font(.system(size: 18, weight: .semibold))
+                    .foregroundStyle(Color.black.opacity(0.88))
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, 16).padding(.top, 16).padding(.bottom, 10)
+                option("高德地图", detail: "打开高德地图规划路线", provider: "amap", symbol: "location.north.fill", color: .blue)
+                Divider().padding(.leading, 64)
+                option("百度地图", detail: "打开百度地图规划路线", provider: "baidu", symbol: "mappin.and.ellipse", color: .red)
+                Divider().padding(.leading, 64)
+                option("苹果地图", detail: "使用系统地图规划路线", provider: "apple", symbol: "map.fill", color: .green)
+            }
+            .frame(minWidth: 260, idealWidth: 304, maxWidth: 304)
+            .background(Color.white, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+            .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+            .shadow(color: .black.opacity(0.10), radius: 14, x: 0, y: 5)
+            .padding(8)
+            .presentationBackground(.clear)
+            .presentationCompactAdaptation(.popover)
+        }
+    }
+
+    private func option(_ title: String.LocalizationValue, detail: String.LocalizationValue,
+                        provider: String, symbol: String, color: Color) -> some View {
+        Button {
+            presented = false
+            select(provider)
+        } label: {
+            HStack(spacing: 12) {
+                Image(systemName: symbol)
+                    .font(.system(size: 20, weight: .medium))
+                    .foregroundStyle(color)
+                    .frame(width: 36, height: 36)
+                    .background(color.opacity(0.10), in: RoundedRectangle(cornerRadius: 10))
+                    .accessibilityHidden(true)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(diningText(title)).font(.system(size: 18, weight: .medium))
+                        .foregroundStyle(Color.black.opacity(0.88))
+                    Text(diningText(detail)).font(.system(size: 13, weight: .regular))
+                        .foregroundStyle(Color.black.opacity(0.50))
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                Image(systemName: "chevron.right").font(.system(size: 18, weight: .regular))
+                    .foregroundStyle(Color.black.opacity(0.35)).accessibilityHidden(true)
+            }
+            .padding(.horizontal, 14)
+            .frame(height: 70)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
     }
 }
