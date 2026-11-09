@@ -268,6 +268,8 @@ public sealed partial class ExercisePanel : ContentView
         if (archive.Active is { } active) {
             clock.TextColor = MomentStyle.Ink; distance.TextColor = MomentStyle.Ink;
             metrics ??= MomentStyle.Card(new VerticalStackLayout { Spacing = 12, Padding = new Thickness(4, 18), Children = { clock, distance, steps, altitudeLabel, activeState } });
+            if (metrics.Parent is Layout previousMetrics)
+                previousMetrics.Children.Remove(metrics);
             body.Add(metrics);
             var actions = new Grid { ColumnDefinitions = new ColumnDefinitionCollection { new(GridLength.Star), new(GridLength.Star) }, ColumnSpacing = 12 };
             actions.Add(Action(active.RunningSince != null ? "暂停" : "继续", () => { if (active.RunningSince != null) Pause(); else _ = Start(active.Kind); }));

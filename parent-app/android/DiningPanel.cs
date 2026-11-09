@@ -453,16 +453,36 @@ public sealed class DiningPanel : ContentView
     }
     private async Task Navigate(DiningPlace place, bool driving = false)
     {
-        var choice = await owner.DisplayActionSheetAsync("选择地图", "取消", null, "高德地图", "百度地图");
-        if (choice is not ("高德地图" or "百度地图")) return;
-        var url = DiningNavigation.Destination(place, driving, choice == "百度地图");
+        if (place.Provider != "amap")
+        {
+            await owner.DisplayAlertAsync("无法导航", "此目的地的坐标系尚未确认，请重新搜索餐厅。", "知道了");
+            return;
+        }
+        var navigator = new ExternalMapNavigator(ExternalMapNavigator.ConfiguredTencentReferer);
+        var available = navigator.GetAvailableMaps();
+        var names = new[] { "高德地图", "腾讯地图" };
+        var apps = new[] { MapApp.Amap, MapApp.Tencent };
+        var labels = apps.Select((app, index) => names[index] + (available.Contains(app) ? "" : "（未安装或已停用）")).ToArray();
+        var choice = await owner.DisplayActionSheetAsync("选择地图", "取消", null, labels);
+        var selected = Array.IndexOf(labels, choice);
+        if (selected < 0) return;
+        if (!available.Contains(apps[selected]))
+        {
+            await owner.DisplayAlertAsync("请先安装地图", $"请在手机应用商店安装或启用{names[selected]}，然后返回重试。", "知道了");
+            return;
+        }
+        var modes = new[] { "驾车", "步行", "公交", "骑行" };
+        var travel = await owner.DisplayActionSheetAsync("导航方式", "取消", null, modes);
+        var mode = Array.IndexOf(modes, travel);
+        if (mode < 0) return;
         try
         {
-            if (await Launcher.Default.CanOpenAsync(url) && await Launcher.Default.OpenAsync(url)) return;
+            navigator.OpenNavigation(apps[selected], new MapDestination(place.Name, place.Latitude, place.Longitude, MapCoordinateSystem.Gcj02),
+                new[] { NavigationMode.Driving, NavigationMode.Walking, NavigationMode.Transit, NavigationMode.Cycling }[mode]);
         }
-        catch { }
-        await owner.DisplayAlertAsync("无法打开地图", $"请先安装或启用{choice}，也可以重新选择其他地图。", "知道了");
+        catch (Exception error) { await owner.DisplayAlertAsync("无法打开地图", error.Message, "知道了"); }
     }
+
     private async Task Filters()
     {
         var rows = new VerticalStackLayout { Padding = 20, Spacing = 14 };

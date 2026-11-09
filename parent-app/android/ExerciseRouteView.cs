@@ -34,14 +34,15 @@ internal sealed class ExerciseRouteView : ContentView
         if (next == route && live == running && !reset) return;
         route = next; live = running; revision++;
         state.Text = points.Count == 0 ? "开启地图模式并开始运动后，GPS 轨迹会显示在这里。" : $"已记录 {points.Count} 个轨迹点";
-        if (ready) _ = Draw(reset);
+        if (ready && map.Handler != null && IsLoaded) _ = Draw(reset);
     }
     async Task Draw(bool reset = false)
     {
+        if (map.Handler == null || !IsLoaded) return;
         var current = revision;
         try {
             var result = await map.EvaluateJavaScriptAsync($"window.drawRoute && window.drawRoute({route},{(live ? "true" : "false")},{(reset ? "true" : "false")})");
-            if (current == revision && !result.Contains("ready", StringComparison.Ordinal)) state.Text = "地图暂未加载，请检查网络。轨迹记录不受影响。";
+            if (current == revision && !(result?.Contains("ready", StringComparison.Ordinal) ?? false)) state.Text = "地图暂未加载，请检查网络。轨迹记录不受影响。";
         } catch { if (current == revision) state.Text = "地图暂未加载，请检查网络。轨迹记录不受影响。"; }
     }
 }
