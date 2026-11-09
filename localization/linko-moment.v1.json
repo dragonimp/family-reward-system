@@ -6300,6 +6300,41 @@
       "zh-Hans": "使用系统地图规划路线",
       "en": "Plan a route in Apple Maps",
       "iosKey": "使用系统地图规划路线"
+    },
+    "moment.tb1571014a30e": {
+      "zh-Hans": "腾讯地图",
+      "en": "Tencent Maps",
+      "iosKey": "腾讯地图"
+    },
+    "moment.t9a61223cc0c8": {
+      "zh-Hans": "谷歌地图",
+      "en": "Google Maps",
+      "iosKey": "谷歌地图"
+    },
+    "moment.t31d0979b6963": {
+      "zh-Hans": "打开腾讯地图规划路线",
+      "en": "Plan a route in Tencent Maps",
+      "iosKey": "打开腾讯地图规划路线"
+    },
+    "moment.t6d0177b60174": {
+      "zh-Hans": "打开谷歌地图规划路线",
+      "en": "Plan a route in Google Maps",
+      "iosKey": "打开谷歌地图规划路线"
+    },
+    "moment.t8cf91963fdb6": {
+      "zh-Hans": "导航服务尚未配置",
+      "en": "Navigation is not configured",
+      "iosKey": "导航服务尚未配置"
+    },
+    "moment.te34beb427cee": {
+      "zh-Hans": "腾讯地图导航尚未配置，请先选择其他地图。",
+      "en": "Tencent Maps navigation is not configured. Please choose another map.",
+      "iosKey": "腾讯地图导航尚未配置，请先选择其他地图。"
+    },
+    "moment.tee2ef044ae37": {
+      "zh-Hans": "暂时无法确认这家店的导航位置，请选择其他地图。",
+      "en": "Unable to confirm this restaurant location. Please choose another map.",
+      "iosKey": "暂时无法确认这家店的导航位置，请选择其他地图。"
     }
   }
 }

@@ -133,6 +133,18 @@ import Foundation
         let syncDecoder = JSONDecoder(); syncDecoder.dateDecodingStrategy = .iso8601
         let restoredPending = try syncDecoder.decode(DiningSyncState.self, from: encoder.encode(pending))
         assert(restoredPending.outbox?.operationId == pending.outbox?.operationId && restoredPending.archive.history.count == archive.history.count)
+
+        let googleURL = DiningExternalNavigation.url(provider: "google", place: known, driving: false)!
+        let googleQuery = URLComponents(url: googleURL, resolvingAgainstBaseURL: false)!.queryItems!
+        check(googleURL.absoluteString.hasPrefix("comgooglemaps://?"), "Google uses the documented iOS app scheme")
+        check(googleQuery.first(where: { $0.name == "directionsmode" })?.value == "walking", "Google preserves walking mode")
+        check(DiningExternalNavigation.url(provider: "google", place: match, driving: true) == nil, "GCJ02 imports require resolution before Google navigation")
+        check(DiningExternalNavigation.url(provider: "tencent", place: known, driving: true) == nil, "Tencent cannot navigate with a missing application key")
+        var namedPlace = known; namedPlace.name = "面馆 & 茶#1"
+        let tencentURL = DiningExternalNavigation.url(provider: "tencent", place: namedPlace, driving: true, tencentKey: "test-application-key")!
+        let tencentQuery = URLComponents(url: tencentURL, resolvingAgainstBaseURL: false)!.queryItems!
+        check(tencentURL.scheme == "qqmap" && tencentURL.fragment == nil && tencentQuery.first(where: { $0.name == "to" })?.value == namedPlace.name, "Tencent name encoding cannot inject query fields")
+        check(tencentQuery.first(where: { $0.name == "fromcoord" })?.value == "CurrentLocation" && tencentQuery.first(where: { $0.name == "type" })?.value == "drive", "Tencent carries the current start and driving mode")
         print("PASS: check-in retries, legacy history, local archive, recommendations and failed-write preservation")
     }
 }

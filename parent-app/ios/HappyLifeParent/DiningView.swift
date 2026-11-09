@@ -396,7 +396,42 @@ import CryptoKit
         let minutes = ceil(seconds / 60).formatted()
         return driving ? diningText("预计开车约 \(minutes) 分钟") : diningText("预计步行约 \(minutes) 分钟")
     }
+    private func resolveImportedNavigation(_ place: DiningPlace) async throws -> DiningPlace {
+        let request = MKLocalSearch.Request(); request.naturalLanguageQuery = place.name + " " + place.address
+        request.resultTypes = .pointOfInterest
+        request.region = MKCoordinateRegion(center: CLLocationCoordinate2D(latitude: place.latitude, longitude: place.longitude), latitudinalMeters: 4000, longitudinalMeters: 4000)
+        let response = try await MKLocalSearch(request: request).start()
+        let candidates = response.mapItems.filter { item in
+            guard item.name?.compare(place.name, options: [.caseInsensitive, .widthInsensitive]) == .orderedSame else { return false }
+            return CLLocation(latitude: item.placemark.coordinate.latitude, longitude: item.placemark.coordinate.longitude).distance(from: CLLocation(latitude: place.latitude, longitude: place.longitude)) < 2000
+        }
+        guard candidates.count == 1 else { throw APIError.message("location") }
+        var resolved = place; resolved.latitude = candidates[0].placemark.coordinate.latitude; resolved.longitude = candidates[0].placemark.coordinate.longitude; resolved.provider = "mapkit"
+        return resolved
+    }
+
     func navigate(_ place: DiningPlace, driving: Bool = false, provider: String = "apple") {
+        if provider == "tencent" || provider == "google" {
+            if provider == "tencent", DiningExternalNavigation.tencentKey == nil {
+                message = diningText("腾讯地图导航尚未配置，请先选择其他地图。")
+                return
+            }
+            if provider == "google", place.provider == "amap" {
+                Task {
+                    do { navigate(try await resolveImportedNavigation(place), driving: driving, provider: provider) }
+                    catch { message = diningText("暂时无法确认这家店的导航位置，请选择其他地图。") }
+                }
+                return
+            }
+            guard let url = DiningExternalNavigation.url(provider: provider, place: place, driving: driving, tencentKey: DiningExternalNavigation.tencentKey), UIApplication.shared.canOpenURL(url) else {
+                message = diningText("请先安装或启用所选地图，也可以重新选择其他地图。")
+                return
+            }
+            UIApplication.shared.open(url, options: [:]) { [weak self] opened in
+                if !opened { Task { @MainActor in self?.message = diningText("无法打开所选地图，请重试或选择其他地图。") } }
+            }
+            return
+        }
         if provider != "apple" {
             // MapKit and manual locations are WGS84; explicitly declare GPS input.
             let gps = place.provider != "amap"
@@ -475,6 +510,7 @@ struct DiningView: View {
     @State private var showingCheckIn = false
     @State private var showingFilters = false
     @State private var spinning = false
+    @State private var navigationPlace: DiningPlace?
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     init(userID: String, family: FamilyStore) { _model = StateObject(wrappedValue: DiningStore(userID: userID, family: family)) }
     var body: some View {
@@ -550,7 +586,25 @@ struct DiningView: View {
                     await model.synchronize()
                 }
             }
-            .onDisappear { model.stop() }
+            .onDisappear { model.stop(); navigationPlace = nil }
+        }
+        .overlayPreferenceValue(DiningNavigationBounds.self) { anchor in
+            if let place = navigationPlace, let anchor {
+                GeometryReader { geometry in
+                    let bounds = geometry[anchor]
+                    ZStack {
+                        Color.black.opacity(0.16).ignoresSafeArea()
+                            .onTapGesture { navigationPlace = nil }
+                        DiningNavigationPicker(maximumHeight: max(70, geometry.size.height - 32)) { provider in
+                            navigationPlace = nil
+                            model.navigate(place, driving: model.trip.driving, provider: provider)
+                        }
+                        .frame(width: bounds.width)
+                        .position(x: bounds.midX, y: geometry.size.height / 2)
+                    }
+                }
+                .accessibilityAddTraits(.isModal)
+            }
         }
     }
     private func shortcut(_ title: String.LocalizationValue, icon: String, selection: DiningSelection, mood: DiningMood = .automatic) -> some View {
@@ -622,12 +676,13 @@ struct DiningView: View {
                 Text(model.confirmed ? diningText("已选好，走，干饭！") : diningText("就吃这家"))
                     .frame(maxWidth: .infinity)
             }.buttonStyle(.borderedProminent).controlSize(.large).tint(.orange).disabled(model.confirmed)
+                .anchorPreference(key: DiningNavigationBounds.self, value: .bounds) { $0 }
             HStack(spacing: 8) {
                 Button { Task { await model.decide() } } label: {
                     Label(diningText("换一家"), systemImage: "arrow.clockwise").frame(maxWidth: .infinity)
                 }
-                DiningNavigationPicker { provider in
-                    model.navigate(place, driving: model.trip.driving, provider: provider)
+                Button { navigationPlace = place } label: {
+                    Label(diningText("带我过去"), systemImage: "map").frame(maxWidth: .infinity)
                 }
             }.buttonStyle(.bordered).controlSize(.large)
         }.padding(18).frame(maxWidth: .infinity, alignment: .leading)
@@ -885,17 +940,20 @@ private struct DiningCheckInSheet: View {
 }
 
 
-// A native Menu does not honor per-row typography. Keep the existing trigger,
-// and use a compact popover so all provider names have an explicit 18 pt size.
+// The full-width restaurant action supplies the width and horizontal center.
+private struct DiningNavigationBounds: PreferenceKey {
+    static var defaultValue: Anchor<CGRect>? { nil }
+    static func reduce(value: inout Anchor<CGRect>?, nextValue: () -> Anchor<CGRect>?) {
+        value = nextValue() ?? value
+    }
+}
+
 private struct DiningNavigationPicker: View {
+    let maximumHeight: CGFloat
     let select: (String) -> Void
-    @State private var presented = false
 
     var body: some View {
-        Button { presented = true } label: {
-            Label(diningText("带我过去"), systemImage: "map").frame(maxWidth: .infinity)
-        }
-        .popover(isPresented: $presented, attachmentAnchor: .rect(.bounds), arrowEdge: .bottom) {
+        ScrollView {
             VStack(spacing: 0) {
                 Text(diningText("选择导航地图"))
                     .font(.system(size: 18, weight: .semibold))
@@ -907,23 +965,23 @@ private struct DiningNavigationPicker: View {
                 option("百度地图", detail: "打开百度地图规划路线", provider: "baidu", symbol: "mappin.and.ellipse", color: .red)
                 Divider().padding(.leading, 64)
                 option("苹果地图", detail: "使用系统地图规划路线", provider: "apple", symbol: "map.fill", color: .green)
+                Divider().padding(.leading, 64)
+                option("腾讯地图", detail: DiningExternalNavigation.tencentKey == nil ? "导航服务尚未配置" : "打开腾讯地图规划路线", provider: "tencent", symbol: "location.fill", color: .cyan)
+                Divider().padding(.leading, 64)
+                option("谷歌地图", detail: "打开谷歌地图规划路线", provider: "google", symbol: "globe", color: .orange)
             }
-            .frame(minWidth: 260, idealWidth: 304, maxWidth: 304)
-            .background(Color.white, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
-            .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
-            .shadow(color: .black.opacity(0.10), radius: 14, x: 0, y: 5)
-            .padding(8)
-            .presentationBackground(.clear)
-            .presentationCompactAdaptation(.popover)
+            .padding(.bottom, 8)
         }
+        .scrollBounceBehavior(.basedOnSize)
+        .frame(height: min(414, maximumHeight))
+        .background(Color.white, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .shadow(color: .black.opacity(0.10), radius: 14, x: 0, y: 5)
     }
 
     private func option(_ title: String.LocalizationValue, detail: String.LocalizationValue,
                         provider: String, symbol: String, color: Color) -> some View {
-        Button {
-            presented = false
-            select(provider)
-        } label: {
+        Button { select(provider) } label: {
             HStack(spacing: 12) {
                 Image(systemName: symbol)
                     .font(.system(size: 20, weight: .medium))

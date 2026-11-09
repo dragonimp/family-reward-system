@@ -3,7 +3,7 @@
 <plist version="1.0">
 <dict>
 	<key>LSApplicationQueriesSchemes</key>
-	<array><string>iosamap</string><string>baidumap</string></array>
+	<array><string>iosamap</string><string>baidumap</string><string>qqmap</string><string>comgooglemaps</string></array>
 	<key>NSMotionUsageDescription</key>
 	<string>在您开始运动后读取本机步数和估算距离，用于散步、慢跑等运动记录。</string>
 	<key>NSCameraUsageDescription</key>

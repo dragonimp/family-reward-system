@@ -264,3 +264,30 @@ struct DiningSyncState: Codable {
     var baseline: DiningArchive?
     var outbox: DiningSyncRequest?
 }
+
+
+// Tencent's current URI contract requires an application Key. This public URI
+// key may be injected at packaging time; never substitute a sample or fake key.
+enum DiningExternalNavigation {
+    static var tencentKey: String? {
+        guard let key = Bundle.main.object(forInfoDictionaryKey: "TencentMapsURIKey") as? String,
+              !key.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return nil }
+        return key
+    }
+    static func url(provider: String, place: DiningPlace, driving: Bool, tencentKey: String? = nil) -> URL? {
+        guard place.latitude.isFinite, place.longitude.isFinite, abs(place.latitude) <= 90, abs(place.longitude) <= 180 else { return nil }
+        var components = URLComponents()
+        if provider == "google" {
+            guard place.provider != "amap" else { return nil }
+            components.scheme = "comgooglemaps"; components.host = ""
+            components.queryItems = [URLQueryItem(name: "daddr", value: "\(place.latitude),\(place.longitude)"), URLQueryItem(name: "directionsmode", value: driving ? "driving" : "walking")]
+        } else if provider == "tencent" {
+            guard let key = tencentKey, !key.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return nil }
+            components.scheme = "qqmap"; components.host = "map"; components.path = "/routeplan"
+            components.queryItems = [URLQueryItem(name: "type", value: driving ? "drive" : "walk"), URLQueryItem(name: "fromcoord", value: "CurrentLocation"),
+                URLQueryItem(name: "to", value: place.name), URLQueryItem(name: "tocoord", value: "\(place.latitude),\(place.longitude)"),
+                URLQueryItem(name: "coord_type", value: place.provider == "amap" ? "2" : "1"), URLQueryItem(name: "referer", value: key)]
+        } else { return nil }
+        return components.url
+    }
+}

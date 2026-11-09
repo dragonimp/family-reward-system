@@ -351,6 +351,7 @@
 "创建族谱" = "Create family tree";
 "堂表亲" = "Cousins";
 "共享中" = "Sharing";
+"打开腾讯地图规划路线" = "Plan a route in Tencent Maps";
 "生成孩子授权码" = "Create child authorization code";
 "活动与分享" = "Activities and sharing";
 "删除这项分享？" = "Delete this share?";
@@ -621,6 +622,7 @@
 "健康授权未完成：%@" = "Health authorization failed: %@";
 "待家长确认" = "Awaiting parent confirmation";
 "发布日常" = "Post a moment";
+"打开谷歌地图规划路线" = "Plan a route in Google Maps";
 "原文件接收进度" = "Original file transfer progress";
 "活动成员" = "Activity members";
 "这家店在你的干饭记录里，熟悉的味道值得再试。" = "This restaurant is in your dining history. A familiar favorite is worth another visit.";
@@ -750,6 +752,7 @@
 "年和月" = "Year and month";
 "风景构图：参考三分线安排天空与地面，突出前景" = "Landscape: use the thirds grid to balance sky and ground and highlight the foreground.";
 "好友关系暂时无法读取：%@" = "Unable to load friendships: %@";
+"导航服务尚未配置" = "Navigation is not configured";
 "暂停" = "Pause";
 "显示方式" = "Display";
 "火锅" = "Hot pot";
@@ -815,6 +818,7 @@
 "共享手表照片" = "Share watch photos";
 "截止 %@ · %@" = "Due %@ · %@";
 "默认选择最近一次活动。完成后打开 Linko Moment，照片或视频会发布到该活动。" = "The most recent activity is selected by default. After finishing, open Linko Moment to publish the photos or videos to that activity.";
+"谷歌地图" = "Google Maps";
 "此空间由你管理，可收藏参加过的活动。" = "You manage this space and can save activities you have joined.";
 "创建空间" = "Create space";
 "续传原文件已发生变化。" = "The original file to resume has changed.";
@@ -913,6 +917,7 @@
 "家庭小会议" = "Family meeting";
 "照片超过 50 MB，请选择较小的照片。" = "This photo exceeds 50 MB. Choose a smaller photo.";
 "另一位成员" = "Another member";
+"腾讯地图" = "Tencent Maps";
 "请选择你所在的餐厅" = "Choose the restaurant you are at";
 "手表设备" = "Watch devices";
 "成员资料暂不可用。" = "Member information is temporarily unavailable.";
@@ -1141,6 +1146,7 @@
 "相册照片" = "Photo library photo";
 "%@ 测试邀请" = "%@ test invitation";
 "从 80 分开通" = "Activate with 80 points";
+"腾讯地图导航尚未配置，请先选择其他地图。" = "Tencent Maps navigation is not configured. Please choose another map.";
 "附近餐厅来自 Apple 地图，菜系及人均可由高德地图补充。搜索位置仅用于本次查询，记录、收藏与偏好按账号跨设备同步。" = "Nearby restaurants come from Apple Maps; cuisine and price may be supplemented by Amap. Your location is used for this search. Records, favorites and preferences sync across devices for your account.";
 "网格" = "Grid";
 "干饭同步回执无效。" = "Invalid dining synchronization response.";
@@ -1187,6 +1193,7 @@
 "祖辈" = "Grandparents";
 "发送" = "Send";
 "%@（当地时间）" = "%@ (local time)";
+"暂时无法确认这家店的导航位置，请选择其他地图。" = "Unable to confirm this restaurant location. Please choose another map.";
 "正在分享" = "Sharing";
 "步骤插画暂未提供" = "Step illustration unavailable";
 "日常已发布。" = "Moment posted.";

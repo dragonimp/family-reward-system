@@ -28,6 +28,11 @@ if flavor == 'legacy':
 for relative in ['parent-app/ios/HappyLifeParent/Info.plist', 'parent-app/ios/WatchInfo.plist']:
     path = source / relative
     info = plistlib.loads(path.read_bytes())
+    if relative.endswith('HappyLifeParent/Info.plist'):
+        # Public Tencent URI application key only; never a server/private key.
+        uri_key = os.environ.get('MOMENT_TENCENT_MAP_URI_KEY', '').strip()
+        if uri_key: info['TencentMapsURIKey'] = uri_key
+        else: info.pop('TencentMapsURIKey', None)
     if relative.endswith('HappyLifeParent/Info.plist') and flavor == 'legacy':
         for entry in info.get('CFBundleURLTypes', []):
             entry['CFBundleURLSchemes'] = ['linkomomentx' if scheme == 'linkomoment' else scheme for scheme in entry.get('CFBundleURLSchemes', [])]
