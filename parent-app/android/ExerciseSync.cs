@@ -22,7 +22,7 @@ public sealed partial class ExercisePanel
     private CancellationTokenSource? locationCancellation;
     private readonly Label altitudeLabel = MomentStyle.Caption("海拔待获取");
     private static readonly JsonSerializerOptions Wire = new(JsonSerializerDefaults.Web);
-    private bool OwnSession(long generation) => api.SessionVersion == generation && api.Profile?.Text("unifiedUserId") == userID;
+    private bool OwnSession(long generation) => api.SessionVersion == generation && DiningAccount.Identity(api.Profile?.Text("unifiedUserId") ?? "") == DiningAccount.Identity(userID);
     private object WireRecord(Workout item) => item.SourceRecord is { } source ? source : JsonSerializer.SerializeToElement(new {
         id = item.SyncId, kind = item.Kind, startedAt = item.StartedAt, endedAt = item.EndedAt,
         intervals = item.Intervals, activity = item.Activity, activityText = item.ActivityText, routeEnabled = item.Route.Count > 0, route = item.Route

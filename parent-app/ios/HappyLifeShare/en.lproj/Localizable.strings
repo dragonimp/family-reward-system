@@ -875,6 +875,7 @@
 "活动列表无效。" = "Invalid activity list.";
 "待确认" = "Awaiting confirmation";
 "过期时间" = "Expires";
+"苹果地图暂时无法确认这家店的位置，请选择高德或百度地图。" = "Apple Maps could not confirm this restaurant location. Choose Amap or Baidu Maps.";
 "我的群组" = "My groups";
 "运动" = "Exercise";
 "%.0f 千卡" = "%.0f kcal";
@@ -912,6 +913,7 @@
 "手表设备" = "Watch devices";
 "成员资料暂不可用。" = "Member information is temporarily unavailable.";
 "正在查找附近餐厅…" = "Finding nearby restaurants…";
+"干饭记录暂未同步；本机记录已保留，联网后自动重试。" = "Dining records have not synced yet. Local records are kept and will retry online.";
 "想一起做什么" = "What would you like to do together?";
 "日常已删除。" = "Moment deleted.";
 "搜索内容不能超过 80 字" = "Search text cannot exceed 80 characters";
@@ -1089,6 +1091,7 @@
 "查看" = "View";
 "%@%@%@" = "%@%@%@";
 "设为活动封面" = "Set as activity cover";
+"记录、收藏与偏好按账号跨设备同步；离线修改联网后自动合并。" = "Records, favorites and preferences sync across devices for your account. Offline changes merge when online.";
 "退出 Linko Moment？" = "Sign out of Linko Moment?";
 "进行中" = "In progress";
 "取消收藏" = "Remove from saved";
@@ -1134,7 +1137,9 @@
 "相册照片" = "Photo library photo";
 "%@ 测试邀请" = "%@ test invitation";
 "从 80 分开通" = "Activate with 80 points";
+"附近餐厅来自 Apple 地图，菜系及人均可由高德地图补充。搜索位置仅用于本次查询，记录、收藏与偏好按账号跨设备同步。" = "Nearby restaurants come from Apple Maps; cuisine and price may be supplemented by Amap. Your location is used for this search. Records, favorites and preferences sync across devices for your account.";
 "网格" = "Grid";
+"干饭同步回执无效。" = "Invalid dining synchronization response.";
 "隐私政策" = "Privacy policy";
 "生成新链接" = "Create a new link";
 "预计 %lld → %lld 分" = "Estimated %lld → %lld points";

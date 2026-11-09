@@ -214,7 +214,8 @@ internal sealed class MomentPhotoPage : ContentPage
         shareOriginal = MomentStyle.Action("分享原文件", () => _ = UseOriginalAsync(false));
         openOriginal = MomentStyle.Action("打开原文件", () => _ = OpenOriginalAsync());
         body.Add(fetchOriginal); body.Add(transferStatus);
-        body.Add(new HorizontalStackLayout { Spacing = 8, Children = { saveOriginal, shareOriginal, openOriginal } });
+        var originalActions = new Grid { ColumnDefinitions = new ColumnDefinitionCollection { new(GridLength.Star), new(GridLength.Star) }, ColumnSpacing = 8 };
+        originalActions.Add(saveOriginal); originalActions.Add(shareOriginal, 1, 0); body.Add(originalActions); body.Add(openOriginal);
         body.Add(MomentStyle.Title("照片点评", 20)); body.Add(MomentStyle.Action("发表点评", () => _ = PostAsync()));
         body.Add(error); body.Add(comments);
         body.Add(MomentStyle.Action("加载更多点评", () => _ = LoadCommentsAsync(false)));

@@ -124,8 +124,15 @@ import Foundation
         check(restored.history.first?.selectedAt == firstVisit.addingTimeInterval(86_400), "check-in time survives a UTC timestamp round trip")
         do { try archive.write(to: file.appendingPathComponent("invalid.json")); preconditionFailure("write must fail") } catch { }
         check(try Data(contentsOf: file) == bytes, "failed write preserves previous records")
+        let beforeMoreVisits = archive.history.count
         for _ in 0..<350 { archive.checkIn(known, mood: .automatic, id: UUID()) }
-        check(archive.history.count == 300 && archive.habits[known.id]?.checkIns == 350, "bounded history retains lifetime habit counts")
+        check(archive.history.count == beforeMoreVisits + 350 && archive.habits[known.id]?.checkIns == 350, "sync archive keeps older history while retaining lifetime habit counts")
+
+        let pending = DiningSyncState(archive: archive, baseline: nil, outbox: DiningSyncRequest(baseline: nil, archive: archive))
+        let encoder = JSONEncoder(); encoder.dateEncodingStrategy = .iso8601
+        let syncDecoder = JSONDecoder(); syncDecoder.dateDecodingStrategy = .iso8601
+        let restoredPending = try syncDecoder.decode(DiningSyncState.self, from: encoder.encode(pending))
+        assert(restoredPending.outbox?.operationId == pending.outbox?.operationId && restoredPending.archive.history.count == archive.history.count)
         print("PASS: check-in retries, legacy history, local archive, recommendations and failed-write preservation")
     }
 }

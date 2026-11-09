@@ -207,7 +207,7 @@ import HealthKit
         locationMessage = String(localized: "定位暂不可用，请检查系统定位权限。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))
     }
     func sync() async {
-        guard readable, let api, !userID.isEmpty, api.profile?.text("unifiedUserId") == userID else { return }
+        guard readable, let api, !userID.isEmpty, DiningAccount.identity(api.profile?.text("unifiedUserId") ?? "") == DiningAccount.identity(userID) else { return }
         if syncing { syncAgain = true; return }
         syncing = true; syncMessage = nil
         defer {
@@ -217,13 +217,13 @@ import HealthKit
         do {
             for id in archive.pendingDeletions ?? [] {
                 _ = try await api.call("/api/exercise/records/\(id.uuidString)", method: "DELETE")
-                guard api.profile?.text("unifiedUserId") == userID else { return }
+                guard DiningAccount.identity(api.profile?.text("unifiedUserId") ?? "") == DiningAccount.identity(userID) else { return }
                 archive.pendingDeletions?.removeAll { $0 == id }; save()
             }
             var remote: [UUID: Bool] = [:]; var cursor: String?
             repeat {
                 let page = try await api.call("/api/exercise/records" + (cursor.map { "?after=" + $0 } ?? "")) as? [String: Any] ?? [:]
-                guard api.profile?.text("unifiedUserId") == userID else { return }
+                guard DiningAccount.identity(api.profile?.text("unifiedUserId") ?? "") == DiningAccount.identity(userID) else { return }
                 for entry in page["records"] as? [[String: Any]] ?? [] {
                     if let raw = entry["id"] as? String, let id = UUID(uuidString: raw) { remote[id] = entry["deleted"] as? Bool ?? false }
                 }
@@ -241,23 +241,23 @@ import HealthKit
                 guard !(archive.pendingDeletions ?? []).contains(record.id) else { continue }
                 let body = try JSONSerialization.jsonObject(with: encoder.encode(record)) as! [String: Any]
                 _ = try await api.call("/api/exercise/records/\(record.id.uuidString)", method: "PUT", body: body)
-                guard api.profile?.text("unifiedUserId") == userID else { return }
+                guard DiningAccount.identity(api.profile?.text("unifiedUserId") ?? "") == DiningAccount.identity(userID) else { return }
                 if archive.history.contains(where: { $0.id == record.id }) { archive.uploaded = Array(Set((archive.uploaded ?? []) + [record.id])); save() }
             }
             for (id, deleted) in remote where !deleted && !archive.history.contains(where: { $0.id == id }) && !(archive.pendingDeletions ?? []).contains(id) {
                 let value = try await api.call("/api/exercise/records/\(id.uuidString)")
                 let record = try decoder.decode(ExerciseSession.self, from: JSONSerialization.data(withJSONObject: value))
-                guard api.profile?.text("unifiedUserId") == userID, record.id == id, record.endedAt != nil else { return }
+                guard DiningAccount.identity(api.profile?.text("unifiedUserId") ?? "") == DiningAccount.identity(userID), record.id == id, record.endedAt != nil else { return }
                 if !(archive.pendingDeletions ?? []).contains(id) && !archive.history.contains(where: { $0.id == id }) {
                     archive.history.append(record); archive.uploaded = Array(Set((archive.uploaded ?? []) + [id])); save()
                 }
             }
             var activityShareError: String?
             for record in archive.history where record.activity != nil && archive.activityShares?[record.id] == nil {
-                guard let linked = record.activity, !(archive.pendingDeletions ?? []).contains(record.id), api.profile?.text("unifiedUserId") == userID else { continue }
+                guard let linked = record.activity, !(archive.pendingDeletions ?? []).contains(record.id), DiningAccount.identity(api.profile?.text("unifiedUserId") ?? "") == DiningAccount.identity(userID) else { continue }
                 do {
                 let response = try await api.call("/api/dear/social/tenants/\(linked.tenantID.uuidString)/activities/\(linked.id.uuidString)/moments", method: "POST", body: ["text": record.activitySummary, "requestId": record.id.uuidString, "recordedAt": ISO8601DateFormatter().string(from: record.startedAt)]) as? [String: Any] ?? [:]
-                guard api.profile?.text("unifiedUserId") == userID else { return }
+                guard DiningAccount.identity(api.profile?.text("unifiedUserId") ?? "") == DiningAccount.identity(userID) else { return }
                 guard let raw = response["id"] as? String, let id = UUID(uuidString: raw) else { throw APIError.message(String(localized: "活动动态未返回有效记录标识。", bundle: AgentIdentityLanguage.appBundle())) }
                 if archive.activityShares == nil { archive.activityShares = [:] }; archive.activityShares?[record.id] = id; save()
                 NotificationCenter.default.post(name: .exerciseActivityPublished, object: nil)

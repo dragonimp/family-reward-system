@@ -24,6 +24,57 @@ import CryptoKit
     private var cachedDriving = false
     private let file: URL
     private let family: FamilyStore
+    private let accountID: String
+    private var syncState = DiningSyncState()
+    private var syncing = false
+    private var syncAgain = false
+    @Published var syncMessage: String?
+    private var syncFile: URL { file.appendingPathExtension("sync-v1") }
+    private func encoded<T: Encodable>(_ value: T) throws -> Data {
+        let encoder = JSONEncoder(); encoder.dateEncodingStrategy = .iso8601; encoder.outputFormatting = [.sortedKeys]
+        return try encoder.encode(value)
+    }
+    private func writeSync(_ value: DiningSyncState) throws {
+        try FileManager.default.createDirectory(at: syncFile.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try encoded(value).write(to: syncFile, options: [.atomic, .completeFileProtectionUntilFirstUserAuthentication])
+    }
+    private var ownsAccount: Bool { family.identity.isAuthenticated && DiningAccount.identity(family.identity.accountIdentifier ?? "") == accountID }
+    func synchronize() async {
+        guard readable, ownsAccount else { return }
+        if syncing { syncAgain = true; return }
+        syncing = true
+        defer { syncing = false }
+        do {
+            repeat {
+                syncAgain = false
+                let needsUpload: Bool
+                if let base = syncState.baseline { needsUpload = try encoded(base) != encoded(archive) } else { needsUpload = true }
+                if syncState.outbox == nil, needsUpload {
+                    syncState.archive = archive
+                    syncState.outbox = DiningSyncRequest(baseline: syncState.baseline, archive: archive)
+                    try writeSync(syncState)
+                }
+                let sent = syncState.outbox
+                let snapshot = archive
+                let response: Any
+                if let sent {
+                    try writeSync(syncState)
+                    let body = try JSONSerialization.jsonObject(with: encoded(sent)) as! [String: Any]
+                    response = try await family.call("/api/dining/account/sync", method: "POST", body: body)
+                } else { response = try await family.call("/api/dining/account") }
+                guard ownsAccount else { return }
+                try Task.checkCancellation()
+                guard let fields = response as? [String: Any], let raw = fields["archive"] as? [String: Any] else { throw APIError.message(String(localized: "干饭同步回执无效。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) }
+                let decoder = JSONDecoder(); decoder.dateDecodingStrategy = .iso8601
+                let remote = try decoder.decode(DiningArchive.self, from: JSONSerialization.data(withJSONObject: raw))
+                let unchanged = try encoded(sent?.archive ?? snapshot) == encoded(archive)
+                let next = DiningSyncState(archive: unchanged ? remote : archive, baseline: unchanged ? remote : (sent?.archive ?? syncState.baseline), outbox: nil)
+                try writeSync(next); syncState = next; archive = next.archive
+                syncMessage = nil; syncAgain = !unchanged
+            } while syncAgain && ownsAccount && !Task.isCancelled
+        } catch is CancellationError { }
+        catch { if ownsAccount { syncMessage = String(localized: "干饭记录暂未同步；本机记录已保留，联网后自动重试。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)) } }
+    }
     private var readable = true
     private let locator = CLLocationManager()
     private var waiting: CheckedContinuation<CLLocation, Error>?
@@ -43,20 +94,27 @@ import CryptoKit
 
     init(userID: String, family: FamilyStore) {
         self.family = family
+        self.accountID = DiningAccount.identity(userID)
         let key = SHA256.hash(data: Data(DiningAccount.identity(userID).utf8)).map { String(format: "%02x", $0) }.joined()
         file = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0].appendingPathComponent("Dining/\(key).json")
         super.init()
         locator.delegate = self; locator.desiredAccuracy = kCLLocationAccuracyHundredMeters
         guard !userID.isEmpty else { readable = false; message = String(localized: "用户身份尚未就绪，请重新登录后重试。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)); return }
         let decoder = JSONDecoder(); decoder.dateDecodingStrategy = .iso8601
-        do { archive = try decoder.decode(DiningArchive.self, from: Data(contentsOf: file)) }
+        do {
+            if FileManager.default.fileExists(atPath: syncFile.path) { syncState = try decoder.decode(DiningSyncState.self, from: Data(contentsOf: syncFile)); archive = syncState.archive }
+            else { archive = try decoder.decode(DiningArchive.self, from: Data(contentsOf: file)) }
+        }
         catch let error as NSError where error.domain == NSCocoaErrorDomain && error.code == NSFileReadNoSuchFileError { }
         catch { readable = false; message = String(localized: "干饭记录暂时无法读取，原记录已保留，请重试。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)) }
     }
     func update(_ transform: (inout DiningArchive) -> Void) -> Bool {
         guard readable else { message = String(localized: "干饭记录暂时无法读取，原记录已保留，请重试。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)); return false }
         var next = archive; transform(&next)
-        do { try next.write(to: file); archive = next; return true }
+        do {
+            var state = syncState; state.archive = next; try writeSync(state); syncState = state; archive = next
+            Task { await synchronize() }; return true
+        }
         catch { message = String(localized: "记录没有保存成功，请重试。原记录已保留。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)); return false }
     }
     func confirm(operation: UUID) {
@@ -364,6 +422,25 @@ import CryptoKit
             }
             return
         }
+        if place.provider == "amap" {
+            // Imported Android favorites use GCJ-02. Resolve them through MapKit
+            // by name/address rather than interpreting those values as GPS.
+            Task {
+                let request = MKLocalSearch.Request(); request.naturalLanguageQuery = place.name + " " + place.address
+                request.resultTypes = .pointOfInterest
+                request.region = MKCoordinateRegion(center: CLLocationCoordinate2D(latitude: place.latitude, longitude: place.longitude), latitudinalMeters: 4000, longitudinalMeters: 4000)
+                do {
+                    let response = try await MKLocalSearch(request: request).start()
+                    let candidates = response.mapItems.filter { item in
+                        guard item.name?.compare(place.name, options: [.caseInsensitive, .widthInsensitive]) == .orderedSame else { return false }
+                        return CLLocation(latitude: item.placemark.coordinate.latitude, longitude: item.placemark.coordinate.longitude).distance(from: CLLocation(latitude: place.latitude, longitude: place.longitude)) < 2000
+                    }
+                    guard candidates.count == 1 else { throw APIError.message("location") }
+                    candidates[0].openInMaps(launchOptions: [MKLaunchOptionsDirectionsModeKey: driving ? MKLaunchOptionsDirectionsModeDriving : MKLaunchOptionsDirectionsModeWalking])
+                } catch { message = String(localized: "苹果地图暂时无法确认这家店的位置，请选择高德或百度地图。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)) }
+            }
+            return
+        }
         let item = MKMapItem(placemark: MKPlacemark(coordinate: CLLocationCoordinate2D(latitude: place.latitude, longitude: place.longitude))); item.name = place.name
         item.openInMaps(launchOptions: [MKLaunchOptionsDirectionsModeKey: driving ? MKLaunchOptionsDirectionsModeDriving : MKLaunchOptionsDirectionsModeWalking])
     }
@@ -422,6 +499,7 @@ struct DiningView: View {
                             .disabled(model.busy || model.checkingIn)
                     }.font(.subheadline)
 
+                    if let syncMessage = model.syncMessage { Text(syncMessage).font(.caption).foregroundStyle(.secondary) }
                     if let place = model.result {
                         resultCard(place, operation: model.confirmationOperation)
                     } else {
@@ -446,7 +524,7 @@ struct DiningView: View {
                     }
                     if model.busy && model.result != nil { ProgressView(diningText("正在安排这顿饭…")).font(.footnote) }
                     if let message = model.message { Text(message).font(.subheadline).foregroundStyle(.secondary).accessibilityAddTraits(.updatesFrequently) }
-                    Text(String(localized: "附近餐厅来自 Apple 地图，菜系及人均可由高德地图补充。搜索位置仅用于本次查询，习惯与记录保存在当前账号的本机空间。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) .font(.caption).foregroundStyle(.secondary)
+                    Text(String(localized: "附近餐厅来自 Apple 地图，菜系及人均可由高德地图补充。搜索位置仅用于本次查询，记录、收藏与偏好按账号跨设备同步。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) .font(.caption).foregroundStyle(.secondary)
                 }.padding(20).frame(maxWidth: 760).frame(maxWidth: .infinity)
             }.background(Color(uiColor: .systemGroupedBackground)).navigationTitle(String(localized: "干饭", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))).navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -465,6 +543,13 @@ struct DiningView: View {
             .sheet(isPresented: $showingRecords) { records }
             .sheet(isPresented: $showingCircles) { circles }
             .onChange(of: model.busy) { _, busy in spinning = busy }
+            .task {
+                await model.synchronize()
+                while !Task.isCancelled {
+                    do { try await Task.sleep(for: .seconds(30)) } catch { break }
+                    await model.synchronize()
+                }
+            }
             .onDisappear { model.stop() }
         }
     }
@@ -656,7 +741,8 @@ struct DiningView: View {
                     }
                     if model.archive.history.isEmpty { Text(String(localized: "选好餐厅后，记录会保存在这里。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) }
                 }
-                Section { Text(String(localized: "记录与习惯仅保存在本机，切换账号相互隔离。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) .font(.caption).foregroundStyle(.secondary) }
+                if let syncMessage = model.syncMessage { Section { Text(syncMessage).font(.caption).foregroundStyle(.secondary) } }
+                Section { Text(String(localized: "记录、收藏与偏好按账号跨设备同步；离线修改联网后自动合并。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) .font(.caption).foregroundStyle(.secondary) }
                 if let message = model.message { Text(message).foregroundStyle(.secondary) }
             }.navigationTitle(String(localized: "干饭记录与收藏", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))).toolbar { ToolbarItem(placement: .topBarTrailing) { Button(String(localized: "完成", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) { showingRecords = false } } }
         }

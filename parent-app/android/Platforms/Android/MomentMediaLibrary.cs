@@ -19,7 +19,7 @@ internal static class MomentMediaLibrary
         var video = contentType.StartsWith("video/", StringComparison.Ordinal);
         var collection = video ? MediaStore.Video.Media.ExternalContentUri! : MediaStore.Images.Media.ExternalContentUri!;
         using var values = new ContentValues();
-        values.Put(MediaStore.IMediaColumns.DisplayName, Path.GetFileName(name));
+        values.Put(MediaStore.IMediaColumns.DisplayName, string.IsNullOrWhiteSpace(Path.GetFileName(name)) ? Path.GetFileName(file) : Path.GetFileName(name));
         values.Put(MediaStore.IMediaColumns.MimeType, contentType);
         values.Put(MediaStore.IMediaColumns.RelativePath, (video ? Android.OS.Environment.DirectoryMovies : Android.OS.Environment.DirectoryPictures) + "/Linko Moment");
         values.Put(MediaStore.IMediaColumns.IsPending, 1);

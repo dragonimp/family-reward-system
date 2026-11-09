@@ -3,5 +3,5 @@
   <ItemGroup>
     <Compile Include="../../FamilyReward.Api/DiningEndpoints.cs" Link="DiningEndpoints.cs" />
     <Compile Include="../../parent-app/android/DiningModels.cs" Link="DiningModels.cs" />
-  </ItemGroup>
+  <Compile Include="../../parent-app/android/DiningSyncState.cs" Link="DiningSyncState.cs" /></ItemGroup>
 </Project>

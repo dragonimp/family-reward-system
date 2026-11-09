@@ -120,6 +120,17 @@ try {
  Check((await client.PostAsync("/api/dining/nearby", body)).StatusCode == HttpStatusCode.BadGateway, "provider failure is honest, never a fake fallback");
  Console.WriteLine("PASS: dining recommendation, persistence, provider and authenticated HTTP checks");
 } finally { await app.StopAsync(); await app.DisposeAsync(); }
+var navPlace = manualPlace with { Name = "面馆 & 奶茶#1", Provider = "amap" };
+Check(LinkoFamily.DiningNavigation.Destination(navPlace, false, false).Query.Contains("dev=0") && LinkoFamily.DiningNavigation.Destination(navPlace, false, false).Query.Contains("t=2"), "AMap destinations preserve GCJ02 and walking mode");
+Check(LinkoFamily.DiningNavigation.Destination(navPlace, true, true).Query.Contains("coord_type=gcj02") && LinkoFamily.DiningNavigation.Destination(navPlace, true, true).Query.Contains("mode=driving"), "Baidu receives declared GCJ02 and driving mode");
+Check(LinkoFamily.DiningNavigation.Destination(manualPlace, true, false).Query.Contains("dev=1") && LinkoFamily.DiningNavigation.Destination(manualPlace, false, true).Query.Contains("coord_type=wgs84"), "manual GPS locations keep WGS84 when changing maps");
+Check(LinkoFamily.DiningNavigation.Destination(navPlace, false, true).Fragment.Length == 0 && LinkoFamily.DiningNavigation.Destination(navPlace, false, true).Query.Contains("%26"), "restaurant names cannot inject map query parameters");
+
+
+var pendingState = new LinkoFamily.DiningSyncState { Archive = manualArchive, Outbox = new LinkoFamily.DiningSyncRequest { Archive = manualArchive } };
+var durablePending = JsonSerializer.Deserialize<LinkoFamily.DiningSyncState>(JsonSerializer.Serialize(pendingState))!;
+Check(durablePending.Outbox!.OperationId == pendingState.Outbox.OperationId && durablePending.Outbox.Archive.History.Count == pendingState.Outbox.Archive.History.Count, "offline dining outbox preserves the original operation and snapshot across restart");
+
 sealed class TestIdentity(IOptionsMonitor<AuthenticationSchemeOptions> options, ILoggerFactory logger, UrlEncoder encoder) : AuthenticationHandler<AuthenticationSchemeOptions>(options, logger, encoder) {
  protected override Task<AuthenticateResult> HandleAuthenticateAsync() => Task.FromResult(Request.Headers.ContainsKey("X-Test-User") ? AuthenticateResult.Success(new AuthenticationTicket(new ClaimsPrincipal(new ClaimsIdentity([new Claim(ClaimTypes.NameIdentifier,"fixture-user")],"test")),"test")) : AuthenticateResult.NoResult());
 }

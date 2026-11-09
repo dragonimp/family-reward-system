@@ -194,7 +194,6 @@ struct DiningArchive: Codable {
         let type = String(restaurantType.trimmingCharacters(in: .whitespacesAndNewlines).prefix(40))
         history.insert(DiningChoice(id: id, place: place, mood: mood ?? .automatic, selectedAt: date,
                                     checkedIn: true, restaurantType: type.isEmpty ? nil : type), at: 0)
-        history = Array(history.prefix(300))
         var habit = habits[place.id, default: DiningHabit()]
         habit.checkIns = (habit.checkIns ?? 0) + 1
         habits[place.id] = habit
@@ -252,4 +251,16 @@ enum DiningAccount {
         if raw.count == 36, let id = UUID(uuidString: raw) { return id.uuidString.lowercased() }
         return raw
     }
+}
+
+
+struct DiningSyncRequest: Codable {
+    var operationId = UUID()
+    var baseline: DiningArchive?
+    var archive: DiningArchive
+}
+struct DiningSyncState: Codable {
+    var archive = DiningArchive()
+    var baseline: DiningArchive?
+    var outbox: DiningSyncRequest?
 }

@@ -53,7 +53,7 @@ public sealed class DiningArchive {
             Id = id, Place = place, Mood = mood ?? "automatic", SelectedAt = at?.ToUniversalTime() ?? DateTimeOffset.UtcNow,
             CheckedIn = true, RestaurantType = string.IsNullOrWhiteSpace(restaurantType) ? null : restaurantType.Trim()
         });
-        if (History.Count > 300) History.RemoveRange(300, History.Count - 300);
+
         var habit = Habit(place.Id);
         habit.CheckIns++;
     }
@@ -167,3 +167,20 @@ public static class DiningRecommendation {
 }
 
 public static class DiningAccount { public static string Identity(string raw) => Guid.TryParseExact(raw, "D", out var id) ? id.ToString("D") : raw; }
+
+internal static class DiningNavigation
+{
+    public static Uri Destination(DiningPlace place, bool driving, bool baidu)
+    {
+        if (!double.IsFinite(place.Latitude) || !double.IsFinite(place.Longitude) || Math.Abs(place.Latitude) > 90 || Math.Abs(place.Longitude) > 180)
+            throw new ArgumentException("餐厅位置无效。");
+        var lat = place.Latitude.ToString("F6", System.Globalization.CultureInfo.InvariantCulture);
+        var lon = place.Longitude.ToString("F6", System.Globalization.CultureInfo.InvariantCulture);
+        var name = Uri.EscapeDataString(place.Name);
+        // Search results are GCJ-02; manually recorded device positions are WGS84.
+        var gps = place.Provider != "amap";
+        return new Uri(baidu
+            ? $"baidumap://map/direction?destination=latlng:{lat},{lon}|name:{name}&coord_type={(gps ? "wgs84" : "gcj02")}&mode={(driving ? "driving" : "walking")}&src=android.net.impx.happylife"
+            : $"amapuri://route/plan/?sourceApplication=LinkoMoment&dlat={lat}&dlon={lon}&dname={name}&dev={(gps ? 1 : 0)}&t={(driving ? 0 : 2)}");
+    }
+}

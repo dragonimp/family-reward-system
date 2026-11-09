@@ -6255,6 +6255,31 @@
       "zh-Hans": "无法打开所选地图，请重试或选择其他地图。",
       "en": "Unable to open the selected map. Try again or choose another map.",
       "iosKey": "无法打开所选地图，请重试或选择其他地图。"
+    },
+    "moment.tb2f8d1a9d3dc": {
+      "zh-Hans": "干饭记录暂未同步；本机记录已保留，联网后自动重试。",
+      "en": "Dining records have not synced yet. Local records are kept and will retry online.",
+      "iosKey": "干饭记录暂未同步；本机记录已保留，联网后自动重试。"
+    },
+    "moment.te45d41f9c627": {
+      "zh-Hans": "干饭同步回执无效。",
+      "en": "Invalid dining synchronization response.",
+      "iosKey": "干饭同步回执无效。"
+    },
+    "moment.ta92e914b49a3": {
+      "zh-Hans": "苹果地图暂时无法确认这家店的位置，请选择高德或百度地图。",
+      "en": "Apple Maps could not confirm this restaurant location. Choose Amap or Baidu Maps.",
+      "iosKey": "苹果地图暂时无法确认这家店的位置，请选择高德或百度地图。"
+    },
+    "moment.te39a7a685346": {
+      "zh-Hans": "附近餐厅来自 Apple 地图，菜系及人均可由高德地图补充。搜索位置仅用于本次查询，记录、收藏与偏好按账号跨设备同步。",
+      "en": "Nearby restaurants come from Apple Maps; cuisine and price may be supplemented by Amap. Your location is used for this search. Records, favorites and preferences sync across devices for your account.",
+      "iosKey": "附近餐厅来自 Apple 地图，菜系及人均可由高德地图补充。搜索位置仅用于本次查询，记录、收藏与偏好按账号跨设备同步。"
+    },
+    "moment.tdc1f853c5578": {
+      "zh-Hans": "记录、收藏与偏好按账号跨设备同步；离线修改联网后自动合并。",
+      "en": "Records, favorites and preferences sync across devices for your account. Offline changes merge when online.",
+      "iosKey": "记录、收藏与偏好按账号跨设备同步；离线修改联网后自动合并。"
     }
   }
 }

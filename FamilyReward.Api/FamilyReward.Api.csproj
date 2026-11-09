@@ -47,4 +47,5 @@
   <ItemGroup>
     <Content Include="recipe-illustrations/**/*.jpg" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
   </ItemGroup>
+  <ItemGroup><Compile Include="../shared/DiningSyncMerge.cs" Link="DiningSyncMerge.cs" /></ItemGroup>
 </Project>

@@ -64,5 +64,5 @@ from pathlib import Path
 import sys,json,hashlib
 out,logs=map(Path,sys.argv[1:3]);m=(logs/'manifest.log').read_text();assert "name='net.impx.happylife'" in m and "versionName='1.0.23'" in m and "versionCode='32'" in m
 apk=out/'Moment-Android-1.0.23-32.apk';receipt={'sourceCommit':sys.argv[3],'version':'1.0.23','buildNumber':'32','sha256':hashlib.sha256(apk.read_bytes()).hexdigest(),'signatureVerified':True};(out/'build-receipt.json').write_text(json.dumps(receipt))
-(out/'bundle.json').write_text(json.dumps({'version':'1.0.23','activate':False,'sourceCommit':sys.argv[3],'releaseNotes':'活动首页与详情统一整页滚动；原文件改为原生接收、查看、保存和分享；干饭导航支持选择高德和百度地图。','artifacts':[{'path':'connect-native-receipt.json','platform':'sdk-metadata','architecture':'arm64'},{'path':apk.name,'platform':'android','architecture':'arm64'},{'path':'build-receipt.json','platform':'release-metadata','architecture':'arm64'}]},ensure_ascii=False))
+(out/'bundle.json').write_text(json.dumps({'version':'1.0.23','activate':False,'sourceCommit':sys.argv[3],'releaseNotes':'干饭记录、收藏和偏好按账号跨设备合并同步；活动首页整页滚动、原文件原生接收；干饭导航支持选择地图。','artifacts':[{'path':'connect-native-receipt.json','platform':'sdk-metadata','architecture':'arm64'},{'path':apk.name,'platform':'android','architecture':'arm64'},{'path':'build-receipt.json','platform':'release-metadata','architecture':'arm64'}]},ensure_ascii=False))
 PY

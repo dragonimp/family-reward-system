@@ -184,6 +184,12 @@ app.MapModulePreferences(connectionString, request =>
     var owner = FirstClaim(request, ClaimTypes.NameIdentifier, "sub", "user_id", "uid");
     return string.IsNullOrWhiteSpace(owner) ? null : Guid.TryParse(owner, out var id) ? id.ToString("D") : owner;
 });
+app.MapDiningAccounts(connectionString, request =>
+{
+    if (!AgentIdentityAuthorizationExtensions.IsUserIdentity(request.HttpContext.User)) return null;
+    var owner = FirstClaim(request, ClaimTypes.NameIdentifier, "sub", "user_id", "uid");
+    return string.IsNullOrWhiteSpace(owner) ? null : Guid.TryParse(owner, out var id) ? id.ToString("D") : owner;
+});
 app.MapPersonalKitchen(connectionString, request =>
 {
     if (!AgentIdentityAuthorizationExtensions.IsUserIdentity(request.HttpContext.User)) return null;

@@ -12,6 +12,55 @@ public sealed class DiningPanel : ContentView
     private readonly string file;
     private readonly ContentView modeHost = new();
     private DiningArchive archive = new();
+    private DiningSyncState syncState = new();
+    private readonly string syncFile, accountID;
+    private bool syncing, syncAgain;
+    private TaskCompletionSource? syncCompletion;
+    private event Action? Synced;
+    private string? syncMessage;
+    private CancellationTokenSource? syncCancellation;
+    private IDispatcherTimer? syncTimer;
+    private static readonly JsonSerializerOptions SyncJson = new(JsonSerializerDefaults.Web);
+    private static DiningArchive Copy(DiningArchive value) => JsonSerializer.Deserialize<DiningArchive>(JsonSerializer.Serialize(value, SyncJson), SyncJson)!;
+    private static bool Same(DiningArchive? left, DiningArchive right) => left != null && System.Text.Json.Nodes.JsonNode.DeepEquals(JsonSerializer.SerializeToNode(left, SyncJson), JsonSerializer.SerializeToNode(right, SyncJson));
+    private void WriteSync(DiningSyncState value)
+    {
+        File.WriteAllText(syncFile + ".tmp", JsonSerializer.Serialize(value, SyncJson));
+        File.Move(syncFile + ".tmp", syncFile, true);
+    }
+    private bool OwnAccount(long session) => store.SessionVersion == session && store.Authenticated && DiningAccount.Identity(store.AccountProfile?.Subject ?? store.Profile?.Text("unifiedUserId") ?? "") == accountID;
+    private async Task SyncAsync()
+    {
+        if (!readable) return;
+        if (syncing) { syncAgain = true; if (syncCompletion != null) await syncCompletion.Task; return; }
+        var session = store.SessionVersion; if (!OwnAccount(session)) return;
+        syncing = true; syncCompletion = new TaskCompletionSource(); using var cancellation = syncCancellation = new CancellationTokenSource();
+        try {
+            do {
+                syncAgain = false;
+                if (syncState.Outbox == null && !Same(syncState.Baseline, archive)) {
+                    syncState.Archive = archive;
+                    syncState.Outbox = new DiningSyncRequest { Baseline = syncState.Baseline == null ? null : Copy(syncState.Baseline), Archive = Copy(archive) };
+                    WriteSync(syncState); // Durable operation ID before any network mutation.
+                }
+                var sent = syncState.Outbox;
+                if (sent != null) WriteSync(syncState);
+                var snapshot = Copy(archive);
+                var response = sent == null ? await store.CallAsync("/api/dining/account", ct: cancellation.Token)
+                    : await store.CallAsync("/api/dining/account/sync", HttpMethod.Post, sent, cancellation.Token);
+                if (!OwnAccount(session) || cancellation.IsCancellationRequested) return;
+                var remote = response.GetProperty("archive").Deserialize<DiningArchive>(SyncJson) ?? throw new InvalidDataException();
+                if (remote.History == null || remote.Habits == null || remote.Favorites == null || remote.Circles == null || remote.ManualRestaurants == null) throw new InvalidDataException();
+                var unchanged = Same(sent?.Archive ?? snapshot, archive);
+                var next = new DiningSyncState { Archive = unchanged ? remote : archive,
+                    Baseline = unchanged ? Copy(remote) : sent?.Archive ?? syncState.Baseline };
+                WriteSync(next); syncState = next; archive = next.Archive;
+                syncAgain = !unchanged; syncMessage = null;
+            } while (syncAgain && OwnAccount(session) && !cancellation.IsCancellationRequested);
+        } catch (OperationCanceledException) { }
+        catch (Exception error) { if (OwnAccount(session)) syncMessage = error is FamilyApiException ? error.Message + " 本机记录已保留。" : "干饭记录暂未同步；本机记录已保留，联网后自动重试。"; }
+        finally { syncing = false; if (syncCancellation == cancellation) syncCancellation = null; syncCompletion?.TrySetResult(); if (OwnAccount(session)) { Render(); Synced?.Invoke(); } }
+    }
     private readonly JsonSerializerOptions json = new() { PropertyNameCaseInsensitive = true };
     private List<DiningPlace> candidates = [];
     private DiningPlace? result;
@@ -39,10 +88,15 @@ public sealed class DiningPanel : ContentView
     private static readonly (string Id, string Title)[] Moods = [("automatic", "🎲 随便安排"), ("familiar", "❤️ 还是老样子"), ("fresh", "✨ 来点新鲜的"), ("budget", "💰 今天省点钱"), ("treat", "😋 今天吃点好的"), ("spicy", "🌶️ 想吃点刺激的")];
     public DiningPanel(FamilyStore store, ContentPage owner, string userId)
     {
-        this.store = store; this.owner = owner;
+        this.store = store; this.owner = owner; accountID = DiningAccount.Identity(userId);
         file = Path.Combine(FileSystem.AppDataDirectory, "dining-" + Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(DiningAccount.Identity(userId)))) + ".json");
+        syncFile = file + ".sync-v1";
         if (userId.Length == 0) { readable = false; message = "用户身份尚未就绪，请重新登录后重试。"; }
-        else try { if (File.Exists(file)) {
+        else try { if (File.Exists(syncFile)) {
+            syncState = JsonSerializer.Deserialize<DiningSyncState>(File.ReadAllText(syncFile), SyncJson) ?? throw new InvalidDataException();
+            archive = syncState.Archive;
+            if (archive.History == null || archive.Habits == null || archive.Favorites == null || archive.Circles == null || archive.ManualRestaurants == null) throw new InvalidDataException();
+        } else if (File.Exists(file)) {
             var loaded = JsonSerializer.Deserialize<DiningArchive>(File.ReadAllText(file), json) ?? throw new InvalidDataException();
             if (loaded.History is null || loaded.Habits is null || loaded.Favorites is null || loaded.Circles is null || loaded.ManualRestaurants is null || loaded.History.Any(c => c.Place is null)) throw new InvalidDataException();
             archive = loaded;
@@ -58,22 +112,31 @@ public sealed class DiningPanel : ContentView
         var root = new Grid { RowDefinitions = new RowDefinitionCollection { new(GridLength.Auto), new(GridLength.Star) } };
         modeHost.Margin = new Thickness(16, 8); modeHost.Content = Modes(0); root.Add(modeHost); root.Add(viewport, 0, 1);
         Content = root;
+        Loaded += (_, _) => {
+            syncTimer ??= Dispatcher.CreateTimer(); syncTimer.Interval = TimeSpan.FromSeconds(30);
+            if (!syncTimer.IsRunning) { syncTimer.Tick -= SyncTick; syncTimer.Tick += SyncTick; syncTimer.Start(); }
+            _ = SyncAsync();
+        };
+        Unloaded += (_, _) => { syncTimer?.Stop(); syncCancellation?.Cancel(); };
         Render();
     }
-    public void Suspend() { ++generation; operation?.Cancel(); busy = false; checkingIn = false; Render(); }
+    private void SyncTick(object? sender, EventArgs e) => _ = SyncAsync();
+    public void Suspend() { syncTimer?.Stop(); syncCancellation?.Cancel(); ++generation; operation?.Cancel(); busy = false; checkingIn = false; Render(); }
     private bool Update(Action<DiningArchive> change)
     {
         if (!readable) { message = "干饭记录暂时无法读取，原记录已保留，请重试。"; return false; }
         try {
             var next = JsonSerializer.Deserialize<DiningArchive>(JsonSerializer.Serialize(archive), json)!;
             change(next);
-            File.WriteAllText(file + ".tmp", JsonSerializer.Serialize(next));
-            File.Move(file + ".tmp", file, true); archive = next; return true;
+            var nextState = new DiningSyncState { Archive = next, Baseline = syncState.Baseline, Outbox = syncState.Outbox };
+            WriteSync(nextState); syncState = nextState; archive = next;
+            _ = SyncAsync(); return true;
         } catch { message = "记录没有保存成功，请重试。原记录已保留。"; return false; }
     }
     private void Render()
     {
         body.Children.Clear();
+        if (syncMessage != null) body.Add(MomentStyle.Caption(syncMessage));
         var header = new Grid { ColumnDefinitions = new ColumnDefinitionCollection { new(44), new(GridLength.Star), new(44) } };
         var title = MomentStyle.Title("干饭", 19); title.HorizontalTextAlignment = TextAlignment.Center; title.VerticalTextAlignment = TextAlignment.Center; header.Add(title, 1);
         var menu = MomentStyle.IconButton("更多", "干饭菜单", () => _ = Menu()); menu.IsEnabled = !Working; header.Add(menu, 2); body.Add(header);
@@ -130,7 +193,7 @@ public sealed class DiningPanel : ContentView
             body.Add(MomentStyle.Card(card));
         }
         if (message is { Length: > 0 }) body.Add(new Label { Text = message, FontSize = 14, TextColor = Colors.DarkOrange });
-        body.Add(MomentStyle.Caption("附近餐厅来自高德地图。位置仅用于本次搜索，习惯与记录保存在当前账号的本机空间。价格、评分缺失时不作推测。"));
+        body.Add(MomentStyle.Caption("附近餐厅来自高德地图。位置仅用于本次搜索，记录、收藏与偏好按账号跨设备同步。价格、评分缺失时不作推测。"));
     }
     private static string MealTitle(DiningMealPeriod? meal) => meal switch
     {
@@ -392,13 +455,7 @@ public sealed class DiningPanel : ContentView
     {
         var choice = await owner.DisplayActionSheetAsync("选择地图", "取消", null, "高德地图", "百度地图");
         if (choice is not ("高德地图" or "百度地图")) return;
-        var lat = place.Latitude.ToString("F6", System.Globalization.CultureInfo.InvariantCulture);
-        var lon = place.Longitude.ToString("F6", System.Globalization.CultureInfo.InvariantCulture);
-        var name = Uri.EscapeDataString(place.Name);
-        // Restaurant discovery returns GCJ-02. Both schemes declare that contract.
-        var url = choice == "高德地图"
-            ? $"amapuri://route/plan/?sourceApplication=LinkoMoment&dlat={lat}&dlon={lon}&dname={name}&dev=0&t={(driving ? 0 : 2)}"
-            : $"baidumap://map/direction?destination=latlng:{lat},{lon}|name:{name}&coord_type=gcj02&mode={(driving ? "driving" : "walking")}&src=android.net.impx.happylife";
+        var url = DiningNavigation.Destination(place, driving, choice == "百度地图");
         try
         {
             if (await Launcher.Default.CanOpenAsync(url) && await Launcher.Default.OpenAsync(url)) return;
@@ -437,7 +494,7 @@ public sealed class DiningPanel : ContentView
         var rows = new VerticalStackLayout { Spacing = 16, Padding = 20 };
         var page = new ContentPage { Title = "干饭记录与收藏", SafeAreaEdges = SafeAreaEdges.All, BackgroundColor = MomentStyle.Background, Content = new ScrollView { Content = rows } };
         void Fill() {
-            rows.Children.Clear(); rows.Add(MomentStyle.Caption("记录与习惯仅保存在本机，切换账号相互隔离。")); rows.Add(MomentStyle.Title("我的收藏", 22));
+            rows.Children.Clear(); if (syncMessage != null) rows.Add(MomentStyle.Caption(syncMessage)); rows.Add(MomentStyle.Caption("记录、收藏与偏好按账号跨设备同步；离线修改联网后自动合并。")); rows.Add(MomentStyle.Title("我的收藏", 22));
             foreach (var place in archive.Favorites) rows.Add(MomentStyle.Card(MomentStyle.Row(place.Name, "导航", () => _ = Navigate(place))));
             if (archive.Favorites.Count == 0) rows.Add(MomentStyle.Caption("还没有收藏餐厅。"));
             rows.Add(MomentStyle.Title("干饭记录 · 当地时间", 22));
@@ -456,6 +513,9 @@ public sealed class DiningPanel : ContentView
             if (archive.History.Count == 0) rows.Add(MomentStyle.Caption("选好餐厅后，记录会保存在这里。"));
             if (message is not null) rows.Add(MomentStyle.Caption(message));
         }
+        void RefreshRecords() => Fill();
+        page.Appearing += (_, _) => { Synced -= RefreshRecords; Synced += RefreshRecords; _ = SyncAsync(); };
+        page.Disappearing += (_, _) => Synced -= RefreshRecords;
         Fill(); await owner.Navigation.PushAsync(page);
     }
     private async Task Circles()
