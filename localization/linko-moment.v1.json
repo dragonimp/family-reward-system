@@ -1,6 +1,41 @@
 {
   "catalogVersion": 1,
   "messages": {
+    "moment.td91e010455ef": {
+      "zh-Hans": "点个外卖",
+      "en": "Order delivery",
+      "iosKey": "点个外卖"
+    },
+    "moment.t427b8695b68e": {
+      "zh-Hans": "复制店名并打开美团外卖",
+      "en": "Copy name and open Meituan",
+      "iosKey": "复制店名并打开美团外卖"
+    },
+    "moment.t3135dc08ce15": {
+      "zh-Hans": "请粘贴店名搜索，并按地址核对分店。是否配送以美团显示为准。",
+      "en": "Paste the restaurant name to search, then check the branch address. See Meituan for delivery availability.",
+      "iosKey": "请粘贴店名搜索，并按地址核对分店。是否配送以美团显示为准。"
+    },
+    "moment.t2a6414e9d3bb": {
+      "zh-Hans": "无法打开美团外卖",
+      "en": "Could not open Meituan Delivery",
+      "iosKey": "无法打开美团外卖"
+    },
+    "moment.t803b41913a81": {
+      "zh-Hans": "打开 App Store",
+      "en": "Open App Store",
+      "iosKey": "打开 App Store"
+    },
+    "moment.tc918e79ce82a": {
+      "zh-Hans": "打开美团外卖网页",
+      "en": "Open Meituan Delivery website",
+      "iosKey": "打开美团外卖网页"
+    },
+    "moment.t2bbe41b3c6ba": {
+      "zh-Hans": "请确认已安装美团外卖。店名已复制，可粘贴搜索。",
+      "en": "Check that Meituan Delivery is installed. The restaurant name was copied for you to paste into search.",
+      "iosKey": "请确认已安装美团外卖。店名已复制，可粘贴搜索。"
+    },
     "moment.t5a3f06390303": {
       "zh-Hans": " · 已包含",
       "en": " · Included",

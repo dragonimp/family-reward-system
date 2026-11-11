@@ -189,13 +189,61 @@ public sealed class DiningPanel : ContentView
             confirm.IsEnabled = !confirmed && !Working;
             card.Add(confirm);
             var another = MomentStyle.Action("换一家", () => _ = Decide()); another.IsEnabled = !Working; card.Add(another);
-            card.Add(MomentStyle.Action("带我过去", () => _ = Navigate(place, trip.Driving())));
+            var travelActions = new Grid { ColumnSpacing = 8 };
+            travelActions.ColumnDefinitions.Add(new ColumnDefinition(GridLength.Star));
+            travelActions.ColumnDefinitions.Add(new ColumnDefinition(GridLength.Star));
+            travelActions.Add(MomentStyle.Action("带我过去", () => _ = Navigate(place, trip.Driving())), 0, 0);
+            travelActions.Add(MomentStyle.Action("点个外卖", () => _ = OrderDelivery(place)), 1, 0);
+            card.Add(travelActions);
             card.Add(MomentStyle.Action(archive.Favorites.Any(p => p.Id == place.Id) ? "♥ 已收藏" : "♡ 收藏餐厅", () => { Update(a => { if (a.Favorites.Any(p => p.Id == place.Id)) a.Favorites.RemoveAll(p => p.Id == place.Id); else a.Favorites.Add(place); }); Render(); }));
             body.Add(MomentStyle.Card(card));
         }
         if (message is { Length: > 0 }) body.Add(new Label { Text = message, FontSize = 14, TextColor = Colors.DarkOrange });
         body.Add(MomentStyle.Caption("附近餐厅来自高德地图。位置仅用于本次搜索，记录、收藏与偏好按账号跨设备同步。价格、评分缺失时不作推测。"));
     }
+    private async Task OrderDelivery(DiningPlace place)
+    {
+        if (place.GetVerifiedMeituanShopUrl() is { } shop && TryOpenMeituan(shop)) return;
+        var details = string.Join("\n", new[] { place.Name, place.Address,
+            "请粘贴店名搜索，并按地址核对分店。是否配送以美团显示为准。" }.Where(text => !string.IsNullOrWhiteSpace(text)));
+        if (!await owner.DisplayAlertAsync("点个外卖", details, "复制店名并打开美团外卖", "取消")) return;
+
+        await Clipboard.Default.SetTextAsync(place.Name);
+        if (TryOpenMeituan()) return;
+        const string download = "前往官方下载";
+        const string web = "打开美团外卖网页";
+        var choice = await owner.DisplayActionSheetAsync("无法打开美团外卖，店名已复制", "取消", null, download, web);
+        if (choice == download)
+            await AgentIdentity.Maui.InAppWebLinks.OpenAsync(new Uri("https://waimai.meituan.com/mobile/download"));
+        else if (choice == web)
+            await AgentIdentity.Maui.InAppWebLinks.OpenAsync(new Uri("https://i.waimai.meituan.com/waimai/"));
+    }
+
+    private static bool TryOpenMeituan(Uri? shop = null)
+    {
+#if ANDROID
+        var activity = Microsoft.Maui.ApplicationModel.Platform.CurrentActivity;
+        if (activity?.PackageManager is not { } packageManager) return false;
+        string[] packages = ["com.sankuai.meituan.takeoutnew", "com.sankuai.meituan"];
+        foreach (var package in packages)
+        {
+            try
+            {
+                var intent = shop is null
+                    ? packageManager.GetLaunchIntentForPackage(package)
+                    : new Android.Content.Intent(Android.Content.Intent.ActionView, Android.Net.Uri.Parse(shop.AbsoluteUri))
+                        .SetPackage(package);
+                if (intent?.ResolveActivity(packageManager) is null) continue;
+                activity.StartActivity(intent);
+                return true;
+            }
+            catch (Android.Content.ActivityNotFoundException) { }
+            catch (Java.Lang.SecurityException) { }
+        }
+#endif
+        return false;
+    }
+
     private static string MealTitle(DiningMealPeriod? meal) => meal switch
     {
         DiningMealPeriod.Breakfast => "早餐推荐",

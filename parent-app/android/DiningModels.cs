@@ -2,7 +2,24 @@ using System.Text.Json.Serialization;
 
 namespace LinkoFamily;
 
-public sealed record DiningPlace(string Id, string Name, string Address, double Latitude, double Longitude, string Category, string Provider, double? Cost, double? Rating, double DistanceMeters);
+public sealed record DiningPlace(string Id, string Name, string Address, double Latitude, double Longitude, string Category, string Provider, double? Cost, double? Rating, double DistanceMeters)
+{
+    public string? MeituanWaimaiShopId { get; init; }
+    public string? MeituanWaimaiUrl { get; init; }
+    public string? MeituanMatchStatus { get; init; }
+    public string? MeituanLastVerifiedAt { get; init; }
+
+    public Uri? GetVerifiedMeituanShopUrl()
+    {
+        if (MeituanMatchStatus != "matched" || string.IsNullOrWhiteSpace(MeituanLastVerifiedAt) ||
+            !Uri.TryCreate(MeituanWaimaiUrl, UriKind.Absolute, out var url) ||
+            url.Scheme != Uri.UriSchemeHttps || !url.IsDefaultPort || url.UserInfo.Length != 0 ||
+            url.Host is not ("i.waimai.meituan.com" or "i.meituan.com") ||
+            !url.AbsolutePath.StartsWith("/waimai/", StringComparison.Ordinal) || url.AbsolutePath.Length <= "/waimai/".Length)
+            return null;
+        return url;
+    }
+}
 public sealed class DiningHabit
 {
     public int Selected { get; set; }

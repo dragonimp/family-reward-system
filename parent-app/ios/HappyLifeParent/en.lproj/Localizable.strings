@@ -374,9 +374,11 @@
 "亲子互动" = "Parent–child connection";
 "暂无好友" = "No friends yet";
 "孩子从手表提交的奖励申请会显示在这里。" = "Reward requests submitted by the child’s watch appear here.";
+"无法打开美团外卖" = "Could not open Meituan Delivery";
 "照片预览不可用，请在 iPhone 上查看。" = "The photo preview is unavailable. View it on your iPhone.";
 "加入 %@" = "Join %@";
 "本周试行：%@" = "Trial plan this week: %@";
+"请确认已安装美团外卖。店名已复制，可粘贴搜索。" = "Check that Meituan Delivery is installed. The restaurant name was copied for you to paste into search.";
 "支系（可选）" = "Branch (optional)";
 "操作失败，请稍后重试。" = "Operation failed. Try again later.";
 "虚报完成" = "Falsely reported completion";
@@ -397,6 +399,7 @@
 "活动名称" = "Activity name";
 "账号" = "Account";
 "创建族谱" = "Create family tree";
+"请粘贴店名搜索，并按地址核对分店。是否配送以美团显示为准。" = "Paste the restaurant name to search, then check the branch address. See Meituan for delivery availability.";
 "堂表亲" = "Cousins";
 "共享中" = "Sharing";
 "打开腾讯地图规划路线" = "Plan a route in Tencent Maps";
@@ -475,6 +478,7 @@
 " 件" = " items";
 "地图分类显示，这家店属于%@。" = "Map listing: %@.";
 "说明" = "Description";
+"复制店名并打开美团外卖" = "Copy name and open Meituan";
 "菜谱暂时无法加载，请重试。" = "Recipes could not be loaded. Try again.";
 "运动记录 · 当地时间" = "Exercise records · Local time";
 "我的反馈" = "My feedback";
@@ -754,6 +758,7 @@
 "群组名称" = "Group name";
 "刷新气温" = "Refresh temperature";
 "健康与手表" = "Health and Watch";
+"打开 App Store" = "Open App Store";
 "仅向你要绑定的孩子提供此授权码。" = "Give this authorization code only to the child you intend to link.";
 "海拔 %.1f–%.1f 米" = "Elevation %.1f–%.1f m";
 "登录并生成邀请" = "Sign in and create invitation";
@@ -1058,6 +1063,7 @@
 "邀请码" = "Invitation code";
 "栏目" = "Category";
 "运动已同步，活动动态待重试：%@" = "Workout synced. Activity feed will retry: %@";
+"打开美团外卖网页" = "Open Meituan Delivery website";
 "心愿提案 · %lld" = "Wish proposals · %lld";
 "移出后，对方将无法查看这场活动的新内容；已有邀请链接仍可再次用于加入。" = "This person will no longer see new activity content. Existing invitation links can still be used to rejoin.";
 "标准版 · 基础功能已包含" = "Standard · Basic features included";
@@ -1127,6 +1133,7 @@
 "本地部分文件与分享源不一致，再次获取将从头开始。" = "The local partial file differs from the shared source. Fetching it again will restart the download.";
 "原图留在此 iPhone；对方获取原图时，请保持 Linko Moment 打开。" = "Originals stay on this iPhone. Keep Linko Moment open while others download them.";
 "奖励与行为规则" = "Rewards and behavior rules";
+"点个外卖" = "Order delivery";
 "就吃这家" = "Choose this place";
 " 可重试同一笔记录，或关闭后在记录页核对。" = " You can retry this same record or close and check it on the records page.";
 "先邀请对方加入本空间的活动，再从活动访客设为空间成员。空间成员可查看本空间的所有原生活动；收藏活动仍遵循原活动权限。" = "Invite the person to an activity in this space first, then promote them from activity guest to space member. Space members can view all original activities in this space. Saved activities still follow the original activity’s permissions.";

@@ -11,6 +11,19 @@ struct DiningPlace: Codable, Identifiable, Equatable {
     var cost: Double?
     var rating: Double?
     var distanceMeters: Double
+    var meituanWaimaiShopId: String? = nil
+    var meituanWaimaiUrl: String? = nil
+    var meituanMatchStatus: String? = nil
+    var meituanLastVerifiedAt: String? = nil
+
+    var verifiedMeituanShopURL: URL? {
+        guard meituanMatchStatus == "matched", meituanLastVerifiedAt?.isEmpty == false,
+              let raw = meituanWaimaiUrl, let url = URL(string: raw), url.scheme == "https",
+              let host = url.host, ["i.waimai.meituan.com", "i.meituan.com"].contains(host),
+              url.user == nil, url.password == nil, url.port == nil,
+              url.path.hasPrefix("/waimai/"), url.path.count > "/waimai/".count else { return nil }
+        return url
+    }
 }
 // Match details across providers without passing GCJ-02 coordinates to Apple Maps.
 struct DiningMapDetails: Decodable {

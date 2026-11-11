@@ -5,7 +5,7 @@
 	<uses-permission android:name="android.permission.INTERNET" />
 	<uses-permission android:name="android.permission.CAMERA" />
 	<uses-feature android:name="android.hardware.camera" android:required="false" />
-	<queries><package android:name="com.autonavi.minimap" /><package android:name="com.tencent.map" /><package android:name="com.baidu.BaiduMap" /><intent><action android:name="android.media.action.IMAGE_CAPTURE" /></intent></queries>
+	<queries><package android:name="com.sankuai.meituan.takeoutnew" /><package android:name="com.sankuai.meituan" /><package android:name="com.autonavi.minimap" /><package android:name="com.tencent.map" /><package android:name="com.baidu.BaiduMap" /><intent><action android:name="android.media.action.IMAGE_CAPTURE" /></intent></queries>
 	<uses-permission android:name="android.permission.ACTIVITY_RECOGNITION" />
 	<uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
 	<uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />

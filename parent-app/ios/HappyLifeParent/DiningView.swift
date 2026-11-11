@@ -511,6 +511,9 @@ struct DiningView: View {
     @State private var showingFilters = false
     @State private var spinning = false
     @State private var navigationPlace: DiningPlace?
+    @State private var deliveryFallback: DiningPlace?
+    @State private var deliveryUnavailable = false
+    @Environment(\.openURL) private var openWebURL
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     init(userID: String, family: FamilyStore) { _model = StateObject(wrappedValue: DiningStore(userID: userID, family: family)) }
     var body: some View {
@@ -588,6 +591,33 @@ struct DiningView: View {
             }
             .onDisappear { model.stop(); navigationPlace = nil }
         }
+        .confirmationDialog(diningText("点个外卖"), isPresented: Binding(
+            get: { deliveryFallback != nil },
+            set: { if !$0 { deliveryFallback = nil } }
+        ), titleVisibility: .visible, presenting: deliveryFallback) { place in
+            Button(diningText("复制店名并打开美团外卖")) {
+                UIPasteboard.general.string = place.name
+                Task {
+                    let home = URL(string: "https://i.waimai.meituan.com/waimai/")!
+                    if !(await openDeliveryApp(home)) { deliveryUnavailable = true }
+                }
+            }
+            Button(diningText("取消"), role: .cancel) {}
+        } message: { place in
+            Text([place.name, place.address, diningText("请粘贴店名搜索，并按地址核对分店。是否配送以美团显示为准。")]
+                .filter { !$0.isEmpty }.joined(separator: "\n"))
+        }
+        .alert(diningText("无法打开美团外卖"), isPresented: $deliveryUnavailable) {
+            Button(diningText("打开 App Store")) {
+                UIApplication.shared.open(URL(string: "itms-apps://apps.apple.com/cn/app/id737310995")!)
+            }
+            Button(diningText("打开美团外卖网页")) {
+                openWebURL(URL(string: "https://i.waimai.meituan.com/waimai/")!)
+            }
+            Button(diningText("取消"), role: .cancel) {}
+        } message: {
+            Text(diningText("请确认已安装美团外卖。店名已复制，可粘贴搜索。"))
+        }
         .overlayPreferenceValue(DiningNavigationBounds.self) { anchor in
             if let place = navigationPlace, let anchor {
                 GeometryReader { geometry in
@@ -608,6 +638,15 @@ struct DiningView: View {
             }
         }
     }
+    private func openDeliveryApp(_ url: URL) async -> Bool {
+        await UIApplication.shared.open(url, options: [.universalLinksOnly: true])
+    }
+
+    private func orderDelivery(_ place: DiningPlace) async {
+        if let url = place.verifiedMeituanShopURL, await openDeliveryApp(url) { return }
+        deliveryFallback = place
+    }
+
     private func shortcut(_ title: String.LocalizationValue, icon: String, selection: DiningSelection, mood: DiningMood = .automatic) -> some View {
         let selected = model.selection == selection && (selection != .recommended || (model.mood == .familiar) == (mood == .familiar))
         return Button {
@@ -685,7 +724,11 @@ struct DiningView: View {
                 Button { navigationPlace = place } label: {
                     Label(diningText("带我过去"), systemImage: "map").frame(maxWidth: .infinity)
                 }
+                Button { Task { await orderDelivery(place) } } label: {
+                    Text(diningText("点个外卖")).frame(maxWidth: .infinity)
+                }
             }.buttonStyle(.bordered).controlSize(.large)
+                .lineLimit(1).minimumScaleFactor(0.75)
         }.padding(18).frame(maxWidth: .infinity, alignment: .leading)
             .background(.background, in: RoundedRectangle(cornerRadius: 24))
             .disabled(model.busy)
