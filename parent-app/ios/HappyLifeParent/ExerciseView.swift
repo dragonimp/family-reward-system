@@ -390,7 +390,14 @@ struct ExerciseView: View {
                             exercise.start(kind: kind, map: mapMode, activity: activity)
                             if exercise.active != nil { activity = nil; family.watchExerciseActivity = nil }
                         } label: {
-                            Label(String(localized: "开始\(exerciseKindTitle(kind))", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), systemImage: "play.fill").frame(maxWidth: .infinity).padding(.vertical, 8)
+                            HStack(spacing: 8) {
+                                Image(systemName: "play.fill").accessibilityHidden(true)
+                                Text(String(localized: "开始\(exerciseKindTitle(kind))", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)))
+                                    .multilineTextAlignment(.center)
+                                Image(systemName: "play.fill").hidden().accessibilityHidden(true)
+                            }
+                            .frame(maxWidth: .infinity, alignment: .center)
+                            .padding(.vertical, 8)
                         }.buttonStyle(.borderedProminent)
                     }
                     Text(String(localized: "距离由系统计步估算。地图模式使用 GPS 记录轨迹，暂停时停止定位。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)))
