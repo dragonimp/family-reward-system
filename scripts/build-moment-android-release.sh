@@ -13,6 +13,14 @@ signing="$HOME/.local/share/android-signing/linko-dear"
 commit="$(git -C "$root" rev-parse HEAD)"
 git -C "$root" fetch -q origin main
 git -C "$root" merge-base --is-ancestor "$commit" origin/main
+read -r release_version release_build < <(python3 - "$root/parent-app/android/LinkoFamily.csproj" <<'VERSION'
+import re,sys,xml.etree.ElementTree as ET
+root=ET.parse(sys.argv[1]).getroot()
+v=root.findtext('.//ApplicationDisplayVersion');b=root.findtext('.//ApplicationVersion')
+assert re.fullmatch(r'[0-9]+(?:\.[0-9]+){1,2}',v or '') and re.fullmatch(r'[1-9][0-9]*',b or '')
+print(v,b)
+VERSION
+)
 source="$ATLAS_BUILD_WORK/android-source"
 mkdir -p "$source"
 git -C "$root" archive "$commit" | tar -x -C "$source"
@@ -55,16 +63,16 @@ dotnet publish "$source/parent-app/android/LinkoFamily.csproj" -f net10.0-androi
  -p:AndroidKeyStore=false \
  -o "$ATLAS_BUILD_WORK/publish" > "$ATLAS_BUILD_LOGS/android.log" 2>&1 || { tail -35 "$ATLAS_BUILD_LOGS/android.log"; exit 1; }
 apk="$(find "$ATLAS_BUILD_WORK/publish" -name '*-Signed.apk' -print -quit)"; [[ -n "$apk" ]]
-"$ANDROID_HOME/build-tools/36.0.0/apksigner" sign --ks "$signing/linko-dear-android-release.jks" --ks-key-alias linko-dear-parent --ks-pass "file:$signing/key-password"  --out "$ATLAS_BUILD_OUTPUT/Moment-Android-1.0.25-34.apk" "$apk"
-apk="$ATLAS_BUILD_OUTPUT/Moment-Android-1.0.25-34.apk"
+"$ANDROID_HOME/build-tools/36.0.0/apksigner" sign --ks "$signing/linko-dear-android-release.jks" --ks-key-alias linko-dear-parent --ks-pass "file:$signing/key-password"  --out "$ATLAS_BUILD_OUTPUT/Moment-Android-${release_version}-${release_build}.apk" "$apk"
+apk="$ATLAS_BUILD_OUTPUT/Moment-Android-${release_version}-${release_build}.apk"
 "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --verbose --print-certs "$apk" > "$ATLAS_BUILD_LOGS/signature.log"
 rg -qi '4596cdb1ea8a5eea1a2567c6800d2bf4f90f051198a5518beb13abb7ac359c83' "$ATLAS_BUILD_LOGS/signature.log"
 rg -q 'Verified using v2 scheme.*true' "$ATLAS_BUILD_LOGS/signature.log"
 "$ANDROID_HOME/build-tools/36.0.0/aapt2" dump badging "$apk" > "$ATLAS_BUILD_LOGS/manifest.log"
-python3 - "$ATLAS_BUILD_OUTPUT" "$ATLAS_BUILD_LOGS" "$commit" <<'PY'
+python3 - "$ATLAS_BUILD_OUTPUT" "$ATLAS_BUILD_LOGS" "$commit" "$release_version" "$release_build" <<'PY'
 from pathlib import Path
 import sys,json,hashlib
-out,logs=map(Path,sys.argv[1:3]);m=(logs/'manifest.log').read_text();assert "name='net.impx.happylife'" in m and "versionName='1.0.25'" in m and "versionCode='34'" in m
-apk=out/'Moment-Android-1.0.25-34.apk';receipt={'sourceCommit':sys.argv[3],'version':'1.0.25','buildNumber':'34','sha256':hashlib.sha256(apk.read_bytes()).hexdigest(),'signatureVerified':True};(out/'build-receipt.json').write_text(json.dumps(receipt))
-(out/'bundle.json').write_text(json.dumps({'version':'1.0.25','activate':False,'sourceCommit':sys.argv[3],'releaseNotes':'干饭带我过去新增高德及腾讯外部导航、安装检测和四种出行模式；运动地图视图生命周期防护。腾讯referer未配置，原生内嵌地图SDK尚未接入。','artifacts':[{'path':'connect-native-receipt.json','platform':'sdk-metadata','architecture':'arm64'},{'path':apk.name,'platform':'android','architecture':'arm64'},{'path':'build-receipt.json','platform':'release-metadata','architecture':'arm64'}]},ensure_ascii=False))
+out,logs=map(Path,sys.argv[1:3]);version,build=sys.argv[4:6];m=(logs/'manifest.log').read_text();assert "name='net.impx.happylife'" in m and f"versionName='{version}'" in m and f"versionCode='{build}'" in m
+apk=out/f'Moment-Android-{version}-{build}.apk';receipt={'sourceCommit':sys.argv[3],'version':version,'buildNumber':build,'sha256':hashlib.sha256(apk.read_bytes()).hexdigest(),'signatureVerified':True};(out/'build-receipt.json').write_text(json.dumps(receipt))
+(out/'bundle.json').write_text(json.dumps({'version':version,'activate':False,'sourceCommit':sys.argv[3],'releaseNotes':'新增成人控制体重每日健康食谱与爬山运动项目、附近地点/周边景点查询及GPX路线预览；未经核实的山峰信息明确标注，保留原有导航功能。','artifacts':[{'path':'connect-native-receipt.json','platform':'sdk-metadata','architecture':'arm64'},{'path':apk.name,'platform':'android','architecture':'arm64'},{'path':'build-receipt.json','platform':'release-metadata','architecture':'arm64'}]},ensure_ascii=False))
 PY
