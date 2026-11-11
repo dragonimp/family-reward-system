@@ -5,3 +5,5 @@
 份量为原创试行搭配，未完成营养师和烹饪复核，不展示未经计算的热量或承诺减重结果。另给水果、奶制品、坚果搭配；用户可按活动量、饥饿程度调整。健康搭配原则参考 WHO：https://www.who.int/news-room/fact-sheets/detail/healthy-diet 。
 
 Android 使用 HealthyEatingPanel；iOS 在 KitchenView.swift 中使用 HealthyEatingView。星期索引一致：周一至周日，设备当地日期。切换保留选中日期。原有两个模式的视图和状态保留。
+
+2026-11-11 已随 iOS 1.3.52（252）内部 TestFlight、Android 1.0.26（35）发布并同步原邀请页。完整发布证据及未完成验收见同目录 hiking-v1.md。实际设备显示、日期切换和饮食内容人工复核仍待完成。
