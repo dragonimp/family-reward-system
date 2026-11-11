@@ -35,7 +35,20 @@ git -C "$root" merge-base --is-ancestor "$ATLAS_SOURCE_COMMIT" "$merge_commit"
 # The checked-out main worktree can lag behind GitHub. Run the adapter from the
 # exact merged revision without touching the user's current checkout.
 adapter="$(mktemp "$root/scripts/.atlas-deploy.XXXXXXXX")"
-trap 'rm -f "$adapter"' EXIT
+cleanup_adapter() {
+  python3 - "$adapter" "$root" <<'PYTHON'
+import os
+from pathlib import Path
+import sys
+path = Path(sys.argv[1])
+if (path.parent != Path(sys.argv[2]) / "scripts"
+        or not path.name.startswith(".atlas-deploy.") or path.is_symlink()
+        or path.stat().st_uid != os.getuid()):
+    raise SystemExit("Refusing adapter cleanup: ownership or scope differs")
+path.unlink()
+PYTHON
+}
+trap cleanup_adapter EXIT
 git -C "$root" show "$merge_commit:scripts/atlas-deploy-server.sh" > "$adapter"
 chmod 700 "$adapter"
 bash "$adapter"

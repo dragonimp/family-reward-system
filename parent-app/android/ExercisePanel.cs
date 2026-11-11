@@ -275,9 +275,10 @@ public sealed partial class ExercisePanel : ContentView
             actions.Add(Action(active.RunningSince != null ? "暂停" : "继续", () => { if (active.RunningSince != null) Pause(); else _ = Start(active.Kind); }));
             var finish = MomentStyle.Action("结束并保存", () => _ = Finish()); finish.TextColor = Colors.Red; actions.Add(finish, 1, 0); body.Add(actions);
         } else {
-            var choice = new Picker { Title = "运动项目", ItemsSource = new[] { "散步", "慢跑", "自由运动", "徒步" }, SelectedItem = selectedKind, TextColor = MomentStyle.Ink };
+            var choice = new Picker { Title = "运动项目", ItemsSource = new[] { "散步", "慢跑", "自由运动", "徒步", "爬山" }, SelectedItem = selectedKind, TextColor = MomentStyle.Ink };
             choice.SelectedIndexChanged += (_, _) => { if (choice.SelectedItem is string value) selectedKind = value; };
             body.Add(MomentStyle.Card(choice));
+            if (selectedKind == "爬山") body.Add(Action("附近山峰与导入路线", async () => { if (Window?.Page is { } page) await page.Navigation.PushAsync(new HikingPage(api)); }));
             body.Add(Action("开始" + selectedKind, () => _ = Start(selectedKind)));
             choice.SelectedIndexChanged += (_, _) => Render();
             if (previousWorkout is { } previous) body.Add(MomentStyle.Action("继续上次" + previous.Kind, () => _ = Continue(previous)));

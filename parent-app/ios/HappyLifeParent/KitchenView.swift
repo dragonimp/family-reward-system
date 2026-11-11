@@ -8,19 +8,21 @@ private func kitchenText(_ value: String.LocalizationValue) -> String {
 struct DiningModesView: View {
     let userID: String
     let family: FamilyStore
-    @State private var cooking = false
+    @State private var cooking = 0
 
     var body: some View {
         VStack(spacing: 0) {
             Picker(kitchenText("用餐方式"), selection: $cooking) {
-                Text(kitchenText("出去吃")).tag(false)
-                Text(kitchenText("下厨房")).tag(true)
+                Text(kitchenText("出去吃")).tag(0)
+                Text(kitchenText("下厨房")).tag(1)
+                Text(String(localized: "健康饮食", bundle: AgentIdentityLanguage.appBundle())).tag(2)
             }.pickerStyle(.segmented).padding(.horizontal).padding(.vertical, 8)
             ZStack {
                 DiningView(userID: userID, family: family)
-                    .opacity(cooking ? 0 : 1).allowsHitTesting(!cooking).accessibilityHidden(cooking)
-                KitchenView(family: family, active: cooking)
-                    .opacity(cooking ? 1 : 0).allowsHitTesting(cooking).accessibilityHidden(!cooking)
+                    .opacity(cooking == 0 ? 1 : 0).allowsHitTesting(cooking == 0).accessibilityHidden(cooking != 0)
+                KitchenView(family: family, active: cooking == 1)
+                    .opacity(cooking == 1 ? 1 : 0).allowsHitTesting(cooking == 1).accessibilityHidden(cooking != 1)
+                HealthyEatingView().opacity(cooking == 2 ? 1 : 0).allowsHitTesting(cooking == 2).accessibilityHidden(cooking != 2)
             }
         }
     }
@@ -242,5 +244,35 @@ private struct KitchenRecipeDetail: View {
             AsyncImage(url: url) { image in image.resizable().scaledToFit() } placeholder: { ProgressView() }
                 .frame(maxHeight: 240).clipShape(RoundedRectangle(cornerRadius: 12))
         }
+    }
+}
+
+private struct HealthyEatingView: View {
+    @State private var day = Date()
+    private let plans: [[String]] = [
+        [String(localized: "燕麦牛奶碗＋鸡蛋\n主食40克＋牛奶250毫升＋鸡蛋1个＋蔬菜100克。燕麦/小米加水煮熟，馒头蒸热，鸡蛋煮至蛋白蛋黄凝固；吐司按包装即食。", bundle: AgentIdentityLanguage.appBundle()), String(localized: "糙米饭＋香菇鸡肉＋西兰花\n杂粮/糙米60克＋肉或鱼虾120克＋蔬菜250克。米加水煮熟；鱼虾蒸熟、肉切片少油炒熟，蔬菜焯熟或清炒。", bundle: AgentIdentityLanguage.appBundle()), String(localized: "红薯＋番茄豆腐煲\n薯类或玉米200克＋豆腐150克（或肉鱼100克）＋蔬菜250克。薯类蒸至无硬芯，豆腐和蔬菜煮透；禽肉中心至少74℃，鱼肉至少63℃。", bundle: AgentIdentityLanguage.appBundle())],
+        [String(localized: "全麦吐司＋鸡蛋＋牛奶\n主食40克＋牛奶250毫升＋鸡蛋1个＋蔬菜100克。燕麦/小米加水煮熟，馒头蒸热，鸡蛋煮至蛋白蛋黄凝固；吐司按包装即食。", bundle: AgentIdentityLanguage.appBundle()), String(localized: "杂粮饭＋清蒸鱼＋油麦菜\n杂粮/糙米60克＋肉或鱼虾120克＋蔬菜250克。米加水煮熟；鱼虾蒸熟、肉切片少油炒熟，蔬菜焯熟或清炒。", bundle: AgentIdentityLanguage.appBundle()), String(localized: "玉米＋香菇豆腐＋青菜\n薯类或玉米200克＋豆腐150克（或肉鱼100克）＋蔬菜250克。薯类蒸至无硬芯，豆腐和蔬菜煮透；禽肉中心至少74℃，鱼肉至少63℃。", bundle: AgentIdentityLanguage.appBundle())],
+        [String(localized: "小米粥＋鸡蛋＋牛奶\n主食40克＋牛奶250毫升＋鸡蛋1个＋蔬菜100克。燕麦/小米加水煮熟，馒头蒸热，鸡蛋煮至蛋白蛋黄凝固；吐司按包装即食。", bundle: AgentIdentityLanguage.appBundle()), String(localized: "糙米饭＋瘦牛肉＋彩椒\n杂粮/糙米60克＋肉或鱼虾120克＋蔬菜250克。米加水煮熟；鱼虾蒸熟、肉切片少油炒熟，蔬菜焯熟或清炒。", bundle: AgentIdentityLanguage.appBundle()), String(localized: "蒸土豆＋虾仁＋西兰花\n薯类或玉米200克＋豆腐150克（或肉鱼100克）＋蔬菜250克。薯类蒸至无硬芯，豆腐和蔬菜煮透；禽肉中心至少74℃，鱼肉至少63℃。", bundle: AgentIdentityLanguage.appBundle())],
+        [String(localized: "全麦馒头＋牛奶＋鸡蛋\n主食40克＋牛奶250毫升＋鸡蛋1个＋蔬菜100克。燕麦/小米加水煮熟，馒头蒸热，鸡蛋煮至蛋白蛋黄凝固；吐司按包装即食。", bundle: AgentIdentityLanguage.appBundle()), String(localized: "杂粮饭＋去皮鸡腿＋白菜\n杂粮/糙米60克＋肉或鱼虾120克＋蔬菜250克。米加水煮熟；鱼虾蒸熟、肉切片少油炒熟，蔬菜焯熟或清炒。", bundle: AgentIdentityLanguage.appBundle()), String(localized: "红薯＋豆腐＋菠菜\n薯类或玉米200克＋豆腐150克（或肉鱼100克）＋蔬菜250克。薯类蒸至无硬芯，豆腐和蔬菜煮透；禽肉中心至少74℃，鱼肉至少63℃。", bundle: AgentIdentityLanguage.appBundle())],
+        [String(localized: "燕麦牛奶碗＋鸡蛋\n主食40克＋牛奶250毫升＋鸡蛋1个＋蔬菜100克。燕麦/小米加水煮熟，馒头蒸热，鸡蛋煮至蛋白蛋黄凝固；吐司按包装即食。", bundle: AgentIdentityLanguage.appBundle()), String(localized: "糙米饭＋清蒸鱼＋西兰花\n杂粮/糙米60克＋肉或鱼虾120克＋蔬菜250克。米加水煮熟；鱼虾蒸熟、肉切片少油炒熟，蔬菜焯熟或清炒。", bundle: AgentIdentityLanguage.appBundle()), String(localized: "玉米＋鸡肉＋番茄\n薯类或玉米200克＋豆腐150克（或肉鱼100克）＋蔬菜250克。薯类蒸至无硬芯，豆腐和蔬菜煮透；禽肉中心至少74℃，鱼肉至少63℃。", bundle: AgentIdentityLanguage.appBundle())],
+        [String(localized: "全麦吐司＋牛奶＋鸡蛋\n主食40克＋牛奶250毫升＋鸡蛋1个＋蔬菜100克。燕麦/小米加水煮熟，馒头蒸热，鸡蛋煮至蛋白蛋黄凝固；吐司按包装即食。", bundle: AgentIdentityLanguage.appBundle()), String(localized: "杂粮饭＋虾仁＋油麦菜\n杂粮/糙米60克＋肉或鱼虾120克＋蔬菜250克。米加水煮熟；鱼虾蒸熟、肉切片少油炒熟，蔬菜焯熟或清炒。", bundle: AgentIdentityLanguage.appBundle()), String(localized: "蒸土豆＋豆腐＋香菇\n薯类或玉米200克＋豆腐150克（或肉鱼100克）＋蔬菜250克。薯类蒸至无硬芯，豆腐和蔬菜煮透；禽肉中心至少74℃，鱼肉至少63℃。", bundle: AgentIdentityLanguage.appBundle())],
+        [String(localized: "小米粥＋牛奶＋鸡蛋\n主食40克＋牛奶250毫升＋鸡蛋1个＋蔬菜100克。燕麦/小米加水煮熟，馒头蒸热，鸡蛋煮至蛋白蛋黄凝固；吐司按包装即食。", bundle: AgentIdentityLanguage.appBundle()), String(localized: "糙米饭＋瘦牛肉＋白菜\n杂粮/糙米60克＋肉或鱼虾120克＋蔬菜250克。米加水煮熟；鱼虾蒸熟、肉切片少油炒熟，蔬菜焯熟或清炒。", bundle: AgentIdentityLanguage.appBundle()), String(localized: "红薯＋清蒸鱼＋青菜\n薯类或玉米200克＋豆腐150克（或肉鱼100克）＋蔬菜250克。薯类蒸至无硬芯，豆腐和蔬菜煮透；禽肉中心至少74℃，鱼肉至少63℃。", bundle: AgentIdentityLanguage.appBundle())]
+    ]
+    var body: some View {
+        let calendar = Calendar(identifier: .gregorian)
+        let index = (calendar.component(.weekday, from: day) + 5) % 7
+        ScrollView { VStack(alignment: .leading, spacing: 16) {
+            Text(String(localized: "健康饮食", bundle: AgentIdentityLanguage.appBundle())).font(.largeTitle.bold())
+            Text(String(localized: "成人控制体重 · 七日轮换食谱 · 当地日期", bundle: AgentIdentityLanguage.appBundle())).foregroundStyle(.secondary)
+            DatePicker(String(localized: "日期", bundle: AgentIdentityLanguage.appBundle()), selection: $day, displayedComponents: .date)
+            Button(String(localized: "今天", bundle: AgentIdentityLanguage.appBundle())) { day = Date() }
+            ForEach(0..<3) { meal in
+                Text([String(localized: "早餐", bundle: AgentIdentityLanguage.appBundle()), String(localized: "午餐", bundle: AgentIdentityLanguage.appBundle()), String(localized: "晚餐", bundle: AgentIdentityLanguage.appBundle())][meal]).font(.title2.bold())
+                Text(plans[index][meal])
+            }
+            Text(String(localized: "成人控制体重参考，每人份；不是个性化热量处方。谷物按干重、肉鱼按生的可食部、蔬果按可食部计。按活动量与饥饿程度调整，避免跳餐。另配新鲜水果200克、无糖酸奶150克、无盐坚果10克；奶制品不耐受时按需选择无乳糖产品。注意蛋、奶、小麦、大豆、鱼虾等过敏原。孕哺期及有疾病者需单独制定饮食方案。", bundle: AgentIdentityLanguage.appBundle()))
+            Text(String(localized: "少油少盐，以水替代含糖饮料。生熟分开，处理食材前后洗手。食谱为原创搭配，尚待营养师及烹饪复核。", bundle: AgentIdentityLanguage.appBundle()))
+            Text(String(localized: "参考：WHO Healthy diet · https://www.who.int/news-room/fact-sheets/detail/healthy-diet", bundle: AgentIdentityLanguage.appBundle())).font(.footnote)
+        }.padding(20) }
     }
 }

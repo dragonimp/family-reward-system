@@ -104,9 +104,10 @@ public sealed class DiningPanel : ContentView
         catch { readable = false; message = "干饭记录暂时无法读取，原记录已保留，请重试。"; }
         var outside = new ScrollView { Content = body };
         var cooking = new KitchenPanel(store, owner);
+        var healthy = new HealthyEatingPanel();
         var viewport = new ContentView { Content = outside };
-        Border Modes(int index) => MomentStyle.Segmented(new[] { "出去吃", "下厨房" }, index, next => {
-            viewport.Content = next == 1 ? cooking : outside; modeHost.Content = Modes(next);
+        Border Modes(int index) => MomentStyle.Segmented(new[] { "出去吃", "下厨房", "健康饮食" }, index, next => {
+            viewport.Content = next == 2 ? healthy : next == 1 ? cooking : outside; modeHost.Content = Modes(next);
             if (next == 1) _ = cooking.Load();
         });
         var root = new Grid { RowDefinitions = new RowDefinitionCollection { new(GridLength.Auto), new(GridLength.Star) } };

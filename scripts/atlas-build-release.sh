@@ -13,8 +13,8 @@ command -v npm >/dev/null && command -v node >/dev/null || {
   exit 2
 }
 
-stage="$(mktemp -d "${TMPDIR:-/tmp}/family-atlas-check.XXXXXXXX")"
-trap 'rm -rf "$stage"' EXIT
+stage="$(python3 "$root/scripts/release-temp.py" create family-atlas-check.)"
+trap 'python3 "$root/scripts/release-temp.py" cleanup "$stage"' EXIT
 version="pipeline-check-${ATLAS_MERGE_COMMIT:0:12}"
 ATLAS_SOURCE_ROOT="${ATLAS_SOURCE_ROOT:-/Users/wengzhishan/Projects/Atlas}" \
 FAMILY_REWARD_SHARED_PROJECTS_ROOT="${FAMILY_REWARD_SHARED_PROJECTS_ROOT:-/Users/wengzhishan/Projects}" \

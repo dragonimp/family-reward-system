@@ -111,7 +111,7 @@ internal static class DiningEndpoints
     }
     private static string Text(JsonElement value, string key) => value.ValueKind == JsonValueKind.Object && value.TryGetProperty(key, out var item) && item.ValueKind == JsonValueKind.String ? item.GetString() ?? "" : "";
     private static double? Number(JsonElement value, string key) => value.ValueKind == JsonValueKind.Object && value.TryGetProperty(key, out var item) && double.TryParse(item.ToString(), NumberStyles.Float, CultureInfo.InvariantCulture, out var number) && double.IsFinite(number) ? number : null;
-    private static bool TryCoordinate(string raw, out double latitude, out double longitude)
+    internal static bool TryCoordinate(string raw, out double latitude, out double longitude)
     {
         latitude = longitude = 0; var parts = raw.Split(',');
         return parts.Length == 2 && double.TryParse(parts[0], NumberStyles.Float, CultureInfo.InvariantCulture, out longitude) && double.TryParse(parts[1], NumberStyles.Float, CultureInfo.InvariantCulture, out latitude) && double.IsFinite(latitude) && double.IsFinite(longitude) && Math.Abs(latitude) <= 90 && Math.Abs(longitude) <= 180;

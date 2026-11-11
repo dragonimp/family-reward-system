@@ -7,8 +7,8 @@ atlas_root="${ATLAS_SOURCE_ROOT:-$root/../Atlas}"
 [[ ! -e "$2" ]] || { echo 'Output directory must not exist.' >&2; exit 2; }
 version="$1"
 [[ "$version" =~ ^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$ && "$version" != latest ]] || exit 2
-stage="$(mktemp -d "${TMPDIR:-/tmp}/family-atlas-build.XXXXXX")"
-trap 'rm -rf "$stage"' EXIT
+stage="$(python3 "$root/scripts/release-temp.py" create family-atlas-build.)"
+trap 'python3 "$root/scripts/release-temp.py" cleanup "$stage"' EXIT
 app_code="$(node -e 'console.log(require(process.argv[1]).appCode)' "$root/deploy/atlas-release.json")"
 shared_projects_root="${FAMILY_REWARD_SHARED_PROJECTS_ROOT:-$root/..}"
 identity_root="$shared_projects_root/AgentIdentity"

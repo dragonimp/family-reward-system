@@ -6335,6 +6335,246 @@
       "zh-Hans": "暂时无法确认这家店的导航位置，请选择其他地图。",
       "en": "Unable to confirm this restaurant location. Please choose another map.",
       "iosKey": "暂时无法确认这家店的导航位置，请选择其他地图。"
+    },
+    "moment.healthy.2c3e0ba99ac0": {
+      "zh-Hans": "健康饮食",
+      "en": "Healthy eating",
+      "iosKey": "健康饮食"
+    },
+    "moment.healthy.77ab1fc0b9f6": {
+      "zh-Hans": "成人控制体重 · 七日轮换食谱 · 当地日期",
+      "en": "Adult weight management · Seven-day rotation · Local date",
+      "iosKey": "成人控制体重 · 七日轮换食谱 · 当地日期"
+    },
+    "moment.healthy.d5f5a7a01073": {
+      "zh-Hans": "今天",
+      "en": "Today",
+      "iosKey": "今天"
+    },
+    "moment.healthy.dec873d9ea53": {
+      "zh-Hans": "早餐",
+      "en": "Breakfast",
+      "iosKey": "早餐"
+    },
+    "moment.healthy.024c0223991a": {
+      "zh-Hans": "午餐",
+      "en": "Lunch",
+      "iosKey": "午餐"
+    },
+    "moment.healthy.4ac9229c83a2": {
+      "zh-Hans": "晚餐",
+      "en": "Dinner",
+      "iosKey": "晚餐"
+    },
+    "moment.healthy.d075989127f3": {
+      "zh-Hans": "燕麦牛奶碗＋鸡蛋\n主食40克＋牛奶250毫升＋鸡蛋1个＋蔬菜100克。燕麦/小米加水煮熟，馒头蒸热，鸡蛋煮至蛋白蛋黄凝固；吐司按包装即食。",
+      "en": "Oats with milk＋egg\n40 g grain/staple + 250 ml milk + 1 egg + 100 g vegetables. Cook oats or millet fully; heat buns and cook eggs until yolks and whites are firm. Serve toast as directed on the package.",
+      "iosKey": "燕麦牛奶碗＋鸡蛋\n主食40克＋牛奶250毫升＋鸡蛋1个＋蔬菜100克。燕麦/小米加水煮熟，馒头蒸热，鸡蛋煮至蛋白蛋黄凝固；吐司按包装即食。"
+    },
+    "moment.healthy.48ae7ab266ce": {
+      "zh-Hans": "糙米饭＋香菇鸡肉＋西兰花\n杂粮/糙米60克＋肉或鱼虾120克＋蔬菜250克。米加水煮熟；鱼虾蒸熟、肉切片少油炒熟，蔬菜焯熟或清炒。",
+      "en": "brown rice＋chicken with shiitake＋broccoli\n60 g dry grain + 120 g raw edible meat/fish/shrimp + 250 g vegetables. Cook rice fully. Steam fish/shrimp or stir-fry sliced meat with a little oil; cook vegetables fully.",
+      "iosKey": "糙米饭＋香菇鸡肉＋西兰花\n杂粮/糙米60克＋肉或鱼虾120克＋蔬菜250克。米加水煮熟；鱼虾蒸熟、肉切片少油炒熟，蔬菜焯熟或清炒。"
+    },
+    "moment.healthy.e2e3f3878855": {
+      "zh-Hans": "红薯＋番茄豆腐煲\n薯类或玉米200克＋豆腐150克（或肉鱼100克）＋蔬菜250克。薯类蒸至无硬芯，豆腐和蔬菜煮透；禽肉中心至少74℃，鱼肉至少63℃。",
+      "en": "sweet potato＋tomato and tofu stew\n200 g potato/sweet potato/corn + 150 g tofu (or 100 g meat/fish) + 250 g vegetables. Steam roots until tender and cook tofu and vegetables fully. Poultry must reach 74 C at the centre; fish 63 C.",
+      "iosKey": "红薯＋番茄豆腐煲\n薯类或玉米200克＋豆腐150克（或肉鱼100克）＋蔬菜250克。薯类蒸至无硬芯，豆腐和蔬菜煮透；禽肉中心至少74℃，鱼肉至少63℃。"
+    },
+    "moment.healthy.7c4063175f02": {
+      "zh-Hans": "全麦吐司＋鸡蛋＋牛奶\n主食40克＋牛奶250毫升＋鸡蛋1个＋蔬菜100克。燕麦/小米加水煮熟，馒头蒸热，鸡蛋煮至蛋白蛋黄凝固；吐司按包装即食。",
+      "en": "wholegrain toast＋egg＋milk\n40 g grain/staple + 250 ml milk + 1 egg + 100 g vegetables. Cook oats or millet fully; heat buns and cook eggs until yolks and whites are firm. Serve toast as directed on the package.",
+      "iosKey": "全麦吐司＋鸡蛋＋牛奶\n主食40克＋牛奶250毫升＋鸡蛋1个＋蔬菜100克。燕麦/小米加水煮熟，馒头蒸热，鸡蛋煮至蛋白蛋黄凝固；吐司按包装即食。"
+    },
+    "moment.healthy.09edbd065fbf": {
+      "zh-Hans": "杂粮饭＋清蒸鱼＋油麦菜\n杂粮/糙米60克＋肉或鱼虾120克＋蔬菜250克。米加水煮熟；鱼虾蒸熟、肉切片少油炒熟，蔬菜焯熟或清炒。",
+      "en": "mixed-grain rice＋steamed fish＋lettuce\n60 g dry grain + 120 g raw edible meat/fish/shrimp + 250 g vegetables. Cook rice fully. Steam fish/shrimp or stir-fry sliced meat with a little oil; cook vegetables fully.",
+      "iosKey": "杂粮饭＋清蒸鱼＋油麦菜\n杂粮/糙米60克＋肉或鱼虾120克＋蔬菜250克。米加水煮熟；鱼虾蒸熟、肉切片少油炒熟，蔬菜焯熟或清炒。"
+    },
+    "moment.healthy.d831f0c583fa": {
+      "zh-Hans": "玉米＋香菇豆腐＋青菜\n薯类或玉米200克＋豆腐150克（或肉鱼100克）＋蔬菜250克。薯类蒸至无硬芯，豆腐和蔬菜煮透；禽肉中心至少74℃，鱼肉至少63℃。",
+      "en": "corn＋tofu with shiitake＋greens\n200 g potato/sweet potato/corn + 150 g tofu (or 100 g meat/fish) + 250 g vegetables. Steam roots until tender and cook tofu and vegetables fully. Poultry must reach 74 C at the centre; fish 63 C.",
+      "iosKey": "玉米＋香菇豆腐＋青菜\n薯类或玉米200克＋豆腐150克（或肉鱼100克）＋蔬菜250克。薯类蒸至无硬芯，豆腐和蔬菜煮透；禽肉中心至少74℃，鱼肉至少63℃。"
+    },
+    "moment.healthy.ef30136b47d6": {
+      "zh-Hans": "小米粥＋鸡蛋＋牛奶\n主食40克＋牛奶250毫升＋鸡蛋1个＋蔬菜100克。燕麦/小米加水煮熟，馒头蒸热，鸡蛋煮至蛋白蛋黄凝固；吐司按包装即食。",
+      "en": "millet porridge＋egg＋milk\n40 g grain/staple + 250 ml milk + 1 egg + 100 g vegetables. Cook oats or millet fully; heat buns and cook eggs until yolks and whites are firm. Serve toast as directed on the package.",
+      "iosKey": "小米粥＋鸡蛋＋牛奶\n主食40克＋牛奶250毫升＋鸡蛋1个＋蔬菜100克。燕麦/小米加水煮熟，馒头蒸热，鸡蛋煮至蛋白蛋黄凝固；吐司按包装即食。"
+    },
+    "moment.healthy.775ba98e57c5": {
+      "zh-Hans": "糙米饭＋瘦牛肉＋彩椒\n杂粮/糙米60克＋肉或鱼虾120克＋蔬菜250克。米加水煮熟；鱼虾蒸熟、肉切片少油炒熟，蔬菜焯熟或清炒。",
+      "en": "brown rice＋lean beef＋bell peppers\n60 g dry grain + 120 g raw edible meat/fish/shrimp + 250 g vegetables. Cook rice fully. Steam fish/shrimp or stir-fry sliced meat with a little oil; cook vegetables fully.",
+      "iosKey": "糙米饭＋瘦牛肉＋彩椒\n杂粮/糙米60克＋肉或鱼虾120克＋蔬菜250克。米加水煮熟；鱼虾蒸熟、肉切片少油炒熟，蔬菜焯熟或清炒。"
+    },
+    "moment.healthy.dd43fb3c2095": {
+      "zh-Hans": "蒸土豆＋虾仁＋西兰花\n薯类或玉米200克＋豆腐150克（或肉鱼100克）＋蔬菜250克。薯类蒸至无硬芯，豆腐和蔬菜煮透；禽肉中心至少74℃，鱼肉至少63℃。",
+      "en": "steamed potato＋shrimp＋broccoli\n200 g potato/sweet potato/corn + 150 g tofu (or 100 g meat/fish) + 250 g vegetables. Steam roots until tender and cook tofu and vegetables fully. Poultry must reach 74 C at the centre; fish 63 C.",
+      "iosKey": "蒸土豆＋虾仁＋西兰花\n薯类或玉米200克＋豆腐150克（或肉鱼100克）＋蔬菜250克。薯类蒸至无硬芯，豆腐和蔬菜煮透；禽肉中心至少74℃，鱼肉至少63℃。"
+    },
+    "moment.healthy.afa066c092ca": {
+      "zh-Hans": "全麦馒头＋牛奶＋鸡蛋\n主食40克＋牛奶250毫升＋鸡蛋1个＋蔬菜100克。燕麦/小米加水煮熟，馒头蒸热，鸡蛋煮至蛋白蛋黄凝固；吐司按包装即食。",
+      "en": "wholegrain steamed bun＋milk＋egg\n40 g grain/staple + 250 ml milk + 1 egg + 100 g vegetables. Cook oats or millet fully; heat buns and cook eggs until yolks and whites are firm. Serve toast as directed on the package.",
+      "iosKey": "全麦馒头＋牛奶＋鸡蛋\n主食40克＋牛奶250毫升＋鸡蛋1个＋蔬菜100克。燕麦/小米加水煮熟，馒头蒸热，鸡蛋煮至蛋白蛋黄凝固；吐司按包装即食。"
+    },
+    "moment.healthy.fb632ee367d1": {
+      "zh-Hans": "杂粮饭＋去皮鸡腿＋白菜\n杂粮/糙米60克＋肉或鱼虾120克＋蔬菜250克。米加水煮熟；鱼虾蒸熟、肉切片少油炒熟，蔬菜焯熟或清炒。",
+      "en": "mixed-grain rice＋skinless chicken thigh＋Chinese cabbage\n60 g dry grain + 120 g raw edible meat/fish/shrimp + 250 g vegetables. Cook rice fully. Steam fish/shrimp or stir-fry sliced meat with a little oil; cook vegetables fully.",
+      "iosKey": "杂粮饭＋去皮鸡腿＋白菜\n杂粮/糙米60克＋肉或鱼虾120克＋蔬菜250克。米加水煮熟；鱼虾蒸熟、肉切片少油炒熟，蔬菜焯熟或清炒。"
+    },
+    "moment.healthy.7de0bb3de2a7": {
+      "zh-Hans": "红薯＋豆腐＋菠菜\n薯类或玉米200克＋豆腐150克（或肉鱼100克）＋蔬菜250克。薯类蒸至无硬芯，豆腐和蔬菜煮透；禽肉中心至少74℃，鱼肉至少63℃。",
+      "en": "sweet potato＋tofu＋spinach\n200 g potato/sweet potato/corn + 150 g tofu (or 100 g meat/fish) + 250 g vegetables. Steam roots until tender and cook tofu and vegetables fully. Poultry must reach 74 C at the centre; fish 63 C.",
+      "iosKey": "红薯＋豆腐＋菠菜\n薯类或玉米200克＋豆腐150克（或肉鱼100克）＋蔬菜250克。薯类蒸至无硬芯，豆腐和蔬菜煮透；禽肉中心至少74℃，鱼肉至少63℃。"
+    },
+    "moment.healthy.11c3416cf5a8": {
+      "zh-Hans": "糙米饭＋清蒸鱼＋西兰花\n杂粮/糙米60克＋肉或鱼虾120克＋蔬菜250克。米加水煮熟；鱼虾蒸熟、肉切片少油炒熟，蔬菜焯熟或清炒。",
+      "en": "brown rice＋steamed fish＋broccoli\n60 g dry grain + 120 g raw edible meat/fish/shrimp + 250 g vegetables. Cook rice fully. Steam fish/shrimp or stir-fry sliced meat with a little oil; cook vegetables fully.",
+      "iosKey": "糙米饭＋清蒸鱼＋西兰花\n杂粮/糙米60克＋肉或鱼虾120克＋蔬菜250克。米加水煮熟；鱼虾蒸熟、肉切片少油炒熟，蔬菜焯熟或清炒。"
+    },
+    "moment.healthy.856c9000aab8": {
+      "zh-Hans": "玉米＋鸡肉＋番茄\n薯类或玉米200克＋豆腐150克（或肉鱼100克）＋蔬菜250克。薯类蒸至无硬芯，豆腐和蔬菜煮透；禽肉中心至少74℃，鱼肉至少63℃。",
+      "en": "corn＋chicken＋tomato\n200 g potato/sweet potato/corn + 150 g tofu (or 100 g meat/fish) + 250 g vegetables. Steam roots until tender and cook tofu and vegetables fully. Poultry must reach 74 C at the centre; fish 63 C.",
+      "iosKey": "玉米＋鸡肉＋番茄\n薯类或玉米200克＋豆腐150克（或肉鱼100克）＋蔬菜250克。薯类蒸至无硬芯，豆腐和蔬菜煮透；禽肉中心至少74℃，鱼肉至少63℃。"
+    },
+    "moment.healthy.739e86522caf": {
+      "zh-Hans": "全麦吐司＋牛奶＋鸡蛋\n主食40克＋牛奶250毫升＋鸡蛋1个＋蔬菜100克。燕麦/小米加水煮熟，馒头蒸热，鸡蛋煮至蛋白蛋黄凝固；吐司按包装即食。",
+      "en": "wholegrain toast＋milk＋egg\n40 g grain/staple + 250 ml milk + 1 egg + 100 g vegetables. Cook oats or millet fully; heat buns and cook eggs until yolks and whites are firm. Serve toast as directed on the package.",
+      "iosKey": "全麦吐司＋牛奶＋鸡蛋\n主食40克＋牛奶250毫升＋鸡蛋1个＋蔬菜100克。燕麦/小米加水煮熟，馒头蒸热，鸡蛋煮至蛋白蛋黄凝固；吐司按包装即食。"
+    },
+    "moment.healthy.18e178c77630": {
+      "zh-Hans": "杂粮饭＋虾仁＋油麦菜\n杂粮/糙米60克＋肉或鱼虾120克＋蔬菜250克。米加水煮熟；鱼虾蒸熟、肉切片少油炒熟，蔬菜焯熟或清炒。",
+      "en": "mixed-grain rice＋shrimp＋lettuce\n60 g dry grain + 120 g raw edible meat/fish/shrimp + 250 g vegetables. Cook rice fully. Steam fish/shrimp or stir-fry sliced meat with a little oil; cook vegetables fully.",
+      "iosKey": "杂粮饭＋虾仁＋油麦菜\n杂粮/糙米60克＋肉或鱼虾120克＋蔬菜250克。米加水煮熟；鱼虾蒸熟、肉切片少油炒熟，蔬菜焯熟或清炒。"
+    },
+    "moment.healthy.28ac0a59aeac": {
+      "zh-Hans": "蒸土豆＋豆腐＋香菇\n薯类或玉米200克＋豆腐150克（或肉鱼100克）＋蔬菜250克。薯类蒸至无硬芯，豆腐和蔬菜煮透；禽肉中心至少74℃，鱼肉至少63℃。",
+      "en": "steamed potato＋tofu＋shiitake\n200 g potato/sweet potato/corn + 150 g tofu (or 100 g meat/fish) + 250 g vegetables. Steam roots until tender and cook tofu and vegetables fully. Poultry must reach 74 C at the centre; fish 63 C.",
+      "iosKey": "蒸土豆＋豆腐＋香菇\n薯类或玉米200克＋豆腐150克（或肉鱼100克）＋蔬菜250克。薯类蒸至无硬芯，豆腐和蔬菜煮透；禽肉中心至少74℃，鱼肉至少63℃。"
+    },
+    "moment.healthy.fe4484faaf48": {
+      "zh-Hans": "小米粥＋牛奶＋鸡蛋\n主食40克＋牛奶250毫升＋鸡蛋1个＋蔬菜100克。燕麦/小米加水煮熟，馒头蒸热，鸡蛋煮至蛋白蛋黄凝固；吐司按包装即食。",
+      "en": "millet porridge＋milk＋egg\n40 g grain/staple + 250 ml milk + 1 egg + 100 g vegetables. Cook oats or millet fully; heat buns and cook eggs until yolks and whites are firm. Serve toast as directed on the package.",
+      "iosKey": "小米粥＋牛奶＋鸡蛋\n主食40克＋牛奶250毫升＋鸡蛋1个＋蔬菜100克。燕麦/小米加水煮熟，馒头蒸热，鸡蛋煮至蛋白蛋黄凝固；吐司按包装即食。"
+    },
+    "moment.healthy.873a22462fe0": {
+      "zh-Hans": "糙米饭＋瘦牛肉＋白菜\n杂粮/糙米60克＋肉或鱼虾120克＋蔬菜250克。米加水煮熟；鱼虾蒸熟、肉切片少油炒熟，蔬菜焯熟或清炒。",
+      "en": "brown rice＋lean beef＋Chinese cabbage\n60 g dry grain + 120 g raw edible meat/fish/shrimp + 250 g vegetables. Cook rice fully. Steam fish/shrimp or stir-fry sliced meat with a little oil; cook vegetables fully.",
+      "iosKey": "糙米饭＋瘦牛肉＋白菜\n杂粮/糙米60克＋肉或鱼虾120克＋蔬菜250克。米加水煮熟；鱼虾蒸熟、肉切片少油炒熟，蔬菜焯熟或清炒。"
+    },
+    "moment.healthy.c08b3f444bd4": {
+      "zh-Hans": "红薯＋清蒸鱼＋青菜\n薯类或玉米200克＋豆腐150克（或肉鱼100克）＋蔬菜250克。薯类蒸至无硬芯，豆腐和蔬菜煮透；禽肉中心至少74℃，鱼肉至少63℃。",
+      "en": "sweet potato＋steamed fish＋greens\n200 g potato/sweet potato/corn + 150 g tofu (or 100 g meat/fish) + 250 g vegetables. Steam roots until tender and cook tofu and vegetables fully. Poultry must reach 74 C at the centre; fish 63 C.",
+      "iosKey": "红薯＋清蒸鱼＋青菜\n薯类或玉米200克＋豆腐150克（或肉鱼100克）＋蔬菜250克。薯类蒸至无硬芯，豆腐和蔬菜煮透；禽肉中心至少74℃，鱼肉至少63℃。"
+    },
+    "moment.healthy.285610f8fe1a": {
+      "zh-Hans": "成人控制体重参考，每人份；不是个性化热量处方。谷物按干重、肉鱼按生的可食部、蔬果按可食部计。按活动量与饥饿程度调整，避免跳餐。另配新鲜水果200克、无糖酸奶150克、无盐坚果10克；奶制品不耐受时按需选择无乳糖产品。注意蛋、奶、小麦、大豆、鱼虾等过敏原。孕哺期及有疾病者需单独制定饮食方案。",
+      "en": "Reference portions for one adult managing weight, not a personal calorie prescription. Grains are weighed dry; meat, fish, fruit and vegetables by edible raw weight. Adjust for activity and hunger; avoid skipping meals. Add 200 g fresh fruit, 150 g unsweetened yogurt and 10 g unsalted nuts. Choose lactose-free dairy if needed. Check egg, milk, wheat, soy, fish and shellfish allergens. Pregnancy, breastfeeding and medical conditions require an individual plan.",
+      "iosKey": "成人控制体重参考，每人份；不是个性化热量处方。谷物按干重、肉鱼按生的可食部、蔬果按可食部计。按活动量与饥饿程度调整，避免跳餐。另配新鲜水果200克、无糖酸奶150克、无盐坚果10克；奶制品不耐受时按需选择无乳糖产品。注意蛋、奶、小麦、大豆、鱼虾等过敏原。孕哺期及有疾病者需单独制定饮食方案。"
+    },
+    "moment.healthy.7cab1b10de4a": {
+      "zh-Hans": "少油少盐，以水替代含糖饮料。生熟分开，处理食材前后洗手。食谱为原创搭配，尚待营养师及烹饪复核。",
+      "en": "Use less oil and salt; choose water over sugary drinks. Separate raw and cooked food and wash hands before and after preparation. Original meal ideas await dietitian and cooking review.",
+      "iosKey": "少油少盐，以水替代含糖饮料。生熟分开，处理食材前后洗手。食谱为原创搭配，尚待营养师及烹饪复核。"
+    },
+    "moment.healthy.3438ac207c99": {
+      "zh-Hans": "参考：WHO Healthy diet · https://www.who.int/news-room/fact-sheets/detail/healthy-diet",
+      "en": "Source: WHO Healthy diet · https://www.who.int/news-room/fact-sheets/detail/healthy-diet",
+      "iosKey": "参考：WHO Healthy diet · https://www.who.int/news-room/fact-sheets/detail/healthy-diet"
+    },
+    "moment.hiking.849f9ce9f688": {
+      "zh-Hans": "爬山",
+      "en": "Mountain hiking",
+      "iosKey": "爬山"
+    },
+    "moment.hiking.cc1f81478d42": {
+      "zh-Hans": "附近山峰与导入路线",
+      "en": "Nearby mountains and imported routes",
+      "iosKey": "附近山峰与导入路线"
+    },
+    "moment.hiking.d967457143be": {
+      "zh-Hans": "地点搜索不代表开放或允许攀登；海拔、路面和登顶时长需核实。",
+      "en": "Search results do not establish access or permission to climb. Confirm elevation, trail surface and hiking time.",
+      "iosKey": "地点搜索不代表开放或允许攀登；海拔、路面和登顶时长需核实。"
+    },
+    "moment.hiking.3b3074c80185": {
+      "zh-Hans": "定位搜索附近的山（30公里）",
+      "en": "Find mountains within 30 km",
+      "iosKey": "定位搜索附近的山（30公里）"
+    },
+    "moment.hiking.31bb23a14b77": {
+      "zh-Hans": "导入 GPX 路线",
+      "en": "Import GPX route",
+      "iosKey": "导入 GPX 路线"
+    },
+    "moment.hiking.0a5a7b9a9fb0": {
+      "zh-Hans": "无法定位，请检查定位权限后重试。",
+      "en": "Unable to locate you. Check location permissions and retry.",
+      "iosKey": "无法定位，请检查定位权限后重试。"
+    },
+    "moment.hiking.b928e4baf46e": {
+      "zh-Hans": "导入路线预览 · WGS84",
+      "en": "Imported route preview · WGS84",
+      "iosKey": "导入路线预览 · WGS84"
+    },
+    "moment.hiking.c9390272dfda": {
+      "zh-Hans": "文件中的最高海拔：%.0f 米，不等于山峰高度",
+      "en": "Highest elevation in file: %.0f m; not necessarily the summit",
+      "iosKey": "文件中的最高海拔：%.0f 米，不等于山峰高度"
+    },
+    "moment.hiking.2e989782d168": {
+      "zh-Hans": "路线只作预览，不计入运动记录。路面和预计时长需向发布者核实。",
+      "en": "Preview only; not added to workout records. Confirm surface and duration with the route publisher.",
+      "iosKey": "路线只作预览，不计入运动记录。路面和预计时长需向发布者核实。"
+    },
+    "moment.hiking.32c282fdafde": {
+      "zh-Hans": "直线距离约 %.1f 公里",
+      "en": "Approximate straight-line distance: %.1f km",
+      "iosKey": "直线距离约 %.1f 公里"
+    },
+    "moment.hiking.5b2423eb4350": {
+      "zh-Hans": "海拔：未核实 · 台阶/山路：未核实 · 登山时长：未核实",
+      "en": "Elevation, steps/trail surface and hiking time: unverified",
+      "iosKey": "海拔：未核实 · 台阶/山路：未核实 · 登山时长：未核实"
+    },
+    "moment.hiking.e534e780c372": {
+      "zh-Hans": "高德查看位置并导航",
+      "en": "View location and navigate with Amap",
+      "iosKey": "高德查看位置并导航"
+    },
+    "moment.hiking.7856dddf2872": {
+      "zh-Hans": "查看周边景点（5公里）",
+      "en": "Nearby attractions within 5 km",
+      "iosKey": "查看周边景点（5公里）"
+    },
+    "moment.hiking.e4426a4eab45": {
+      "zh-Hans": "地点来源：高德地图 · 不代表登山路线推荐",
+      "en": "Places: Amap · Not a hiking route recommendation",
+      "iosKey": "地点来源：高德地图 · 不代表登山路线推荐"
+    },
+    "moment.hiking.da0a5550f7d8": {
+      "zh-Hans": "GPX 已导入，仅保留在本次预览中。",
+      "en": "GPX imported for this preview only.",
+      "iosKey": "GPX 已导入，仅保留在本次预览中。"
+    },
+    "moment.hiking.1b35ea6975f2": {
+      "zh-Hans": "无法导入，请选择有效 GPX 文件（最多500万字节、2万个点）。",
+      "en": "Unable to import. Choose a valid GPX file (up to 5 MB and 20,000 points).",
+      "iosKey": "无法导入，请选择有效 GPX 文件（最多500万字节、2万个点）。"
+    },
+    "moment.hiking.15f4fa2d534c": {
+      "zh-Hans": "附近暂未找到结果。",
+      "en": "No nearby results found.",
+      "iosKey": "附近暂未找到结果。"
+    },
+    "moment.hiking.d429164da1b6": {
+      "zh-Hans": "地点来源：高德地图",
+      "en": "Places: Amap",
+      "iosKey": "地点来源：高德地图"
+    },
+    "moment.hiking.7497454a5c22": {
+      "zh-Hans": "地点查询失败，请检查网络及地图服务配置后重试。",
+      "en": "Place search failed. Check network and map service configuration before retrying.",
+      "iosKey": "地点查询失败，请检查网络及地图服务配置后重试。"
     }
   }
 }

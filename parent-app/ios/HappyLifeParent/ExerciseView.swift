@@ -5,6 +5,7 @@ import CryptoKit
 import MapKit
 import CoreLocation
 import HealthKit
+import UniformTypeIdentifiers
 
 @MainActor final class ExerciseStore: NSObject, ObservableObject, CLLocationManagerDelegate {
     private static var stores: [String: ExerciseStore] = [:]
@@ -382,7 +383,9 @@ struct ExerciseView: View {
                         Picker(String(localized: "运动项目", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), selection: $kind) {
                             Text(String(localized: "散步", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))).tag("散步"); Text(String(localized: "慢跑", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))).tag("慢跑"); Text(String(localized: "自由运动", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))).tag("自由运动")
                             Text(String(localized: "徒步", bundle: AgentIdentityLanguage.appBundle())).tag("徒步")
+                            Text(String(localized: "爬山", bundle: AgentIdentityLanguage.appBundle())).tag("爬山")
                         }.pickerStyle(.menu)
+                        if kind == "爬山" { NavigationLink(String(localized: "附近山峰与导入路线", bundle: AgentIdentityLanguage.appBundle())) { HikingPlacesView(family: family) } }
                         Button {
                             exercise.start(kind: kind, map: mapMode, activity: activity)
                             if exercise.active != nil { activity = nil; family.watchExerciseActivity = nil }
@@ -511,6 +514,7 @@ struct ExerciseView: View {
 private func exerciseKindTitle(_ value: String) -> String {
     let locale = Locale(identifier: AgentIdentityLanguage.current)
     switch value {
+    case "爬山": return String(localized: "爬山", bundle: AgentIdentityLanguage.appBundle(), locale: locale)
     case "散步": return String(localized: "散步", bundle: AgentIdentityLanguage.appBundle(), locale: locale)
     case "徒步": return String(localized: "徒步", bundle: AgentIdentityLanguage.appBundle())
     case "慢跑": return String(localized: "慢跑", bundle: AgentIdentityLanguage.appBundle(), locale: locale)
@@ -707,5 +711,118 @@ struct ExerciseWatchConnectionView: View {
         exercise.importWatchRecords(records)
         await exercise.sync()
         if let record = exercise.active ?? exercise.history.first { await health.read(record) }
+    }
+}
+
+@MainActor private final class HikingLocation: NSObject, ObservableObject, CLLocationManagerDelegate {
+    @Published var coordinate: CLLocationCoordinate2D?
+    @Published var failed = false
+    private let manager = CLLocationManager()
+    override init() { super.init(); manager.delegate = self }
+    func locate() {
+        switch manager.authorizationStatus {
+        case .notDetermined: manager.requestWhenInUseAuthorization()
+        case .authorizedAlways, .authorizedWhenInUse: manager.requestLocation()
+        default: failed = true
+        }
+    }
+    func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {
+        if manager.authorizationStatus == .authorizedAlways || manager.authorizationStatus == .authorizedWhenInUse { manager.requestLocation() }
+    }
+    func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) { coordinate = locations.last?.coordinate }
+    func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) { failed = true }
+}
+
+private struct HikingPlacesView: View {
+    @Environment(\.openURL) private var openURL
+    let family: FamilyStore
+    @StateObject private var location = HikingLocation()
+    @State private var places: [HikingPlace] = []
+    @State private var message = ""
+    @State private var busy = false
+    @State private var importing = false
+    @State private var imported: [[CLLocationCoordinate2D]] = []
+    @State private var highest: Double?
+    private struct HikingPlace: Decodable, Identifiable {
+        let id: String; let name: String; let address: String
+        let latitude: Double; let longitude: Double; let distanceMeters: Double
+    }
+    var body: some View {
+        List {
+            Section {
+                Text(String(localized: "地点搜索不代表开放或允许攀登；海拔、路面和登顶时长需核实。", bundle: AgentIdentityLanguage.appBundle()))
+                Button(String(localized: "定位搜索附近的山（30公里）", bundle: AgentIdentityLanguage.appBundle())) { location.locate() }
+                Button(String(localized: "导入 GPX 路线", bundle: AgentIdentityLanguage.appBundle())) { importing = true }
+                if busy { ProgressView() }
+                if !message.isEmpty { Text(message) }
+                if location.failed { Text(String(localized: "无法定位，请检查定位权限后重试。", bundle: AgentIdentityLanguage.appBundle())) }
+            }
+            if !imported.isEmpty {
+                Section(String(localized: "导入路线预览 · WGS84", bundle: AgentIdentityLanguage.appBundle())) {
+                    Map {
+                        ForEach(imported.indices, id: \.self) { index in MapPolyline(coordinates: imported[index]).stroke(.teal, lineWidth: 4) }
+                    }.frame(height: 320)
+                    if let highest { Text(String(format: String(localized: "文件中的最高海拔：%.0f 米，不等于山峰高度", bundle: AgentIdentityLanguage.appBundle()), highest)) }
+                    Text(String(localized: "路线只作预览，不计入运动记录。路面和预计时长需向发布者核实。", bundle: AgentIdentityLanguage.appBundle()))
+                }
+            }
+            ForEach(places) { place in
+                Section(place.name) {
+                    Text(place.address)
+                    Text(String(format: String(localized: "直线距离约 %.1f 公里", bundle: AgentIdentityLanguage.appBundle()), place.distanceMeters / 1000))
+                    Text(String(localized: "海拔：未核实 · 台阶/山路：未核实 · 登山时长：未核实", bundle: AgentIdentityLanguage.appBundle()))
+                    Button(String(localized: "高德查看位置并导航", bundle: AgentIdentityLanguage.appBundle())) {
+                        var url = URLComponents(string: "https://uri.amap.com/navigation")!
+                        url.queryItems = [URLQueryItem(name: "to", value: "\(place.longitude),\(place.latitude),\(place.name)"), URLQueryItem(name: "mode", value: "car"), URLQueryItem(name: "coordinate", value: "gaode")]
+                        if let url = url.url { openURL(url) }
+                    }
+                    Button(String(localized: "查看周边景点（5公里）", bundle: AgentIdentityLanguage.appBundle())) { Task { await search(latitude: place.latitude, longitude: place.longitude, scenic: true) } }
+                }
+            }
+            Text(String(localized: "地点来源：高德地图 · 不代表登山路线推荐", bundle: AgentIdentityLanguage.appBundle()))
+        }.navigationTitle(String(localized: "爬山", bundle: AgentIdentityLanguage.appBundle())).disabled(busy)
+            .onReceive(location.$coordinate) { coordinate in
+                if let point = coordinate { Task { await search(latitude: point.latitude, longitude: point.longitude) } }
+            }
+            .fileImporter(isPresented: $importing, allowedContentTypes: [.xml, .data], allowsMultipleSelection: false) { result in
+                do {
+                    guard let url = try result.get().first, url.pathExtension.lowercased() == "gpx" else { return }
+                    let access = url.startAccessingSecurityScopedResource(); defer { if access { url.stopAccessingSecurityScopedResource() } }
+                    guard (try url.resourceValues(forKeys: [.fileSizeKey]).fileSize ?? 0) <= 5_000_000 else { throw CocoaError(.fileReadTooLarge) }
+                    let data = try Data(contentsOf: url); guard data.count <= 5_000_000 else { throw CocoaError(.fileReadTooLarge) }
+                    let reader = HikingGPXReader(); let parser = XMLParser(data: data); parser.shouldResolveExternalEntities = false; parser.delegate = reader
+                    guard !String(decoding: data, as: UTF8.self).uppercased().contains("<!DOCTYPE"), parser.parse(), !reader.failed, reader.segments.flatMap({ $0 }).count >= 2 else { throw CocoaError(.fileReadCorruptFile) }
+                    imported = reader.segments; highest = reader.highest; message = String(localized: "GPX 已导入，仅保留在本次预览中。", bundle: AgentIdentityLanguage.appBundle())
+                } catch { message = String(localized: "无法导入，请选择有效 GPX 文件（最多500万字节、2万个点）。", bundle: AgentIdentityLanguage.appBundle()) }
+            }
+    }
+    @MainActor private func search(latitude: Double, longitude: Double, scenic: Bool = false) async {
+        guard !busy else { return }; busy = true; defer { busy = false }
+        do {
+            struct Response: Decodable { let places: [HikingPlace] }
+            let result = try await family.call("/api/hiking/nearby", method: "POST", body: ["latitude": latitude, "longitude": longitude, "scenic": scenic])
+            places = try JSONDecoder().decode(Response.self, from: JSONSerialization.data(withJSONObject: result)).places
+            message = places.isEmpty ? String(localized: "附近暂未找到结果。", bundle: AgentIdentityLanguage.appBundle()) : String(localized: "地点来源：高德地图", bundle: AgentIdentityLanguage.appBundle())
+        } catch { message = String(localized: "地点查询失败，请检查网络及地图服务配置后重试。", bundle: AgentIdentityLanguage.appBundle()) }
+    }
+}
+
+private final class HikingGPXReader: NSObject, XMLParserDelegate {
+    var segments: [[CLLocationCoordinate2D]] = []; var highest: Double?; var failed = false
+    private var segment: [CLLocationCoordinate2D] = []; private var active = false; private var count = 0
+    private var point: CLLocationCoordinate2D?; private var elevation = false; private var text = ""
+    func parser(_ parser: XMLParser, didStartElement element: String, namespaceURI: String?, qualifiedName qName: String?, attributes: [String: String]) {
+        if element == "trkseg" || element == "rte" { active = true; segment = [] }
+        if active && (element == "trkpt" || element == "rtept") {
+            guard let lat = Double(attributes["lat"] ?? ""), let lon = Double(attributes["lon"] ?? ""), lat.isFinite, lon.isFinite, abs(lat) <= 90, abs(lon) <= 180, count < 20000 else { failed = true; parser.abortParsing(); return }
+            point = CLLocationCoordinate2D(latitude: lat, longitude: lon); count += 1
+        }
+        if element == "ele" && point != nil { elevation = true; text = "" }
+    }
+    func parser(_ parser: XMLParser, foundCharacters string: String) { if elevation { text += string } }
+    func parser(_ parser: XMLParser, didEndElement element: String, namespaceURI: String?, qualifiedName qName: String?) {
+        if element == "ele" && elevation { if let value = Double(text), value.isFinite, abs(value) < 20000 { highest = max(highest ?? value, value) }; elevation = false }
+        if element == "trkpt" || element == "rtept" { if let point { segment.append(point) }; point = nil }
+        if element == "trkseg" || element == "rte" { if !segment.isEmpty { segments.append(segment) }; active = false }
     }
 }

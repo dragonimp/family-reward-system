@@ -172,6 +172,7 @@ app.MapPublicActivityIntroduction();
 app.MapAnonymousActivityMedia();
 app.MapExerciseEndpoints();
 app.MapDiningEndpoints();
+app.MapHikingEndpoints();
 app.MapAtlasReleaseVersion();
 if (!string.IsNullOrWhiteSpace(releaseControlApplicationId))
     app.MapAtlasReleaseDrain(ReleaseDrainExtensions.UpgradeControlPolicy);
