@@ -22,7 +22,7 @@ internal sealed class DiningGatheringsPage : ContentPage
             {
                 id = operation, restaurantId = place.Id, restaurantName = place.Name
             })));
-        var code = new Entry { Placeholder = "粘贴饭局口令" };
+        var code = new Entry { Placeholder = "输入 6 位数字口令", Keyboard = Keyboard.Numeric };
         content.Add(code);
         content.Add(MomentStyle.Action("扫描饭局二维码", async () =>
         {
@@ -37,8 +37,10 @@ internal sealed class DiningGatheringsPage : ContentPage
         }));
         content.Add(MomentStyle.Action("加入饭局", () =>
         {
-            if (Guid.TryParseExact(code.Text?.Trim(), "D", out var value)) _ = Update("/join", new { code = value });
-            else status.Text = "请输入完整饭局口令。";
+            var value = code.Text?.Trim() ?? "";
+            if ((value.Length == 6 && value.All(char.IsAsciiDigit)) || Guid.TryParseExact(value, "D", out _))
+                _ = Update("/join", new { code = value });
+            else status.Text = "请输入 6 位数字口令。";
         }));
         content.Add(MomentStyle.Action("刷新饭局", () => _ = Update()));
         content.Add(status);
@@ -67,6 +69,7 @@ internal sealed class DiningGatheringsPage : ContentPage
             var items = await store.CallAsync(Endpoint);
             if (session != store.SessionVersion) { rows.Clear(); return; }
             rows.Clear();
+            if (items.GetArrayLength() == 0) rows.Add(MomentStyle.Caption("暂无饭局"));
             foreach (var item in items.EnumerateArray()) Show(item);
             status.Text = "";
         }
@@ -78,6 +81,22 @@ internal sealed class DiningGatheringsPage : ContentPage
         finally { content.IsEnabled = true; }
     }
 
+    private async Task CopyCode(Guid id)
+    {
+        try
+        {
+            var latest = await store.CallAsync($"{Endpoint}/{id:D}");
+            if (latest.TryGetProperty("shortCode", out var code) && code.GetString() is { } digits)
+            {
+                await Clipboard.Default.SetTextAsync(digits);
+                status.Text = "复制口令成功";
+                await DisplayAlertAsync("复制口令成功", digits, "好");
+            }
+            else await DisplayAlertAsync("口令已失效", "", "好");
+        }
+        catch (Exception) { await DisplayAlertAsync("暂时无法复制口令，请重试", "", "好"); }
+    }
+
     private void Show(JsonElement item)
     {
         var id = item.GetProperty("id").GetGuid();
@@ -87,10 +106,18 @@ internal sealed class DiningGatheringsPage : ContentPage
         var card = new VerticalStackLayout { Spacing = 8 };
         card.Add(MomentStyle.Title(item.GetProperty("restaurantName").GetString() ?? "", 18));
         card.Add(MomentStyle.Caption($"{(ended ? "已结束" : "进行中")} · {members.GetArrayLength()} 人已加入 · {confirmed} 人已确认"));
+        var participants = new VerticalStackLayout { Spacing = 4, IsVisible = false };
         foreach (var member in members.EnumerateArray())
         {
             var userId = member.GetProperty("userId").GetString() ?? "";
-            card.Add(MomentStyle.Caption("参与者 " + userId[^Math.Min(6, userId.Length)..]));
+            participants.Add(MomentStyle.Caption("参与者 " + userId[^Math.Min(6, userId.Length)..]));
+        }
+        card.Add(MomentStyle.Action("参与者", () => participants.IsVisible = !participants.IsVisible));
+        card.Add(participants);
+        if (item.TryGetProperty("shortCode", out var shortCode) && shortCode.GetString() is { } digits)
+        {
+            card.Add(MomentStyle.Action($"复制口令 {digits}", () => _ = CopyCode(id)));
+            card.Add(MomentStyle.Caption("口令自创建起 20 分钟有效"));
         }
         if (item.GetProperty("joinCode").GetString() is { } code)
         {
@@ -107,13 +134,11 @@ internal sealed class DiningGatheringsPage : ContentPage
                         Padding = 24, Spacing = 16,
                         Children =
                         {
-                            new Image { Source = ImageSource.FromStream(() => new MemoryStream(bytes)), WidthRequest = 240, HeightRequest = 240 },
-                            MomentStyle.Caption(code)
+                            new Image { Source = ImageSource.FromStream(() => new MemoryStream(bytes)), WidthRequest = 240, HeightRequest = 240 }
                         }
                     }
                 });
             }));
-            card.Add(MomentStyle.Action("分享饭局口令", () => _ = Share.Default.RequestAsync(new ShareTextRequest { Text = code, Title = "饭局口令" })));
         }
         if (!ended && item.GetProperty("myConfirmedAt").ValueKind == JsonValueKind.Null)
             card.Add(MomentStyle.Action("确认就餐", () => _ = Update($"/{id:D}/confirm", new { })));

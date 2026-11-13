@@ -19,12 +19,17 @@ assert call(user=u[0],data=p)['id']==id
 assert call(user=u[0].upper(),data=p)['id']==id
 call(user=u[0],data={**p,'restaurantName':'different'},expected=409)
 call('/'+id,u[4],expected=404)
-code=call('/'+id,u[0])['joinCode']
+host_row=call('/'+id,u[0])
+code=host_row['shortCode']
+assert len(code)==6 and code.isascii() and code.isdecimal()
+from datetime import datetime
+assert (datetime.fromisoformat(host_row['codeExpiresAt'])-datetime.fromisoformat(host_row['createdAt'])).total_seconds()==1200
+assert call('/'+id,u[1],expected=404) is None
 with concurrent.futures.ThreadPoolExecutor() as pool:
  assert all(x['id']==id for x in pool.map(lambda who:call('/join',who,{'code':code.upper()}),u[1:4]))
-call('/join',u[1],{'code':code})
+call('/join',u[1],{'code':host_row['joinCode'].upper()})
 assert len(call('/'+id,u[0])['members'])==4
-assert call('/'+id,u[1])['joinCode'] is None
+assert call('/'+id,u[1])['joinCode'] is None and call('/'+id,u[1])['shortCode'] is None
 call('/'+id+'/end',u[1],{},404)
 for who in u[:3]:call('/'+id.upper()+'/confirm',who,{},204)
 call('/'+id+'/confirm',u[0],{},204)
@@ -89,3 +94,12 @@ assert call('/invitations',u[1])[0]['status']=='accepted'
 base=os.environ['DINING_SOCIAL_TEST_ORIGIN'] + '/api/dining/gatherings'
 assert len(call('/'+nextid,u[1])['members'])==2
 print('PASS: invitation ownership, mutual consent, acceptance and retry safety')
+
+import subprocess
+active=call('/'+nextid,u[0])
+subprocess.run(['psql', os.environ['FAMILY_REWARD_DB_DSN'], '-X', '-v', 'ON_ERROR_STOP=1', '-c',
+    f"UPDATE dining_gatherings SET created_at=now()-interval '21 minutes' WHERE id='{nextid}'"], check=True)
+expired=call('/'+nextid,u[0])
+assert expired['joinExpired'] and expired['joinCode'] is None
+call('/join',u[4],{'code':active['shortCode']},404)
+assert expired['shortCode'] is None

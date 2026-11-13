@@ -7,7 +7,7 @@ createdb "$db"
 trap 'if [[ -n "${server:-}" ]]; then kill "$server" 2>/dev/null || true; wait "$server" 2>/dev/null || true; fi; dropdb "$db"' EXIT
 pg_dump -Fc "$db" > "$ATLAS_BUILD_WORK/before.dump"
 mkdir "$ATLAS_BUILD_WORK/migrations"
-cp scripts/migrations/20261113-dining-{gatherings,social}-v1.sql "$ATLAS_BUILD_WORK/migrations/"
+cp scripts/migrations/20261113-dining-{gatherings,social}-v1.sql scripts/migrations/20261114-dining-short-codes-v1.sql "$ATLAS_BUILD_WORK/migrations/"
 export FAMILY_REWARD_DB_DSN="dbname=$db" FAMILY_REWARD_DB_BACKUP="$ATLAS_BUILD_WORK/before.dump"
 for attempt in 1 2; do
     bash scripts/run-db-migrations.sh "$ATLAS_BUILD_WORK/migrations"

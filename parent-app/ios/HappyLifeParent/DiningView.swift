@@ -1084,6 +1084,7 @@ private struct DiningGatheringsView: View {
     @State private var operation = UUID()
     @State private var busy = false
     @State private var failed = false
+    @State private var copyNotice: String?
     @State private var scanning = false
     @State private var displayedCode: String?
     @Environment(\.dismiss) private var dismiss
@@ -1100,37 +1101,51 @@ private struct DiningGatheringsView: View {
                     }
                 }
                 Section("面对面加入") {
-                    TextField("粘贴饭局口令", text: $code).textInputAutocapitalization(.never).autocorrectionDisabled()
+                    TextField("输入 6 位数字口令", text: $code).keyboardType(.numberPad)
                     if AgentIdentityQRCodeScanner.isAvailable {
                         Button("扫描饭局二维码") { scanning = true }
                     }
                     Button("加入饭局") {
                         Task { await update("/join", body: ["code": code.trimmingCharacters(in: .whitespacesAndNewlines)]) }
-                    }.disabled(UUID(uuidString: code.trimmingCharacters(in: .whitespacesAndNewlines)) == nil)
+                    }.disabled(!validCode(code))
                 }
                 if failed { Text("饭局操作未完成，请核对口令或刷新重试。").foregroundStyle(.secondary) }
                 Section("我的饭局") {
+                    if items.isEmpty && !busy && !failed { Text("暂无饭局").foregroundStyle(.secondary) }
                     ForEach(items.compactMap { item in (item["id"] as? String).map { GatheringRow(id: $0, item: item) } }) { row in
                         let item = row.item
                         let ended = item["endedAt"] is String
                         let confirmed = item["myConfirmedAt"] is String
                         let members = item["members"] as? [[String: Any]] ?? []
                         VStack(alignment: .leading, spacing: 8) {
-                            Text(item["restaurantName"] as? String ?? "").font(.headline)
-                            Text(ended ? "已结束" : "进行中")
+                            HStack {
+                                Text(item["restaurantName"] as? String ?? "").font(.headline)
+                                Spacer()
+                                Text(ended ? "已结束" : "进行中").font(.caption).foregroundStyle(.secondary)
+                            }
                             Text("\(members.count) 人已加入 · \(members.filter { $0["confirmedAt"] is String }.count) 人已确认")
-                            ForEach(members.compactMap { $0["userId"] as? String }, id: \.self) { member in
-                                Text("参与者 \(member.suffix(6))").font(.caption)
+                                .font(.subheadline).foregroundStyle(.secondary)
+                            DisclosureGroup("参与者") {
+                                ForEach(members.compactMap { $0["userId"] as? String }, id: \.self) { member in
+                                    Text("参与者 \(member.suffix(6))").font(.caption)
+                                }
+                            }.font(.subheadline)
+                            if let shortCode = item["shortCode"] as? String {
+                                Button {
+                                    Task { await copyCode(row.id) }
+                                } label: {
+                                    Label("复制口令 \(shortCode)", systemImage: "doc.on.doc")
+                                }
+                                Text("口令自创建起 20 分钟有效").font(.caption).foregroundStyle(.secondary)
                             }
                             if let code = item["joinCode"] as? String {
                                 Button("显示饭局二维码") { displayedCode = code }
-                                ShareLink(item: code) { Label("分享饭局口令", systemImage: "square.and.arrow.up") }
                             }
                             if !ended && !confirmed {
                                 Button("确认就餐") { Task { await update("/\(row.id)/confirm", body: [:]) } }
                             }
                             if !ended && item["isHost"] as? Bool == true {
-                                Button("结束饭局") { Task { await update("/\(row.id)/end", body: [:]) } }
+                                Button("结束饭局", role: .destructive) { Task { await update("/\(row.id)/end", body: [:]) } }
                             }
                         }.buttonStyle(.borderless)
                     }
@@ -1148,8 +1163,34 @@ private struct DiningGatheringsView: View {
             .sheet(isPresented: Binding(get: { displayedCode != nil }, set: { if !$0 { displayedCode = nil } })) {
                 if let displayedCode { invitationQR(displayedCode) }
             }
+            .alert(copyNotice ?? "", isPresented: Binding(get: { copyNotice != nil }, set: { if !$0 { copyNotice = nil } })) {
+                Button("好") { copyNotice = nil }
+            }
             .task { await refresh() }
             .refreshable { await refresh() }
+        }
+    }
+
+    private func validCode(_ value: String) -> Bool {
+        let value = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        return (value.utf8.count == 6 && value.utf8.allSatisfy { (48...57).contains($0) })
+            || UUID(uuidString: value) != nil
+    }
+
+    private func copyCode(_ id: String) async {
+        guard !busy else { return }
+        busy = true
+        defer { busy = false }
+        do {
+            let latest = try await family.call(endpoint + "/" + id) as? [String: Any]
+            if let code = latest?["shortCode"] as? String {
+                UIPasteboard.general.string = code
+                copyNotice = "复制口令成功"
+            } else {
+                copyNotice = "口令已失效"
+            }
+        } catch {
+            copyNotice = "暂时无法复制口令，请重试"
         }
     }
 
@@ -1165,7 +1206,6 @@ private struct DiningGatheringsView: View {
                 Image(decorative: image, scale: 1).interpolation(.none).resizable()
                     .scaledToFit().frame(width: 220, height: 220).padding(12).background(.white)
             }
-            Text(code).font(.caption.monospaced()).textSelection(.enabled)
             Button("完成") { displayedCode = nil }
         }.padding()
     }
