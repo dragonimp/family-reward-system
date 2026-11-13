@@ -104,10 +104,9 @@ public sealed class DiningPanel : ContentView
         catch { readable = false; message = "干饭记录暂时无法读取，原记录已保留，请重试。"; }
         var outside = new ScrollView { Content = body };
         var cooking = new KitchenPanel(store, owner);
-        var healthy = new HealthyEatingPanel();
         var viewport = new ContentView { Content = outside };
-        Border Modes(int index) => MomentStyle.Segmented(new[] { "出去吃", "下厨房", "健康饮食" }, index, next => {
-            viewport.Content = next == 2 ? healthy : next == 1 ? cooking : outside; modeHost.Content = Modes(next);
+        Border Modes(int index) => MomentStyle.Segmented(new[] { "出去吃", "下厨房" }, index, next => {
+            viewport.Content = next == 1 ? cooking : outside; modeHost.Content = Modes(next);
             if (next == 1) _ = cooking.Load();
         });
         var root = new Grid { RowDefinitions = new RowDefinitionCollection { new(GridLength.Auto), new(GridLength.Star) } };
@@ -188,12 +187,22 @@ public sealed class DiningPanel : ContentView
             }, true);
             confirm.IsEnabled = !confirmed && !Working;
             card.Add(confirm);
-            var another = MomentStyle.Action("换一家", () => _ = Decide()); another.IsEnabled = !Working; card.Add(another);
-            var travelActions = new Grid { ColumnSpacing = 8 };
-            travelActions.ColumnDefinitions.Add(new ColumnDefinition(GridLength.Star));
-            travelActions.ColumnDefinitions.Add(new ColumnDefinition(GridLength.Star));
-            travelActions.Add(MomentStyle.Action("带我过去", () => _ = Navigate(place, trip.Driving())), 0, 0);
-            travelActions.Add(MomentStyle.Action("点个外卖", () => _ = OrderDelivery(place)), 1, 0);
+            var travelActions = new Grid
+            {
+                ColumnSpacing = 6,
+                ColumnDefinitions = new ColumnDefinitionCollection
+                {
+                    new(GridLength.Star), new(GridLength.Star), new(GridLength.Star)
+                }
+            };
+            var another = RecommendationAction("换一家", () => _ = Decide());
+            another.IsEnabled = !Working;
+            travelActions.Add(another, 0, 0);
+            var directions = RecommendationAction("带我去", () => _ = Navigate(place, trip.Driving()));
+            directions.ImageSource = "dining_navigation_arrow";
+            directions.ContentLayout = new Button.ButtonContentLayout(Button.ButtonContentLayout.ImagePosition.Left, 3);
+            travelActions.Add(directions, 1, 0);
+            travelActions.Add(RecommendationAction("点外卖", () => _ = OrderDelivery(place)), 2, 0);
             card.Add(travelActions);
             card.Add(MomentStyle.Action(archive.Favorites.Any(p => p.Id == place.Id) ? "♥ 已收藏" : "♡ 收藏餐厅", () => { Update(a => { if (a.Favorites.Any(p => p.Id == place.Id)) a.Favorites.RemoveAll(p => p.Id == place.Id); else a.Favorites.Add(place); }); Render(); }));
             body.Add(MomentStyle.Card(card));
@@ -201,6 +210,14 @@ public sealed class DiningPanel : ContentView
         if (message is { Length: > 0 }) body.Add(new Label { Text = message, FontSize = 14, TextColor = Colors.DarkOrange });
         body.Add(MomentStyle.Caption("附近餐厅来自高德地图。位置仅用于本次搜索，记录、收藏与偏好按账号跨设备同步。价格、评分缺失时不作推测。"));
     }
+    private static Button RecommendationAction(string title, Action action)
+    {
+        var button = MomentStyle.Action(title, action);
+        button.FontSize = 14;
+        button.Padding = new Thickness(2, 8);
+        return button;
+    }
+
     private async Task OrderDelivery(DiningPlace place)
     {
         if (place.GetVerifiedMeituanShopUrl() is { } shop && TryOpenMeituan(shop)) return;

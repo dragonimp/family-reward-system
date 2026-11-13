@@ -15,14 +15,12 @@ struct DiningModesView: View {
             Picker(kitchenText("用餐方式"), selection: $cooking) {
                 Text(kitchenText("出去吃")).tag(0)
                 Text(kitchenText("下厨房")).tag(1)
-                Text(String(localized: "健康饮食", bundle: AgentIdentityLanguage.appBundle())).tag(2)
             }.pickerStyle(.segmented).padding(.horizontal).padding(.vertical, 8)
             ZStack {
                 DiningView(userID: userID, family: family)
                     .opacity(cooking == 0 ? 1 : 0).allowsHitTesting(cooking == 0).accessibilityHidden(cooking != 0)
                 KitchenView(family: family, active: cooking == 1)
                     .opacity(cooking == 1 ? 1 : 0).allowsHitTesting(cooking == 1).accessibilityHidden(cooking != 1)
-                HealthyEatingView().opacity(cooking == 2 ? 1 : 0).allowsHitTesting(cooking == 2).accessibilityHidden(cooking != 2)
             }
         }
     }
@@ -163,7 +161,18 @@ private struct KitchenView: View {
                 }.padding(20).frame(maxWidth: 760).frame(maxWidth: .infinity)
             }.background(Color(uiColor: .systemGroupedBackground))
                 .navigationTitle(kitchenText("下厨房")).navigationBarTitleDisplayMode(.inline)
-                .toolbar { ToolbarItem(placement: .topBarTrailing) { Menu { NavigationLink("我的厨房") { MyKitchenView(family: family) } } label: { Image(systemName: "ellipsis") }.accessibilityLabel("更多") } }
+                .toolbar {
+                    ToolbarItem(placement: .topBarTrailing) {
+                        Menu {
+                            NavigationLink("我的厨房") { MyKitchenView(family: family) }
+                            NavigationLink(kitchenText("健康饮食")) {
+                                HealthyEatingView().navigationBarTitleDisplayMode(.inline)
+                            }
+                        } label: {
+                            Image(systemName: "ellipsis")
+                        }.accessibilityLabel("更多")
+                    }
+                }
                 .disabled(model.busy)
                 .task(id: active) { if active { await model.load() } }
                 .sheet(isPresented: $showingRecipe) {

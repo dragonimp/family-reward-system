@@ -717,22 +717,32 @@ struct DiningView: View {
                     .frame(maxWidth: .infinity)
             }.buttonStyle(.borderedProminent).controlSize(.large).tint(.orange).disabled(model.confirmed)
                 .anchorPreference(key: DiningNavigationBounds.self, value: .bounds) { $0 }
-            HStack(spacing: 8) {
+            HStack(spacing: 6) {
                 Button { Task { await model.decide() } } label: {
-                    Label(diningText("换一家"), systemImage: "arrow.clockwise").frame(maxWidth: .infinity)
+                    recommendationActionLabel("换一家", icon: "arrow.clockwise")
                 }
                 Button { navigationPlace = place } label: {
-                    Label(diningText("带我过去"), systemImage: "map").frame(maxWidth: .infinity)
+                    recommendationActionLabel("带我去", icon: "location.fill")
                 }
                 Button { Task { await orderDelivery(place) } } label: {
-                    Text(diningText("点个外卖")).frame(maxWidth: .infinity)
+                    recommendationActionLabel("点外卖")
                 }
-            }.buttonStyle(.bordered).controlSize(.large)
-                .lineLimit(1).minimumScaleFactor(0.75)
+            }.buttonStyle(.bordered).controlSize(.small)
         }.padding(18).frame(maxWidth: .infinity, alignment: .leading)
             .background(.background, in: RoundedRectangle(cornerRadius: 24))
             .disabled(model.busy)
     }
+    private func recommendationActionLabel(_ title: String.LocalizationValue, icon: String? = nil) -> some View {
+        HStack(spacing: 3) {
+            if let icon {
+                Image(systemName: icon).font(.system(size: 11)).accessibilityHidden(true)
+            }
+            Text(diningText(title)).lineLimit(1).minimumScaleFactor(0.7)
+        }
+        .font(.subheadline)
+        .frame(maxWidth: .infinity, minHeight: 36)
+    }
+
     private func cuisineText(_ place: DiningPlace) -> String {
         let bundle = AgentIdentityLanguage.appBundle()
         let locale = Locale(identifier: AgentIdentityLanguage.current)

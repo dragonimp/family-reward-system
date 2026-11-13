@@ -65,7 +65,18 @@ public sealed class KitchenPanel : ContentView
         body.Children.Clear();
         var title = new Grid { ColumnDefinitions = new ColumnDefinitionCollection { new(GridLength.Star), new(GridLength.Auto) } };
         title.Add(MomentStyle.Title("今天做什么？", 28));
-        title.Add(MomentStyle.Action("···", async () => { if (await owner.DisplayActionSheetAsync("下厨房", "取消", null, "我的厨房") == "我的厨房") await owner.Navigation.PushAsync(new MyKitchenPage(store)); }), 1);
+        title.Add(MomentStyle.Action("···", async () =>
+        {
+            var choice = await owner.DisplayActionSheetAsync("下厨房", "取消", null, "我的厨房", "健康饮食");
+            if (choice == "我的厨房") await owner.Navigation.PushAsync(new MyKitchenPage(store));
+            else if (choice == "健康饮食")
+                await owner.Navigation.PushAsync(new ContentPage
+                {
+                    Title = "健康饮食",
+                    BackgroundColor = MomentStyle.Background,
+                    Content = new HealthyEatingPanel()
+                });
+        }), 1);
         body.Add(title);
         var grid = new Grid { ColumnSpacing = 10, RowSpacing = 10,
             ColumnDefinitions = new ColumnDefinitionCollection { new(GridLength.Star), new(GridLength.Star) } };

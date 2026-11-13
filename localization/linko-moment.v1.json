@@ -1,6 +1,16 @@
 {
   "catalogVersion": 1,
   "messages": {
+    "moment.td4507ecfd49d": {
+      "zh-Hans": "点外卖",
+      "en": "Delivery",
+      "iosKey": "点外卖"
+    },
+    "moment.t402115dd9854": {
+      "zh-Hans": "带我去",
+      "en": "Directions",
+      "iosKey": "带我去"
+    },
     "moment.td91e010455ef": {
       "zh-Hans": "点个外卖",
       "en": "Order delivery",
