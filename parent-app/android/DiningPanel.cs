@@ -161,6 +161,14 @@ public sealed class DiningPanel : ContentView
             var decide = MomentStyle.Action(busy ? "正在安排这顿饭…" : "🎲 帮我决定", () => _ = Decide(), true); decide.IsEnabled = !Working; decide.BackgroundColor = Color.FromArgb("#FF8A20"); decide.CornerRadius = 28; hero.Add(decide);
             var card = MomentStyle.Card(hero, new Thickness(24)); card.BackgroundColor = Color.FromArgb("#F4E9E2"); body.Add(card);
         }
+        var socialActions = new Grid
+        {
+            ColumnSpacing = 6,
+            ColumnDefinitions = new ColumnDefinitionCollection { new(GridLength.Star), new(GridLength.Star) }
+        };
+        socialActions.Add(MomentStyle.Action("一起干饭", () => _ = owner.Navigation.PushAsync(new DiningGatheringsPage(store, result))), 0, 0);
+        socialActions.Add(MomentStyle.Action("我的饭圈", () => _ = owner.Navigation.PushAsync(new DiningCirclePage(store, result))), 1, 0);
+        body.Add(socialActions);
         if (result is { } place)
         {
             var card = new VerticalStackLayout { Spacing = 14 };
@@ -594,6 +602,7 @@ public sealed class DiningPanel : ContentView
                         row.Add(MomentStyle.Caption(entry.Place.Address.Length == 0 ? "已记录定位，暂无地址" : entry.Place.Address));
                 }
                 else row.Add(entry.EatenAt is not null ? MomentStyle.Caption("✓ 吃过了") : MomentStyle.Action("我吃过了", () => { Update(a => a.ConfirmEaten(entry.Id)); Fill(); }));
+                row.Add(MomentStyle.Action("分享到饭圈", () => _ = owner.Navigation.PushAsync(new DiningCirclePage(store, entry.Place))));
                 rows.Add(MomentStyle.Card(row));
             }
             if (archive.History.Count == 0) rows.Add(MomentStyle.Caption("选好餐厅后，记录会保存在这里。"));

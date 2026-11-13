@@ -3,6 +3,7 @@ import SwiftUI
 import MapKit
 import CoreLocation
 import CryptoKit
+import CoreImage.CIFilterBuiltins
 
 @MainActor final class DiningStore: NSObject, ObservableObject, CLLocationManagerDelegate {
     @Published var archive = DiningArchive()
@@ -509,13 +510,17 @@ struct DiningView: View {
     @State private var showingCircles = false
     @State private var showingCheckIn = false
     @State private var showingFilters = false
+    @State private var showingGatherings = false
+    @State private var showingDiningCircle = false
+    @State private var historySharePlace: DiningPlace?
+    private let family: FamilyStore
     @State private var spinning = false
     @State private var navigationPlace: DiningPlace?
     @State private var deliveryFallback: DiningPlace?
     @State private var deliveryUnavailable = false
     @Environment(\.openURL) private var openWebURL
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    init(userID: String, family: FamilyStore) { _model = StateObject(wrappedValue: DiningStore(userID: userID, family: family)) }
+    init(userID: String, family: FamilyStore) { self.family = family; _model = StateObject(wrappedValue: DiningStore(userID: userID, family: family)) }
     var body: some View {
         NavigationStack {
             ScrollView {
@@ -538,6 +543,10 @@ struct DiningView: View {
                             .disabled(model.busy || model.checkingIn)
                     }.font(.subheadline)
 
+                    HStack(spacing: 16) {
+                        Button("一起干饭", systemImage: "person.2") { showingGatherings = true }
+                        Button("我的饭圈", systemImage: "bubble.left") { showingDiningCircle = true }
+                    }.font(.subheadline)
                     if let syncMessage = model.syncMessage { Text(syncMessage).font(.caption).foregroundStyle(.secondary) }
                     if let place = model.result {
                         resultCard(place, operation: model.confirmationOperation)
@@ -591,6 +600,8 @@ struct DiningView: View {
             }
             .onDisappear { model.stop(); navigationPlace = nil }
         }
+        .sheet(isPresented: $showingDiningCircle) { DiningCircleView(family: family, place: model.result) }
+        .sheet(isPresented: $showingGatherings) { DiningGatheringsView(family: family, place: model.result) }
         .confirmationDialog(diningText("点个外卖"), isPresented: Binding(
             get: { deliveryFallback != nil },
             set: { if !$0 { deliveryFallback = nil } }
@@ -831,6 +842,8 @@ struct DiningView: View {
                     ForEach(model.archive.history) { choice in
                         VStack(alignment: .leading, spacing: 8) {
                             Text(choice.place.name).font(.headline)
+                            Button("分享到饭圈") { historySharePlace = choice.place }
+
                             Text(choice.selectedAt, format: .dateTime.year().month().day().hour().minute()).font(.caption).foregroundStyle(.secondary)
                             if choice.checkedIn == true {
                                 let count = model.archive.habits[choice.place.id]?.checkIns ?? 0
@@ -851,6 +864,7 @@ struct DiningView: View {
                 if let message = model.message { Text(message).foregroundStyle(.secondary) }
             }.navigationTitle(String(localized: "干饭记录与收藏", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))).toolbar { ToolbarItem(placement: .topBarTrailing) { Button(String(localized: "完成", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) { showingRecords = false } } }
         }
+        .sheet(item: $historySharePlace) { DiningCircleView(family: family, place: $0) }
     }
     private var circles: some View {
         NavigationStack {
@@ -1058,5 +1072,337 @@ private struct DiningNavigationPicker: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+    }
+}
+
+private struct DiningGatheringsView: View {
+    let family: FamilyStore
+    let place: DiningPlace?
+    private let endpoint = "/api/dining/gatherings"
+    @State private var items: [[String: Any]] = []
+    @State private var code = ""
+    @State private var operation = UUID()
+    @State private var busy = false
+    @State private var failed = false
+    @State private var scanning = false
+    @State private var displayedCode: String?
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        NavigationStack {
+            List {
+                if let place {
+                    Button("为「\(place.name)」创建饭局") {
+                        Task {
+                            await update("", body: ["id": operation.uuidString,
+                                "restaurantId": place.id, "restaurantName": place.name])
+                        }
+                    }
+                }
+                Section("面对面加入") {
+                    TextField("粘贴饭局口令", text: $code).textInputAutocapitalization(.never).autocorrectionDisabled()
+                    if AgentIdentityQRCodeScanner.isAvailable {
+                        Button("扫描饭局二维码") { scanning = true }
+                    }
+                    Button("加入饭局") {
+                        Task { await update("/join", body: ["code": code.trimmingCharacters(in: .whitespacesAndNewlines)]) }
+                    }.disabled(UUID(uuidString: code.trimmingCharacters(in: .whitespacesAndNewlines)) == nil)
+                }
+                if failed { Text("饭局操作未完成，请核对口令或刷新重试。").foregroundStyle(.secondary) }
+                Section("我的饭局") {
+                    ForEach(items.compactMap { item in (item["id"] as? String).map { GatheringRow(id: $0, item: item) } }) { row in
+                        let item = row.item
+                        let ended = item["endedAt"] is String
+                        let confirmed = item["myConfirmedAt"] is String
+                        let members = item["members"] as? [[String: Any]] ?? []
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text(item["restaurantName"] as? String ?? "").font(.headline)
+                            Text(ended ? "已结束" : "进行中")
+                            Text("\(members.count) 人已加入 · \(members.filter { $0["confirmedAt"] is String }.count) 人已确认")
+                            ForEach(members.compactMap { $0["userId"] as? String }, id: \.self) { member in
+                                Text("参与者 \(member.suffix(6))").font(.caption)
+                            }
+                            if let code = item["joinCode"] as? String {
+                                Button("显示饭局二维码") { displayedCode = code }
+                                ShareLink(item: code) { Label("分享饭局口令", systemImage: "square.and.arrow.up") }
+                            }
+                            if !ended && !confirmed {
+                                Button("确认就餐") { Task { await update("/\(row.id)/confirm", body: [:]) } }
+                            }
+                            if !ended && item["isHost"] as? Bool == true {
+                                Button("结束饭局") { Task { await update("/\(row.id)/end", body: [:]) } }
+                            }
+                        }.buttonStyle(.borderless)
+                    }
+                }
+            }
+            .disabled(busy)
+            .navigationTitle("一起干饭")
+            .toolbar { ToolbarItem(placement: .cancellationAction) { Button("完成") { dismiss() } } }
+            .sheet(isPresented: $scanning) {
+                AgentIdentityQRCodeScanner(accepts: { UUID(uuidString: $0) != nil }) { value in
+                    if let value { code = value }
+                    scanning = false
+                }
+            }
+            .sheet(isPresented: Binding(get: { displayedCode != nil }, set: { if !$0 { displayedCode = nil } })) {
+                if let displayedCode { invitationQR(displayedCode) }
+            }
+            .task { await refresh() }
+            .refreshable { await refresh() }
+        }
+    }
+
+    private func invitationQR(_ code: String) -> some View {
+        let filter = CIFilter.qrCodeGenerator()
+        filter.message = Data(code.utf8)
+        let image = filter.outputImage.flatMap { output in
+            CIContext().createCGImage(output, from: output.extent)
+        }
+        return VStack(spacing: 20) {
+            Text("面对面扫码加入").font(.headline)
+            if let image {
+                Image(decorative: image, scale: 1).interpolation(.none).resizable()
+                    .scaledToFit().frame(width: 220, height: 220).padding(12).background(.white)
+            }
+            Text(code).font(.caption.monospaced()).textSelection(.enabled)
+            Button("完成") { displayedCode = nil }
+        }.padding()
+    }
+
+    private struct GatheringRow: Identifiable {
+        let id: String
+        let item: [String: Any]
+    }
+
+    private func refresh() async {
+        guard !busy else { return }
+        busy = true
+        defer { busy = false }
+        do { items = try await family.call(endpoint) as? [[String: Any]] ?? []; failed = false }
+        catch { failed = true }
+    }
+
+    private func update(_ path: String, body: [String: Any]) async {
+        guard !busy else { return }
+        busy = true
+        defer { busy = false }
+        do {
+            _ = try await family.call(endpoint + path, method: "POST", body: body)
+            if path.isEmpty { operation = UUID() }
+            items = try await family.call(endpoint) as? [[String: Any]] ?? []
+            failed = false
+        } catch { failed = true }
+    }
+}
+
+private struct DiningCircleView: View {
+    let family: FamilyStore
+    let place: DiningPlace?
+    @Environment(\.dismiss) private var dismiss
+    @State private var posts: [[String: Any]] = []
+    @State private var buddies: [[String: Any]] = []
+    @State private var restaurants: [[String: Any]] = []
+    @State private var invitations: [[String: Any]] = []
+    @State private var note = ""
+    @State private var scope = "private"
+    @State private var selected: Set<String> = []
+    @State private var draft = UUID()
+    @State private var commentText: [String: String] = [:]
+    @State private var commentDrafts: [String: UUID] = [:]
+    @State private var gatheringDrafts: [String: UUID] = [:]
+    @State private var busy = false
+    @State private var failed = false
+    private let base = "/api/dining/circle"
+    private var mutual: [[String: Any]] { buddies.filter { $0["incoming"] as? Bool == true && $0["outgoing"] as? Bool == true } }
+
+    var body: some View {
+        NavigationStack {
+            List {
+                if failed { Text("饭圈操作未完成，请刷新重试。") }
+                if let place {
+                    Section("分享当前餐厅") {
+                        Text(place.name)
+                        TextField("感受（选填）", text: $note)
+                        Picker("可见范围", selection: $scope) {
+                            Text("仅自己").tag("private")
+                            Text("互相确认的饭搭子").tag("buddies")
+                            Text("指定饭搭子").tag("selected")
+                        }
+                        if scope == "selected" {
+                            ForEach(mutual.indices, id: \.self) { index in
+                                if let id = mutual[index]["userId"] as? String {
+                                    Toggle(buddyLabel(id), isOn: Binding(get: { selected.contains(id) }, set: {
+                                        if $0 { selected.insert(id) } else { selected.remove(id) }
+                                    }))
+                                }
+                            }
+                        }
+                        Button("分享到饭圈") {
+                            perform {
+                                try await send("/posts", "POST", ["id": draft.uuidString, "restaurantId": place.id,
+                                    "restaurantName": place.name, "note": note, "visibility": scope,
+                                    "buddyIds": scope == "selected" ? selected.sorted() : []])
+                                draft = UUID()
+                                note = ""
+                            }
+                        }.disabled(scope == "selected" && selected.isEmpty)
+                    }
+                }
+                Section("饭搭子") {
+                    ForEach(buddies.indices, id: \.self) { index in
+                        if let id = buddies[index]["userId"] as? String {
+                            let outgoing = buddies[index]["outgoing"] as? Bool == true
+                            let incoming = buddies[index]["incoming"] as? Bool == true
+                            Text("\(buddyLabel(id)) · 共同就餐 \(buddies[index]["sharedCount"] as? Int ?? 0) 次")
+                            Button(outgoing ? (incoming ? "解除饭搭子连接" : "撤回连接请求") : (incoming ? "确认连接" : "请求连接")) {
+                                perform { try await send("/buddies/\(pathPart(id))", "PUT", ["enabled": !outgoing]) }
+                            }
+                        }
+                    }
+                }
+                Section("约饭邀请") {
+                    ForEach(invitations.indices, id: \.self) { index in
+                        let item = invitations[index]
+                        if let id = item["gatheringId"] as? String, item["status"] as? String == "pending", !(item["endedAt"] is String) {
+                            Text(item["restaurantName"] as? String ?? "")
+                            Button("接受") { perform { try await send("/invitations/\(id)", "PUT", ["accept": true]) } }
+                            Button("拒绝") { perform { try await send("/invitations/\(id)", "PUT", ["accept": false]) } }
+                        }
+                    }
+                }
+                Section("收藏与想吃") {
+                    ForEach(restaurants.indices, id: \.self) { index in
+                        let restaurant = restaurants[index]
+                        let name = restaurant["restaurantName"] as? String ?? ""
+                        let saved = restaurant["saved"] as? Bool == true
+                        let wanted = restaurant["wanted"] as? Bool == true
+                        Text(name + (saved ? " · 已收藏" : "") + (wanted ? " · 想吃" : ""))
+                    }
+                }
+                Section("美食动态") {
+                    ForEach(posts.indices, id: \.self) { index in postRow(posts[index]) }
+                }
+            }
+            .disabled(busy)
+            .navigationTitle("我的饭圈")
+            .toolbar { ToolbarItem(placement: .cancellationAction) { Button("完成") { dismiss() } } }
+            .task { await load() }
+            .refreshable { await load() }
+        }
+    }
+
+    @ViewBuilder private func postRow(_ item: [String: Any]) -> some View {
+        if let id = item["id"] as? String, let name = item["restaurantName"] as? String,
+           let restaurant = item["restaurantId"] as? String {
+            VStack(alignment: .leading, spacing: 8) {
+                Text(name).font(.headline)
+                if let note = item["note"] as? String, !note.isEmpty { Text(note) }
+                let actions = item["myActions"] as? [String] ?? []
+                HStack {
+                    action(id, "like", actions.contains("like") ? "取消赞" : "点赞", actions)
+                    action(id, "save", actions.contains("save") ? "已收藏" : "收藏", actions)
+                    action(id, "want", actions.contains("want") ? "已想吃" : "想吃", actions)
+                }
+                ForEach(Array((item["comments"] as? [String] ?? []).enumerated()), id: \.offset) { _, comment in
+                    Text(comment).font(.caption)
+                }
+                TextField("写评论", text: Binding(get: { commentText[id, default: ""] }, set: { commentText[id] = $0 }))
+                Button("发表评论") {
+                    let text = commentText[id, default: ""].trimmingCharacters(in: .whitespacesAndNewlines)
+                    perform {
+                        let operation = commentDrafts[id] ?? UUID()
+                        commentDrafts[id] = operation
+                        try await send("/posts/\(id)/comments", "POST", ["id": operation.uuidString, "body": text])
+                        commentDrafts.removeValue(forKey: id)
+                        commentText.removeValue(forKey: id)
+                    }
+                }.disabled(commentText[id, default: ""].trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || commentText[id, default: ""].count > 500)
+                Menu("约饭") {
+                    Button("创建饭局") { createGathering(id, restaurant, name, nil) }
+                    ForEach(mutual.indices, id: \.self) { index in
+                        if let buddy = mutual[index]["userId"] as? String {
+                            Button("邀请\(buddyLabel(buddy))") { createGathering(id, restaurant, name, buddy) }
+                        }
+                    }
+                }
+                if item["isMine"] as? Bool == true {
+                    Menu("管理动态") {
+                        Button("设为仅自己") { perform { try await send("/posts/\(id)/visibility", "PUT", ["visibility": "private"]) } }
+                        Button("设为饭搭子可见") { perform { try await send("/posts/\(id)/visibility", "PUT", ["visibility": "buddies"]) } }
+                        ForEach(mutual.indices, id: \.self) { index in
+                            if let buddy = mutual[index]["userId"] as? String {
+                                Button("仅分享给\(buddyLabel(buddy))") {
+                                    perform { try await send("/posts/\(id)/visibility", "PUT", ["visibility": "selected", "buddyIds": [buddy]]) }
+                                }
+                            }
+                        }
+                        Button("删除动态", role: .destructive) { perform { try await send("/posts/\(id)", "DELETE") } }
+                    }
+                }
+            }.buttonStyle(.borderless)
+        }
+    }
+
+    private func action(_ id: String, _ kind: String, _ title: String, _ actions: [String]) -> some View {
+        Button(title) { perform { try await send("/posts/\(id)/actions/\(kind)", "PUT", ["enabled": !actions.contains(kind)]) } }
+    }
+
+    private func createGathering(_ post: String, _ restaurant: String, _ name: String, _ buddy: String?) {
+        perform {
+            let id = gatheringDrafts[post] ?? UUID()
+            gatheringDrafts[post] = id
+            _ = try await family.call("/api/dining/gatherings", method: "POST", body: [
+                "id": id.uuidString, "restaurantId": restaurant, "restaurantName": name
+            ])
+            if let buddy { try await send("/invitations", "POST", ["gatheringId": id.uuidString, "buddyId": buddy]) }
+            gatheringDrafts.removeValue(forKey: post)
+            dismiss()
+        }
+    }
+
+    private func buddyLabel(_ id: String) -> String { "饭搭子 \(id.suffix(6))" }
+
+    private func pathPart(_ value: String) -> String {
+        value.addingPercentEncoding(withAllowedCharacters: CharacterSet.alphanumerics.union(CharacterSet(charactersIn: "-._~"))) ?? ""
+    }
+
+    private func send(_ path: String, _ method: String, _ body: [String: Any]? = nil) async throws {
+        _ = try await family.call(base + path, method: method, body: body)
+    }
+
+    private func load() async {
+        guard !busy else { return }
+        await run {}
+    }
+
+    private func perform(_ action: @escaping @MainActor () async throws -> Void) {
+        Task { await run(action) }
+    }
+
+    private func run(_ action: @MainActor () async throws -> Void) async {
+        guard !busy else { return }
+        let account = family.identity.accountIdentifier
+        busy = true
+        defer { busy = false }
+        do {
+            try await action()
+            let nextPosts = try await family.call(base + "/posts") as? [[String: Any]] ?? []
+            let nextBuddies = try await family.call(base + "/buddies") as? [[String: Any]] ?? []
+            let nextInvitations = try await family.call(base + "/invitations") as? [[String: Any]] ?? []
+            let nextRestaurants = try await family.call(base + "/restaurants") as? [[String: Any]] ?? []
+            guard family.identity.accountIdentifier == account else { throw CancellationError() }
+            posts = nextPosts
+            buddies = nextBuddies
+            invitations = nextInvitations
+            restaurants = nextRestaurants
+            failed = false
+        } catch {
+            posts = []
+            buddies = []
+            invitations = []
+            restaurants = []
+            failed = true
+        }
     }
 }

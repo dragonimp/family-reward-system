@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Npgsql" Version="10.0.3" />
+    <Compile Include="../../FamilyReward.Api/DiningGatheringEndpoints.cs" Link="DiningGatheringEndpoints.cs" />
+    <Compile Include="../../FamilyReward.Api/DiningCircleEndpoints.cs" Link="DiningCircleEndpoints.cs" />
+  </ItemGroup>
+</Project>
