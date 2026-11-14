@@ -1,5 +1,7 @@
 # 仓库指南
 
+共同架构和规则见[全局 AGENTS.md](/Users/wengzhishan/.codex/AGENTS.md)。
+
 ## 项目结构与模块组织
 
 本仓库是一个后端/全栈混合项目，首选后端为 ASP.NET Core。
@@ -51,9 +53,3 @@
 - 数据库凭据通过环境变量配置，例如 PostgreSQL 连接信息。
 - 不要提交密钥、`.env` 文件或生成的运行期文件（`bin/`、`obj/`、`node_modules/`）。
 - 保持 CORS 设置与本地和部署 URL 一致。
-
-## GUID / UUID 身份一致性
-
-- 所有 GUID / UUID 的类型、接口表示、数据库与驱动映射、导入和权限匹配遵循 [跨项目 GUID 公约](/Users/wengzhishan/Projects/GUID-STANDARD.md)。
-- 不以默认字符串大小写比较替代 GUID 身份比较；SQLite 主外键与索引排序规则及写入格式须一致，必须验证大小写变体的查询、选择、保存、关联和权限隔离。
-- 历史数据修复使用 Atlas 独立、带备份与不可变执行记录的迁移；不得在应用启动时批量改写，也不得规范化 Token、密钥或非 GUID 业务标识。
