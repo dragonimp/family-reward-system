@@ -666,17 +666,17 @@ public sealed class DiningPanel : ContentView
     {
         if (Working) return;
         var circles = archive.Circles.ToArray();
-        var labels = new[] { "当前位置", "搜索地址调整位置" }.Concat(circles.Select((c, i) => $"{i + 1}. {c.Name}")).ToArray();
+        var labels = new[] { "当前位置" }.Concat(circles.Select((c, i) => $"{i + 1}. {c.Name}")).ToArray();
         var index = Array.IndexOf(labels, await owner.DisplayActionSheetAsync("推荐位置", "取消", null, labels));
         if (index < 0) return;
         DiningPlace? point = null;
-        if (index == 1)
+        if (index == 0)
         {
             point = await DiningPlacePickerPage.OpenAsync(owner, store, false);
             if (point is null) return;
         }
         ResetPosition(resetMode: false);
-        circleId = index >= 2 ? circles[index - 2].Id : null;
+        circleId = index > 0 ? circles[index - 1].Id : null;
         temporaryPosition = point;
         await Decide();
     }

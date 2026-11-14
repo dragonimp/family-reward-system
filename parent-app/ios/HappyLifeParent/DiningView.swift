@@ -645,16 +645,15 @@ struct DiningView: View {
         }
         .sheet(isPresented: $showingDiningCircle) { DiningCircleView(family: family, place: model.result) }
         .confirmationDialog("推荐位置", isPresented: $showingLocations, titleVisibility: .visible) {
-            Button("当前位置") { model.selectCircle(nil); Task { await model.decide() } }
-            Button("地图调整位置") { pickingPosition = true }
+            Button("当前位置") { pickingPosition = true }
             ForEach(model.archive.circles) { circle in
                 Button(circle.name) { model.selectCircle(circle.id); Task { await model.decide() } }
             }
         }
         .sheet(isPresented: $pickingPosition) {
-            DiningPlacePicker(model: model, restaurant: false, initial: model.temporaryPosition.map {
-                CLLocationCoordinate2D(latitude: $0.latitude, longitude: $0.longitude)
-            }) { model.selectPosition($0); Task { await model.decide() } }
+            DiningPlacePicker(model: model, restaurant: false) {
+                model.selectPosition($0); Task { await model.decide() }
+            }
         }
         .sheet(isPresented: $showingGatherings) { DiningGatheringsView(family: family, model: model, place: model.result) }
         .confirmationDialog(diningText("点个外卖"), isPresented: Binding(
