@@ -22,7 +22,13 @@ Check(DiningRecommendation.Weight(old, "familiar", archive) > DiningRecommendati
 Check(DiningRecommendation.Weight(fresh, "fresh", archive) > DiningRecommendation.Weight(old, "fresh", archive), "fresh mode favors unseen choices");
 Check(DiningRecommendation.Pick([old, fresh], "automatic", archive, "a", 0)?.Id == "b", "reroll skips only current choice");
 Check(DiningRecommendation.Pick([old], "automatic", archive, "a", 0)?.Id == "a", "one restaurant is not excluded forever");
-Check(DiningRecommendation.Pick([old with { DistanceMeters = 2000 }, fresh with { DistanceMeters = 100 }], "familiar", archive, null, 0, "nearby")?.Id == fresh.Id, "nearby shortcut chooses the closest eligible place regardless of habit weight");
+var around = new DiningArchive();
+var farther = fresh with { Latitude = 31.24 };
+var outOfRange = old with { Id = "remote", Latitude = 32 };
+around.History.AddRange([new() { Place = old }, new() { Place = farther }, new() { Place = farther }, new() { Place = outOfRange }]);
+Check(DiningRecommendation.Familiar(around, 31.2, 121.4, (31.2, 121.4), null).Place?.Id == old.Id, "local tier beats a more frequent place outside three km");
+Check(DiningRecommendation.Familiar(around, 31.27, 121.4, (31.27, 121.4), null).Place?.Id == farther.Id, "a different origin expands to five km when needed");
+Check(DiningRecommendation.Familiar(around, 34, 121.4, (34, 121.4), null).Place is null, "never recommends distant history");
 Check(DiningRecommendation.Pick([old, fresh], "familiar", archive, null, .75, "random")?.Id == fresh.Id, "random shortcut uses equal weights like iOS");
 Check(DiningRecommendation.Pick([], "automatic", archive, null) is null, "empty search never fabricates a restaurant");
 Check(DiningRecommendation.Pick([old with { Latitude = double.NaN }], "automatic", archive, null) is null, "invalid coordinates are rejected");

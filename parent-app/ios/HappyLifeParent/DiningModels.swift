@@ -151,7 +151,7 @@ enum DiningTrip: CaseIterable, Hashable {
     }
 }
 
-enum DiningSelection { case recommended, nearby, random }
+enum DiningSelection { case recommended, familiar, random }
 
 enum DiningMood: String, Codable, CaseIterable {
     case automatic, familiar, fresh, budget, treat, spicy
@@ -246,12 +246,37 @@ enum DiningRecommendation {
         }
         return max(0.01, value)
     }
+    static func familiar(_ archive: DiningArchive, latitude: Double, longitude: Double, amap: DiningMapDetails.Center?, excluding: String?) -> (DiningPlace?, Int) {
+        let ranked = Dictionary(grouping: archive.history, by: { $0.place.id }).values.compactMap { records -> (DiningPlace, Int, Date)? in
+            guard let last = records.max(by: { ($0.eatenAt ?? $0.selectedAt) < ($1.eatenAt ?? $1.selectedAt) }) else { return nil }
+            var place = last.place
+            guard place.latitude.isFinite, place.longitude.isFinite, abs(place.latitude) <= 90, abs(place.longitude) <= 180 else { return nil }
+            if place.provider == "amap" && amap == nil { return nil }
+            let lat = place.provider == "amap" ? amap!.latitude : latitude
+            let lon = place.provider == "amap" ? amap!.longitude : longitude
+            let north = (place.latitude - lat) * 111_000
+            let east = (place.longitude - lon).remainder(dividingBy: 360) * 111_000 * cos(lat * .pi / 180)
+            place.distanceMeters = hypot(north, east)
+            guard place.distanceMeters <= 5000 else { return nil }
+            return (place, records.count, last.eatenAt ?? last.selectedAt)
+        }.sorted {
+            let a = $0.0.distanceMeters <= 3000, b = $1.0.distanceMeters <= 3000
+            if a != b { return a }
+            if $0.1 != $1.1 { return $0.1 > $1.1 }
+            if $0.2 != $1.2 { return $0.2 > $1.2 }
+            if $0.0.distanceMeters != $1.0.distanceMeters { return $0.0.distanceMeters < $1.0.distanceMeters }
+            return $0.0.id < $1.0.id
+        }
+        let close = ranked.filter { $0.0.distanceMeters <= 3000 }
+        let pool = close.isEmpty ? ranked : close
+        return ((pool.first { $0.0.id != excluding } ?? pool.first)?.0, pool.count)
+    }
+
     static func pick(_ places: [DiningPlace], mood: DiningMood, archive: DiningArchive, excluding: String?, selection: DiningSelection = .recommended, draw: Double = Double.random(in: 0..<1)) -> DiningPlace? {
         var seen = Set<String>()
         let unique = places.filter { !$0.name.isEmpty && $0.latitude.isFinite && $0.longitude.isFinite && abs($0.latitude) <= 90 && abs($0.longitude) <= 180 && seen.insert($0.id).inserted }
         let alternatives = unique.filter { $0.id != excluding }
         let candidates = alternatives.isEmpty ? unique : alternatives
-        if selection == .nearby { return candidates.min { $0.distanceMeters < $1.distanceMeters } }
         let weights = candidates.map { selection == .random ? 1 : weight($0, mood: mood, archive: archive) }
         var target = min(0.999999, max(0, draw)) * weights.reduce(0, +)
         for (place, weight) in zip(candidates, weights) { target -= weight; if target < 0 { return place } }

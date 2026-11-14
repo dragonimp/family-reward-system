@@ -171,11 +171,34 @@ public static class DiningRecommendation {
         else if (mood == "spicy" && new[] { "川", "湘", "辣", "火锅", "chili", "sichuan", "hunan" }.Any(k => (place.Name + place.Category).Contains(k, StringComparison.OrdinalIgnoreCase))) value *= 4;
         return Math.Max(0.01, value);
     }
+    public static (DiningPlace? Place, int Count) Familiar(DiningArchive archive, double latitude, double longitude,
+        (double Latitude, double Longitude)? amap, string? excluding)
+    {
+        var ranked = archive.History.GroupBy(x => x.Place.Id).Select(records =>
+        {
+            var last = records.MaxBy(x => x.EatenAt ?? x.SelectedAt)!;
+            var place = last.Place;
+            var center = place.Provider == "amap" ? amap : (latitude, longitude);
+            var distance = double.PositiveInfinity;
+            if (center is { } point && Math.Abs(place.Latitude) <= 90 && Math.Abs(place.Longitude) <= 180)
+            {
+                var north = (place.Latitude - point.Item1) * 111_000;
+                var east = Math.IEEERemainder(place.Longitude - point.Item2, 360) * 111_000 * Math.Cos(point.Item1 * Math.PI / 180);
+                distance = Math.Sqrt(north * north + east * east);
+            }
+            return (Place: place with { DistanceMeters = distance }, Count: records.Count(), Last: last.EatenAt ?? last.SelectedAt);
+        }).Where(x => x.Place.DistanceMeters <= 5000)
+            .OrderByDescending(x => x.Count).ThenByDescending(x => x.Last)
+            .ThenBy(x => x.Place.DistanceMeters).ThenBy(x => x.Place.Id, StringComparer.Ordinal).ToList();
+        var close = ranked.Where(x => x.Place.DistanceMeters <= 3000).ToList();
+        var pool = close.Count > 0 ? close : ranked;
+        return (pool.FirstOrDefault(x => x.Place.Id != excluding).Place ?? pool.FirstOrDefault().Place, pool.Count);
+    }
+
     public static DiningPlace? Pick(IEnumerable<DiningPlace> places, string mood, DiningArchive archive, string? excluding, double? draw = null, string selection = "recommended") {
         var unique = places.Where(p => !string.IsNullOrWhiteSpace(p.Name) && double.IsFinite(p.Latitude) && double.IsFinite(p.Longitude) && Math.Abs(p.Latitude) <= 90 && Math.Abs(p.Longitude) <= 180).DistinctBy(p => p.Id).ToList();
         var alternatives = unique.Where(p => p.Id != excluding).ToList();
         var candidates = alternatives.Count > 0 ? alternatives : unique;
-        if (selection == "nearby") return candidates.OrderBy(p => p.DistanceMeters).FirstOrDefault();
         var weights = candidates.Select(p => selection == "random" ? 1d : Weight(p, mood, archive)).ToList();
         var target = Math.Clamp(draw ?? Random.Shared.NextDouble(), 0, 0.999999) * weights.Sum();
         for (var i = 0; i < candidates.Count; i++) { target -= weights[i]; if (target < 0) return candidates[i]; }

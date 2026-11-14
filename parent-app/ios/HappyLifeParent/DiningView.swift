@@ -225,6 +225,12 @@ import CoreImage.CIFilterBuiltins
     }
 
     @Published var selection: DiningSelection = .recommended
+    func selectMode(_ mode: DiningSelection) {
+        guard selection != mode else { return }
+        stop()
+        selection = mode
+        candidates = []; result = nil; confirmed = false
+    }
     func decide() async {
         guard !busy, !checkingIn else { return }; busy = true; message = nil; walking = nil
         let current = UUID()
@@ -232,12 +238,28 @@ import CoreImage.CIFilterBuiltins
         defer { if current == generation { busy = false } }
         hasRequestedRecommendation = true
         let meal = DiningMeal.current()
-        let food = self.food
-        let mealKey: DiningMeal? = food == .smart ? meal : nil
-        let trip = self.trip
+        let intelligent = selection == .recommended
+        let food = intelligent ? self.food : .smart
+        let mood = intelligent ? self.mood : .automatic
+        let mealKey: DiningMeal? = intelligent && food == .smart ? meal : nil
+        let trip = intelligent ? self.trip : .unrestricted
         let radius: CLLocationDistance = trip.driving ? 8000 : 3000
         if resultMeal != mealKey { result = nil; confirmed = false }
         do {
+            if selection == .familiar {
+                let location: CLLocation
+                if let circle = archive.circles.first(where: { $0.id == circleID }) { location = CLLocation(latitude: circle.latitude, longitude: circle.longitude) }
+                else if let point = temporaryPosition { location = CLLocation(latitude: point.latitude, longitude: point.longitude) }
+                else { location = try await locate() }
+                let center = archive.history.contains { $0.place.provider == "amap" } ? await mapDetails(near: location)?.searchCenter : nil
+                guard current == generation else { return }
+                let (next, count) = DiningRecommendation.familiar(archive, latitude: location.coordinate.latitude,
+                    longitude: location.coordinate.longitude, amap: center, excluding: result?.id)
+                result = next; resultMood = .automatic; resultMeal = nil; confirmed = false; resultOperation = UUID()
+                if next == nil { message = diningText("附近 5 公里内暂无常去餐厅。") }
+                else if count == 1 { message = diningText("这个范围内只有一家常去餐厅。") }
+                return
+            }
             if cachedFood != food || cachedMeal != mealKey || cachedDriving != trip.driving || Date().timeIntervalSince(fetchedAt) > 300 { candidates = [] }
             if candidates.isEmpty {
                 let location: CLLocation
@@ -248,8 +270,8 @@ import CoreImage.CIFilterBuiltins
                 origin = location
                 routeTimes = [:]
                 async let details = mapDetails(near: location)
-                let query = food == .smart ? (meal == .breakfast ? "breakfast" : meal == .afternoonTea ? "dessert" : "restaurant") : food.searchQuery
-                let expanded = mealKey == .breakfast || mealKey == .afternoonTea || food == .sweets
+                let query = !intelligent ? "restaurant" : food == .smart ? (meal == .breakfast ? "breakfast" : meal == .afternoonTea ? "dessert" : "restaurant") : food.searchQuery
+                let expanded = !intelligent || mealKey == .breakfast || mealKey == .afternoonTea || food == .sweets
                 var nearby = try await nearbyPlaces(around: location, radius: radius, query: query, includeCafes: expanded)
                 let mapDetails = await details
                 if let mapDetails {
@@ -261,7 +283,7 @@ import CoreImage.CIFilterBuiltins
                     nearby += mapDetails?.applying(to: tea, latitude: location.coordinate.latitude, longitude: location.coordinate.longitude) ?? tea
                 }
                 guard current == generation else { return }
-                candidates = nearby.filter { food.includes($0, meal: meal) }
+                candidates = intelligent ? nearby.filter { food.includes($0, meal: meal) } : nearby
                 cachedFood = food
                 cachedMeal = mealKey
                 cachedDriving = trip.driving
@@ -286,7 +308,9 @@ import CoreImage.CIFilterBuiltins
             }
             guard let next = DiningRecommendation.pick(eligible, mood: mood, archive: archive, excluding: result?.id, selection: selection) else {
                 result = nil
-                if !candidates.isEmpty && trip != .unrestricted {
+                if !intelligent {
+                    message = diningText("附近暂时没有可供随机选择的餐厅。")
+                } else if !candidates.isEmpty && trip != .unrestricted {
                     message = diningText("暂未找到能确认符合路程上限的餐厅。可以放宽上限后重试。")
                 } else {
                     message = food == .smart
@@ -295,7 +319,7 @@ import CoreImage.CIFilterBuiltins
                 }
                 return
             }
-            if let previous = result, !confirmed { _ = update { $0.habits[previous.id, default: DiningHabit()].skipped += 1 } }
+            if intelligent, let previous = result, !confirmed { _ = update { $0.habits[previous.id, default: DiningHabit()].skipped += 1 } }
             guard current == generation else { return }
             result = next; resultMood = mood; resultMeal = mealKey; confirmed = false; resultOperation = UUID()
             if eligible.count == 1 { message = String(localized: "附近暂时只找到这一家，可换个生活圈再试。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)) }
@@ -353,7 +377,7 @@ import CoreImage.CIFilterBuiltins
               let data = try? JSONSerialization.data(withJSONObject: response) else { return nil }
         return try? JSONDecoder().decode(DiningMapDetails.self, from: data)
     }
-    func refreshLocation() { stop(); temporaryPosition = nil; circleID = nil; candidates = []; origin = nil; result = nil; walking = nil; confirmed = false }
+    func refreshLocation() { stop(); selection = .recommended; temporaryPosition = nil; circleID = nil; candidates = []; origin = nil; result = nil; walking = nil; confirmed = false }
     func stop() {
         generation = UUID(); search?.cancel(); directions?.cancel(); timeout?.cancel(); locator.stopUpdatingLocation()
         waiting?.resume(throwing: CancellationError()); waiting = nil; busy = false; checkingIn = false
@@ -540,13 +564,12 @@ struct DiningView: View {
                 VStack(alignment: .leading, spacing: 16) {
                     HStack(spacing: 4) {
                         shortcut("推荐", icon: "sparkles", selection: .recommended)
-                        shortcut("附近", icon: "location", selection: .nearby)
-                        shortcut("常去", icon: "heart", selection: .recommended, mood: .familiar)
+                        shortcut("常去", icon: "heart", selection: .familiar)
                         shortcut("随机", icon: "dice", selection: .random)
                     }
                     .padding(4)
                     .background(.background, in: RoundedRectangle(cornerRadius: 18))
-                    .disabled(model.busy || model.checkingIn)
+                    .disabled(model.checkingIn)
 
                     HStack(spacing: 8) {
                         Button { showingLocations = true } label: {
@@ -560,7 +583,7 @@ struct DiningView: View {
                         .disabled(model.busy || model.checkingIn)
                         Spacer(minLength: 4)
                         Button(diningText("筛选"), systemImage: "slider.horizontal.3") { showingFilters = true }
-                            .disabled(model.busy || model.checkingIn)
+                            .disabled(model.busy || model.checkingIn || model.selection != .recommended)
                     }.font(.subheadline)
 
                     HStack(spacing: 16) {
@@ -622,16 +645,16 @@ struct DiningView: View {
         }
         .sheet(isPresented: $showingDiningCircle) { DiningCircleView(family: family, place: model.result) }
         .confirmationDialog("推荐位置", isPresented: $showingLocations, titleVisibility: .visible) {
-            Button("当前位置") { model.refreshLocation() }
+            Button("当前位置") { model.selectCircle(nil); Task { await model.decide() } }
             Button("地图调整位置") { pickingPosition = true }
             ForEach(model.archive.circles) { circle in
-                Button(circle.name) { model.selectCircle(circle.id) }
+                Button(circle.name) { model.selectCircle(circle.id); Task { await model.decide() } }
             }
         }
         .sheet(isPresented: $pickingPosition) {
             DiningPlacePicker(model: model, restaurant: false, initial: model.temporaryPosition.map {
                 CLLocationCoordinate2D(latitude: $0.latitude, longitude: $0.longitude)
-            }) { model.selectPosition($0) }
+            }) { model.selectPosition($0); Task { await model.decide() } }
         }
         .sheet(isPresented: $showingGatherings) { DiningGatheringsView(family: family, model: model, place: model.result) }
         .confirmationDialog(diningText("点个外卖"), isPresented: Binding(
@@ -690,11 +713,10 @@ struct DiningView: View {
         deliveryFallback = place
     }
 
-    private func shortcut(_ title: String.LocalizationValue, icon: String, selection: DiningSelection, mood: DiningMood = .automatic) -> some View {
-        let selected = model.selection == selection && (selection != .recommended || (model.mood == .familiar) == (mood == .familiar))
+    private func shortcut(_ title: String.LocalizationValue, icon: String, selection: DiningSelection) -> some View {
+        let selected = model.selection == selection
         return Button {
-            model.selection = selection
-            model.mood = mood
+            model.selectMode(selection)
             Task { await model.decide() }
         } label: {
             VStack(spacing: 5) {
@@ -741,7 +763,7 @@ struct DiningView: View {
             Text(place.name).font(.title.bold()).textSelection(.enabled)
                 .accessibilityAddTraits(.isHeader)
             Label(model.walking ?? (diningText("直线距离估算：") + place.distanceMeters.formatted(.number.precision(.fractionLength(0))) + " m"),
-                  systemImage: model.walking == nil ? "location" : model.trip.driving ? "car" : "figure.walk")
+                  systemImage: model.walking == nil ? "location" : model.selection == .recommended && model.trip.driving ? "car" : "figure.walk")
                 .font(.subheadline.weight(.semibold))
             Text(reason(place)).font(.subheadline)
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -834,8 +856,8 @@ struct DiningView: View {
         }
     }
     private func reason(_ place: DiningPlace) -> String {
-        if model.selection == .nearby { return diningText("优先挑选符合当前条件的近处餐厅。") }
-        if model.selection == .random { return diningText("从符合当前条件的餐厅中随机挑选。") }
+        if model.selection == .familiar { return diningText("根据你在当前位置附近的到访记录推荐。") }
+        if model.selection == .random { return diningText("从当前位置附近的餐厅中随机挑选。") }
         switch model.resultMood {
         case .familiar: return (model.archive.habits[place.id]?.visits ?? 0) > 0 ? String(localized: "这家店在你的干饭记录里，熟悉的味道值得再试。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)) : String(localized: "还没有常吃记录，先从附近这家开始。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))
         case .fresh: return (model.archive.habits[place.id]?.visits ?? 0) == 0 ? String(localized: "你的干饭记录里还没有这家，来点新鲜的！", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)) : String(localized: "附近的新选择有限，熟悉的店也保留机会。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))

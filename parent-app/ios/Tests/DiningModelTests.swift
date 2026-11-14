@@ -18,6 +18,14 @@ import Foundation
         check(DiningRecommendation.weight(fresh, mood: .fresh, archive: archive) > DiningRecommendation.weight(known, mood: .fresh, archive: archive), "fresh mode prefers new history")
         check(DiningRecommendation.pick([known, fresh], mood: .automatic, archive: archive, excluding: known.id, draw: 0)?.id == fresh.id, "reroll excludes current only")
         check(DiningRecommendation.pick([known], mood: .automatic, archive: archive, excluding: known.id, draw: 0)?.id == known.id, "regular restaurant never permanently excluded")
+        var farther = fresh; farther.latitude += 0.04
+        var visits = archive
+        visits.checkIn(farther, mood: nil, id: UUID())
+        visits.checkIn(farther, mood: nil, id: UUID())
+        check(DiningRecommendation.familiar(visits, latitude: 31.2, longitude: 121.4, amap: nil, excluding: nil).0?.id == known.id, "local tier beats higher frequency farther away")
+        check(DiningRecommendation.familiar(visits, latitude: 31.27, longitude: 121.4, amap: nil, excluding: nil).0?.id == farther.id, "new origin expands to five km when needed")
+        check(DiningRecommendation.familiar(visits, latitude: 34, longitude: 121.4, amap: nil, excluding: nil).0 == nil, "distant history is excluded")
+        check(DiningRecommendation.pick([known, fresh], mood: .familiar, archive: archive, excluding: known.id, selection: .random, draw: 0)?.id == fresh.id, "random avoids the current result")
         check(DiningRecommendation.pick([], mood: .automatic, archive: archive, excluding: nil) == nil, "no fabricated empty result")
         var broken = known; broken.latitude = .nan
         check(DiningRecommendation.pick([broken], mood: .automatic, archive: archive, excluding: nil) == nil, "invalid coordinate rejected")
