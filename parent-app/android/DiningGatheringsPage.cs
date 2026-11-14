@@ -9,6 +9,7 @@ internal sealed class DiningGatheringsPage : ContentPage
     private readonly FamilyStore store;
     private readonly VerticalStackLayout rows = new() { Spacing = 12 };
     private readonly Label status = MomentStyle.Caption("");
+    private DiningPlace? selected;
     private Guid operation = Guid.NewGuid();
     private readonly VerticalStackLayout content = new() { Spacing = 12, Padding = 20 };
 
@@ -17,11 +18,28 @@ internal sealed class DiningGatheringsPage : ContentPage
         this.store = store;
         Title = "一起干饭";
         BackgroundColor = MomentStyle.Background;
-        if (place is not null)
-            content.Add(MomentStyle.Action($"为「{place.Name}」创建饭局", () => _ = Update("", new
+        selected = place;
+        var create = MomentStyle.Action("创建饭局", () =>
+        {
+            if (selected is { } restaurant) _ = Update("", new
             {
-                id = operation, restaurantId = place.Id, restaurantName = place.Name
-            })));
+                id = operation, restaurantId = restaurant.Id, restaurantName = restaurant.Name
+            });
+        }, true);
+        create.IsVisible = selected is not null;
+        var pick = MomentStyle.Action(selected?.Name ?? "选择餐厅，发起饭局", () => { });
+        pick.Clicked += async (_, _) =>
+        {
+            if (await DiningPlacePickerPage.OpenAsync(this, store, true) is { } restaurant)
+            {
+                selected = restaurant;
+                operation = Guid.NewGuid();
+                pick.Text = restaurant.Name;
+                create.IsVisible = true;
+            }
+        };
+        content.Add(pick);
+        content.Add(create);
         var code = new Entry { Placeholder = "输入 6 位数字口令", Keyboard = Keyboard.Numeric };
         content.Add(code);
         content.Add(MomentStyle.Action("扫描饭局二维码", async () =>

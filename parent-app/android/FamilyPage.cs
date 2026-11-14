@@ -90,7 +90,7 @@ public sealed class FamilyPage : ContentPage
     private void SelectTab(string name)
     {
         if ((name is "干饭" or "带娃" or "活动" or "运动") && !SectionEnabled(name)) _ = EnableSectionAsync(name);
-        if (name != "干饭") dining?.Suspend();
+        if (name != "干饭" && tab == "干饭") { dining?.ResetPosition(); dining?.Suspend(); }
         if (name != "运动") exercise?.Suspend();
         if (name != "活动") activities?.Deactivate();
         tab = name; childId = null; Render();

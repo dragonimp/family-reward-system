@@ -106,6 +106,7 @@ public sealed class DiningPanel : ContentView
         var cooking = new KitchenPanel(store, owner);
         var viewport = new ContentView { Content = outside };
         Border Modes(int index) => MomentStyle.Segmented(new[] { "出去吃", "下厨房" }, index, next => {
+            if (next == 1 && index == 0) { ResetPosition(); Suspend(); }
             viewport.Content = next == 1 ? cooking : outside; modeHost.Content = Modes(next);
             if (next == 1) _ = cooking.Load();
         });
@@ -152,8 +153,8 @@ public sealed class DiningPanel : ContentView
         }
         body.Add(MomentStyle.Card(shortcuts, new Thickness(4)));
         var location = new Grid { ColumnDefinitions = new ColumnDefinitionCollection { new(GridLength.Star), new(GridLength.Auto) } };
-        var positionName = archive.Circles.FirstOrDefault(c => c.Id == circleId)?.Name ?? "当前位置附近";
-        var position = MomentStyle.Action($"◎ {positionName} ▾", () => _ = Circles());
+        var positionName = archive.Circles.FirstOrDefault(c => c.Id == circleId)?.Name ?? temporaryPosition?.Name ?? "当前位置附近";
+        var position = MomentStyle.Action($"◎ {positionName} ▾", () => _ = ChoosePosition());
         position.HorizontalOptions = LayoutOptions.Start;
         position.IsEnabled = !Working;
         location.Add(position);
@@ -312,7 +313,8 @@ public sealed class DiningPanel : ContentView
             if (cachedFood != food || cachedMeal != mealKey || cachedDriving != driving || DateTimeOffset.UtcNow - fetchedAt > TimeSpan.FromMinutes(5)) candidates = [];
             if (candidates.Count == 0) {
                 var saved = archive.Circles.FirstOrDefault(c => c.Id == circleId);
-                var location = saved is null ? await Locate(cancel.Token) : new Location(saved.Latitude, saved.Longitude);
+                var location = saved is not null ? new Location(saved.Latitude, saved.Longitude)
+                    : temporaryPosition is { } point ? new Location(point.Latitude, point.Longitude) : await Locate(cancel.Token);
                 var response = await SearchNearby(location, driving, cancel.Token);
                 if (current != generation) return;
                 candidates = ReadPlaces(response).Where(place => food.Includes(place, meal)).ToList();
@@ -384,7 +386,19 @@ public sealed class DiningPanel : ContentView
         {
             const string manual = "手动填写餐厅";
             const string nearby = "查找附近餐厅";
-            var source = await owner.DisplayActionSheetAsync("到店打卡", "取消", null, nearby, manual);
+            const string search = "搜索餐厅";
+            var source = await owner.DisplayActionSheetAsync("到店打卡", "取消", null, nearby, search, manual);
+            if (source == search && current == generation)
+            {
+                var restaurant = await DiningPlacePickerPage.OpenAsync(owner, store, true);
+                if (restaurant is not null && current == generation)
+                {
+                    var type = await owner.DisplayPromptAsync(restaurant.Name, restaurant.Address, accept: "确认打卡",
+                        cancel: "取消", placeholder: "餐厅类型（选填）", maxLength: 40);
+                    if (type is not null && current == generation) SaveCheckIn(restaurant, null, id, type);
+                }
+                return;
+            }
             if (current != generation || source is not (manual or nearby)) return;
             if (source == manual)
             {
@@ -581,11 +595,10 @@ public sealed class DiningPanel : ContentView
     }
     private async Task Menu()
     {
-        var choice = await owner.DisplayActionSheetAsync("干饭", "取消", null, "到店打卡", "干饭记录与收藏", "我的生活圈", "重新定位");
+        var choice = await owner.DisplayActionSheetAsync("干饭", "取消", null, "到店打卡", "干饭记录与收藏", "我的生活圈");
         if (choice == "到店打卡") await CheckInNearby();
         else if (choice == "干饭记录与收藏") await Records();
         else if (choice == "我的生活圈") await Circles();
-        else if (choice == "重新定位") { circleId = null; candidates = []; result = null; confirmed = false; Render(); }
     }
     private async Task Records()
     {
@@ -619,23 +632,67 @@ public sealed class DiningPanel : ContentView
         page.Disappearing += (_, _) => { Synced -= RefreshRecords; recordsTimer.Stop(); };
         Fill(); await owner.Navigation.PushAsync(page);
     }
+    private DiningPlace? temporaryPosition;
+
+    private async Task ChoosePosition()
+    {
+        if (Working) return;
+        var circles = archive.Circles.ToArray();
+        var labels = new[] { "当前位置", "搜索地址调整位置" }.Concat(circles.Select((c, i) => $"{i + 1}. {c.Name}")).ToArray();
+        var index = Array.IndexOf(labels, await owner.DisplayActionSheetAsync("推荐位置", "取消", null, labels));
+        if (index < 0) return;
+        DiningPlace? point = null;
+        if (index == 1)
+        {
+            point = await DiningPlacePickerPage.OpenAsync(owner, store, false);
+            if (point is null) return;
+        }
+        ResetPosition();
+        circleId = index >= 2 ? circles[index - 2].Id : null;
+        temporaryPosition = point;
+        Render();
+    }
+
+    public void ResetPosition()
+    {
+        temporaryPosition = null;
+        circleId = null;
+        candidates = [];
+        result = null;
+        confirmed = false;
+        routeOrigin = default;
+        routeTimes.Clear();
+    }
+
     private async Task Circles()
     {
-        var labels = new[] { "当前位置", "🏠 将当前位置设为家", "🏢 将当前位置设为公司" }.Concat(archive.Circles.Select(c => c.Name)).ToArray();
-        var choice = await owner.DisplayActionSheetAsync("我的生活圈", "取消", null, labels);
-        if (choice is null or "取消") return;
-        if (choice == "当前位置") circleId = null;
-        else if (choice is "🏠 将当前位置设为家" or "🏢 将当前位置设为公司") {
-            if (busy) return; busy = true; var current = ++generation; Render();
-            using var cancel = operation = new CancellationTokenSource(TimeSpan.FromSeconds(15));
-            try {
-                var location = await Locate(cancel.Token);
-                if (current != generation) return;
-                var name = choice.Contains("家") ? "家附近" : "公司附近"; var circle = new DiningCircle(Guid.NewGuid(), name, location.Latitude, location.Longitude);
-                if (Update(a => { a.Circles.RemoveAll(c => c.Name == name); a.Circles.Add(circle); })) circleId = circle.Id;
-            } catch { if (current == generation) message = "未能保存生活圈，请检查定位权限后重试。"; }
-            finally { if (ReferenceEquals(operation, cancel)) operation = null; if (current == generation) busy = false; }
-        } else circleId = archive.Circles.FirstOrDefault(c => c.Name == choice)?.Id;
-        candidates = []; result = null; confirmed = false; Render();
+        while (!Working)
+        {
+            var circles = archive.Circles.ToArray();
+            var choices = new[] { "新增常用地址" }.Concat(circles.Select((c, i) => $"{i + 1}. {c.Name}")).ToArray();
+            var index = Array.IndexOf(choices, await owner.DisplayActionSheetAsync("我的生活圈", "完成", null, choices));
+            if (index < 0) return;
+            var circle = index > 0 ? circles[index - 1] : null;
+            if (circle is not null)
+            {
+                var option = await owner.DisplayActionSheetAsync(circle.Name, "取消", "删除", "编辑");
+                if (option == "删除")
+                {
+                    if (await owner.DisplayAlertAsync("删除常用地址", circle.Name, "删除", "取消") &&
+                        Update(a => a.Circles.RemoveAll(c => c.Id == circle.Id)) && circleId == circle.Id)
+                    { ResetPosition(); Render(); }
+                    continue;
+                }
+                if (option != "编辑") continue;
+            }
+            var name = await owner.DisplayPromptAsync("常用地址", "填写名称，例如家附近或公司附近。", maxLength: 100, initialValue: circle?.Name ?? "");
+            if (string.IsNullOrWhiteSpace(name)) continue;
+            var point = await DiningPlacePickerPage.OpenAsync(owner, store, false);
+            if (point is null && circle is null) continue;
+            var updated = new DiningCircle(circle?.Id ?? Guid.NewGuid(), name.Trim(),
+                point?.Latitude ?? circle!.Latitude, point?.Longitude ?? circle!.Longitude);
+            if (Update(a => { a.Circles.RemoveAll(c => c.Id == updated.Id); a.Circles.Add(updated); }) && circleId == updated.Id)
+            { ResetPosition(); circleId = updated.Id; Render(); }
+        }
     }
 }

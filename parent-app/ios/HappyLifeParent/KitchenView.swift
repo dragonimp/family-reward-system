@@ -17,7 +17,7 @@ struct DiningModesView: View {
                 Text(kitchenText("下厨房")).tag(1)
             }.pickerStyle(.segmented).padding(.horizontal).padding(.vertical, 8)
             ZStack {
-                DiningView(userID: userID, family: family)
+                DiningView(userID: userID, family: family, active: cooking == 0)
                     .opacity(cooking == 0 ? 1 : 0).allowsHitTesting(cooking == 0).accessibilityHidden(cooking != 0)
                 KitchenView(family: family, active: cooking == 1)
                     .opacity(cooking == 1 ? 1 : 0).allowsHitTesting(cooking == 1).accessibilityHidden(cooking != 1)

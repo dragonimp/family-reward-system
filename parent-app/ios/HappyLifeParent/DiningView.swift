@@ -186,8 +186,14 @@ import CoreImage.CIFilterBuiltins
         manualAddress = address.joined()
     }
 
+    @Published var temporaryPosition: DiningPlace?
+    func selectPosition(_ place: DiningPlace) {
+        selectCircle(nil)
+        temporaryPosition = place
+    }
     func selectCircle(_ id: UUID?) {
         guard !busy else { return }
+        temporaryPosition = nil
         circleID = id; origin = nil; candidates = []; result = nil; walking = nil; confirmed = false
     }
     func saveCircle(_ name: String) async {
@@ -236,6 +242,7 @@ import CoreImage.CIFilterBuiltins
             if candidates.isEmpty {
                 let location: CLLocation
                 if let circle = archive.circles.first(where: { $0.id == circleID }) { location = CLLocation(latitude: circle.latitude, longitude: circle.longitude) }
+                else if let point = temporaryPosition { location = CLLocation(latitude: point.latitude, longitude: point.longitude) }
                 else { location = try await locate() }
                 guard current == generation else { return }
                 origin = location
@@ -346,12 +353,12 @@ import CoreImage.CIFilterBuiltins
               let data = try? JSONSerialization.data(withJSONObject: response) else { return nil }
         return try? JSONDecoder().decode(DiningMapDetails.self, from: data)
     }
-    func refreshLocation() { stop(); circleID = nil; candidates = []; origin = nil; result = nil; walking = nil; confirmed = false }
+    func refreshLocation() { stop(); temporaryPosition = nil; circleID = nil; candidates = []; origin = nil; result = nil; walking = nil; confirmed = false }
     func stop() {
         generation = UUID(); search?.cancel(); directions?.cancel(); timeout?.cancel(); locator.stopUpdatingLocation()
         waiting?.resume(throwing: CancellationError()); waiting = nil; busy = false; checkingIn = false
     }
-    private func locate(accuracy: CLLocationAccuracy = kCLLocationAccuracyHundredMeters) async throws -> CLLocation {
+    fileprivate func locate(accuracy: CLLocationAccuracy = kCLLocationAccuracyHundredMeters) async throws -> CLLocation {
         guard CLLocationManager.locationServicesEnabled() else { throw APIError.message(String(localized: "系统定位服务未开启，可使用已保存的生活圈。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) }
         locator.desiredAccuracy = accuracy
         return try await withCheckedThrowingContinuation { continuation in
@@ -508,6 +515,12 @@ struct DiningView: View {
     @StateObject private var model: DiningStore
     @State private var showingRecords = false
     @State private var showingCircles = false
+    @State private var showingLocations = false
+    @State private var pickingPosition = false
+    @State private var editingCircle: DiningCircle?
+    @State private var circleName = ""
+    @State private var managingAddress = false
+    let active: Bool
     @State private var showingCheckIn = false
     @State private var showingFilters = false
     @State private var showingGatherings = false
@@ -520,7 +533,7 @@ struct DiningView: View {
     @State private var deliveryUnavailable = false
     @Environment(\.openURL) private var openWebURL
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    init(userID: String, family: FamilyStore) { self.family = family; _model = StateObject(wrappedValue: DiningStore(userID: userID, family: family)) }
+    init(userID: String, family: FamilyStore, active: Bool = true) { self.active = active; self.family = family; _model = StateObject(wrappedValue: DiningStore(userID: userID, family: family)) }
     var body: some View {
         NavigationStack {
             ScrollView {
@@ -536,9 +549,9 @@ struct DiningView: View {
                     .disabled(model.busy || model.checkingIn)
 
                     HStack(spacing: 8) {
-                        Button { showingCircles = true } label: {
+                        Button { showingLocations = true } label: {
                             HStack(spacing: 5) {
-                                Label(model.archive.circles.first(where: { $0.id == model.circleID })?.name ?? diningText("当前位置附近"), systemImage: "location.circle")
+                                Label(model.archive.circles.first(where: { $0.id == model.circleID })?.name ?? model.temporaryPosition?.name ?? diningText("当前位置附近"), systemImage: "location.circle")
                                     .lineLimit(1)
                                 Image(systemName: "chevron.down").font(.caption2).accessibilityHidden(true)
                             }
@@ -588,7 +601,6 @@ struct DiningView: View {
                         Button(diningText("到店打卡"), systemImage: "mappin.circle") { showingCheckIn = true }
                         Button(String(localized: "干饭记录与收藏", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), systemImage: "clock") { showingRecords = true }
                         Button(String(localized: "我的生活圈", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), systemImage: "location.circle") { showingCircles = true }
-                        Button(String(localized: "重新定位", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), systemImage: "location") { model.refreshLocation() }
                     } label: { Image(systemName: "ellipsis.circle").accessibilityLabel(String(localized: "干饭菜单", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) }
                     .disabled(model.busy)
                 }
@@ -605,10 +617,23 @@ struct DiningView: View {
                     await model.synchronize()
                 }
             }
-            .onDisappear { model.stop(); navigationPlace = nil }
+            .onDisappear { model.refreshLocation(); navigationPlace = nil }
+            .onChange(of: active) { _, active in if !active { model.refreshLocation() } }
         }
         .sheet(isPresented: $showingDiningCircle) { DiningCircleView(family: family, place: model.result) }
-        .sheet(isPresented: $showingGatherings) { DiningGatheringsView(family: family, place: model.result) }
+        .confirmationDialog("推荐位置", isPresented: $showingLocations, titleVisibility: .visible) {
+            Button("当前位置") { model.refreshLocation() }
+            Button("地图调整位置") { pickingPosition = true }
+            ForEach(model.archive.circles) { circle in
+                Button(circle.name) { model.selectCircle(circle.id) }
+            }
+        }
+        .sheet(isPresented: $pickingPosition) {
+            DiningPlacePicker(model: model, restaurant: false, initial: model.temporaryPosition.map {
+                CLLocationCoordinate2D(latitude: $0.latitude, longitude: $0.longitude)
+            }) { model.selectPosition($0) }
+        }
+        .sheet(isPresented: $showingGatherings) { DiningGatheringsView(family: family, model: model, place: model.result) }
         .confirmationDialog(diningText("点个外卖"), isPresented: Binding(
             get: { deliveryFallback != nil },
             set: { if !$0 { deliveryFallback = nil } }
@@ -873,24 +898,54 @@ struct DiningView: View {
         }
         .sheet(item: $historySharePlace) { DiningCircleView(family: family, place: $0) }
     }
+    private var validCircleName: String? {
+        let name = circleName.trimmingCharacters(in: .whitespacesAndNewlines)
+        return (1...100).contains(name.count) ? name : nil
+    }
+
+    private func saveAddress(latitude: Double, longitude: Double) {
+        guard let name = validCircleName else { return }
+        let circle = DiningCircle(id: editingCircle?.id ?? UUID(), name: name, latitude: latitude, longitude: longitude)
+        if model.update({ archive in
+            archive.circles.removeAll { $0.id == circle.id }
+            archive.circles.append(circle)
+        }), model.circleID == circle.id { model.selectCircle(circle.id) }
+        managingAddress = false
+    }
+
     private var circles: some View {
         NavigationStack {
             List {
-                Button(String(localized: "使用当前位置", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) { model.selectCircle(nil); showingCircles = false }
+                Button("新增常用地址") {
+                    editingCircle = nil; circleName = ""; managingAddress = true
+                }
                 ForEach(model.archive.circles) { circle in
-                    HStack { Button(circle.name) { model.selectCircle(circle.id); showingCircles = false }; Spacer(); if model.circleID == circle.id { Image(systemName: "checkmark") } }
+                    Button(circle.name) {
+                        editingCircle = circle; circleName = circle.name; managingAddress = true
+                    }
                 }.onDelete { indices in
                     let removed = indices.map { model.archive.circles[$0].id }
                     if model.update({ $0.circles.removeAll { removed.contains($0.id) } }), let selected = model.circleID, removed.contains(selected) { model.selectCircle(nil) }
                 }
-                Section(String(localized: "将当前位置保存为生活圈", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) {
-                    Button(String(localized: "🏠 家附近", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) { Task { await model.saveCircle(String(localized: "家附近", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) } }
-                    Button(String(localized: "🏢 公司附近", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) { Task { await model.saveCircle(String(localized: "公司附近", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) } }
-                    Text(String(localized: "保存后可直接发现该区域餐厅，无需每次重新定位。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) .font(.caption).foregroundStyle(.secondary)
-                }.disabled(model.busy)
                 if model.busy { ProgressView() }
                 if let message = model.message { Text(message).foregroundStyle(.secondary) }
             }.navigationTitle(String(localized: "我的生活圈", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))).toolbar { ToolbarItem(placement: .topBarTrailing) { Button(String(localized: "完成", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) { showingCircles = false } } }
+            .sheet(isPresented: $managingAddress) {
+                VStack(spacing: 12) {
+                    TextField("常用地址名称（如家附近）", text: $circleName).textFieldStyle(.roundedBorder)
+                        .padding(.horizontal)
+                    if let old = editingCircle {
+                        Button("只保存名称") {
+                            saveAddress(latitude: old.latitude, longitude: old.longitude)
+                        }.disabled(validCircleName == nil)
+                    }
+                    DiningPlacePicker(model: model, restaurant: false, initial: editingCircle.map {
+                        CLLocationCoordinate2D(latitude: $0.latitude, longitude: $0.longitude)
+                    }, canChoose: { validCircleName != nil }) { place in
+                        saveAddress(latitude: place.latitude, longitude: place.longitude)
+                    }
+                }.padding(.top)
+            }
         }
     }
 }
@@ -899,6 +954,7 @@ struct DiningView: View {
 private struct DiningCheckInSheet: View {
     @ObservedObject var model: DiningStore
     @Environment(\.dismiss) private var dismiss
+    @State private var pickingRestaurant = false
     @State private var selected: DiningPlace?
     @State private var restaurantType = ""
     @State private var manual = false
@@ -910,6 +966,12 @@ private struct DiningCheckInSheet: View {
     var body: some View {
         NavigationStack {
             List {
+                Button("地图搜索餐厅") { if model.checkingIn { model.closeCheckIn() }; pickingRestaurant = true }
+                    .sheet(isPresented: $pickingRestaurant) {
+                        DiningPlacePicker(model: model, restaurant: true, initial: selected.flatMap {
+                            $0.provider == "amap" ? nil : CLLocationCoordinate2D(latitude: $0.latitude, longitude: $0.longitude)
+                        }) { selected = $0; manual = false; restaurantType = "" }
+                    }
                 if manual {
                     Section {
                         TextField(diningText("餐厅名称"), text: $restaurantName)
@@ -1084,7 +1146,9 @@ private struct DiningNavigationPicker: View {
 
 private struct DiningGatheringsView: View {
     let family: FamilyStore
-    let place: DiningPlace?
+    let model: DiningStore
+    @State var place: DiningPlace?
+    @State private var picking = false
     private let endpoint = "/api/dining/gatherings"
     @State private var items: [[String: Any]] = []
     @State private var code = ""
@@ -1099,6 +1163,7 @@ private struct DiningGatheringsView: View {
     var body: some View {
         NavigationStack {
             List {
+                Button(place?.name ?? "选择餐厅，发起饭局") { picking = true }
                 if let place {
                     Button("为「\(place.name)」创建饭局") {
                         Task {
@@ -1172,6 +1237,11 @@ private struct DiningGatheringsView: View {
             }
             .alert(copyNotice ?? "", isPresented: Binding(get: { copyNotice != nil }, set: { if !$0 { copyNotice = nil } })) {
                 Button("好") { copyNotice = nil }
+            }
+            .sheet(isPresented: $picking) {
+                DiningPlacePicker(model: model, restaurant: true, initial: place.flatMap {
+                    $0.provider == "amap" ? nil : CLLocationCoordinate2D(latitude: $0.latitude, longitude: $0.longitude)
+                }) { place = $0; operation = UUID() }
             }
             .task { await refresh() }
             .refreshable { await refresh() }
@@ -1451,5 +1521,116 @@ private struct DiningCircleView: View {
             restaurants = []
             failed = true
         }
+    }
+}
+
+private struct DiningPlacePicker: View {
+    let model: DiningStore
+    let restaurant: Bool
+    var initial: CLLocationCoordinate2D? = nil
+    let choose: (DiningPlace) -> Void
+    let canChoose: () -> Bool
+    @Environment(\.dismiss) private var dismiss
+    @State private var camera: MapCameraPosition = .automatic
+    @State private var center: CLLocationCoordinate2D?
+    @State private var results: [MKMapItem] = []
+    @State private var query = ""
+    @State private var status = ""
+    @State private var searching = false
+
+    init(model: DiningStore, restaurant: Bool, initial: CLLocationCoordinate2D? = nil,
+         canChoose: @escaping () -> Bool = { true }, choose: @escaping (DiningPlace) -> Void) {
+        self.model = model
+        self.restaurant = restaurant
+        self.initial = initial
+        self.choose = choose
+        self.canChoose = canChoose
+    }
+
+    var body: some View {
+        NavigationStack {
+            VStack {
+                HStack {
+                    TextField(restaurant ? "餐厅名称或地址" : "搜索地址", text: $query)
+                        .textFieldStyle(.roundedBorder).onSubmit { Task { await search() } }
+                    Button("搜索") { Task { await search() } }.disabled(searching)
+                }.padding(.horizontal)
+                if center != nil {
+                    Map(position: $camera) {
+                        ForEach(results.indices, id: \.self) { index in
+                            let item = results[index]
+                            Annotation(item.name ?? "", coordinate: item.placemark.coordinate) {
+                                Button { finish(item) } label: {
+                                    Image(systemName: "mappin.circle.fill").font(.title).foregroundStyle(.red)
+                                }.accessibilityLabel(item.name ?? "选择地点")
+                            }
+                        }
+                    }.onMapCameraChange(frequency: .onEnd) { center = $0.region.center }
+                        .overlay { if !restaurant { Image(systemName: "plus").allowsHitTesting(false) } }
+                        .frame(minHeight: 220)
+                    if !restaurant {
+                        Button("使用地图中心") {
+                            guard let center, canChoose() else { return }
+                            choose(makePlace("地图选点", "", center)); dismiss()
+                        }.disabled(!canChoose())
+                    }
+                }
+                if !status.isEmpty { Text(status).font(.caption).foregroundStyle(.secondary) }
+                List(results.indices, id: \.self) { index in
+                    let item = results[index]
+                    Button { finish(item) } label: {
+                        VStack(alignment: .leading) {
+                            Text(item.name ?? "地点")
+                            if let address = item.placemark.title { Text(address).font(.caption) }
+                        }
+                    }
+                }.listStyle(.plain)
+            }
+            .navigationTitle(restaurant ? "选择餐厅" : "调整位置")
+            .toolbar { ToolbarItem(placement: .cancellationAction) { Button("取消") { dismiss() } } }
+            .task {
+                if let initial { move(initial) }
+                else if let location = try? await model.locate() {
+                    if center == nil { move(location.coordinate) }
+                } else if center == nil { status = "无法获取当前位置，可以直接搜索。" }
+                if restaurant && results.isEmpty && query.isEmpty && center != nil { await search() }
+            }
+        }
+    }
+
+    private func move(_ coordinate: CLLocationCoordinate2D) {
+        center = coordinate
+        camera = .region(MKCoordinateRegion(center: coordinate, latitudinalMeters: 1800, longitudinalMeters: 1800))
+    }
+
+    private func search() async {
+        guard !searching else { return }
+        let term = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !term.isEmpty || restaurant else { return }
+        searching = true
+        defer { searching = false }
+        let request = MKLocalSearch.Request()
+        request.naturalLanguageQuery = term.isEmpty ? "餐厅" : term
+        request.resultTypes = restaurant ? .pointOfInterest : [.pointOfInterest, .address]
+        if restaurant { request.pointOfInterestFilter = MKPointOfInterestFilter(including: [.restaurant, .cafe, .bakery, .brewery, .foodMarket]) }
+        if let center { request.region = MKCoordinateRegion(center: center, latitudinalMeters: 8000, longitudinalMeters: 8000) }
+        do {
+            results = try await MKLocalSearch(request: request).start().mapItems
+            if let first = results.first { move(first.placemark.coordinate) }
+            status = results.isEmpty ? "没有找到地点，可试试加上城市或详细地址。" : ""
+        } catch { results = []; status = "搜索未完成，请重试。" }
+    }
+
+    private func makePlace(_ name: String, _ address: String, _ point: CLLocationCoordinate2D) -> DiningPlace {
+        let raw = name + "|" + String(format: "%.5f|%.5f", point.latitude, point.longitude)
+        let id = "mapkit:" + SHA256.hash(data: Data(raw.utf8)).map { String(format: "%02x", $0) }.joined()
+        return DiningPlace(id: id, name: name, address: address, latitude: point.latitude,
+            longitude: point.longitude, category: "", provider: "mapkit", distanceMeters: 0)
+    }
+
+    private func finish(_ item: MKMapItem) {
+        guard canChoose() else { return }
+        choose(makePlace(item.name ?? "地点", item.placemark.title ?? "", item.placemark.coordinate))
+        dismiss()
     }
 }

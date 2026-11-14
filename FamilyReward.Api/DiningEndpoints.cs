@@ -43,6 +43,29 @@ internal static class DiningEndpoints
             { return Results.Json(new { error = "地图服务暂时不可用，请稍后重试。", code = "dining_provider_unavailable" }, statusCode: 502); }
         }).RequireAuthorization().RequireRateLimiting("dining-search");
 
+        app.MapPost("/api/dining/search", async (DiningKeyword input, IConfiguration configuration,
+            IHttpClientFactory factory, HttpContext context) =>
+        {
+            context.Response.Headers.CacheControl = "no-store";
+            var query = input.Query?.Trim();
+            if (query is not { Length: > 0 and <= 80 } || query.Contains('|')) return Results.BadRequest();
+            var key = configuration["Dining:AmapWebServiceKey"];
+            if (string.IsNullOrWhiteSpace(key)) return Results.StatusCode(503);
+            var url = QueryHelpers.AddQueryString("https://restapi.amap.com/v3/place/text", new Dictionary<string, string?> {
+                ["key"] = key, ["keywords"] = query, ["types"] = "050000", ["offset"] = "25", ["page"] = "1", ["extensions"] = "all"
+            });
+            try
+            {
+                using var response = await factory.CreateClient("dining-amap").GetAsync(url, context.RequestAborted);
+                response.EnsureSuccessStatusCode();
+                using var data = await JsonDocument.ParseAsync(await response.Content.ReadAsStreamAsync(context.RequestAborted), cancellationToken: context.RequestAborted);
+                return Results.Ok(new { restaurants = Parse(data.RootElement, requireDistance: false) });
+            }
+            catch (OperationCanceledException) when (context.RequestAborted.IsCancellationRequested) { throw; }
+            catch (Exception error) when (error is HttpRequestException or JsonException or InvalidDataException or OperationCanceledException)
+            { return Results.Json(new { error = "餐厅搜索暂时不可用，请稍后重试。" }, statusCode: 502); }
+        }).RequireAuthorization().RequireRateLimiting("dining-search");
+
         app.MapPost("/api/dining/route-times", async (DiningRouteSearch input, IConfiguration configuration,
             IHttpClientFactory factory, HttpContext context) =>
         {
@@ -92,7 +115,7 @@ internal static class DiningEndpoints
             return null;
         }
     }
-    internal static List<DiningRestaurant> Parse(JsonElement root)
+    internal static List<DiningRestaurant> Parse(JsonElement root, bool requireDistance = true)
     {
         if (Text(root, "status") != "1" || !root.TryGetProperty("pois", out var pois) || pois.ValueKind != JsonValueKind.Array) throw new InvalidDataException();
         var restaurants = new List<DiningRestaurant>(); var seen = new HashSet<string>(StringComparer.Ordinal);
@@ -103,9 +126,9 @@ internal static class DiningEndpoints
             if (id.Length == 0 || name.Length == 0 || !seen.Add(id) || !TryCoordinate(Text(poi, "location"), out var lat, out var lon)) continue;
             var info = poi.TryGetProperty("biz_ext", out var business) ? business : default;
             var distance = Number(poi, "distance");
-            if (distance is null || distance < 0 || distance > 10000) continue;
+            if (requireDistance && (distance is null || distance < 0 || distance > 10000)) continue;
             var cost = Number(info, "cost"); var rating = Number(info, "rating");
-            restaurants.Add(new("amap:" + id, name, Text(poi, "address"), lat, lon, Text(poi, "type"), "amap", cost > 0 ? cost : null, rating is >= 0 and <= 5 ? rating : null, distance.Value));
+            restaurants.Add(new("amap:" + id, name, Text(poi, "address"), lat, lon, Text(poi, "type"), "amap", cost > 0 ? cost : null, rating is >= 0 and <= 5 ? rating : null, distance ?? 0));
         }
         return restaurants;
     }
@@ -122,3 +145,5 @@ internal sealed record DiningRestaurant(string Id, string Name, string Address, 
 internal sealed record DiningSearch(double Latitude, double Longitude, bool Driving = false);
 internal sealed record DiningRoutePoint(double Latitude, double Longitude);
 internal sealed record DiningRouteSearch(string Mode, DiningRoutePoint Origin, DiningRoutePoint[] Destinations);
+
+internal sealed record DiningKeyword(string Query);
