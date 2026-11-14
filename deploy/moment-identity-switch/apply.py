@@ -23,7 +23,11 @@ def main(action):
   assert not ENV.is_symlink() and not EDGE.is_symlink(), "Configuration aliases require explicit review"
   beforeEnv=ENV.read_bytes();lines=beforeEnv.decode().splitlines();existing=[s.partition('=')[2].strip('"') for s in lines if s.startswith(RULE+'=')];assert not existing or existing==[VALUE],'Existing Moment SSO rule conflicts'
   afterEnv=beforeEnv if existing else (beforeEnv.rstrip(b'\n')+b'\n'+(RULE+'='+VALUE+'\n').encode())
-  afterEdge=(ROOT/'happylife.ai.xmkurt.com.nginx.conf').read_bytes();beforeEdge=EDGE.read_bytes();assert b'server_name happylife.ai.xmkurt.com;' in beforeEdge
+  beforeEdge=EDGE.read_bytes();assert b'server_name happylife.ai.xmkurt.com;' in beforeEdge
+  redirect=b'location / { return 308 https://happylife.ai.impx.net$request_uri; }'
+  assert beforeEdge.count(redirect)==2, 'Expected legacy HTTPS/HTTP redirect locations have changed'
+  fragment=(ROOT/'happylife.ai.xmkurt.com.nginx.conf').read_bytes().strip()
+  afterEdge=beforeEdge.replace(redirect,fragment,1).replace(redirect,b'location / { return 308 https://happylife.ai.xmkurt.com$request_uri; }',1)
   files=[{'path':str(p),'before':sha(old),'after':sha(new),'mode':p.stat().st_mode & 0o777} for p,old,new in [(ENV,beforeEnv,afterEnv),(EDGE,beforeEdge,afterEdge)]]
   baseline=STORE/'preflight.json';candidate={'operationId':ID,'checksum':digest,'files':files}
   if action=='preflight':
