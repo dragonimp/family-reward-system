@@ -176,7 +176,7 @@ private actor PhotoPreviewLoader {
         if response.statusCode == 401 { logout(); throw APIError.message(String(localized: "登录已过期，请重新登录。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) }
         guard (200..<300).contains(response.statusCode) else {
             let detail = value as? [String: Any]
-            throw APIError.message(detail?["error"] as? String ?? detail?["message"] as? String ?? String(localized: "请求失败（\(response.statusCode)），请重试。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)))
+            throw APIError.http(response.statusCode, detail?["error"] as? String ?? detail?["message"] as? String ?? String(localized: "请求失败（\(response.statusCode)），请重试。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)))
         }
         return value
     }

@@ -24,9 +24,10 @@ struct Record: Identifiable {
 enum APIError: LocalizedError {
     case message(String)
     case invalidData(String?)
+    case http(Int, String)
     var errorDescription: String? {
         switch self {
-        case .message(let text): return text
+        case .message(let text), .http(_, let text): return text
         case .invalidData: return "The service returned invalid data."
         }
     }

@@ -238,10 +238,16 @@ import UniformTypeIdentifiers
             save()
             let encoder = JSONEncoder(); encoder.dateEncodingStrategy = .iso8601
             let decoder = ExerciseSession.syncDecoder()
+            var conflictingRecords = Set<UUID>()
             for record in archive.history where remote[record.id] == nil || !(archive.uploaded ?? []).contains(record.id) {
                 guard !(archive.pendingDeletions ?? []).contains(record.id) else { continue }
                 let body = try JSONSerialization.jsonObject(with: encoder.encode(record)) as! [String: Any]
-                _ = try await api.call("/api/exercise/records/\(record.id.uuidString)", method: "PUT", body: body)
+                do {
+                    _ = try await api.call("/api/exercise/records/\(record.id.uuidString)", method: "PUT", body: body)
+                } catch APIError.http(409, _) {
+                    conflictingRecords.insert(record.id)
+                    continue
+                }
                 guard DiningAccount.identity(api.profile?.text("unifiedUserId") ?? "") == DiningAccount.identity(userID) else { return }
                 if archive.history.contains(where: { $0.id == record.id }) { archive.uploaded = Array(Set((archive.uploaded ?? []) + [record.id])); save() }
             }
@@ -254,7 +260,7 @@ import UniformTypeIdentifiers
                 }
             }
             var activityShareError: String?
-            for record in archive.history where record.activity != nil && archive.activityShares?[record.id] == nil {
+            for record in archive.history where !conflictingRecords.contains(record.id) && record.activity != nil && archive.activityShares?[record.id] == nil {
                 guard let linked = record.activity, !(archive.pendingDeletions ?? []).contains(record.id), DiningAccount.identity(api.profile?.text("unifiedUserId") ?? "") == DiningAccount.identity(userID) else { continue }
                 do {
                 let response = try await api.call("/api/dear/social/tenants/\(linked.tenantID.uuidString)/activities/\(linked.id.uuidString)/moments", method: "POST", body: ["text": record.activitySummary, "requestId": record.id.uuidString, "recordedAt": ISO8601DateFormatter().string(from: record.startedAt)]) as? [String: Any] ?? [:]
@@ -264,7 +270,14 @@ import UniformTypeIdentifiers
                 NotificationCenter.default.post(name: .exerciseActivityPublished, object: nil)
                 } catch { activityShareError = String(localized: "运动已同步，活动动态待重试：\(error.localizedDescription)", bundle: AgentIdentityLanguage.appBundle()) }
             }
-            archive.history.sort { $0.startedAt > $1.startedAt }; save(); syncMessage = activityShareError ?? String(localized: "已同步到当前账号", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))
+            archive.history.sort { $0.startedAt > $1.startedAt }
+            save()
+            if !conflictingRecords.isEmpty {
+                let conflict = String(localized: "有 \(conflictingRecords.count) 条运动记录与云端冲突，本机副本已保留。", bundle: AgentIdentityLanguage.appBundle())
+                syncMessage = [conflict, activityShareError].compactMap { $0 }.joined(separator: " ")
+                return
+            }
+            syncMessage = activityShareError ?? String(localized: "已同步到当前账号", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))
         } catch is CancellationError { }
         catch { syncMessage = String(localized: "同步未完成，本机记录已保留：\(error.localizedDescription)", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)) }
     }
