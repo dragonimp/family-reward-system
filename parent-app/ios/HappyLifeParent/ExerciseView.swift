@@ -685,9 +685,20 @@ struct ActivityExerciseTimelineRow: View {
 
 struct ExerciseWatchConnectionView: View {
     @ObservedObject var family: FamilyStore
+    @Environment(\.openURL) private var openURL
+    @State private var scanningLogin = false
+    @State private var loginApprovalURL: URL?
     @StateObject private var health = ExerciseHealth()
     var body: some View {
         List {
+            Section {
+                Button { scanningLogin = true } label: { Label(String(localized: "扫码登录", bundle: AgentIdentityLanguage.appBundle()), systemImage: "qrcode.viewfinder") }
+                    .sheet(isPresented: $scanningLogin, onDismiss: {
+                        if let url = loginApprovalURL { loginApprovalURL = nil; openURL(url) }
+                    }) {
+                        WatchCodeScanner(loginOrigin: URL(string: "https://happylife.ai.impx.net")!) { payload in loginApprovalURL = URL(string: payload) }
+                    }
+            }
                 Section(String(localized: "健康与手表", bundle: AgentIdentityLanguage.appBundle())) {
                     if !family.watchExerciseMetrics.isEmpty {
                         Text(String(localized: "手表运动数据", bundle: AgentIdentityLanguage.appBundle())).font(.headline)

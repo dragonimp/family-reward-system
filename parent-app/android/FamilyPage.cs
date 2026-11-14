@@ -390,7 +390,6 @@ public sealed class FamilyPage : ContentPage
         if (store.AccountProfileError is { } profileError) content.Add(new Label { Text = profileError, FontSize = 12 });
         Section("应用与设置",
             MomentStyle.MenuRow("连接手表", "连接手表", WatchConnections),
-            MomentStyle.MenuRow("扫码登录", "扫码登录", () => _ = MomentLoginScanner.OpenAsync(this)),
             MomentStyle.MenuRow("栏目启用", "栏目启用", SectionSettings),
             MomentStyle.MenuRow("AI 对话", "AI 对话", () => _ = OpenAccountWeb("/assistant")),
             MomentStyle.MenuRow("家族族谱", "带娃", () => _ = OpenAccountWeb("/genealogy")),
@@ -519,7 +518,9 @@ public sealed class FamilyPage : ContentPage
             global::Android.App.Application.Context.StartActivity(intent);
         }));
         rows.Add(MomentStyle.Caption("当前安卓版本暂不支持手表健康数据同步。孩子手表请在带娃的孩子菜单中连接。"));
-        _ = Navigation.PushAsync(new ContentPage { Title = "连接手表", Content = new ScrollView { Content = rows } });
+        var page = new ContentPage { Title = "连接手表", Content = new ScrollView { Content = rows } };
+        rows.Children.Insert(0, MomentStyle.MenuRow("扫码登录", "扫码登录", () => _ = MomentLoginScanner.OpenAsync(page)));
+        _ = Navigation.PushAsync(page);
     }
 
     private async Task PairWatch(FamilyRecord child)
