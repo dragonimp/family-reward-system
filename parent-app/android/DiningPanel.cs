@@ -152,7 +152,11 @@ public sealed class DiningPanel : ContentView
         }
         body.Add(MomentStyle.Card(shortcuts, new Thickness(4)));
         var location = new Grid { ColumnDefinitions = new ColumnDefinitionCollection { new(GridLength.Star), new(GridLength.Auto) } };
-        var current = MomentStyle.Caption("◎ " + (archive.Circles.FirstOrDefault(c => c.Id == circleId)?.Name ?? "当前位置附近")); current.VerticalTextAlignment = TextAlignment.Center; location.Add(current);
+        var positionName = archive.Circles.FirstOrDefault(c => c.Id == circleId)?.Name ?? "当前位置附近";
+        var position = MomentStyle.Action($"◎ {positionName} ▾", () => _ = Circles());
+        position.HorizontalOptions = LayoutOptions.Start;
+        position.IsEnabled = !Working;
+        location.Add(position);
         var filter = MomentStyle.Action("☷ 筛选", () => _ = Filters()); filter.IsEnabled = !Working; location.Add(filter, 1); body.Add(location);
         if (result is null || busy) {
             var hero = new VerticalStackLayout { Spacing = 16 }; hero.Add(MomentStyle.Bowl());

@@ -536,8 +536,15 @@ struct DiningView: View {
                     .disabled(model.busy || model.checkingIn)
 
                     HStack(spacing: 8) {
-                        Label(model.archive.circles.first(where: { $0.id == model.circleID })?.name ?? diningText("当前位置附近"), systemImage: "location.circle")
-                            .foregroundStyle(.secondary)
+                        Button { showingCircles = true } label: {
+                            HStack(spacing: 5) {
+                                Label(model.archive.circles.first(where: { $0.id == model.circleID })?.name ?? diningText("当前位置附近"), systemImage: "location.circle")
+                                    .lineLimit(1)
+                                Image(systemName: "chevron.down").font(.caption2).accessibilityHidden(true)
+                            }
+                            .frame(minHeight: 44)
+                        }
+                        .disabled(model.busy || model.checkingIn)
                         Spacer(minLength: 4)
                         Button(diningText("筛选"), systemImage: "slider.horizontal.3") { showingFilters = true }
                             .disabled(model.busy || model.checkingIn)
