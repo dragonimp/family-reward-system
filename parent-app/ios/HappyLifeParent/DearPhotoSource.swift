@@ -91,7 +91,7 @@ import UniformTypeIdentifiers
     private var importingSharedItems = false
     private var checkedLocationIDs = Set<String>()
     private let session = URLSession(configuration: .ephemeral)
-    private let base = URL(string: "https://happylife.ai.impx.net")!
+    private let base = URL(string: "https://happylife.ai.xmkurt.com")!
 
     func start() {
         guard pump == nil else { return }
@@ -220,7 +220,7 @@ import UniformTypeIdentifiers
               let index = try? readIndex(at: root) else { return }
         if !index.pendingRemoval.isEmpty { _ = try? cleanPendingRemoval(at: root) }
         do {
-            var body: [String: Any] = deviceInformation.merging(["notificationApplicationKey": "happylife.ai", "transferProtocol": "connect-datachannel-v1"]) { _, value in value }
+            var body: [String: Any] = deviceInformation.merging(["notificationApplicationKey": "linko-moment.ai", "transferProtocol": "connect-datachannel-v1"]) { _, value in value }
             if let deviceID = index.deviceID { body["id"] = deviceID }
             let response = try await store.call("/api/dear/social/photo-devices", method: "POST", body: body) as? [String: Any]
             guard let deviceID = response?["id"] as? String, UUID(uuidString: deviceID) != nil else { return }
@@ -390,7 +390,7 @@ import UniformTypeIdentifiers
         let subject = try await currentSubject()
         let root = try directory(for: subject)
         var index = try readIndex(at: root)
-        let deviceBody = deviceInformation.merging(["id": index.deviceID as Any? ?? NSNull(), "notificationApplicationKey": "happylife.ai", "transferProtocol": "connect-datachannel-v1"]) { _, value in value }
+        let deviceBody = deviceInformation.merging(["id": index.deviceID as Any? ?? NSNull(), "notificationApplicationKey": "linko-moment.ai", "transferProtocol": "connect-datachannel-v1"]) { _, value in value }
         let device = try await store.call("/api/dear/social/photo-devices", method: "POST",
                                           body: deviceBody) as? [String: Any]
         guard let deviceID = device?["id"] as? String, UUID(uuidString: deviceID) != nil else {
@@ -1175,7 +1175,7 @@ import UniformTypeIdentifiers
         guard let config = try await store.call("/auth/native/configuration") as? [String: Any],
               let text = config["authority"] as? String, let url = URL(string: text), url.scheme == "https",
               url.host != nil, url.user == nil, url.password == nil, url.path.isEmpty, url.query == nil, url.fragment == nil,
-              let key = config["clientId"] as? String, key == "happylife.ai", expected == generation else {
+              let key = config["clientId"] as? String, key == "linko-moment.ai", expected == generation else {
             throw APIError.message("通知应用配置无效。")
         }
         let result = NotificationClient(authority: url, applicationKey: key) { [weak self] in

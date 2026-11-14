@@ -12,12 +12,12 @@ public sealed record FeedbackWallPost(int Id, string Category, string Title, str
 public sealed record FeedbackWallSnapshot(int Total, int Wishes, int Opinions, int Upvotes,
     int Downvotes, IReadOnlyList<FeedbackWallPost> Items);
 
-// The native login is issued for happylife.ai. User Center validates that audience
+// The native login is issued for linko-moment.ai. User Center validates that audience
 // for this wall; no credentials or feedback records are stored by Linko Moment.
 public sealed class FeedbackWallClient
 {
     private static readonly Uri Origin = new("https://auth.ai.xmkurt.com");
-    private static readonly Uri Wall = new(Origin, "/api/feedback/wall/happylife.ai");
+    private static readonly Uri Wall = new(Origin, "/api/feedback/wall/linko-moment.ai");
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
     private static readonly HttpClient SharedHttp = new(new HttpClientHandler
     {

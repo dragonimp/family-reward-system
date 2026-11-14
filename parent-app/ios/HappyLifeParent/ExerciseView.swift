@@ -696,7 +696,7 @@ struct ExerciseWatchConnectionView: View {
                     .sheet(isPresented: $scanningLogin, onDismiss: {
                         if let url = loginApprovalURL { loginApprovalURL = nil; openURL(url) }
                     }) {
-                        WatchCodeScanner(loginOrigin: URL(string: "https://happylife.ai.impx.net")!) { payload in loginApprovalURL = URL(string: payload) }
+                        WatchCodeScanner(loginOrigin: URL(string: "https://happylife.ai.xmkurt.com")!) { payload in loginApprovalURL = URL(string: payload) }
                     }
             }
                 Section(String(localized: "健康与手表", bundle: AgentIdentityLanguage.appBundle())) {

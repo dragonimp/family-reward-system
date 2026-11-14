@@ -117,6 +117,7 @@ builder.Services.AddAgentIdentityJwtCookieAuthentication(new AgentIdentityOption
 {
     Authority = (Environment.GetEnvironmentVariable("AGENTIDENTITY_AUTHORITY") ?? "https://auth.ai.xmkurt.com").TrimEnd('/'),
     ClientId = Environment.GetEnvironmentVariable("AGENTIDENTITY_CLIENT_ID") ?? "happylife.ai",
+    ClientIdsByHost = MomentIdentityApplications.HostClients,
     CookieName = Environment.GetEnvironmentVariable("AGENTIDENTITY_COOKIE_NAME") ?? "happylife_access_token",
     LogoutCompletedPath = "/auth/logged-out"
 });
@@ -7634,7 +7635,7 @@ static async Task<List<IdentityApplicationUser>> GetIdentityApplicationUsers(
     CancellationToken cancellationToken)
 {
     var authority = (Environment.GetEnvironmentVariable("AGENTIDENTITY_AUTHORITY") ?? "https://auth.ai.xmkurt.com").Trim().TrimEnd('/');
-    var clientId = (Environment.GetEnvironmentVariable("AGENTIDENTITY_CLIENT_ID") ?? "happylife.ai").Trim();
+    var clientId = MomentIdentityApplications.ClientForHost(incomingRequest.Host.Host);
     using var request = new HttpRequestMessage(
         HttpMethod.Get,
         $"{authority}/api/applications/{Uri.EscapeDataString(clientId)}/users");

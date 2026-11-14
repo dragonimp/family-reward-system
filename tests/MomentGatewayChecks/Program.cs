@@ -14,6 +14,11 @@ using Microsoft.Extensions.Options;
 var assertions = 0;
 void Check(bool ok, string name) { if (!ok) throw new Exception(name); assertions++; }
 string Address(WebApplication app) => app.Services.GetRequiredService<IServer>().Features.Get<IServerAddressesFeature>()!.Addresses.Single();
+Check(MomentIdentityApplications.ClientForHost("happylife.ai.impx.net") == "happylife.ai", "legacy hostname retains original login audience");
+Check(MomentIdentityApplications.ClientForHost("HAPPYLIFE.AI.XMKURT.COM") == "linko-moment.ai", "Moment hostname uses independent login audience");
+Check(MomentIdentityApplications.SourceClient(new ClaimsPrincipal(new ClaimsIdentity())) is null, "anonymous source rejected");
+Check(MomentIdentityApplications.SourceClient(new ClaimsPrincipal(new ClaimsIdentity([new Claim("app_id", "other.ai")], "test"))) is null, "unrelated application rejected");
+Check(MomentIdentityApplications.SourceClient(new ClaimsPrincipal(new ClaimsIdentity([new Claim("app_id", "linko-moment.ai"), new Claim("token_use", "service")], "test"))) is null, "service source rejected");
 var downstreamBuilder = WebApplication.CreateBuilder();
 downstreamBuilder.Logging.ClearProviders();
 downstreamBuilder.WebHost.UseUrls("http://127.0.0.1:0");
@@ -95,19 +100,21 @@ await Task.WhenAll(Enumerable.Range(0, 20).Select(_ => client.GetAsync("/api/dea
 Check(ExchangeHandler.Count == 1, "concurrent previews coalesce the User Center exchange");
 client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", "family-test-two");
 Check((await client.GetAsync("/api/dear/social/me")).IsSuccessStatusCode && ExchangeHandler.Count == 2, "rotated source token uses a separate exchange");
+client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", "moment-test");
+Check((await client.GetAsync("/api/dear/social/me")).IsSuccessStatusCode && ExchangeHandler.Count == 3, "Moment audience exchanges independently without reusing legacy service-token cache");
 Console.WriteLine($"PASS: {assertions} Moment gateway HTTP, identity exchange and WebSocket checks");
 
 sealed class TestAuth(IOptionsMonitor<AuthenticationSchemeOptions> options, ILoggerFactory logger, UrlEncoder encoder) : AuthenticationHandler<AuthenticationSchemeOptions>(options, logger, encoder) {
  protected override Task<AuthenticateResult> HandleAuthenticateAsync() {
-  var token = Request.Headers.Authorization.ToString() is "Bearer family-test" or "Bearer family-test-two" || Request.Cookies["happylife_access_token"] == "family-test";
-  return Task.FromResult(token ? AuthenticateResult.Success(new AuthenticationTicket(new ClaimsPrincipal(new ClaimsIdentity([new Claim("sub","test")],"test")),"test")) : AuthenticateResult.NoResult());
+  var token = Request.Headers.Authorization.ToString() is "Bearer family-test" or "Bearer family-test-two" or "Bearer moment-test" || Request.Cookies["happylife_access_token"] == "family-test";
+  return Task.FromResult(token ? AuthenticateResult.Success(new AuthenticationTicket(new ClaimsPrincipal(new ClaimsIdentity([new Claim("sub","test"), new Claim("app_id", Request.Headers.Authorization.ToString() == "Bearer moment-test" ? "linko-moment.ai" : "happylife.ai")],"test")),"test")) : AuthenticateResult.NoResult());
  }
 }
 sealed class ExchangeHandler : HttpMessageHandler {
  public static int Count;
  protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request,CancellationToken ct) {
   var body = JsonDocument.Parse(await request.Content!.ReadAsStringAsync(ct)).RootElement;
-  if (request.RequestUri!.AbsoluteUri != "https://identity.example.test/oauth/native-service-token" || request.Headers.Authorization?.ToString() is not ("Bearer family-test" or "Bearer family-test-two") || body.GetProperty("sourceClientId").GetString() != "happylife.ai" || body.GetProperty("targetClientId").GetString() != "linko.ai") throw new Exception("incorrect SDK application exchange");
+  if (request.RequestUri!.AbsoluteUri != "https://identity.example.test/oauth/native-service-token" || request.Headers.Authorization?.ToString() is not ("Bearer family-test" or "Bearer family-test-two" or "Bearer moment-test") || body.GetProperty("sourceClientId").GetString() != (request.Headers.Authorization?.Parameter == "moment-test" ? "linko-moment.ai" : "happylife.ai") || body.GetProperty("targetClientId").GetString() != "linko.ai") throw new Exception("incorrect SDK application exchange");
   Interlocked.Increment(ref Count);
   return new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(JsonSerializer.Serialize(new { access_token = TestTokens.Service }),Encoding.UTF8,"application/json") };
  }

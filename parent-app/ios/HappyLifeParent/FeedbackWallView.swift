@@ -35,7 +35,7 @@ private final class FeedbackWallStore: ObservableObject {
     @Published var busy = false
 
     private let origin = URL(string: "https://auth.ai.xmkurt.com")!
-    private let clientID = "happylife.ai"
+    private let clientID = "linko-moment.ai"
     private let session = URLSession(configuration: .ephemeral)
     private weak var identity: AgentIdentitySession?
 

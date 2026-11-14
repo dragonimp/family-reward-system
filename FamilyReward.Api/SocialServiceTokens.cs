@@ -12,17 +12,17 @@ internal sealed class SocialServiceTokens : IDisposable
     private readonly MemoryCache cache = new(new MemoryCacheOptions { SizeLimit = 512 });
     private readonly SemaphoreSlim exchange = new(1, 1);
 
-    public async Task<string> GetAsync(string token, string application, AgentIdentityOptions identity,
+    public async Task<string> GetAsync(string token, string sourceClient, string application, AgentIdentityOptions identity,
         IHttpClientFactory clients, CancellationToken ct)
     {
-        var key = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(identity.Authority + "\n" + identity.ClientId + "\n" + application + "\n" + token)));
+        var key = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(identity.Authority + "\n" + sourceClient + "\n" + application + "\n" + token)));
         if (cache.TryGetValue<string>(key, out var cached)) return cached!;
         await exchange.WaitAsync(ct);
         try
         {
             if (cache.TryGetValue<string>(key, out cached)) return cached!;
             var result = await new NativeSsoClient(clients.CreateClient("dear-social-sso"))
-                .ExchangeApplicationAsync(new Uri(identity.Authority), identity.ClientId, application, token, ct);
+                .ExchangeApplicationAsync(new Uri(identity.Authority), sourceClient, application, token, ct);
             var expires = Expires(result);
             var now = DateTimeOffset.UtcNow;
             if (expires > now.AddSeconds(30))

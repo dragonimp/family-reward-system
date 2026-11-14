@@ -40,7 +40,7 @@ import UserNotifications
         Task { @MainActor [weak self] in
             self?.photoSource?.start()
             let info = response.notification.request.content.userInfo
-            if info["applicationKey"] as? String == "happylife.ai",
+            if info["applicationKey"] as? String == "linko-moment.ai",
                let raw = info["messageId"] as? String, let id = Int64(raw), id > 0 {
                 if let notifications = self?.notifications { notifications.open(messageID: id) }
                 else { self?.pendingMessageID = id }
@@ -74,7 +74,7 @@ extension View {
     init() {
         let store = FamilyStore()
         _store = StateObject(wrappedValue: store)
-        let language = AgentIdentityLanguageStore(applicationKey: "happylife.ai",
+        let language = AgentIdentityLanguageStore(applicationKey: "linko-moment.ai",
             authority: URL(string: "https://auth.ai.xmkurt.com")!,
             accountIdentifier: store.identity.accountIdentifier,
             accountIdentifierProvider: { store.identity.accountIdentifier },

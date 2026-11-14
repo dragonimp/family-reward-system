@@ -102,7 +102,7 @@ internal sealed class MomentOriginals(FamilyStore store)
                 if (row.Flag("serverCached"))
                 {
                     status("正在从服务器缓存接收原文件…");
-                    using var request = await AuthorizedAsync(new Uri("https://happylife.ai.impx.net" + path + "/relay"), HttpMethod.Get, session, ct);
+                    using var request = await AuthorizedAsync(new Uri("https://happylife.ai.xmkurt.com" + path + "/relay"), HttpMethod.Get, session, ct);
                     await RealtimeFileRelay.ReceiveAsync(partial, manifest, request, ct);
                 }
                 ct.ThrowIfCancellationRequested();

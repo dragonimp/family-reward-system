@@ -1,6 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk.Web">
   <PropertyGroup><TargetFramework>net10.0</TargetFramework><Nullable>enable</Nullable><ImplicitUsings>enable</ImplicitUsings></PropertyGroup>
   <ItemGroup>
+    <Compile Include="../../FamilyReward.Api/MomentIdentityApplications.cs" Link="MomentIdentityApplications.cs" />
     <Compile Include="../../FamilyReward.Api/LinkoSocialGateway.cs" Link="LinkoSocialGateway.cs" />
     <Compile Include="../../FamilyReward.Api/SocialServiceTokens.cs" Link="SocialServiceTokens.cs" />
     <ProjectReference Include="../../../AgentIdentity/src/AgentIdentity.NativeClient/AgentIdentity.NativeClient.csproj" />

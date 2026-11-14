@@ -25,12 +25,13 @@ git -C "$shared_projects_root/AgentFree" archive HEAD packages/agentfree-webapp-
 git -C "$identity_root" archive HEAD src/AgentIdentity.WebSdk | tar -x -C "$stage/shared-sdk"
 shared_chat_package="$stage/shared-sdk/packages/agentfree-webapp-chat"
 shared_identity_package="$stage/shared-sdk/src/AgentIdentity.WebSdk"
-[[ -s "$shared_chat_package/dist/index.js" && -s "$shared_chat_package/dist/index.d.ts" ]] || {
-  echo 'Committed AgentFree WebApp chat package is incomplete.' >&2; exit 1;
-}
-[[ -s "$shared_identity_package/dist/index.js" && -s "$shared_identity_package/dist/index.d.ts" ]] || {
-  echo 'Committed AgentIdentity Web SDK is incomplete.' >&2; exit 1;
-}
+# Compile the committed public SDK inputs; generated output is never an implicit dependency.
+npm --prefix "$shared_identity_package" ci
+npm --prefix "$shared_identity_package" run build
+mkdir -p "$shared_chat_package/dist"
+if [[ ! -s "$shared_chat_package/dist/index.js" ]]; then
+  echo 'Pinned Orbit WebApp package must be built by the release orchestrator.' >&2; exit 2
+fi
 node - "$stage/frontend/package.json" "$shared_chat_package" "$shared_identity_package" <<'NODE'
 const fs = require('fs');
 const [manifestPath, chatPackage, identityPackage] = process.argv.slice(2);
@@ -71,5 +72,7 @@ mkdir -p "$stage/api/deploy/moment-domain"
 cp "$root/deploy/activate-moment-domain.py" "$root/deploy/happylife.ai.impx.net.nginx.conf" "$root/deploy/happylife.ai.xmkurt.com.nginx.conf" "$stage/api/deploy/moment-domain/"
 cp "$linko_root/deploy/nginx-linko-ai-impx.conf" "$stage/api/deploy/moment-domain/linko.ai.impx.net.nginx.conf"
 cp "$linko_root/deploy/configure-turn.sh" "$stage/api/deploy/moment-domain/"
+mkdir -p "$stage/api/deploy/moment-identity-switch"
+cp "$root/deploy/moment-identity-switch/"* "$stage/api/deploy/moment-identity-switch/"
 # Atlas owns package validation, release identity, checksums and combined API/Web layout.
 bash "$atlas_root/scripts/atlas-package-server.sh" "$stage/api" "$stage/web" "$2" "$app_code" "$version"

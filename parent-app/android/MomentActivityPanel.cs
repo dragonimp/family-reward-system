@@ -139,7 +139,7 @@ public sealed class MomentActivityPanel : ContentView
             await ReloadAsync();
         }
         else if (choice == "刷新") await ReloadAsync();
-        else if (choice == "打开完整活动页") await OpenWebAsync(new Uri("https://happylife.ai.impx.net/dear"));
+        else if (choice == "打开完整活动页") await OpenWebAsync(new Uri("https://happylife.ai.xmkurt.com/dear"));
     }
     private async Task CreateActivityAsync()
     {

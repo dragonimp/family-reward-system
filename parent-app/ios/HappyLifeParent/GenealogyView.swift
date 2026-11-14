@@ -528,7 +528,7 @@ struct GenealogyDetailView: View {
         do {
             let result = try object(await store.call(base + "/people/\(personID)/invitations", method: "POST"))
             guard let path = result["path"] as? String,
-                  let url = URL(string: path, relativeTo: URL(string: "https://happylife.ai.impx.net")!)?.absoluteURL else {
+                  let url = URL(string: path, relativeTo: URL(string: "https://happylife.ai.xmkurt.com")!)?.absoluteURL else {
                 throw APIError.message(String(localized: "邀请链接格式不正确", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)))
             }
             invitationURL = url

@@ -35,7 +35,9 @@ internal static class LinkoSocialGateway
 
             try
             {
-                var serviceToken = await tokens.GetAsync(token, applicationKey, identity, clients, ct);
+                var sourceClient = MomentIdentityApplications.SourceClient(context.User);
+                if (sourceClient is null) return Results.Unauthorized();
+                var serviceToken = await tokens.GetAsync(token, sourceClient, applicationKey, identity, clients, ct);
                 var destination = new Uri(backend, "/api/" + path + context.Request.QueryString);
                 if (context.WebSockets.IsWebSocketRequest)
                 {

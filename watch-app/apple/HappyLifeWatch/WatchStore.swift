@@ -188,7 +188,7 @@ final class WatchStore: ObservableObject {
     }
     @Published var message: String?
     let accountLogin: AgentIdentityDeviceLogin
-    private lazy var accountAPI = AgentIdentityHTTPClient(origin: accountOrigin, applicationID: "happylife.ai", token: { [weak self] in try await self?.accountLogin.accessToken() })
+    private lazy var accountAPI = AgentIdentityHTTPClient(origin: accountOrigin, applicationID: "linko-moment.ai", token: { [weak self] in try await self?.accountLogin.accessToken() })
     private var accountOrigin: URL { URL(string: Bundle.main.object(forInfoDictionaryKey: "HappyLifeIdentityOrigin") as! String)! }
     private let api: WatchAPI
     private let activityTransport = WatchActivityTransport()
@@ -247,7 +247,7 @@ final class WatchStore: ObservableObject {
          clearCredential: @escaping () throws -> Void = DeviceCredential.clear) {
         let address = Bundle.main.object(forInfoDictionaryKey: "HappyLifeAPIBaseURL") as? String ?? ""
         let origin = URL(string: Bundle.main.object(forInfoDictionaryKey: "HappyLifeIdentityOrigin") as! String)!
-        accountLogin = AgentIdentityDeviceLogin(origin: origin, service: (Bundle.main.bundleIdentifier ?? "LinkoMomentWatch") + ".identity")
+        accountLogin = AgentIdentityDeviceLogin(origin: origin, service: (Bundle.main.bundleIdentifier ?? "LinkoMomentWatch") + ".identity.moment")
         self.api = api ?? WatchAPI(baseURL: URL(string: address) ?? URL(fileURLWithPath: "/"))
         self.readCredential = readCredential
         self.saveCredential = saveCredential

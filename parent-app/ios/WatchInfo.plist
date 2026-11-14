@@ -19,7 +19,7 @@
 	<key>HappyLifeAPIBaseURL</key>
 	<string>https://happylife.ai.xmkurt.com</string>
 	<key>HappyLifeIdentityOrigin</key>
-	<string>https://happylife.ai.impx.net</string>
+	<string>https://happylife.ai.xmkurt.com</string>
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
 	<key>NSHealthShareUsageDescription</key>
