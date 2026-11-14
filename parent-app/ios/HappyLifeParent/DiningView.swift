@@ -572,11 +572,11 @@ struct DiningView: View {
                     .disabled(model.checkingIn)
 
                     HStack(spacing: 8) {
-                        Button { showingLocations = true } label: {
+                        Button { showingLocations.toggle() } label: {
                             HStack(spacing: 5) {
                                 Label(model.archive.circles.first(where: { $0.id == model.circleID })?.name ?? model.temporaryPosition?.name ?? diningText("当前位置附近"), systemImage: "location.circle")
                                     .lineLimit(1)
-                                Image(systemName: "chevron.down").font(.caption2).accessibilityHidden(true)
+                                Image(systemName: showingLocations ? "chevron.up" : "chevron.down").font(.caption2).accessibilityHidden(true)
                             }
                             .frame(minHeight: 44)
                         }
@@ -585,6 +585,27 @@ struct DiningView: View {
                         Button(diningText("筛选"), systemImage: "slider.horizontal.3") { showingFilters = true }
                             .disabled(model.busy || model.checkingIn || model.selection != .recommended)
                     }.font(.subheadline)
+
+                    if showingLocations {
+                        VStack(alignment: .leading, spacing: 0) {
+                            locationRow("当前位置", icon: "location.fill", marked: model.circleID == nil) {
+                                showingLocations = false; pickingPosition = true
+                            }
+                            ForEach(model.archive.circles) { circle in
+                                Divider()
+                                locationRow(circle.name, icon: "mappin", marked: model.circleID == circle.id) {
+                                    showingLocations = false
+                                    model.selectCircle(circle.id)
+                                    Task { await model.decide() }
+                                }
+                            }
+                        }
+                        .padding(.horizontal, 12)
+                        .frame(maxWidth: 280, alignment: .leading)
+                        .background(.background, in: RoundedRectangle(cornerRadius: 14))
+                        .overlay { RoundedRectangle(cornerRadius: 14).strokeBorder(.quaternary) }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    }
 
                     HStack(spacing: 16) {
                         Button("一起干饭", systemImage: "person.2") { showingGatherings = true }
@@ -640,16 +661,10 @@ struct DiningView: View {
                     await model.synchronize()
                 }
             }
-            .onDisappear { model.refreshLocation(); navigationPlace = nil }
+            .onDisappear { showingLocations = false; model.refreshLocation(); navigationPlace = nil }
             .onChange(of: active) { _, active in if !active { model.refreshLocation() } }
         }
         .sheet(isPresented: $showingDiningCircle) { DiningCircleView(family: family, place: model.result) }
-        .confirmationDialog("推荐位置", isPresented: $showingLocations, titleVisibility: .visible) {
-            Button("当前位置") { pickingPosition = true }
-            ForEach(model.archive.circles) { circle in
-                Button(circle.name) { model.selectCircle(circle.id); Task { await model.decide() } }
-            }
-        }
         .sheet(isPresented: $pickingPosition) {
             DiningPlacePicker(model: model, restaurant: false) {
                 model.selectPosition($0); Task { await model.decide() }
@@ -710,6 +725,19 @@ struct DiningView: View {
     private func orderDelivery(_ place: DiningPlace) async {
         if let url = place.verifiedMeituanShopURL, await openDeliveryApp(url) { return }
         deliveryFallback = place
+    }
+
+    private func locationRow(_ title: String, icon: String, marked: Bool, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            HStack {
+                Label(title, systemImage: icon).lineLimit(1)
+                Spacer()
+                if marked { Image(systemName: "checkmark").foregroundStyle(.orange) }
+            }
+            .font(.subheadline)
+            .frame(minHeight: 44)
+            .contentShape(Rectangle())
+        }.buttonStyle(.plain).accessibilityAddTraits(marked ? .isSelected : [])
     }
 
     private func shortcut(_ title: String.LocalizationValue, icon: String, selection: DiningSelection) -> some View {

@@ -155,11 +155,19 @@ public sealed class DiningPanel : ContentView
         body.Add(MomentStyle.Card(shortcuts, new Thickness(4)));
         var location = new Grid { ColumnDefinitions = new ColumnDefinitionCollection { new(GridLength.Star), new(GridLength.Auto) } };
         var positionName = archive.Circles.FirstOrDefault(c => c.Id == circleId)?.Name ?? temporaryPosition?.Name ?? "当前位置附近";
-        var position = MomentStyle.Action($"◎ {positionName} ▾", () => _ = ChoosePosition());
+        var position = MomentStyle.Action($"◎ {positionName} {(positionsExpanded ? "▴" : "▾")}", () => { positionsExpanded = !positionsExpanded; Render(); });
         position.HorizontalOptions = LayoutOptions.Start;
         position.IsEnabled = !Working;
         location.Add(position);
         var filter = MomentStyle.Action("☷ 筛选", () => _ = Filters()); filter.IsEnabled = !Working && selection == "recommended"; location.Add(filter, 1); body.Add(location);
+        if (positionsExpanded)
+        {
+            var options = new VerticalStackLayout { Spacing = 2, MaximumWidthRequest = 280, HorizontalOptions = LayoutOptions.Start };
+            options.Add(MomentStyle.Action(circleId is null ? "当前位置    ✓" : "当前位置", () => _ = ChoosePosition(null)));
+            foreach (var circle in archive.Circles)
+                options.Add(MomentStyle.Action(circle.Id == circleId ? $"{circle.Name}    ✓" : circle.Name, () => _ = ChoosePosition(circle)));
+            body.Add(MomentStyle.Card(options, new Thickness(6)));
+        }
         if (result is null || busy) {
             var hero = new VerticalStackLayout { Spacing = 16 }; hero.Add(MomentStyle.Bowl());
             var question = MomentStyle.Title("今天吃啥？", 28); question.HorizontalTextAlignment = TextAlignment.Center; hero.Add(question);
@@ -662,27 +670,28 @@ public sealed class DiningPanel : ContentView
     }
     private DiningPlace? temporaryPosition;
 
-    private async Task ChoosePosition()
+    private bool positionsExpanded;
+
+    private async Task ChoosePosition(DiningCircle? circle)
     {
         if (Working) return;
-        var circles = archive.Circles.ToArray();
-        var labels = new[] { "当前位置" }.Concat(circles.Select((c, i) => $"{i + 1}. {c.Name}")).ToArray();
-        var index = Array.IndexOf(labels, await owner.DisplayActionSheetAsync("推荐位置", "取消", null, labels));
-        if (index < 0) return;
+        positionsExpanded = false;
+        Render();
         DiningPlace? point = null;
-        if (index == 0)
+        if (circle is null)
         {
             point = await DiningPlacePickerPage.OpenAsync(owner, store, false);
             if (point is null) return;
         }
         ResetPosition(resetMode: false);
-        circleId = index > 0 ? circles[index - 1].Id : null;
+        circleId = circle?.Id;
         temporaryPosition = point;
         await Decide();
     }
 
     public void ResetPosition(bool resetMode = true)
     {
+        positionsExpanded = false;
         if (resetMode) selection = "recommended";
         temporaryPosition = null;
         circleId = null;
