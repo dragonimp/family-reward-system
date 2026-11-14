@@ -62,7 +62,7 @@ public readonly record struct MomentScope
     }
     public string Api => $"/api/dear/social/tenants/{Tenant:D}/activities/{Activity:D}";
     public Uri ShareUrl => new($"https://home.ai.impx.net/invite/activity/{Tenant:D}/{Activity:D}");
-    public Uri Web => new($"https://happylife.ai.xmkurt.com/dear/spaces/{Tenant:D}/activities/{Activity:D}");
+    public Uri Web => new($"https://happylife.ai.impx.net/dear/spaces/{Tenant:D}/activities/{Activity:D}");
 }
 
 public static class MomentLoginApproval

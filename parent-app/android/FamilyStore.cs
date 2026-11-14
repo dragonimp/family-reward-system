@@ -7,7 +7,7 @@ namespace LinkoFamily;
 
 public sealed class FamilyStore
 {
-    private static readonly Uri Origin = new("https://happylife.ai.xmkurt.com/");
+    private static readonly Uri Origin = new("https://happylife.ai.impx.net/");
     private const string SessionKey = "linko_family_android_session.moment";
     private readonly NativeSessionHandler session;
     private readonly HttpClient api;

@@ -765,7 +765,7 @@ struct DearSocialView: View {
                     }
                 }
                 if showLogout {
-                    Section { Link(String(localized: "隐私政策与支持", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), destination: URL(string: "https://happylife.ai.xmkurt.com/legal/linko-family-privacy.html")!) }
+                    Section { Link(String(localized: "隐私政策与支持", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), destination: URL(string: "https://happylife.ai.impx.net/legal/linko-family-privacy.html")!) }
                 }
             }
             .listStyle(.insetGrouped)
@@ -2932,7 +2932,7 @@ private struct MomentAnonymousMediaSharesView: View {
         do {
             let value = try await store.call(route, method: "POST", body: ["requestId": operationID.uuidString, "expiresAt": ISO8601DateFormatter().string(from: expiry)])
             let link = DearRecord(data: value as? [String: Any] ?? [:]); let token = link.text("token")
-            guard token.count == 64, token.allSatisfy(\.isHexDigit), let url = URL(string: "https://happylife.ai.xmkurt.com/api/dear/public/media-shares/" + token + "/view") else { throw CocoaError(.coderReadCorrupt) }
+            guard token.count == 64, token.allSatisfy(\.isHexDigit), let url = URL(string: "https://happylife.ai.impx.net/api/dear/public/media-shares/" + token + "/view") else { throw CocoaError(.coderReadCorrupt) }
             shareURL = url; generatedID = link.id; operationID = UUID(); await load()
         } catch { let message = momentDisplayError(error); await load(); self.error = message }
     }

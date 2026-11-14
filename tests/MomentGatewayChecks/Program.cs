@@ -14,8 +14,8 @@ using Microsoft.Extensions.Options;
 var assertions = 0;
 void Check(bool ok, string name) { if (!ok) throw new Exception(name); assertions++; }
 string Address(WebApplication app) => app.Services.GetRequiredService<IServer>().Features.Get<IServerAddressesFeature>()!.Addresses.Single();
-Check(MomentIdentityApplications.ClientForHost("happylife.ai.impx.net") == "happylife.ai", "legacy hostname retains original login audience");
-Check(MomentIdentityApplications.ClientForHost("HAPPYLIFE.AI.XMKURT.COM") == "linko-moment.ai", "Moment hostname uses independent login audience");
+Check(MomentIdentityApplications.ClientForHost("happylife.ai.impx.net") == "linko-moment.ai", "unchanged primary hostname uses the Moment login audience");
+Check(MomentIdentityApplications.ClientForHost("HAPPYLIFE.AI.XMKURT.COM") == "happylife.ai", "previous alias retains legacy login audience");
 Check(MomentIdentityApplications.SourceClient(new ClaimsPrincipal(new ClaimsIdentity())) is null, "anonymous source rejected");
 Check(MomentIdentityApplications.SourceClient(new ClaimsPrincipal(new ClaimsIdentity([new Claim("app_id", "other.ai")], "test"))) is null, "unrelated application rejected");
 Check(MomentIdentityApplications.SourceClient(new ClaimsPrincipal(new ClaimsIdentity([new Claim("app_id", "linko-moment.ai"), new Claim("token_use", "service")], "test"))) is null, "service source rejected");

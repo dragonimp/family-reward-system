@@ -74,5 +74,7 @@ cp "$linko_root/deploy/nginx-linko-ai-impx.conf" "$stage/api/deploy/moment-domai
 cp "$linko_root/deploy/configure-turn.sh" "$stage/api/deploy/moment-domain/"
 mkdir -p "$stage/api/deploy/moment-identity-switch"
 cp "$root/deploy/moment-identity-switch/"* "$stage/api/deploy/moment-identity-switch/"
+mkdir -p "$stage/api/deploy/moment-primary-host"
+cp "$root/deploy/moment-primary-host/"* "$stage/api/deploy/moment-primary-host/"
 # Atlas owns package validation, release identity, checksums and combined API/Web layout.
 bash "$atlas_root/scripts/atlas-package-server.sh" "$stage/api" "$stage/web" "$2" "$app_code" "$version"

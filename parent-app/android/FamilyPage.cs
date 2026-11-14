@@ -257,7 +257,7 @@ public sealed class FamilyPage : ContentPage
         var choice = await DisplayActionSheetAsync("成长管理", "取消", null, "家庭组与孩子管理", "奖励与行为规则", "亲子互动", "刷新成长数据");
         if (choice == "家庭组与孩子管理") SelectTab("管理");
         else if (choice == "奖励与行为规则") SelectTab("规则");
-        else if (choice == "亲子互动") await AgentIdentity.Maui.InAppWebLinks.OpenAsync(new Uri("https://happylife.ai.xmkurt.com/family-connections"), BrowserLaunchMode.SystemPreferred);
+        else if (choice == "亲子互动") await AgentIdentity.Maui.InAppWebLinks.OpenAsync(new Uri("https://happylife.ai.impx.net/family-connections"), BrowserLaunchMode.SystemPreferred);
         else if (choice == "刷新成长数据") await Run(store.LoadAsync);
     }
 
@@ -305,8 +305,8 @@ public sealed class FamilyPage : ContentPage
         content.Add(MomentStyle.Caption("群组成长"));
         var growth = new VerticalStackLayout { Spacing = 0 };
         growth.Add(MomentStyle.Row("奖励与行为规则", action: () => SelectTab("规则"))); growth.Add(MomentStyle.Divider());
-        growth.Add(MomentStyle.Row("成长足迹", "↗", () => _ = AgentIdentity.Maui.InAppWebLinks.OpenAsync(new Uri("https://happylife.ai.xmkurt.com/growth"), BrowserLaunchMode.SystemPreferred))); growth.Add(MomentStyle.Divider());
-        growth.Add(MomentStyle.Row("亲子互动", "↗", () => _ = AgentIdentity.Maui.InAppWebLinks.OpenAsync(new Uri("https://happylife.ai.xmkurt.com/family-connections"), BrowserLaunchMode.SystemPreferred)));
+        growth.Add(MomentStyle.Row("成长足迹", "↗", () => _ = AgentIdentity.Maui.InAppWebLinks.OpenAsync(new Uri("https://happylife.ai.impx.net/growth"), BrowserLaunchMode.SystemPreferred))); growth.Add(MomentStyle.Divider());
+        growth.Add(MomentStyle.Row("亲子互动", "↗", () => _ = AgentIdentity.Maui.InAppWebLinks.OpenAsync(new Uri("https://happylife.ai.impx.net/family-connections"), BrowserLaunchMode.SystemPreferred)));
         content.Add(Card(growth));
         if (store.GroupId != 0) { content.Add(MomentStyle.Caption("群组协作")); content.Add(Card(MomentStyle.Row("邀请组员", action: () => _ = ShareInvite()))); }
         content.Add(Button("刷新成长数据", () => _ = Run(store.LoadAsync)));
@@ -402,7 +402,7 @@ public sealed class FamilyPage : ContentPage
             MomentStyle.MenuRow("使用手册", "设置", () => _ = Navigation.PushAsync(new AtlasInformationPage(false, "userManualUrl"))),
             MomentStyle.MenuRow("关于我们", "设置", () => _ = Navigation.PushAsync(new MomentAboutPage(store)), AppInfo.Current.VersionString));
     }
-    private static Task OpenAccountWeb(string path, bool identity = false) => AgentIdentity.Maui.InAppWebLinks.OpenAsync(new Uri((identity ? "https://auth.ai.xmkurt.com" : "https://happylife.ai.xmkurt.com") + path));
+    private static Task OpenAccountWeb(string path, bool identity = false) => AgentIdentity.Maui.InAppWebLinks.OpenAsync(new Uri((identity ? "https://auth.ai.xmkurt.com" : "https://happylife.ai.impx.net") + path));
 
     private async Task Logout()
     {
