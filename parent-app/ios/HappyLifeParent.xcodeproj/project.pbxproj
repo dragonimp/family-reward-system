@@ -63,7 +63,7 @@ A0675EBFE98C433BABD02B47 = { isa = PBXBuildFile; fileRef = A0675EBFE98C433BABD02
 0000000000000000000000CC = { isa = PBXBuildFile; productRef = 000000000000000000000080; };
 000000000000000000000080 = { isa = XCSwiftPackageProductDependency; package = 000000000000000000000081; productName = AgentIdentity; };
 000000000000000000000A00 = { isa = XCSwiftPackageProductDependency; package = 000000000000000000000A01; productName = MyVncRealtime; };
-000000000000000000000A01 = { isa = XCRemoteSwiftPackageReference; repositoryURL = "https://github.com/dragonimp/MyVnc.git"; requirement = { kind = revision; revision = 081d40eaf3c91bf5b02fb552d249c4acc92007bc; }; };
+000000000000000000000A01 = { isa = XCRemoteSwiftPackageReference; repositoryURL = "https://github.com/dragonimp/MyVnc.git"; requirement = { kind = revision; revision = c401b6012f8aeccfa21288a277faa690d37ddb8f; }; };
 000000000000000000000A02 = { isa = PBXBuildFile; productRef = 000000000000000000000A00; };
 000000000000000000000081 = { isa = XCLocalSwiftPackageReference; relativePath = "../../../AgentIdentity/packages/AgentIdentity-iOS"; };
 000000000000000000000300 = { isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WatchAPI.swift; sourceTree = "<group>"; };
