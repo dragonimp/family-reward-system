@@ -194,6 +194,38 @@ private enum PhotoDisplayImage {
     }
 }
 
+private struct DearPhotoDirectionsButton: View {
+    let photo: DearRecord
+    @State private var showingMap = false
+
+    var body: some View {
+        if let point = DearActivityMapPoint.points(checkIns: [], photos: [photo]).first {
+            Button { showingMap = true } label: {
+                Label(String(localized: "去这里", bundle: AgentIdentityLanguage.appBundle()), systemImage: "location")
+            }
+            .buttonStyle(.borderless)
+            .sheet(isPresented: $showingMap) {
+                NavigationStack {
+                    Map(initialPosition: .region(MKCoordinateRegion(
+                        center: point.coordinate,
+                        span: MKCoordinateSpan(latitudeDelta: 0.01, longitudeDelta: 0.01)
+                    ))) {
+                        Marker(point.placeName.isEmpty ? String(localized: "拍摄位置", bundle: AgentIdentityLanguage.appBundle()) : point.placeName,
+                               coordinate: point.coordinate)
+                    }
+                    .navigationTitle(String(localized: "拍摄位置", bundle: AgentIdentityLanguage.appBundle()))
+                    .navigationBarTitleDisplayMode(.inline)
+                    .toolbar {
+                        ToolbarItem(placement: .confirmationAction) {
+                            Button(String(localized: "完成", bundle: AgentIdentityLanguage.appBundle())) { showingMap = false }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
 private struct DearPhotoPlaceView: View {
     let photo: DearRecord
     @State private var resolvedName: String?
@@ -929,6 +961,7 @@ struct DearSocialView: View {
             Button { selectedPhoto = photo } label: {
                 Label("\(Int(photo.number("commentCount")))", systemImage: "text.bubble")
             }.accessibilityLabel("照片点评 \(Int(photo.number("commentCount"))) 条")
+            DearPhotoDirectionsButton(photo: photo)
             Spacer(minLength: 0)
             if selectingPhotoDownloads && photoViewMode == "list" {
                 Image(systemName: selectedPhotoIDs.contains(photo.id) ? "checkmark.circle.fill" : "circle").foregroundStyle(.teal)
@@ -966,41 +999,44 @@ struct DearSocialView: View {
     private func photoGridTile(_ photo: DearRecord) -> some View {
         let nickname = photo.text("sourceDisplayName").isEmpty ? "活动成员" : photo.text("sourceDisplayName")
         let path = base + "tenants/\(activityTenantId)/activities/\(activityId)/native-photos/\(photo.id)/thumbnail"
-        return Button {
-            if selectingPhotoDownloads {
-                if !selectedPhotoIDs.insert(photo.id).inserted { selectedPhotoIDs.remove(photo.id) }
-                batchOriginalURLs = []
-            } else { selectedPhoto = photo }
-        } label: {
-            VStack(spacing: 3) {
-                GeometryReader { proxy in
-                    DearPhotoPreview(store: store, path: path, photo: photo)
-                        .frame(width: proxy.size.width, height: proxy.size.height)
-                        .overlay(alignment: .topLeading) {
-                            Text(nickname).font(.system(size: 9, weight: .semibold)).lineLimit(1)
-                                .foregroundStyle(.white).padding(3).background(.black.opacity(0.4))
-                        }
-                        .overlay(alignment: .bottomTrailing) {
-                            if photo.text("contentType").hasPrefix("video/") {
-                                Image(systemName: "play.circle.fill").foregroundStyle(.white).padding(3)
+        VStack(spacing: 3) {
+            Button {
+                if selectingPhotoDownloads {
+                    if !selectedPhotoIDs.insert(photo.id).inserted { selectedPhotoIDs.remove(photo.id) }
+                    batchOriginalURLs = []
+                } else { selectedPhoto = photo }
+            } label: {
+                VStack(spacing: 3) {
+                    GeometryReader { proxy in
+                        DearPhotoPreview(store: store, path: path, photo: photo)
+                            .frame(width: proxy.size.width, height: proxy.size.height)
+                            .overlay(alignment: .topLeading) {
+                                Text(nickname).font(.system(size: 9, weight: .semibold)).lineLimit(1)
+                                    .foregroundStyle(.white).padding(3).background(.black.opacity(0.4))
                             }
-                        }
-                        .overlay(alignment: .topTrailing) {
-                            if selectingPhotoDownloads {
-                                Image(systemName: selectedPhotoIDs.contains(photo.id) ? "checkmark.circle.fill" : "circle")
-                                    .foregroundStyle(selectedPhotoIDs.contains(photo.id) ? .teal : .white).padding(3)
+                            .overlay(alignment: .bottomTrailing) {
+                                if photo.text("contentType").hasPrefix("video/") {
+                                    Image(systemName: "play.circle.fill").foregroundStyle(.white).padding(3)
+                                }
                             }
-                        }
-                }.aspectRatio(1, contentMode: .fit)
+                            .overlay(alignment: .topTrailing) {
+                                if selectingPhotoDownloads {
+                                    Image(systemName: selectedPhotoIDs.contains(photo.id) ? "checkmark.circle.fill" : "circle")
+                                        .foregroundStyle(selectedPhotoIDs.contains(photo.id) ? .teal : .white).padding(3)
+                                }
+                            }
+                    }.aspectRatio(1, contentMode: .fit)
+                }
+            }.buttonStyle(.plain).disabled(batchDownloading || batchDeleting)
+            .accessibilityLabel("\(nickname)，\(photo.text("originalFileName"))")
+            .contextMenu {
+                if selectedActivity?.flag("canEdit") == true {
+                    Button { run { try await setActivityCover(photo) } } label: { Label(String(localized: "设为活动封面", bundle: AgentIdentityLanguage.appBundle()), systemImage: "photo") }
+                        .disabled(busy || !photo.flag("thumbnailAvailable"))
+                }
+                if photo.flag("canDelete") { Button("删除分享", role: .destructive) { photoToDelete = photo } }
             }
-        }.buttonStyle(.plain).disabled(batchDownloading || batchDeleting)
-        .accessibilityLabel("\(nickname)，\(photo.text("originalFileName"))")
-        .contextMenu {
-            if selectedActivity?.flag("canEdit") == true {
-                Button { run { try await setActivityCover(photo) } } label: { Label(String(localized: "设为活动封面", bundle: AgentIdentityLanguage.appBundle()), systemImage: "photo") }
-                    .disabled(busy || !photo.flag("thumbnailAvailable"))
-            }
-            if photo.flag("canDelete") { Button("删除分享", role: .destructive) { photoToDelete = photo } }
+            DearPhotoDirectionsButton(photo: photo).font(.caption2).lineLimit(1)
         }
     }
 
@@ -2321,6 +2357,7 @@ private struct DearPhotoDetailView: View {
                 } else { Text((serverCacheReady ?? photo.flag("serverCached")) ? "服务器已缓存，可在共享设备离线时获取" : "服务器尚未缓存，获取原件需等待共享设备上线").font(.caption).foregroundStyle(.secondary) }
                 Text("分享时间：\(photo.dateText("createdAt"))").font(.subheadline).foregroundStyle(.secondary)
                 DearPhotoPlaceView(photo: photo).font(.subheadline).foregroundStyle(.secondary)
+                DearPhotoDirectionsButton(photo: photo)
                 MomentPhotoWeatherView(store: store, photo: photo, tenant: spaceID, activity: activityID, original: originalURL)
                 if let originalURL {
                     HStack(spacing: 20) {
