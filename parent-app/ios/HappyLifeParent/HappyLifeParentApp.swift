@@ -189,7 +189,13 @@ struct FamilyRoot: View {
             ForEach(store.moduleOrder, id: \.self) { key in
                 switch key {
             case "dining" where diningEnabled:
-            DiningModesView(userID: identity.accountIdentifier ?? "", family: store).id(identity.accountIdentifier ?? "").tabItem { Label(String(localized: "干饭", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), systemImage: "fork.knife") }.tag(0)
+            Group {
+                if let account = identity.accountIdentifier, !account.isEmpty {
+                    DiningModesView(userID: account, family: store).id(account)
+                } else {
+                    ProgressView()
+                }
+            }.tabItem { Label(String(localized: "干饭", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), systemImage: "fork.knife") }.tag(0)
             case "growth" where growthEnabled:
             Group { if store.ready { FamilyHome(store: store) } else { growthUnavailable } }.tabItem { Label(String(localized: "带娃", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), systemImage: "person.3.fill") }
                 .badge(store.requests.filter { $0.text("status") == "pending" }.count).tag(1)

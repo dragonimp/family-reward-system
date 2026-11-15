@@ -154,6 +154,11 @@ public sealed class FamilyPage : ContentPage
         {
             case "干饭":
                 var diningId = store.AccountProfile?.Subject ?? store.Profile?.Text("unifiedUserId") ?? "";
+                if (string.IsNullOrEmpty(diningId)) {
+                    dining?.Suspend(); dining = null; diningUser = null;
+                    content.Add(new ActivityIndicator { IsRunning = true, HorizontalOptions = LayoutOptions.Center });
+                    break;
+                }
                 if (dining == null || diningUser != diningId) { dining?.Suspend(); dining = new DiningPanel(store, this, diningId); diningUser = diningId; }
                 viewport.Content = dining; break;
             case "活动":
