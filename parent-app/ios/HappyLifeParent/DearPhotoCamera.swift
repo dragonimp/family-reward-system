@@ -981,17 +981,37 @@ final class DearPhotoCameraController: UIViewController {
         }
     }
 
-    @objc private func takePhoto() { capturePhoto(allowMissingLocation: false) }
+    private var captureToast: UILabel?
 
-    private func capturePhoto(allowMissingLocation: Bool) {
+    private func showCaptureToast(_ message: String) {
+        captureToast?.removeFromSuperview()
+        let label = UILabel()
+        label.text = message
+        label.textColor = .white
+        label.backgroundColor = UIColor.black.withAlphaComponent(0.8)
+        label.font = .preferredFont(forTextStyle: .subheadline)
+        label.textAlignment = .center
+        label.numberOfLines = 0
+        label.isUserInteractionEnabled = false
+        label.translatesAutoresizingMaskIntoConstraints = false
+        view.addSubview(label)
+        captureToast = label
+        NSLayoutConstraint.activate([
+            label.centerXAnchor.constraint(equalTo: view.safeAreaLayoutGuide.centerXAnchor),
+            label.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 56),
+            label.widthAnchor.constraint(lessThanOrEqualTo: view.safeAreaLayoutGuide.widthAnchor, constant: -40)
+        ])
+        DispatchQueue.main.asyncAfter(deadline: .now() + 4) { [weak self, weak label] in
+            label?.removeFromSuperview()
+            if self?.captureToast === label { self?.captureToast = nil }
+        }
+    }
+
+    @objc private func takePhoto() {
         guard shutter.isEnabled, data == nil else { return }
         let location = recordLocation ? locator.location.flatMap { DearCaptureGeography.valid($0) ? $0 : nil } : nil
-        if recordLocation, location == nil, !allowMissingLocation {
-            let alert = UIAlertController(title: nil, message: String(localized: "尚未获取有效定位，可稍后重试或选择不记录位置拍摄。", bundle: AgentIdentityLanguage.appBundle()), preferredStyle: .alert)
-            alert.addAction(UIAlertAction(title: String(localized: "取消", bundle: AgentIdentityLanguage.appBundle()), style: .cancel))
-            alert.addAction(UIAlertAction(title: String(localized: "不记录位置拍摄", bundle: AgentIdentityLanguage.appBundle()), style: .default) { [weak self] _ in self?.capturePhoto(allowMissingLocation: true) })
-            present(alert, animated: true)
-            return
+        if recordLocation, location == nil {
+            showCaptureToast(String(localized: "本次拍摄未记录位置。", bundle: AgentIdentityLanguage.appBundle()))
         }
         takingPhoto = true
         refreshAnalysis()
@@ -1000,9 +1020,7 @@ final class DearPhotoCameraController: UIViewController {
             self.takingPhoto = false
             guard let data, let image = UIImage(data: data) else {
                 self.refreshAnalysis()
-                let alert = UIAlertController(title: nil, message: self.cameraError.localizedDescription, preferredStyle: .alert)
-                alert.addAction(UIAlertAction(title: String(localized: "知道了", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), style: .default))
-                self.present(alert, animated: true)
+                self.showCaptureToast(self.cameraError.localizedDescription)
                 return
             }
             do { self.data = try DearCaptureGeography.tag(data, location: location) }

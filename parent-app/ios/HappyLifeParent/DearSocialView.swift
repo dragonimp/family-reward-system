@@ -56,15 +56,15 @@ private struct DearCaptureTarget {
     let spaceID: String
     let activityID: String
     let locationName: String
-    let sessionToken: String
+    let accountID: String
 }
 
-private struct DearCapturedMedia {
+private struct DearCapturedMedia: Identifiable {
+    var id: URL { url }
     var capturedAt = Date()
     let url: URL
     let video: Bool
     let target: DearCaptureTarget
-    var savedToLibrary = false
 }
 
 enum DearPhotoLocation {
@@ -568,10 +568,12 @@ struct DearSocialView: View {
     @State private var selectedPhotos: [PhotosPickerItem] = []
     @State private var cameraMode: DearCamera.Mode?
     @State private var cameraTarget: DearCaptureTarget?
-    @State private var capturedMedia: DearCapturedMedia?
+    @State private var capturedMedia: [DearCapturedMedia] = []
+    @State private var savingCaptures: Set<URL> = []
+    @State private var latestCapture: DearCapturedMedia?
     @State private var requestingCamera = false
-    @State private var cameraError = ""
-    @State private var showingCameraError = false
+    @State private var activityToast = ""
+    @State private var activityToastID = UUID()
     @AppStorage("dearPhotoViewMode") private var photoViewMode = "grid"
     @State private var photoLocationName = ""
     @State private var selectingPhotoDownloads = false
@@ -1072,13 +1074,13 @@ struct DearSocialView: View {
             HStack(spacing: 8) {
                 PhotosPicker(selection: $selectedPhotos, maxSelectionCount: 50, matching: .any(of: [.images, .videos]), preferredItemEncoding: .current) {
                     activityPhotoTile(String(localized: "分享", bundle: AgentIdentityLanguage.appBundle()), icon: "photo.badge.plus")
-                }
+                }.disabled(busy || batchDeleting || batchDownloading)
                 Button { Task { await openCamera(.photo) } } label: {
                     activityPhotoTile(String(localized: "拍照", bundle: AgentIdentityLanguage.appBundle()), icon: "camera")
-                }
+                }.disabled(requestingCamera || cameraMode != nil)
                 Button { Task { await openCamera(.video) } } label: {
                     activityPhotoTile(String(localized: "拍视频", bundle: AgentIdentityLanguage.appBundle()), icon: "video")
-                }
+                }.disabled(requestingCamera || cameraMode != nil)
                 Button { checkInNote = ""; checkInRequestID = UUID(); pendingCheckIn = true; checkInLocator.locate() } label: {
                     activityPhotoTile(String(localized: "打卡", bundle: AgentIdentityLanguage.appBundle()), icon: "location.circle")
                 }.disabled(pendingCheckIn)
@@ -1093,19 +1095,18 @@ struct DearSocialView: View {
             }
             .buttonStyle(.plain)
             .fixedSize(horizontal: false, vertical: true)
-            .disabled(busy || requestingCamera || capturedMedia != nil || batchDeleting || batchDownloading)
-            if let capturedMedia {
-                Text(capturedMedia.savedToLibrary ? "已保存到系统相册，尚未共享到活动。" : "拍摄内容尚未保存并共享，请重试。")
+            ForEach(capturedMedia.filter { $0.target.activityID == activityId && $0.target.spaceID == activityTenantId && $0.target.accountID == store.identity.accountIdentifier }) { capture in
+                Text(savingCaptures.contains(capture.id) ? "正在保存拍摄内容…" : "这项拍摄内容尚未加入同步队列，可以重试或另存。")
                     .font(.caption).foregroundStyle(.secondary)
                 HStack {
-                    Button("重试保存并共享") { shareCapturedMedia() }
+                    Button("重试保存并共享") { shareCapturedMedia(capture) }
                     Spacer()
-                    ShareLink(item: DearOriginalFile(url: capturedMedia.url), preview: SharePreview("原文件")) { Label("另存或分享", systemImage: "square.and.arrow.up") }
+                    ShareLink(item: DearOriginalFile(url: capture.url), preview: SharePreview("原文件")) { Label("另存或分享", systemImage: "square.and.arrow.up") }
                     Button("移除", role: .destructive) {
-                        try? FileManager.default.removeItem(at: capturedMedia.url)
-                        self.capturedMedia = nil
+                        try? FileManager.default.removeItem(at: capture.url)
+                        capturedMedia.removeAll { $0.id == capture.id }
                     }
-                }.buttonStyle(.borderless).disabled(busy)
+                }.buttonStyle(.borderless).disabled(savingCaptures.contains(capture.id))
             }
             if selectingPhotoDownloads {
                 Text("已选 \(selectedPhotoIDs.count) 项").font(.caption).foregroundStyle(.secondary)
@@ -1216,7 +1217,6 @@ struct DearSocialView: View {
 
     private var activityDetail: some View {
         List {
-            if !error.isEmpty { Section { Text(error).foregroundStyle(.red) } }
             if !notice.isEmpty { Section { Text(notice).foregroundStyle(.teal) } }
             if let selectedActivity {
                 Section {
@@ -1317,25 +1317,45 @@ struct DearSocialView: View {
         } message: { Text("活动成员将无法再获取这些文件；iPhone 相册中的原文件不会删除。") }
         .sheet(isPresented: $showingCheckIn) { checkInSheet }
         .sheet(isPresented: $showingMomentCreate) { momentCreateSheet }
-        .fullScreenCover(item: $cameraMode, onDismiss: { store.captureInProgress = false; shareCapturedMedia() }) { mode in
+        .fullScreenCover(item: $cameraMode, onDismiss: {
+            store.captureInProgress = false
+            if let capture = latestCapture {
+                latestCapture = nil
+                shareCapturedMedia(capture)
+            }
+        }) { mode in
             DearCamera(mode: mode, recordLocation: true) { result in
                 switch result {
                 case .success(let media):
                     if let (url, video) = media, let target = cameraTarget {
-                        capturedMedia = DearCapturedMedia(url: url, video: video, target: target)
+                        let capture = DearCapturedMedia(url: url, video: video, target: target)
+                        capturedMedia.append(capture)
+                        latestCapture = capture
                     }
                 case .failure(let failure):
-                    cameraError = failure.localizedDescription; showingCameraError = true
+                    showActivityToast(failure.localizedDescription)
                 }
                 cameraMode = nil
             }.ignoresSafeArea()
         }
-        .alert("拍摄提示", isPresented: $showingCameraError) {
-            Button("好", role: .cancel) { }
-            Button("打开设置") {
-                if let url = URL(string: UIApplication.openSettingsURLString) { UIApplication.shared.open(url) }
+        .onChange(of: error) { _, message in
+            if !message.isEmpty { showActivityToast(message) }
+        }
+        .overlay(alignment: .bottom) {
+            if !activityToast.isEmpty {
+                Text(activityToast)
+                    .font(.subheadline)
+                    .padding(12)
+                    .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12))
+                    .padding()
+                    .allowsHitTesting(false)
             }
-        } message: { Text(cameraError) }
+        }
+        .task(id: activityToastID) {
+            guard !activityToast.isEmpty else { return }
+            do { try await Task.sleep(for: .seconds(4)) } catch { return }
+            activityToast = ""
+        }
         .onChange(of: checkInLocator.location?.timestamp) { _, value in
             guard pendingCheckIn, value != nil else { return }
             pendingCheckIn = false
@@ -1419,13 +1439,18 @@ struct DearSocialView: View {
                 } label: { Image(systemName: "ellipsis").accessibilityLabel("更多活动操作") }
     }
 
+    private func showActivityToast(_ message: String) {
+        activityToast = message
+        activityToastID = UUID()
+    }
+
     @MainActor private func openCamera(_ mode: DearCamera.Mode) async {
-        guard !busy, !requestingCamera, capturedMedia == nil,
-              let token = store.identity.accessToken, !activityId.isEmpty else { return }
+        guard !requestingCamera, cameraMode == nil,
+              let accountID = store.identity.accountIdentifier, !activityId.isEmpty else { return }
         requestingCamera = true
         defer { requestingCamera = false }
         let target = DearCaptureTarget(spaceID: activityTenantId, activityID: activityId,
-                                       locationName: photoLocationName, sessionToken: token)
+                                       locationName: photoLocationName, accountID: accountID)
         do {
             guard UIImagePickerController.isSourceTypeAvailable(.camera),
                   UIImagePickerController.availableMediaTypes(for: .camera)?.contains(mode == .video ? UTType.movie.identifier : UTType.image.identifier) == true else {
@@ -1437,20 +1462,20 @@ struct DearSocialView: View {
                 let microphoneAllowed = await AVCaptureDevice.requestAccess(for: .audio)
                 guard microphoneAllowed else { throw APIError.message("请在设置中允许使用麦克风，以录制有声音的视频。") }
             }
-            guard token == store.identity.accessToken, target.activityID == activityId, showingActivity else { return }
+            guard accountID == store.identity.accountIdentifier, target.spaceID == activityTenantId,
+                  target.activityID == activityId, showingActivity else { return }
             cameraTarget = target
             store.captureInProgress = true
             cameraMode = mode
-        } catch { cameraError = error.localizedDescription; showingCameraError = true }
+        } catch { showActivityToast(error.localizedDescription) }
     }
 
-    private func shareCapturedMedia() {
-        guard let capture = capturedMedia, !busy else { return }
-        busy = true; error = ""; notice = ""
+    private func shareCapturedMedia(_ capture: DearCapturedMedia) {
+        guard savingCaptures.insert(capture.id).inserted else { return }
         Task {
-            defer { busy = false }
+            defer { savingCaptures.remove(capture.id) }
             do {
-                guard capture.target.sessionToken == store.identity.accessToken else {
+                guard capture.target.accountID == store.identity.accountIdentifier else {
                     throw APIError.message("登录状态已变化，拍摄内容未共享。请另存到相册，再使用当前账号选择共享。")
                 }
                 // Commit the app's durable copy before any Photos or network operation.
@@ -1464,7 +1489,6 @@ struct DearSocialView: View {
                 }
                 Task {
                     defer { try? FileManager.default.removeItem(at: capture.url) }
-                if !capture.savedToLibrary {
                     let permission = await PHPhotoLibrary.requestAuthorization(for: .addOnly)
                     if permission == .authorized || permission == .limited {
                         let photoLocation = capture.video ? nil : DearCaptureGeography.location(in: capture.url)
@@ -1474,10 +1498,9 @@ struct DearSocialView: View {
                         }
                     }
                 }
-                }
-                capturedMedia = nil
+                capturedMedia.removeAll { $0.id == capture.id }
                 notice = String(localized: "已保存到本机，联网后自动同步到活动。", bundle: AgentIdentityLanguage.appBundle())
-            } catch { self.error = error.localizedDescription }
+            } catch { showActivityToast(error.localizedDescription) }
         }
     }
 
