@@ -350,7 +350,7 @@ struct ExerciseView: View {
             List {
                 if let linked = exercise.active?.activity ?? activity {
                     Section(String(localized: "关联活动", bundle: AgentIdentityLanguage.appBundle())) {
-                        Text(linked.title)
+                        Text(family.exerciseActivityTitle(linked))
                         if exercise.active == nil {
                             Button(String(localized: "取消关联", bundle: AgentIdentityLanguage.appBundle())) { activity = nil; family.watchExerciseActivity = nil }
                         }
@@ -439,7 +439,7 @@ struct ExerciseView: View {
                                 }.buttonStyle(.borderless).disabled(exercise.busy)
                             }
                             Button(String(localized: "继续\(item.kind)", bundle: AgentIdentityLanguage.appBundle())) { exercise.continueRecord(item) }.buttonStyle(.borderless).disabled(exercise.active != nil || exercise.busy)
-                            if let linked = item.activity { Text(linked.title).font(.subheadline).foregroundStyle(.secondary) }
+                            if let linked = item.activity { Text(family.exerciseActivityTitle(linked)).font(.subheadline).foregroundStyle(.secondary) }
                             Text(exerciseDistanceTitle(item)).font(.headline).monospacedDigit()
                             if let altitude = item.altitudeRange { Text(String(format: String(localized: "海拔 %.1f–%.1f 米", bundle: AgentIdentityLanguage.appBundle()), altitude.lowerBound, altitude.upperBound)).font(.caption) }
                             if !item.routePoints.isEmpty {
@@ -494,7 +494,7 @@ struct ExerciseView: View {
                     mapMode = exercise.active?.routeEnabled == true
                     receiveActivity()
                     if let id = family.pendingExerciseContinuation, let record = exercise.history.first(where: { $0.id == id }) { exercise.continueRecord(record); family.pendingExerciseContinuation = nil }
-                    await exercise.refresh(); await refreshHealth()
+                    await family.refreshExerciseActivityTitles(); await exercise.refresh(); await refreshHealth()
                 }
                 .onChange(of: family.pendingExerciseContinuation) { _, value in
                     if let id = value, let record = exercise.history.first(where: { $0.id == id }) { exercise.continueRecord(record); family.pendingExerciseContinuation = nil }
@@ -503,7 +503,7 @@ struct ExerciseView: View {
                 .onChange(of: family.profile?.text("unifiedUserId")) { _, _ in activity = nil; exercise.accountDidChange() }
                 .onChange(of: mapMode) { _, value in if value { exercise.enableRoute() } }
                 .onChange(of: phase) { _, value in
-                    if value == .active { Task { await exercise.refresh(); await refreshHealth() } }
+                    if value == .active { Task { await family.refreshExerciseActivityTitles(); await exercise.refresh(); await refreshHealth() } }
                     else { exercise.stopObserving() }
                 }
                 .onDisappear { exercise.stopObserving() }

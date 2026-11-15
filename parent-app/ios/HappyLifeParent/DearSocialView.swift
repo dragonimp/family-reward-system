@@ -2053,10 +2053,15 @@ struct DearSocialView: View {
         let name = editedActivityName.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !name.isEmpty && name.count <= 200 else { throw APIError.message(String(localized: "请填写不超过 200 字的活动名称。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) }
         guard editedActivityDescription.count <= 2000 else { throw APIError.message(String(localized: "活动介绍不能超过 2000 字。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) }
+        let owner = store.identity.accountIdentifier
+        let tenant = UUID(uuidString: activityTenantId), activity = UUID(uuidString: activityId)
         _ = try await store.call(base + "tenants/\(activityTenantId)/activities/\(activityId)", method: "PATCH", body: [
             "title": name, "description": editedActivityDescription,
             "startsAt": ISO8601DateFormatter().string(from: editedActivityDate)
         ])
+        if let tenant, let activity {
+            store.rememberActivityTitle(name, tenant: tenant, activity: activity, owner: owner)
+        }
         showingActivityManagement = false
         try await load(); notice = String(localized: "活动基本信息已更新。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))
     }

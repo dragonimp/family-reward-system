@@ -89,6 +89,40 @@ private actor PhotoPreviewLoader {
     @Published var watchMetricsUpdatedAt: Date?
     @Published var watchExerciseMetrics: [String: Double] = [:]
     var watchExerciseActivity: ExerciseActivity?
+    @Published private var activityTitles: [UUID: [UUID: String]] = [:]
+    private var activityTitleOwner: String?
+    private var activityTitleRevision = UUID()
+
+    func exerciseActivityTitle(_ activity: ExerciseActivity) -> String {
+        guard activityTitleOwner == identity.accountIdentifier else { return activity.title }
+        return activityTitles[activity.tenantID]?[activity.id] ?? activity.title
+    }
+
+    func rememberActivityTitle(_ title: String, tenant: UUID, activity: UUID, owner: String?) {
+        guard let owner, owner == identity.accountIdentifier, !title.isEmpty else { return }
+        if activityTitleOwner != owner { activityTitles = [:]; activityTitleOwner = owner }
+        activityTitleRevision = UUID()
+        activityTitles[tenant, default: [:]][activity] = title
+    }
+
+    func refreshExerciseActivityTitles() async {
+        guard let owner = identity.accountIdentifier else { return }
+        let revision = UUID()
+        activityTitleRevision = revision
+        guard let data = try? await call("/api/dear/social/activities/joined"),
+              let rows = data as? [[String: Any]],
+              owner == identity.accountIdentifier, revision == activityTitleRevision else { return }
+        var titles: [UUID: [UUID: String]] = [:]
+        for row in rows {
+            guard let tenant = (row["sourceTenantId"] as? String).flatMap(UUID.init(uuidString:)),
+                  let activity = (row["id"] as? String).flatMap(UUID.init(uuidString:)),
+                  let title = row["title"] as? String, !title.isEmpty else { continue }
+            titles[tenant, default: [:]][activity] = title
+        }
+        activityTitleOwner = owner
+        activityTitles = titles
+    }
+
     @Published var pendingExerciseActivity: ExerciseActivity?
     @Published var pendingActivityLink: MomentActivityLink?
     @Published var profile: Record?
@@ -388,6 +422,7 @@ private actor PhotoPreviewLoader {
         resetModulePreferences()
         captureInProgress = false
         exerciseStore?.accountDidChange(); exerciseStore = nil
+        activityTitleOwner = nil; activityTitles = [:]; activityTitleRevision = UUID()
         pendingExerciseActivity = nil
         pendingExerciseContinuation = nil; watchExerciseActivity = nil; watchExerciseMetrics = [:]; watchMetricsUpdatedAt = nil
         Task { await photoPreviews.clear() }
