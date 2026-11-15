@@ -611,7 +611,8 @@ struct DearSocialView: View {
     @State private var selectingPhotoDownloads = false
     @State private var selectedPhotoIDs = Set<String>()
     @State private var sharingSelectedOriginals = false
-    @State private var showingOriginalShare = false
+    @State private var originalShare: MomentOriginalShare?
+    @State private var diningDrafts: [MomentLocalDraft] = []
     @State private var showingActivityDining = false
     @State private var batchOriginalURLs: [URL] = []
     @State private var batchProgress = PhotoTransferPresentation()
@@ -1182,13 +1183,19 @@ struct DearSocialView: View {
         let shared = moments.filter { row in
             !(UUID(uuidString: row.id).map { published.contains($0) } ?? false) && !records.contains { UUID(uuidString: row.text("requestId")) == $0.id }
         }.map { DearTimelineEntry(id: "moment:" + $0.id, kind: .moment, record: $0) }
+        let syncedRequests = Set(moments.compactMap { UUID(uuidString: $0.text("requestId")) })
+        let pendingDining = diningDrafts.filter { !syncedRequests.contains($0.id) }.map { draft in
+            DearTimelineEntry(id: "dining:" + draft.id.uuidString, kind: .moment,
+                record: DearRecord(data: ["text": (draft.displayName ?? "") + " · 待同步",
+                    "createdAt": ISO8601DateFormatter().string(from: draft.createdAt)]))
+        }
         let exercises = records.map { record in
             DearTimelineEntry(id: "exercise:" + record.id.uuidString, kind: .exercise,
                 record: DearRecord(data: ["id": record.id.uuidString, "createdAt": ISO8601DateFormatter().string(from: record.startedAt)]), exercise: record)
         }
         let located = checkIns.map { DearTimelineEntry(id: "checkin:" + $0.id, kind: .checkIn, record: $0) }
         let media = photos.map { DearTimelineEntry(id: "photo:" + $0.id, kind: .photo, record: $0) }
-        return (shared + located + media + exercises).sorted {
+        return (shared + pendingDining + located + media + exercises).sorted {
             let left = $0.record.sortDate
             let right = $1.record.sortDate
             return left == right ? $0.id < $1.id : left > right
@@ -1284,6 +1291,11 @@ struct DearSocialView: View {
         }
     }
 
+    private func refreshDiningDrafts() {
+        diningDrafts = store.photoSource.pendingDrafts(spaceID: activityTenantId, activityID: activityId)
+            .filter { $0.kind == "moments" && $0.displayName?.hasPrefix("干饭 · ") == true }
+    }
+
     private var activityDetail: some View {
         List {
             if !notice.isEmpty { Section { Text(notice).foregroundStyle(.teal) } }
@@ -1345,6 +1357,8 @@ struct DearSocialView: View {
         }
         .navigationTitle(selectedActivity?.text("title") ?? "活动详情")
         .navigationBarTitleDisplayMode(.inline)
+        .onReceive(store.photoSource.$draftRevision) { _ in refreshDiningDrafts() }
+        .onChange(of: activityId, initial: true) { _, _ in refreshDiningDrafts() }
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 activityActions
@@ -1385,12 +1399,12 @@ struct DearSocialView: View {
             Button("取消", role: .cancel) { }
         } message: { Text("活动成员将无法再获取这些文件；iPhone 相册中的原文件不会删除。") }
         .sheet(isPresented: $showingCheckIn) { checkInSheet }
-        .sheet(isPresented: $showingOriginalShare) {
-            MomentOriginalShareSheet(urls: batchOriginalURLs)
+        .sheet(item: $originalShare) { share in
+            MomentOriginalShareSheet(urls: share.urls)
         }
         .sheet(isPresented: $showingActivityDining) {
             let space = activityTenantId, activity = activityId, account = store.identity.accountIdentifier
-            MomentActivityDiningPicker(store: store) { id, name in
+            MomentActivityDiningPicker(store: store, space: space, activity: activity) { id, name in
                 guard account != nil, account == store.identity.accountIdentifier,
                       space == activityTenantId, activity == activityId else { throw CancellationError() }
                 try store.photoSource.enqueueRecord(kind: "moments", spaceID: space, activityID: activity,
@@ -1873,7 +1887,13 @@ struct DearSocialView: View {
         }
         guard targetSpace == activityTenantId, targetActivity == activityId, owner == store.identity.accountIdentifier else { return }
         if !share || failures.isEmpty { batchOriginalURLs = originals }
-        if share && failures.isEmpty && originals.count == selected.count { showingOriginalShare = true }
+        if share && failures.isEmpty && originals.count == selected.count {
+            if originals.allSatisfy({ $0.isFileURL && FileManager.default.isReadableFile(atPath: $0.path) }) {
+                originalShare = MomentOriginalShare(urls: originals)
+            } else {
+                batchDownloadError = "部分原文件暂不可用，请重新获取后分享。"
+            }
+        }
         if !failures.isEmpty { batchDownloadError = failures.joined(separator: "；") }
     }
     private func loadMoments() async throws {
@@ -3196,6 +3216,11 @@ private struct MomentPhotoWeatherView: View {
     }
 }
 
+private struct MomentOriginalShare: Identifiable {
+    let id = UUID()
+    let urls: [URL]
+}
+
 private struct MomentOriginalShareSheet: UIViewControllerRepresentable {
     let urls: [URL]
     @Environment(\.dismiss) private var dismiss
@@ -3211,19 +3236,63 @@ private struct MomentOriginalShareSheet: UIViewControllerRepresentable {
 
 private struct MomentActivityDiningPicker: View {
     let store: FamilyStore
+    let space: String
+    let activity: String
+    @StateObject private var dining: DiningStore
+    @State private var place: DiningPlace?
+    @State private var picking = false
+    @State private var creating = false
+    @State private var operation = UUID()
+    @State private var created = false
     let associate: (UUID, String) throws -> Void
     @Environment(\.dismiss) private var dismiss
     @State private var gatherings: [DearRecord] = []
     @State private var loading = true
     @State private var failure = ""
 
+    init(store: FamilyStore, space: String, activity: String, associate: @escaping (UUID, String) throws -> Void) {
+        self.store = store
+        self.space = space
+        self.activity = activity
+        self.associate = associate
+        _dining = StateObject(wrappedValue: DiningStore(userID: store.profile?.text("unifiedUserId") ?? "", family: store))
+    }
+
+    private func create(_ place: DiningPlace) async {
+        guard !creating else { return }
+        creating = true
+        failure = ""
+        defer { creating = false }
+        do {
+            let owner = store.identity.accountIdentifier
+            guard owner != nil else { throw CancellationError() }
+            if !created {
+                _ = try await store.call("/api/dining/gatherings", method: "POST", body: [
+                    "id": operation.uuidString, "restaurantId": place.id, "restaurantName": place.name,
+                    "activityTenantId": space, "activityId": activity
+                ])
+                guard owner == store.identity.accountIdentifier else { return }
+                created = true
+            }
+            try associate(operation, place.name)
+            dismiss()
+        } catch { failure = momentDisplayError(error) }
+    }
+
     var body: some View {
         NavigationStack {
             List {
+                Section("新建饭局") {
+                    Button(place?.name ?? "选择餐厅") { picking = true }.disabled(created)
+                    if let place {
+                        Button(created ? "重试关联到活动" : "创建饭局") { Task { await create(place) } }
+                    }
+                    Text("默认包含活动所有成员。").font(.footnote).foregroundStyle(.secondary)
+                }
                 if loading { ProgressView() }
                 if !failure.isEmpty { Text(failure).foregroundStyle(.secondary) }
                 if !loading && failure.isEmpty && gatherings.isEmpty {
-                    ContentUnavailableView("暂无饭局", systemImage: "fork.knife", description: Text("可先在干饭栏目创建饭局。"))
+                    ContentUnavailableView("暂无饭局", systemImage: "fork.knife", description: Text("可以在上方新建饭局。"))
                 }
                 ForEach(gatherings) { gathering in
                     Button(gathering.text("restaurantName")) {
@@ -3235,9 +3304,17 @@ private struct MomentActivityDiningPicker: View {
                     }
                 }
             }
+            .disabled(creating)
+            .interactiveDismissDisabled(creating)
+            .sheet(isPresented: $picking) {
+                DiningPlacePicker(model: dining, restaurant: true) {
+                    place = $0
+                    operation = UUID()
+                }
+            }
             .navigationTitle("关联干饭")
             .navigationBarTitleDisplayMode(.inline)
-            .toolbar { ToolbarItem(placement: .cancellationAction) { Button("取消") { dismiss() } } }
+            .toolbar { ToolbarItem(placement: .cancellationAction) { Button("取消") { dismiss() }.disabled(creating) } }
             .task {
                 let owner = store.identity.accountIdentifier
                 defer { loading = false }

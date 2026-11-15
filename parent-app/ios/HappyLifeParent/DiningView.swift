@@ -1573,7 +1573,7 @@ private struct DiningCircleView: View {
     }
 }
 
-private struct DiningPlacePicker: View {
+struct DiningPlacePicker: View {
     let model: DiningStore
     let restaurant: Bool
     var initial: CLLocationCoordinate2D? = nil

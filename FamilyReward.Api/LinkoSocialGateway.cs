@@ -128,6 +128,35 @@ internal static class LinkoSocialGateway
         }
     }
 
+    internal static async Task<string[]?> ActivityMemberSubjects(HttpContext context, Guid tenant, Guid activity, CancellationToken ct)
+    {
+        var services = context.RequestServices;
+        var configuration = services.GetRequiredService<IConfiguration>();
+        var clients = services.GetRequiredService<IHttpClientFactory>();
+        var tokens = services.GetRequiredService<SocialServiceTokens>();
+        var identity = services.GetRequiredService<AgentIdentityOptions>();
+        var source = MomentIdentityApplications.SourceClient(context.User);
+        var token = AccessToken(context, configuration);
+        if (source is null || string.IsNullOrEmpty(token)) return null;
+        if (!Uri.TryCreate(configuration["LinkoSocial:BackendOrigin"], UriKind.Absolute, out var backend) ||
+            !(backend.Scheme == "https" || backend.Scheme == "http" && backend.IsLoopback) ||
+            backend.UserInfo.Length != 0 || backend.AbsolutePath != "/" || backend.Query.Length != 0 || backend.Fragment.Length != 0 ||
+            configuration["LinkoSocial:ApplicationKey"] is not { Length: > 0 } application)
+            throw new HttpRequestException("Linko social configuration unavailable");
+        var serviceToken = await tokens.GetAsync(token, source, application, identity, clients, ct);
+        using var request = new HttpRequestMessage(HttpMethod.Get, new Uri(backend, $"/api/tenants/{tenant:D}/activities/{activity:D}/members"));
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", serviceToken);
+        using var response = await clients.CreateClient("dear-social-api").SendAsync(request, ct);
+        if (response.StatusCode is HttpStatusCode.Forbidden or HttpStatusCode.NotFound or HttpStatusCode.Unauthorized) return null;
+        response.EnsureSuccessStatusCode();
+        var members = await response.Content.ReadFromJsonAsync<ActivityMember[]>(cancellationToken: ct)
+            ?? throw new System.Text.Json.JsonException("Missing activity members");
+        return members.Where(x => !string.IsNullOrWhiteSpace(x.Subject))
+            .Select(x => Guid.TryParse(x.Subject, out var id) ? id.ToString("D") : x.Subject).Distinct().ToArray();
+    }
+
+    private sealed record ActivityMember(string Subject);
+
     private static string? AccessToken(HttpContext context, IConfiguration configuration)
     {
         var authorization = context.Request.Headers.Authorization.ToString();

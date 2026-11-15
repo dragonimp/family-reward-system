@@ -4,7 +4,7 @@ using Npgsql;
 
 internal static class DiningGatheringEndpoints
 {
-    private sealed record CreateGathering(Guid Id, string RestaurantId, string RestaurantName);
+    private sealed record CreateGathering(Guid Id, string RestaurantId, string RestaurantName, Guid? ActivityTenantId = null, Guid? ActivityId = null);
     private sealed record JoinGathering(string Code);
 
     public static void MapDiningGatherings(this WebApplication app, string connectionString, Func<HttpRequest, string?> ownerFor)
@@ -23,6 +23,23 @@ internal static class DiningGatheringEndpoints
             if (input.Id == Guid.Empty || restaurantId is not { Length: > 0 and <= 256 } ||
                 restaurantName is not { Length: > 0 and <= 160 }) return Results.BadRequest();
             var owner = ownerFor(request)!;
+            string[] activityMembers = [];
+            if (input.ActivityTenantId is not null || input.ActivityId is not null)
+            {
+                if (input.ActivityTenantId is not { } tenant || tenant == Guid.Empty ||
+                    input.ActivityId is not { } activity || activity == Guid.Empty) return Results.BadRequest();
+                using var timeout = CancellationTokenSource.CreateLinkedTokenSource(ct);
+                timeout.CancelAfter(TimeSpan.FromSeconds(15));
+                try
+                {
+                    var members = await LinkoSocialGateway.ActivityMemberSubjects(request.HttpContext, tenant, activity, timeout.Token);
+                    if (members is null) return Results.Forbid();
+                    activityMembers = members;
+                }
+                catch (OperationCanceledException) when (!ct.IsCancellationRequested) { return Results.StatusCode(503); }
+                catch (HttpRequestException) { return Results.StatusCode(503); }
+                catch (System.Text.Json.JsonException) { return Results.StatusCode(503); }
+            }
             await using var db = new NpgsqlConnection(connectionString);
             await db.OpenAsync(ct);
             await using var tx = await db.BeginTransactionAsync(ct);
@@ -48,6 +65,17 @@ internal static class DiningGatheringEndpoints
             if (await verify.ExecuteScalarAsync(ct) is null) return Results.Conflict();
             if (created && !await AllocateCode(db, tx, input.Id, ct)) return Results.StatusCode(503);
             await AddMember(db, tx, input.Id, owner, ct);
+            if (created && activityMembers.Length > 0)
+            {
+                await using var includeMembers = new NpgsqlCommand("""
+                    INSERT INTO dining_gathering_members(gathering_id,user_id)
+                    SELECT @id, member FROM unnest(@members) AS roster(member)
+                    ON CONFLICT DO NOTHING
+                    """, db, tx);
+                includeMembers.Parameters.AddWithValue("id", input.Id);
+                includeMembers.Parameters.AddWithValue("members", activityMembers);
+                await includeMembers.ExecuteNonQueryAsync(ct);
+            }
             await tx.CommitAsync(ct);
             return Results.Ok(new { id = input.Id });
         });
