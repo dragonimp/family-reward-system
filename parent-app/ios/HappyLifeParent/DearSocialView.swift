@@ -615,6 +615,7 @@ struct DearSocialView: View {
     @State private var diningDrafts: [MomentLocalDraft] = []
     @State private var showingActivityDining = false
     @State private var batchOriginalURLs: [URL] = []
+    @State private var savingBatchToPhotos = false
     @State private var batchProgress = PhotoTransferPresentation()
     private var batchDownloadProgress: Double {
         get { batchProgress.progress ?? 0 }
@@ -1161,6 +1162,14 @@ struct DearSocialView: View {
                         .disabled(!canDeleteSelectedPhotos || batchDownloading || batchDeleting)
                 }
                 Text("分享者和活动 owner 可删除分享；iPhone 相册原件保留。") .font(.caption).foregroundStyle(.secondary)
+                if selectedPhotoIDs.count > 1 {
+                    Button {
+                        Task { await downloadSelectedPhotos(saveToPhotos: true) }
+                    } label: {
+                        Label(savingBatchToPhotos ? "正在存入相册…" : "全部存入相册", systemImage: "square.and.arrow.down")
+                    }
+                    .disabled(batchDownloading || batchDeleting || savingBatchToPhotos)
+                }
                 DearBatchProgress(presentation: batchProgress, active: batchDownloading)
                 if !sharingSelectedOriginals && !batchOriginalURLs.isEmpty { ShareLink(items: batchOriginalURLs.map { DearOriginalFile(url: $0) }, preview: { SharePreview($0.url.lastPathComponent) }) { Label("保存或分享 \(batchOriginalURLs.count) 项", systemImage: "square.and.arrow.up") } }
                 if !batchDownloadError.isEmpty { Text(batchDownloadError).font(.caption).foregroundStyle(.red) }
@@ -1866,7 +1875,7 @@ struct DearSocialView: View {
         batchDownloadError = failures.joined(separator: "；")
     }
 
-    private func downloadSelectedPhotos(share: Bool = false) async {
+    private func downloadSelectedPhotos(share: Bool = false, saveToPhotos: Bool = false) async {
         let selected = photos.filter { selectedPhotoIDs.contains($0.id) }
         guard !selected.isEmpty, !batchDownloading, !batchDeleting else { return }
         let targetSpace = activityTenantId, targetActivity = activityId
@@ -1887,6 +1896,27 @@ struct DearSocialView: View {
         }
         guard targetSpace == activityTenantId, targetActivity == activityId, owner == store.identity.accountIdentifier else { return }
         if !share || failures.isEmpty { batchOriginalURLs = originals }
+        if saveToPhotos && failures.isEmpty && originals.count == selected.count {
+            savingBatchToPhotos = true
+            defer { savingBatchToPhotos = false }
+            let media = zip(selected, originals).map { record, url in
+                (url: url, isVideo: record.text("contentType").lowercased().hasPrefix("video/")
+                    || UTType(filenameExtension: url.pathExtension)?.conforms(to: .movie) == true)
+            }
+            do {
+                let authorization = await PHPhotoLibrary.requestAuthorization(for: .addOnly)
+                guard authorization == .authorized || authorization == .limited else {
+                    throw APIError.message("请在系统设置中允许添加照片，原文件仍保留在 App 中。")
+                }
+                try await PHPhotoLibrary.shared().performChanges {
+                    for item in media {
+                        PHAssetCreationRequest.forAsset().addResource(
+                            with: item.isVideo ? .video : .photo, fileURL: item.url, options: nil)
+                    }
+                }
+                notice = "已将 \(media.count) 项原件存入相册，可在微信中从相册多选发送。"
+            } catch { batchDownloadError = momentDisplayError(error) }
+        }
         if share && failures.isEmpty && originals.count == selected.count {
             if originals.allSatisfy({ $0.isFileURL && FileManager.default.isReadableFile(atPath: $0.path) }) {
                 originalShare = MomentOriginalShare(urls: originals)
@@ -3231,7 +3261,19 @@ private struct MomentOriginalShareSheet: UIViewControllerRepresentable {
     @Environment(\.dismiss) private var dismiss
 
     func makeUIViewController(context: Context) -> UIActivityViewController {
-        let controller = UIActivityViewController(activityItems: urls, applicationActivities: nil)
+        let providers = urls.map { url in
+            let provider = NSItemProvider()
+            provider.suggestedName = url.lastPathComponent
+            let type = UTType(filenameExtension: url.pathExtension) ?? .data
+            provider.registerFileRepresentation(forTypeIdentifier: type.identifier,
+                                                fileOptions: [], visibility: .all) { completion in
+                completion(url, false, nil)
+                return nil
+            }
+            return provider
+        }
+        let controller = UIActivityViewController(
+            activityItemsConfiguration: UIActivityItemsConfiguration(itemProviders: providers))
         controller.completionWithItemsHandler = { _, _, _, _ in dismiss() }
         return controller
     }
