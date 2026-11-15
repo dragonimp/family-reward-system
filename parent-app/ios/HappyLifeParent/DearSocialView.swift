@@ -1602,8 +1602,6 @@ struct DearSocialView: View {
                         TextField(String(localized: "活动介绍", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), text: $editedActivityDescription, axis: .vertical)
                             .lineLimit(2...5)
                         DatePicker(String(localized: "活动日期", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), selection: $editedActivityDate, displayedComponents: .date)
-                        Button(String(localized: "保存基本信息", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) { run { try await updateActivity() } }
-                            .disabled(busy || editedActivityName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || editedActivityDescription.count > 2000)
                         Button(String(localized: "删除活动", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), systemImage: "trash", role: .destructive) {
                             showingActivityDelete = true
                         }.disabled(busy)
@@ -1658,7 +1656,22 @@ struct DearSocialView: View {
                 }
             }
             .navigationTitle(String(localized: "管理 · \(selectedActivity?.text("title") ?? String(localized: "活动", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)))", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)))
-            .toolbar { ToolbarItem(placement: .topBarTrailing) { Button(String(localized: "完成", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) { showingActivityManagement = false } } }
+            .interactiveDismissDisabled(busy)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button(String(localized: "完成", bundle: AgentIdentityLanguage.appBundle())) {
+                        guard let activity = selectedActivity, activity.flag("canEdit"),
+                              editedActivityName != activity.text("title") ||
+                              editedActivityDescription != activity.text("description") ||
+                              editedActivityDate != activityDateValue(activity) else {
+                            showingActivityManagement = false
+                            return
+                        }
+                        run { try await updateActivity() }
+                    }
+                    .disabled(busy)
+                }
+            }
             .confirmationDialog(String(localized: "删除活动「\(selectedActivity?.text("title") ?? "")」？", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), isPresented: $showingActivityDelete, titleVisibility: .visible) {
                 Button(String(localized: "确认删除活动", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), role: .destructive) { run { try await deleteActivity() } }
                 Button(String(localized: "取消", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), role: .cancel) { }
@@ -1986,6 +1999,7 @@ struct DearSocialView: View {
             "title": name, "description": editedActivityDescription,
             "startsAt": ISO8601DateFormatter().string(from: editedActivityDate)
         ])
+        showingActivityManagement = false
         try await load(); notice = String(localized: "活动基本信息已更新。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))
     }
     private func deleteActivity() async throws {
@@ -2494,16 +2508,19 @@ struct MomentNotificationInbox: View {
     @ObservedObject var notifications: MomentNotifications
     @Environment(\.dismiss) private var dismiss
     @State private var confirmDeleteAll = false
+    @State private var toast = ""
     var body: some View {
         NavigationStack {
             List {
                 Section(String(localized: "积分申请通知", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) {
                     NavigationLink { ApprovalList(store: store) } label: {
-                        LabeledContent(String(localized: "奖励审批", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), value: "\(store.requests.filter { $0.text("status") == "pending" }.count)")
+                        LabeledContent {
+                            Text(store.requests.filter { $0.text("status") == "pending" }.count, format: .number)
+                        } label: {
+                            Label(String(localized: "奖励审批", bundle: AgentIdentityLanguage.appBundle()), systemImage: "checkmark.seal")
+                        }
                     }
                 }
-                if !notifications.error.isEmpty { Section { Text(notifications.error).foregroundStyle(.red) } }
-                if !notifications.pushRegistrationError.isEmpty { Section { Text(notifications.pushRegistrationError).foregroundStyle(.red) } }
                 Section("请求与消息 · 未读 \(notifications.unreadCount)") {
                     ForEach(notifications.items) { item in
                         NavigationLink {
@@ -2517,8 +2534,30 @@ struct MomentNotificationInbox: View {
                             }
                         }
                     }
-                    if notifications.items.isEmpty { Text("暂无消息。下载请求会在此保留。") }
+                    if notifications.items.isEmpty { Label("暂无消息", systemImage: "tray").foregroundStyle(.secondary) }
                 }
+            }
+            .listStyle(.insetGrouped)
+            .overlay(alignment: .bottom) {
+                if !toast.isEmpty {
+                    Text(toast)
+                        .font(.subheadline)
+                        .padding(12)
+                        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12))
+                        .padding()
+                        .allowsHitTesting(false)
+                }
+            }
+            .onChange(of: notifications.error, initial: true) { _, value in
+                if !value.isEmpty { toast = value }
+            }
+            .onChange(of: notifications.pushRegistrationError, initial: true) { _, value in
+                if !value.isEmpty { toast = value }
+            }
+            .task(id: toast) {
+                guard !toast.isEmpty else { return }
+                do { try await Task.sleep(for: .seconds(4)) } catch { return }
+                toast = ""
             }
             .navigationTitle("消息通知")
             .navigationBarTitleDisplayMode(.inline)
@@ -2529,6 +2568,7 @@ struct MomentNotificationInbox: View {
                     Button("全部删除", systemImage: "trash", role: .destructive) { confirmDeleteAll = true }
                         .labelStyle(.iconOnly).disabled(notifications.items.isEmpty || notifications.editingInbox)
                     Menu {
+                        if !notifications.notificationStatus.isEmpty { Text(notifications.notificationStatus) }
                         Button(notifications.enableButtonTitle) { Task { await notifications.enable() } }
                             .disabled(notifications.enabling || notifications.registering)
                         Button("系统通知设置", systemImage: "gearshape") { notifications.openSettings() }
