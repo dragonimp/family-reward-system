@@ -186,18 +186,19 @@ struct FamilyRoot: View {
     }
     private var main: some View {
         TabView(selection: $selectedTab) {
-            if diningEnabled {
+            ForEach(store.moduleOrder, id: \.self) { key in
+                switch key {
+            case "dining" where diningEnabled:
             DiningModesView(userID: identity.accountIdentifier ?? "", family: store).id(identity.accountIdentifier ?? "").tabItem { Label(String(localized: "干饭", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), systemImage: "fork.knife") }.tag(0)
-            }
-            if growthEnabled {
+            case "growth" where growthEnabled:
             Group { if store.ready { FamilyHome(store: store) } else { growthUnavailable } }.tabItem { Label(String(localized: "带娃", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), systemImage: "person.3.fill") }
                 .badge(store.requests.filter { $0.text("status") == "pending" }.count).tag(1)
-            }
-            if activitiesEnabled {
+            case "activities" where activitiesEnabled:
             DearSocialView(store: store).tabItem { Label(String(localized: "活动", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), systemImage: "photo.on.rectangle.angled") }.tag(2)
-            }
-            if exerciseEnabled {
+            case "exercise" where exerciseEnabled:
             Group { if store.ready { ExerciseView(userID: store.profile?.text("unifiedUserId") ?? "").id(store.profile?.text("unifiedUserId") ?? "") } else { growthUnavailable } }.tabItem { Label(String(localized: "运动", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), systemImage: "figure.walk") }.tag(3)
+                default: EmptyView()
+                }
             }
             AccountView(store: store).tabItem { Label(String(localized: "我的", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), systemImage: "person.crop.circle") }.badge(notifications.unreadCount).tag(4)
         }
@@ -618,7 +619,7 @@ struct AccountView: View {
                 Section(String(localized: "应用与设置", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) {
                     NavigationLink { ExerciseWatchConnectionView(family: store) } label: { Label(String(localized: "连接手表", bundle: AgentIdentityLanguage.appBundle()), systemImage: "applewatch") }
 
-                    NavigationLink { MomentSectionSettings(store: store) } label: { Label(String(localized: "栏目启用", bundle: AgentIdentityLanguage.appBundle()), systemImage: "square.grid.2x2") }
+                    NavigationLink { MomentSectionSettings(store: store) } label: { Label(String(localized: "栏目设置", bundle: AgentIdentityLanguage.appBundle()), systemImage: "square.grid.2x2") }
                     NavigationLink { FamilyChatView(store: store) } label: {
                         Label(String(localized: "AI 对话", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), systemImage: "bubble.left.and.bubble.right.fill")
                     }
@@ -1349,14 +1350,21 @@ private struct MomentSectionSettings: View {
     @ObservedObject var store: FamilyStore
     var body: some View {
         Form {
-            ForEach(["dining", "growth", "activities", "exercise"], id: \.self) { key in
+            ForEach(store.moduleOrder, id: \.self) { key in
                 Toggle(["dining": String(localized: "干饭", bundle: AgentIdentityLanguage.appBundle()), "growth": String(localized: "带娃", bundle: AgentIdentityLanguage.appBundle()), "activities": String(localized: "活动", bundle: AgentIdentityLanguage.appBundle()), "exercise": String(localized: "运动", bundle: AgentIdentityLanguage.appBundle())][key] ?? key,
                        isOn: Binding(get: { store.moduleSections[key] ?? true }, set: { value in Task { await store.setModule(key, enabled: value) } }))
+                    .draggable(key)
+                    .dropDestination(for: String.self) { values, _ in
+                        guard let moving = values.first else { return false }
+                        return store.moveModule(moving, to: key)
+                    }
+                    .accessibilityAction(named: Text("上移")) { store.shiftModule(key, by: -1) }
+                    .accessibilityAction(named: Text("下移")) { store.shiftModule(key, by: 1) }
             }.disabled(store.modulePreferenceSaving)
-            Text("同一账号的所有设备同步栏目设置；“我的”始终保留。").font(.footnote).foregroundStyle(.secondary)
+            Text("长按栏目拖动排序。启用状态随账号同步，顺序保存在本机。「我的」始终保留。").font(.footnote).foregroundStyle(.secondary)
             if let error = store.modulePreferenceError { Text(error).foregroundStyle(.secondary) }
             Button("重新同步") { Task { await store.refreshModulePreferences() } }
-        }.navigationTitle(String(localized: "栏目启用", bundle: AgentIdentityLanguage.appBundle()))
+        }.navigationTitle(String(localized: "栏目设置", bundle: AgentIdentityLanguage.appBundle()))
             .task { await store.refreshModulePreferences() }
     }
 }

@@ -108,6 +108,36 @@ private actor PhotoPreviewLoader {
     @Published var ledgerPage = 1
     @Published var ledgerTotal = 0
     @Published var moduleSections: [String: Bool] = ["dining": true, "growth": true, "activities": true, "exercise": true]
+    private static let defaultModuleOrder = ["dining", "growth", "activities", "exercise"]
+    @Published private var savedModuleOrders: [String: [String]] =
+        UserDefaults.standard.dictionary(forKey: "moment.moduleOrders") as? [String: [String]] ?? [:]
+
+    var moduleOrder: [String] {
+        guard let owner = identity.accountIdentifier, let order = savedModuleOrders[owner],
+              order.count == Self.defaultModuleOrder.count, Set(order) == Set(Self.defaultModuleOrder) else {
+            return Self.defaultModuleOrder
+        }
+        return order
+    }
+
+    @discardableResult
+    func moveModule(_ moving: String, to target: String) -> Bool {
+        var order = moduleOrder
+        guard let owner = identity.accountIdentifier, moving != target,
+              let source = order.firstIndex(of: moving), let destination = order.firstIndex(of: target) else { return false }
+        order.remove(at: source)
+        order.insert(moving, at: destination)
+        savedModuleOrders[owner] = order
+        UserDefaults.standard.set(savedModuleOrders, forKey: "moment.moduleOrders")
+        return true
+    }
+
+    func shiftModule(_ key: String, by offset: Int) {
+        let order = moduleOrder
+        guard let index = order.firstIndex(of: key), order.indices.contains(index + offset) else { return }
+        moveModule(key, to: order[index + offset])
+    }
+
     @Published var modulePreferenceError: String?
     @Published var modulePreferenceSaving = false
     private var modulePreferenceVersion = 0
