@@ -1209,6 +1209,18 @@ struct DearSocialView: View {
                     Button(String(localized: "大图", bundle: AgentIdentityLanguage.appBundle()), systemImage: "rectangle") { photoViewMode = "grid" }
                     Button(String(localized: "紧凑", bundle: AgentIdentityLanguage.appBundle()), systemImage: "list.bullet") { photoViewMode = "list" }
                     Button(String(localized: "网格 · 每行5张", bundle: AgentIdentityLanguage.appBundle()), systemImage: "square.grid.3x3") { photoViewMode = "tiles" }
+                    Divider()
+                    NavigationLink {
+                        DearActivityMapView(
+                            locations: locations, store: store,
+                            title: selectedActivity?.text("title") ?? "活动地图",
+                            spaceID: activityTenantId, activityID: activityId,
+                            points: DearActivityMapPoint.points(checkIns: [], photos: photos),
+                            photos: photos, initialMembersOnly: false
+                        )
+                    } label: {
+                        Label(String(localized: "打开地图", bundle: AgentIdentityLanguage.appBundle()), systemImage: "map")
+                    }
                 } label: { Image(systemName: "slider.horizontal.3") }
                 .accessibilityLabel(String(localized: "展示样式", bundle: AgentIdentityLanguage.appBundle()))
             }.textCase(nil)
