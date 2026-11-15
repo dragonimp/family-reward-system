@@ -1002,7 +1002,7 @@ struct DearSocialView: View {
     private func photoGridTile(_ photo: DearRecord) -> some View {
         let nickname = photo.text("sourceDisplayName").isEmpty ? "活动成员" : photo.text("sourceDisplayName")
         let path = base + "tenants/\(activityTenantId)/activities/\(activityId)/native-photos/\(photo.id)/thumbnail"
-        VStack(spacing: 3) {
+        return VStack(spacing: 3) {
             Button {
                 if selectingPhotoDownloads {
                     if !selectedPhotoIDs.insert(photo.id).inserted { selectedPhotoIDs.remove(photo.id) }
