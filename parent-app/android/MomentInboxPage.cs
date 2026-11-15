@@ -77,7 +77,7 @@ internal sealed class MomentInboxPage : ContentPage
             body.Add(MomentStyle.Caption(data.Flag("serverCached") ? "原文件已缓存，可在完整活动页继续接收。" : "原文件尚未缓存，需要保存原件的设备继续分享。"));
             if (data.Data.TryGetProperty("photo", out var photo) && photo.ValueKind == System.Text.Json.JsonValueKind.Object)
                 body.Add(MomentStyle.Action("查看请求的照片", () => _ = Navigation.PushAsync(new MomentPhotoPage(store, new MomentThumbnails(store), new MomentFeedItem("photo", new MomentRecord(photo.Clone()), scope)))));
-            body.Add(MomentStyle.Action("打开完整活动页处理请求", () => _ = MomentActivityPanel.OpenWebAsync(scope.Web), true));
+            body.Add(MomentStyle.Action("打开完整活动页处理请求", () => _ = store.OpenWebAsync(scope.Web), true));
         }
         catch { body.Add(MomentStyle.Caption("请求对象暂不可访问，请稍后重试。")); }
     }

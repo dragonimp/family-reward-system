@@ -36,6 +36,10 @@ public sealed class FamilyStore
     public bool Authenticated { get; private set; }
     public long SessionVersion => Volatile.Read(ref generation);
     public Task<string?> GetIdentityTokenAsync(CancellationToken ct = default) => session.GetTokenAsync(ct);
+    public Task<bool> OpenWebAsync(Uri url) => AgentIdentity.Maui.InAppWebLinks.OpenAuthenticatedAsync(url, Origin,
+        GetIdentityTokenAsync, () => SessionVersion.ToString(System.Globalization.CultureInfo.InvariantCulture),
+        [new Uri("https://auth.ai.xmkurt.com")]);
+
     public IReadOnlyDictionary<string, bool> ModuleSections { get; private set; } = ModuleDefaults();
     public event Action? ModulePreferencesChanged;
     public string? ModulePreferenceError { get; private set; }
