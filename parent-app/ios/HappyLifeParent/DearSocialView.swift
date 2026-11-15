@@ -610,6 +610,9 @@ struct DearSocialView: View {
     @State private var photoLocationName = ""
     @State private var selectingPhotoDownloads = false
     @State private var selectedPhotoIDs = Set<String>()
+    @State private var sharingSelectedOriginals = false
+    @State private var showingOriginalShare = false
+    @State private var showingActivityDining = false
     @State private var batchOriginalURLs: [URL] = []
     @State private var batchProgress = PhotoTransferPresentation()
     private var batchDownloadProgress: Double {
@@ -1108,15 +1111,6 @@ struct DearSocialView: View {
             MomentPendingActivityView(source: store.photoSource, spaceID: activityTenantId, activityID: activityId)
 
             HStack(spacing: 8) {
-                PhotosPicker(selection: $selectedPhotos, maxSelectionCount: 50, matching: .any(of: [.images, .videos]), preferredItemEncoding: .current) {
-                    activityPhotoTile(String(localized: "分享", bundle: AgentIdentityLanguage.appBundle()), icon: "photo.badge.plus")
-                }.disabled(busy || batchDeleting || batchDownloading)
-                Button { Task { await openCamera(.photo) } } label: {
-                    activityPhotoTile(String(localized: "拍照", bundle: AgentIdentityLanguage.appBundle()), icon: "camera")
-                }.disabled(requestingCamera || cameraMode != nil)
-                Button { Task { await openCamera(.video) } } label: {
-                    activityPhotoTile(String(localized: "拍视频", bundle: AgentIdentityLanguage.appBundle()), icon: "video")
-                }.disabled(requestingCamera || cameraMode != nil)
                 Button { checkInNote = ""; checkInRequestID = UUID(); pendingCheckIn = true; checkInLocator.locate() } label: {
                     activityPhotoTile(String(localized: "打卡", bundle: AgentIdentityLanguage.appBundle()), icon: "location.circle")
                 }.disabled(pendingCheckIn)
@@ -1126,8 +1120,20 @@ struct DearSocialView: View {
                         showingActivity = false
                     }
                 } label: {
-                    activityPhotoTile(String(localized: "创建运动", bundle: AgentIdentityLanguage.appBundle()), icon: "figure.hiking")
+                    activityPhotoTile(String(localized: "徒步运动", bundle: AgentIdentityLanguage.appBundle()), icon: "figure.hiking")
                 }.disabled(UUID(uuidString: activityTenantId) == nil || UUID(uuidString: activityId) == nil)
+                Button { showingActivityDining = true } label: {
+                    activityPhotoTile(String(localized: "干饭", bundle: AgentIdentityLanguage.appBundle()), icon: "fork.knife")
+                }
+                PhotosPicker(selection: $selectedPhotos, maxSelectionCount: 50, matching: .any(of: [.images, .videos]), preferredItemEncoding: .current) {
+                    activityPhotoTile(String(localized: "添加照片/视频", bundle: AgentIdentityLanguage.appBundle()), icon: "photo.badge.plus")
+                }.disabled(busy || batchDeleting || batchDownloading)
+                Button { Task { await openCamera(.photo) } } label: {
+                    activityPhotoTile(String(localized: "拍照", bundle: AgentIdentityLanguage.appBundle()), icon: "camera")
+                }.disabled(requestingCamera || cameraMode != nil)
+                Button { Task { await openCamera(.video) } } label: {
+                    activityPhotoTile(String(localized: "拍视频", bundle: AgentIdentityLanguage.appBundle()), icon: "video")
+                }.disabled(requestingCamera || cameraMode != nil)
             }
             .buttonStyle(.plain)
             .fixedSize(horizontal: false, vertical: true)
@@ -1147,7 +1153,7 @@ struct DearSocialView: View {
             if selectingPhotoDownloads {
                 Text("已选 \(selectedPhotoIDs.count) 项").font(.caption).foregroundStyle(.secondary)
                 HStack {
-                    Button(batchDownloading ? "正在获取…" : "获取原文件") { Task { await downloadSelectedPhotos() } }
+                    Button(batchDownloading ? "正在获取…" : sharingSelectedOriginals ? "分享原文件" : "获取原文件") { Task { await downloadSelectedPhotos(share: sharingSelectedOriginals) } }
                         .disabled(selectedPhotoIDs.isEmpty || batchDownloading || batchDeleting)
                     Spacer()
                     Button(batchDeleting ? "正在删除…" : "删除分享", role: .destructive) { showingBatchDelete = true }
@@ -1155,7 +1161,7 @@ struct DearSocialView: View {
                 }
                 Text("分享者和活动 owner 可删除分享；iPhone 相册原件保留。") .font(.caption).foregroundStyle(.secondary)
                 DearBatchProgress(presentation: batchProgress, active: batchDownloading)
-                if !batchOriginalURLs.isEmpty { ShareLink(items: batchOriginalURLs.map { DearOriginalFile(url: $0) }, preview: { SharePreview($0.url.lastPathComponent) }) { Label("保存或分享 \(batchOriginalURLs.count) 项", systemImage: "square.and.arrow.up") } }
+                if !sharingSelectedOriginals && !batchOriginalURLs.isEmpty { ShareLink(items: batchOriginalURLs.map { DearOriginalFile(url: $0) }, preview: { SharePreview($0.url.lastPathComponent) }) { Label("保存或分享 \(batchOriginalURLs.count) 项", systemImage: "square.and.arrow.up") } }
                 if !batchDownloadError.isEmpty { Text(batchDownloadError).font(.caption).foregroundStyle(.red) }
             }
         } header: { Text("照片分享").textCase(nil) }
@@ -1241,6 +1247,21 @@ struct DearSocialView: View {
             HStack {
                 Text(String(localized: "活动动态", bundle: AgentIdentityLanguage.appBundle()))
                 Spacer()
+                Button {
+                    if sharingSelectedOriginals {
+                        Task { await downloadSelectedPhotos(share: true) }
+                    } else {
+                        selectingPhotoDownloads = true
+                        sharingSelectedOriginals = true
+                        selectedPhotoIDs.removeAll()
+                        batchOriginalURLs = []
+                        batchDownloadError = ""
+                    }
+                } label: {
+                    Image(systemName: "square.and.arrow.up")
+                }
+                .accessibilityLabel(sharingSelectedOriginals ? "分享选中的原文件" : "批量分享原文件")
+                .disabled(photos.isEmpty || batchDownloading || batchDeleting || (sharingSelectedOriginals && selectedPhotoIDs.isEmpty))
                 Menu {
                     Button(String(localized: "大图", bundle: AgentIdentityLanguage.appBundle()), systemImage: "rectangle") { photoViewMode = "grid" }
                     Button(String(localized: "紧凑", bundle: AgentIdentityLanguage.appBundle()), systemImage: "list.bullet") { photoViewMode = "list" }
@@ -1364,6 +1385,18 @@ struct DearSocialView: View {
             Button("取消", role: .cancel) { }
         } message: { Text("活动成员将无法再获取这些文件；iPhone 相册中的原文件不会删除。") }
         .sheet(isPresented: $showingCheckIn) { checkInSheet }
+        .sheet(isPresented: $showingOriginalShare) {
+            MomentOriginalShareSheet(urls: batchOriginalURLs)
+        }
+        .sheet(isPresented: $showingActivityDining) {
+            let space = activityTenantId, activity = activityId, account = store.identity.accountIdentifier
+            MomentActivityDiningPicker(store: store) { id, name in
+                guard account != nil, account == store.identity.accountIdentifier,
+                      space == activityTenantId, activity == activityId else { throw CancellationError() }
+                try store.photoSource.enqueueRecord(kind: "moments", spaceID: space, activityID: activity,
+                    payload: ["text": "干饭 · \(name)", "requestId": id.uuidString])
+            }
+        }
         .sheet(isPresented: $showingMomentCreate) { momentCreateSheet }
         .fullScreenCover(item: $cameraMode, onDismiss: {
             store.captureInProgress = false
@@ -1415,7 +1448,7 @@ struct DearSocialView: View {
             error = value
         }
         .onDisappear { pendingCheckIn = false }
-        .onChange(of: activityId) { _, _ in photoToDelete = nil; showingActivityManagement = false; selectedPhoto = nil; inviteLink = nil; inviteUsername = ""; momentDraft = ""; momentRequestID = UUID(); photoLocationName = ""; selectingPhotoDownloads = false; selectedPhotoIDs.removeAll(); batchOriginalURLs = [] }
+        .onChange(of: activityId) { _, _ in photoToDelete = nil; showingActivityManagement = false; selectedPhoto = nil; inviteLink = nil; inviteUsername = ""; momentDraft = ""; momentRequestID = UUID(); photoLocationName = ""; selectingPhotoDownloads = false; sharingSelectedOriginals = false; selectedPhotoIDs.removeAll(); batchOriginalURLs = [] }
         .onChange(of: selectedPhotos) { _, selected in
             guard !selected.isEmpty else { return }
             let targetSpace = activityTenantId, targetActivity = activityId
@@ -1466,7 +1499,7 @@ struct DearSocialView: View {
                         editedActivityDate = selectedActivity.map(activityDateValue) ?? Date(); showingActivityManagement = true
                     } label: { Label("活动管理与邀请", systemImage: "person.badge.plus") }
                     Button {
-                        selectingPhotoDownloads.toggle(); selectedPhotoIDs.removeAll(); batchOriginalURLs = []; batchDownloadError = ""; batchDownloadProgress = 0
+                        selectingPhotoDownloads.toggle(); sharingSelectedOriginals = false; selectedPhotoIDs.removeAll(); batchOriginalURLs = []; batchDownloadError = ""; batchDownloadProgress = 0
                     } label: { Label(selectingPhotoDownloads ? "完成多选" : "批量下载或删除", systemImage: "checkmark.circle") }
                         .disabled(photos.isEmpty || batchDownloading || batchDeleting)
                     Button { showingPhotoLocation = true } label: { Label("照片默认地点", systemImage: "mappin") }
@@ -1819,12 +1852,14 @@ struct DearSocialView: View {
         batchDownloadError = failures.joined(separator: "；")
     }
 
-    private func downloadSelectedPhotos() async {
+    private func downloadSelectedPhotos(share: Bool = false) async {
         let selected = photos.filter { selectedPhotoIDs.contains($0.id) }
         guard !selected.isEmpty, !batchDownloading, !batchDeleting else { return }
         let targetSpace = activityTenantId, targetActivity = activityId
         batchDownloading = true; batchDownloadProgress = 0; batchDownloadError = ""; batchOriginalURLs = []
         defer { batchDownloading = false }
+        let owner = store.identity.accountIdentifier
+        var originals: [URL] = []
         var failures: [String] = []
         for (index, photo) in selected.enumerated() {
             do {
@@ -1832,10 +1867,13 @@ struct DearSocialView: View {
                     spaceID: targetSpace, activityID: targetActivity, record: photo) { fraction in
                     batchDownloadProgress = (Double(index) + fraction) / Double(selected.count)
                 }
-                batchOriginalURLs.append(url)
+                originals.append(url)
             } catch { failures.append("\(photo.text("originalFileName"))：\(momentDisplayError(error))") }
             batchDownloadProgress = Double(index + 1) / Double(selected.count)
         }
+        guard targetSpace == activityTenantId, targetActivity == activityId, owner == store.identity.accountIdentifier else { return }
+        if !share || failures.isEmpty { batchOriginalURLs = originals }
+        if share && failures.isEmpty && originals.count == selected.count { showingOriginalShare = true }
         if !failures.isEmpty { batchDownloadError = failures.joined(separator: "；") }
     }
     private func loadMoments() async throws {
@@ -3154,6 +3192,61 @@ private struct MomentPhotoWeatherView: View {
                     weather = DearRecord(data: try await store.call(route, timeout: 8) as? [String: Any] ?? [:])
                 }
             } catch { /* Missing network or source data never blocks viewing the photo. */ }
+        }
+    }
+}
+
+private struct MomentOriginalShareSheet: UIViewControllerRepresentable {
+    let urls: [URL]
+    @Environment(\.dismiss) private var dismiss
+
+    func makeUIViewController(context: Context) -> UIActivityViewController {
+        let controller = UIActivityViewController(activityItems: urls, applicationActivities: nil)
+        controller.completionWithItemsHandler = { _, _, _, _ in dismiss() }
+        return controller
+    }
+
+    func updateUIViewController(_ controller: UIActivityViewController, context: Context) {}
+}
+
+private struct MomentActivityDiningPicker: View {
+    let store: FamilyStore
+    let associate: (UUID, String) throws -> Void
+    @Environment(\.dismiss) private var dismiss
+    @State private var gatherings: [DearRecord] = []
+    @State private var loading = true
+    @State private var failure = ""
+
+    var body: some View {
+        NavigationStack {
+            List {
+                if loading { ProgressView() }
+                if !failure.isEmpty { Text(failure).foregroundStyle(.secondary) }
+                if !loading && failure.isEmpty && gatherings.isEmpty {
+                    ContentUnavailableView("暂无饭局", systemImage: "fork.knife", description: Text("可先在干饭栏目创建饭局。"))
+                }
+                ForEach(gatherings) { gathering in
+                    Button(gathering.text("restaurantName")) {
+                        guard let id = UUID(uuidString: gathering.id) else { return }
+                        do {
+                            try associate(id, gathering.text("restaurantName"))
+                            dismiss()
+                        } catch { failure = momentDisplayError(error) }
+                    }
+                }
+            }
+            .navigationTitle("关联干饭")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar { ToolbarItem(placement: .cancellationAction) { Button("取消") { dismiss() } } }
+            .task {
+                let owner = store.identity.accountIdentifier
+                defer { loading = false }
+                do {
+                    let response = try await store.call("/api/dining/gatherings")
+                    guard owner != nil, owner == store.identity.accountIdentifier else { return }
+                    gatherings = try DearRecord.list(response)
+                } catch { failure = momentDisplayError(error) }
+            }
         }
     }
 }
