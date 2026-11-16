@@ -325,6 +325,24 @@ enum DiningExternalNavigation {
             components.queryItems = [URLQueryItem(name: "type", value: driving ? "drive" : "walk"), URLQueryItem(name: "fromcoord", value: "CurrentLocation"),
                 URLQueryItem(name: "to", value: place.name), URLQueryItem(name: "tocoord", value: "\(place.latitude),\(place.longitude)"),
                 URLQueryItem(name: "coord_type", value: place.provider == "amap" ? "2" : "1"), URLQueryItem(name: "referer", value: key)]
+        } else if provider == "amap" {
+            components.scheme = "iosamap"; components.host = "path"
+            components.queryItems = [
+                URLQueryItem(name: "sourceApplication", value: "LinkoMoment"),
+                URLQueryItem(name: "dlat", value: String(place.latitude)),
+                URLQueryItem(name: "dlon", value: String(place.longitude)),
+                URLQueryItem(name: "dname", value: place.name),
+                URLQueryItem(name: "dev", value: place.provider == "amap" ? "0" : "1"),
+                URLQueryItem(name: "t", value: driving ? "0" : "2")
+            ]
+        } else if provider == "baidu" {
+            components.scheme = "baidumap"; components.host = "map"; components.path = "/direction"
+            components.queryItems = [
+                URLQueryItem(name: "destination", value: "latlng:\(place.latitude),\(place.longitude)|name:\(place.name)"),
+                URLQueryItem(name: "coord_type", value: place.provider == "amap" ? "gcj02" : "wgs84"),
+                URLQueryItem(name: "mode", value: driving ? "driving" : "walking"),
+                URLQueryItem(name: "src", value: "ios.net.impx.happylife")
+            ]
         } else { return nil }
         return components.url
     }

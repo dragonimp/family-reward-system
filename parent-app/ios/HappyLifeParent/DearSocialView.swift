@@ -196,32 +196,46 @@ private enum PhotoDisplayImage {
 
 private struct DearPhotoDirectionsButton: View {
     let photo: DearRecord
-    @State private var showingMap = false
+    @State private var mapOpenFailed = false
 
     var body: some View {
         if let point = DearActivityMapPoint.points(checkIns: [], photos: [photo]).first {
-            Button { showingMap = true } label: {
-                Label(String(localized: "去这里", bundle: AgentIdentityLanguage.appBundle()), systemImage: "location")
-            }
-            .buttonStyle(.borderless)
-            .sheet(isPresented: $showingMap) {
-                NavigationStack {
-                    Map(initialPosition: .region(MKCoordinateRegion(
-                        center: point.coordinate,
-                        span: MKCoordinateSpan(latitudeDelta: 0.01, longitudeDelta: 0.01)
-                    ))) {
-                        Marker(point.placeName.isEmpty ? String(localized: "拍摄位置", bundle: AgentIdentityLanguage.appBundle()) : point.placeName,
-                               coordinate: point.coordinate)
-                    }
-                    .navigationTitle(String(localized: "拍摄位置", bundle: AgentIdentityLanguage.appBundle()))
-                    .navigationBarTitleDisplayMode(.inline)
-                    .toolbar {
-                        ToolbarItem(placement: .confirmationAction) {
-                            Button(String(localized: "完成", bundle: AgentIdentityLanguage.appBundle())) { showingMap = false }
+            let name = point.placeName.isEmpty ? String(localized: "拍摄位置", bundle: AgentIdentityLanguage.appBundle()) : point.placeName
+            let destination = DiningPlace(id: photo.id, name: name, address: "",
+                latitude: point.coordinate.latitude, longitude: point.coordinate.longitude,
+                category: "", provider: "gps", distanceMeters: 0)
+            Menu {
+                Button("苹果地图") {
+                    let item = MKMapItem(placemark: MKPlacemark(coordinate: point.coordinate))
+                    item.name = name
+                    mapOpenFailed = !item.openInMaps(launchOptions: [MKLaunchOptionsDirectionsModeKey: MKLaunchOptionsDirectionsModeDriving])
+                }
+                ForEach(["amap", "baidu", "google", "tencent"], id: \.self) { provider in
+                    if let url = DiningExternalNavigation.url(provider: provider, place: destination, driving: true, tencentKey: DiningExternalNavigation.tencentKey),
+                       UIApplication.shared.canOpenURL(url) {
+                        Button(mapName(provider)) {
+                            Task { mapOpenFailed = !(await UIApplication.shared.open(url)) }
                         }
                     }
                 }
+            } label: {
+                Image(systemName: "map")
+                    .accessibilityLabel(String(localized: "打开地图", bundle: AgentIdentityLanguage.appBundle()))
             }
+            .buttonStyle(.borderless)
+            .popover(isPresented: $mapOpenFailed) {
+                Text("无法打开所选地图，请重新选择。").padding()
+                    .presentationCompactAdaptation(.popover)
+            }
+        }
+    }
+
+    private func mapName(_ provider: String) -> String {
+        switch provider {
+        case "amap": return String(localized: "高德地图", bundle: AgentIdentityLanguage.appBundle())
+        case "baidu": return String(localized: "百度地图", bundle: AgentIdentityLanguage.appBundle())
+        case "tencent": return String(localized: "腾讯地图", bundle: AgentIdentityLanguage.appBundle())
+        default: return "Google Maps"
         }
     }
 }
@@ -240,7 +254,7 @@ private struct DearPhotoPlaceView: View {
     }
     var body: some View {
         VStack(alignment: .leading, spacing: 3) {
-            Label(name, systemImage: "mappin").lineLimit(2)
+            Text(name).lineLimit(2)
             if let altitude = (photo.data["altitudeMeters"] as? NSNumber)?.doubleValue, altitude.isFinite {
                 Label("海拔 \(altitude.formatted(.number.precision(.fractionLength(0...1)))) 米", systemImage: "mountain.2").lineLimit(1)
             } else { Label("海拔未记录", systemImage: "mountain.2").lineLimit(1) }
@@ -1287,6 +1301,11 @@ struct DearSocialView: View {
                 }
                 .accessibilityLabel(sharingSelectedOriginals ? "分享选中的原文件" : "批量分享原文件")
                 .disabled(photos.isEmpty || batchDownloading || batchDeleting || (sharingSelectedOriginals && selectedPhotoIDs.isEmpty))
+                if sharingSelectedOriginals {
+                    Button("退出多选", systemImage: "xmark.circle") { exitPhotoShareSelection() }
+                        .labelStyle(.iconOnly)
+                        .disabled(batchDownloading || batchDeleting || savingBatchToPhotos)
+                }
                 Menu {
                     Button(String(localized: "大图", bundle: AgentIdentityLanguage.appBundle()), systemImage: "rectangle") { photoViewMode = "grid" }
                     Button(String(localized: "紧凑", bundle: AgentIdentityLanguage.appBundle()), systemImage: "list.bullet") { photoViewMode = "list" }
@@ -1417,7 +1436,7 @@ struct DearSocialView: View {
             Button("取消", role: .cancel) { }
         } message: { Text("活动成员将无法再获取这些文件；iPhone 相册中的原文件不会删除。") }
         .sheet(isPresented: $showingCheckIn) { checkInSheet }
-        .sheet(item: $originalShare) { share in
+        .sheet(item: $originalShare, onDismiss: exitPhotoShareSelection) { share in
             MomentOriginalShareSheet(urls: share.urls)
         }
         .sheet(isPresented: $showingActivityDining) {
@@ -1926,6 +1945,16 @@ struct DearSocialView: View {
         notice = "已删除 \(deleted) 项分享。" + (pendingCleanup ? "部分本机副本暂未清理，App 会继续重试。" : "")
         do { try await loadPhotos() } catch { failures.append("相册刷新失败：\(error.localizedDescription)") }
         batchDownloadError = failures.joined(separator: "；")
+    }
+
+    private func exitPhotoShareSelection() {
+        guard sharingSelectedOriginals else { return }
+        selectingPhotoDownloads = false
+        sharingSelectedOriginals = false
+        selectedPhotoIDs.removeAll()
+        batchOriginalURLs = []
+        batchDownloadError = ""
+        batchDownloadProgress = 0
     }
 
     private func downloadSelectedPhotos(share: Bool = false, saveToPhotos: Bool = false) async {

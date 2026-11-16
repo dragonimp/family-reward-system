@@ -465,23 +465,7 @@ import CoreImage.CIFilterBuiltins
             return
         }
         if provider != "apple" {
-            // MapKit and manual locations are WGS84; explicitly declare GPS input.
-            let gps = place.provider != "amap"
-            var components = URLComponents()
-            components.scheme = provider == "amap" ? "iosamap" : "baidumap"
-            components.host = provider == "amap" ? "path" : "map"
-            if provider == "amap" {
-                components.queryItems = [URLQueryItem(name: "sourceApplication", value: "LinkoMoment"),
-                    URLQueryItem(name: "dlat", value: String(place.latitude)), URLQueryItem(name: "dlon", value: String(place.longitude)),
-                    URLQueryItem(name: "dname", value: place.name), URLQueryItem(name: "dev", value: gps ? "1" : "0"),
-                    URLQueryItem(name: "t", value: driving ? "0" : "2")]
-            } else {
-                components.path = "/direction"
-                components.queryItems = [URLQueryItem(name: "destination", value: "latlng:\(place.latitude),\(place.longitude)|name:\(place.name)"),
-                    URLQueryItem(name: "coord_type", value: gps ? "wgs84" : "gcj02"),
-                    URLQueryItem(name: "mode", value: driving ? "driving" : "walking"), URLQueryItem(name: "src", value: "ios.net.impx.happylife")]
-            }
-            guard let url = components.url, UIApplication.shared.canOpenURL(url) else {
+            guard let url = DiningExternalNavigation.url(provider: provider, place: place, driving: driving), UIApplication.shared.canOpenURL(url) else {
                 message = String(localized: "请先安装或启用所选地图，也可以重新选择其他地图。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)); return
             }
             UIApplication.shared.open(url, options: [:]) { [weak self] opened in
