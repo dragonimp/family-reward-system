@@ -1310,18 +1310,6 @@ struct DearSocialView: View {
                     Button(String(localized: "大图", bundle: AgentIdentityLanguage.appBundle()), systemImage: "rectangle") { photoViewMode = "grid" }
                     Button(String(localized: "紧凑", bundle: AgentIdentityLanguage.appBundle()), systemImage: "list.bullet") { photoViewMode = "list" }
                     Button(String(localized: "网格 · 每行5张", bundle: AgentIdentityLanguage.appBundle()), systemImage: "square.grid.3x3") { photoViewMode = "tiles" }
-                    Divider()
-                    NavigationLink {
-                        DearActivityMapView(
-                            locations: locations, store: store,
-                            title: selectedActivity?.text("title") ?? "活动地图",
-                            spaceID: activityTenantId, activityID: activityId,
-                            points: DearActivityMapPoint.points(checkIns: [], photos: photos),
-                            photos: photos, initialMembersOnly: false
-                        )
-                    } label: {
-                        Label(String(localized: "打开地图", bundle: AgentIdentityLanguage.appBundle()), systemImage: "map")
-                    }
                 } label: { Image(systemName: "slider.horizontal.3") }
                 .accessibilityLabel(String(localized: "展示样式", bundle: AgentIdentityLanguage.appBundle()))
             }.textCase(nil)
@@ -1336,30 +1324,7 @@ struct DearSocialView: View {
     private var activityDetail: some View {
         List {
             if !notice.isEmpty { Section { Text(notice).foregroundStyle(.teal) } }
-            if let selectedActivity {
-                Section {
-                    VStack(alignment: .leading, spacing: 8) {
-                        HStack { Label(activityDate(selectedActivity), systemImage: "calendar"); Spacer(); Label("\(activityMembers.count) 位成员", systemImage: "person.2") }
-                            .font(.caption).foregroundStyle(.secondary)
-                    }.padding(.vertical, 4)
-                }
-                Section {
-                    HStack(spacing: 12) {
-                        Button { showingLocationMap = true } label: {
-                            HStack {
-                                Label(String(localized: "共享我的位置", bundle: AgentIdentityLanguage.appBundle()), systemImage: "location.fill")
-                                Spacer()
-                                Image(systemName: "chevron.right").font(.caption.weight(.semibold)).foregroundStyle(.secondary).accessibilityHidden(true)
-                            }
-                        }.buttonStyle(.plain)
-                        Toggle(String(localized: "共享我的位置", bundle: AgentIdentityLanguage.appBundle()), isOn: Binding(get: { locations.sharing }, set: { locations.setSharing($0) })).labelsHidden()
-                    }
-                    NavigationLink {
-                        DearActivityMapView(locations: locations, store: store, title: selectedActivity.text("title"), spaceID: activityTenantId, activityID: activityId,
-                                            points: DearActivityMapPoint.points(checkIns: checkIns, photos: photos), photos: photos)
-                    } label: { Label(String(localized: "活动地图", bundle: AgentIdentityLanguage.appBundle()), systemImage: "map") }
-                    if !locations.status.isEmpty { Text(locations.status).font(.caption).foregroundStyle(.secondary) }
-                }
+            if selectedActivity != nil {
                 activityPhotoSection
                 activityTimelineSection
             }
@@ -1563,6 +1528,11 @@ struct DearSocialView: View {
                             store.pendingExerciseActivity = ExerciseActivity(tenantID: tenant, id: activity, title: selectedActivity?.text("title") ?? "")
                             showingActivity = false
                         } label: { Label(String(localized: "创建运动", bundle: AgentIdentityLanguage.appBundle()), systemImage: "figure.hiking") }
+                    }
+                    Button {
+                        showingLocationMap = true
+                    } label: {
+                        Label(String(localized: "共享我的位置", bundle: AgentIdentityLanguage.appBundle()), systemImage: "location.fill")
                     }
                     let points = DearActivityMapPoint.points(checkIns: checkIns, photos: photos)
                     NavigationLink {
