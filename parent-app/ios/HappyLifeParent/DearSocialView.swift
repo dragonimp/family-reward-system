@@ -1131,10 +1131,12 @@ struct DearSocialView: View {
         }.accessibilityAddTraits(photoViewMode == mode ? [.isSelected] : [])
     }
 
-    private var activityPhotoSection: some View {
-        Section {
-            MomentPendingActivityView(source: store.photoSource, spaceID: activityTenantId, activityID: activityId)
-
+    private var pinnedActivityOperations: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(String(localized: "活动操作", bundle: AgentIdentityLanguage.appBundle()))
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.secondary)
+                .accessibilityAddTraits(.isHeader)
             HStack(spacing: 8) {
                 Button { checkInNote = ""; checkInRequestID = UUID(); pendingCheckIn = true; checkInLocator.locate() } label: {
                     activityPhotoTile(String(localized: "打卡", bundle: AgentIdentityLanguage.appBundle()), icon: "location.circle")
@@ -1150,18 +1152,31 @@ struct DearSocialView: View {
                 Button { showingActivityDining = true } label: {
                     activityPhotoTile(String(localized: "干饭", bundle: AgentIdentityLanguage.appBundle()), icon: "fork.knife")
                 }
-                PhotosPicker(selection: $selectedPhotos, maxSelectionCount: 50, matching: .any(of: [.images, .videos]), preferredItemEncoding: .current) {
-                    activityPhotoTile(String(localized: "添加照片/视频", bundle: AgentIdentityLanguage.appBundle()), icon: "photo.badge.plus")
-                }.disabled(busy || batchDeleting || batchDownloading)
                 Button { Task { await openCamera(.photo) } } label: {
                     activityPhotoTile(String(localized: "拍照", bundle: AgentIdentityLanguage.appBundle()), icon: "camera")
                 }.disabled(requestingCamera || cameraMode != nil)
                 Button { Task { await openCamera(.video) } } label: {
                     activityPhotoTile(String(localized: "拍视频", bundle: AgentIdentityLanguage.appBundle()), icon: "video")
                 }.disabled(requestingCamera || cameraMode != nil)
+                PhotosPicker(selection: $selectedPhotos, maxSelectionCount: 50, matching: .any(of: [.images, .videos]), preferredItemEncoding: .current) {
+                    activityPhotoTile(String(localized: "添加照片/视频", bundle: AgentIdentityLanguage.appBundle()), icon: "photo.badge.plus")
+                }.disabled(busy || batchDeleting || batchDownloading)
             }
             .buttonStyle(.plain)
             .fixedSize(horizontal: false, vertical: true)
+        }
+        .frame(maxWidth: 760)
+        .padding(.horizontal, 20)
+        .padding(.vertical, 10)
+        .frame(maxWidth: .infinity)
+        .background(.regularMaterial)
+        .overlay(alignment: .bottom) { Divider() }
+    }
+
+    private var activityPhotoSection: some View {
+        Section {
+            MomentPendingActivityView(source: store.photoSource, spaceID: activityTenantId, activityID: activityId)
+
             ForEach(capturedMedia.filter { $0.target.activityID == activityId && $0.target.spaceID == activityTenantId && $0.target.accountID == store.identity.accountIdentifier }) { capture in
                 Text(savingCaptures.contains(capture.id) ? "正在保存拍摄内容…" : "这项拍摄内容尚未加入同步队列，可以重试或另存。")
                     .font(.caption).foregroundStyle(.secondary)
@@ -1197,7 +1212,7 @@ struct DearSocialView: View {
                 if !sharingSelectedOriginals && !batchOriginalURLs.isEmpty { ShareLink(items: batchOriginalURLs.map { DearOriginalFile(url: $0) }, preview: { SharePreview($0.url.lastPathComponent) }) { Label("保存或分享 \(batchOriginalURLs.count) 项", systemImage: "square.and.arrow.up") } }
                 if !batchDownloadError.isEmpty { Text(batchDownloadError).font(.caption).foregroundStyle(.red) }
             }
-        } header: { Text("照片分享").textCase(nil) }
+        }
         .onReceive(NotificationCenter.default.publisher(for: .exerciseActivityPublished)) { _ in
             Task { try? await loadMoments() }
         }
@@ -1330,6 +1345,9 @@ struct DearSocialView: View {
             }
         }
         .listStyle(.insetGrouped)
+        .safeAreaInset(edge: .top, spacing: 0) {
+            if selectedActivity != nil { pinnedActivityOperations }
+        }
         .onAppear { locations.activate(store: store, tenant: activityTenantId, activity: activityId) }
         .onReceive(NotificationCenter.default.publisher(for: .exerciseRecordsChanged)) { _ in exerciseRevision = UUID() }
         .task(id: activityTenantId + activityId + (store.profile?.text("unifiedUserId") ?? "") + exerciseRevision.uuidString) {
