@@ -415,19 +415,6 @@ struct ExerciseView: View {
                         .padding(.vertical, 4)
                     }
                 }
-                Section {
-                    Picker(String(localized: "显示模式", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), selection: $mapMode) {
-                        Label(String(localized: "数据", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), systemImage: "figure.walk").tag(false)
-                        Label(String(localized: "地图", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), systemImage: "map").tag(true)
-                    }.pickerStyle(.segmented)
-                    if mapMode {
-                        ExerciseRouteMap(points: exercise.active?.routePoints ?? [], live: exercise.active?.running == true)
-                            .frame(height: 300).clipShape(RoundedRectangle(cornerRadius: 14))
-                        if let message = exercise.locationMessage, exercise.active != nil {
-                            Text(message).font(.caption).foregroundStyle(.secondary)
-                        }
-                    }
-                }
                 Section(exercise.active.map { exerciseKindTitle($0.kind) } ?? String(localized: "开始运动", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) {
                     if let active = exercise.active {
                         TimelineView(.periodic(from: .now, by: 1)) { context in
@@ -454,20 +441,31 @@ struct ExerciseView: View {
                             Button(String(localized: "结束并保存", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), role: .destructive) { confirmFinish = true }.buttonStyle(.bordered)
                         }.disabled(exercise.busy)
                     } else {
-                        if kind == "爬山" { NavigationLink(String(localized: "附近山峰与导入路线", bundle: AgentIdentityLanguage.appBundle())) { HikingPlacesView(family: family) } }
-                        Button {
-                            exercise.start(kind: kind, map: mapMode, activity: activity)
-                            if exercise.active != nil { activity = nil; family.watchExerciseActivity = nil }
-                        } label: {
-                            HStack(spacing: 8) {
-                                Image(systemName: "play.fill").accessibilityHidden(true)
-                                Text(String(localized: "开始\(exerciseKindTitle(kind))", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)))
-                                    .multilineTextAlignment(.center)
-                                Image(systemName: "play.fill").hidden().accessibilityHidden(true)
+                        HStack(spacing: 8) {
+                            Button {
+                                exercise.start(kind: kind, map: mapMode, activity: activity)
+                                if exercise.active != nil { activity = nil; family.watchExerciseActivity = nil }
+                            } label: {
+                                Label(String(localized: "开始\(exerciseKindTitle(kind))", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), systemImage: "play.fill")
+                                    .frame(maxWidth: .infinity, minHeight: 36)
                             }
-                            .frame(maxWidth: .infinity, alignment: .center)
-                            .padding(.vertical, 8)
-                        }.buttonStyle(.borderedProminent)
+                            .buttonStyle(.borderedProminent)
+                            .disabled(exercise.busy)
+                            displayModeButtons
+                        }
+                    }
+                    if exercise.active != nil {
+                        HStack { Spacer(); displayModeButtons }
+                    }
+                    if mapMode {
+                        ExerciseRouteMap(points: exercise.active?.routePoints ?? [], live: exercise.active?.running == true)
+                            .frame(height: 300).clipShape(RoundedRectangle(cornerRadius: 14))
+                        if let message = exercise.locationMessage, exercise.active != nil {
+                            Text(message).font(.caption).foregroundStyle(.secondary)
+                        }
+                    }
+                    if exercise.active == nil && kind == "爬山" {
+                        NavigationLink(String(localized: "附近山峰与导入路线", bundle: AgentIdentityLanguage.appBundle())) { HikingPlacesView(family: family) }
                     }
                     if (exercise.active?.kind ?? kind) == "滑雪", exercise.active == nil {
                         Text("打开地图可记录滑雪轨迹、距离和海拔。")
@@ -589,6 +587,28 @@ struct ExerciseView: View {
         await exercise.sync()
         if let record = exercise.active ?? exercise.history.first { await health.read(record) }
     }
+    private var displayModeButtons: some View {
+        HStack(spacing: 4) {
+            displayModeButton(false, title: String(localized: "数据", bundle: AgentIdentityLanguage.appBundle()), icon: "chart.bar")
+            displayModeButton(true, title: String(localized: "地图", bundle: AgentIdentityLanguage.appBundle()), icon: "map")
+        }
+    }
+
+    private func displayModeButton(_ showsMap: Bool, title: String, icon: String) -> some View {
+        let selected = mapMode == showsMap
+        return Button { mapMode = showsMap } label: {
+            Image(systemName: icon)
+                .font(.body.weight(.semibold))
+                .frame(width: 44, height: 44)
+                .foregroundStyle(selected ? Color.teal : Color.secondary)
+                .background(selected ? Color.teal.opacity(0.14) : Color.secondary.opacity(0.08),
+                            in: RoundedRectangle(cornerRadius: 12))
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(title)
+        .accessibilityAddTraits(selected ? .isSelected : [])
+    }
+
     private func exerciseTile(_ value: String, icon: String) -> some View {
         let selected = kind == value
         return Button { kind = value } label: {
