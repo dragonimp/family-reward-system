@@ -207,7 +207,7 @@ import UniformTypeIdentifiers
         }
         if changed { save(sensorUpdate: true) }
         else if let last = locations.last, last.horizontalAccuracy > 65 { locationMessage = String(localized: "定位精度不足，可在系统设置中开启精确位置。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)) }
-        if (active?.route?.count ?? 0) >= 20_000 { stopLocationTracking(); locationMessage = String(localized: "本次轨迹已达记录上限，计时与计步继续。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)) }
+        if (archive.active?.route?.count ?? 0) >= 20_000 { stopLocationTracking(); locationMessage = String(localized: "本次轨迹已达记录上限，计时与计步继续。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)) }
     }
     func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {
         if (error as? CLError)?.code == .locationUnknown { locationMessage = String(localized: "正在获取 GPS 信号", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)); return }
