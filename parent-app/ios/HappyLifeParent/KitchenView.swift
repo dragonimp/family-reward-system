@@ -8,20 +8,36 @@ private func kitchenText(_ value: String.LocalizationValue) -> String {
 struct DiningModesView: View {
     let userID: String
     let family: FamilyStore
-    @State private var cooking = 0
+    @AppStorage private var cooking: Bool
+
+    init(userID: String, family: FamilyStore) {
+        self.userID = userID
+        self.family = family
+        _cooking = AppStorage(wrappedValue: false, "dining.mode.\(DiningAccount.identity(userID))")
+    }
 
     var body: some View {
-        VStack(spacing: 0) {
+        ZStack {
+            DiningView(userID: userID, family: family, active: !cooking, cooking: $cooking)
+                .opacity(cooking ? 0 : 1).allowsHitTesting(!cooking).accessibilityHidden(cooking)
+            KitchenView(family: family, active: cooking, cooking: $cooking)
+                .opacity(cooking ? 1 : 0).allowsHitTesting(cooking).accessibilityHidden(!cooking)
+        }
+    }
+}
+
+struct DiningModeMenu: View {
+    @Binding var cooking: Bool
+
+    var body: some View {
+        Menu {
             Picker(kitchenText("用餐方式"), selection: $cooking) {
-                Text(kitchenText("出去吃")).tag(0)
-                Text(kitchenText("下厨房")).tag(1)
-            }.pickerStyle(.segmented).padding(.horizontal).padding(.vertical, 8)
-            ZStack {
-                DiningView(userID: userID, family: family, active: cooking == 0)
-                    .opacity(cooking == 0 ? 1 : 0).allowsHitTesting(cooking == 0).accessibilityHidden(cooking != 0)
-                KitchenView(family: family, active: cooking == 1)
-                    .opacity(cooking == 1 ? 1 : 0).allowsHitTesting(cooking == 1).accessibilityHidden(cooking != 1)
+                Label(kitchenText("出去吃"), systemImage: "fork.knife").tag(false)
+                Label(kitchenText("下厨房"), systemImage: "frying.pan").tag(true)
             }
+        } label: {
+            Image(systemName: "line.3.horizontal")
+                .accessibilityLabel(kitchenText("用餐方式"))
         }
     }
 }
@@ -113,7 +129,13 @@ private struct KitchenView: View {
     @State private var showingRecipe = false
     let active: Bool
     let family: FamilyStore
-    init(family: FamilyStore, active: Bool) { _model = StateObject(wrappedValue: KitchenStore(family: family)); self.active = active; self.family = family }
+    @Binding var cooking: Bool
+    init(family: FamilyStore, active: Bool, cooking: Binding<Bool>) {
+        _model = StateObject(wrappedValue: KitchenStore(family: family))
+        self.active = active
+        self.family = family
+        _cooking = cooking
+    }
 
     var body: some View {
         NavigationStack {
@@ -162,6 +184,7 @@ private struct KitchenView: View {
             }.background(Color(uiColor: .systemGroupedBackground))
                 .navigationTitle(kitchenText("下厨房")).navigationBarTitleDisplayMode(.inline)
                 .toolbar {
+                    ToolbarItem(placement: .topBarLeading) { DiningModeMenu(cooking: $cooking) }
                     ToolbarItem(placement: .topBarTrailing) {
                         Menu {
                             NavigationLink("我的厨房") { MyKitchenView(family: family) }

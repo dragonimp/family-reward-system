@@ -545,6 +545,7 @@ struct DiningView: View {
     @State private var circleName = ""
     @State private var managingAddress = false
     let active: Bool
+    @Binding var cooking: Bool
     @State private var showingCheckIn = false
     @State private var showingFilters = false
     @State private var showingGatherings = false
@@ -557,7 +558,12 @@ struct DiningView: View {
     @State private var deliveryUnavailable = false
     @Environment(\.openURL) private var openWebURL
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    init(userID: String, family: FamilyStore, active: Bool = true) { self.active = active; self.family = family; _model = StateObject(wrappedValue: DiningStore(userID: userID, family: family)) }
+    init(userID: String, family: FamilyStore, active: Bool, cooking: Binding<Bool>) {
+        self.active = active
+        self.family = family
+        _cooking = cooking
+        _model = StateObject(wrappedValue: DiningStore(userID: userID, family: family))
+    }
     var body: some View {
         NavigationStack {
             ScrollView {
@@ -640,6 +646,7 @@ struct DiningView: View {
                 }.padding(20).frame(maxWidth: 760).frame(maxWidth: .infinity)
             }.background(Color(uiColor: .systemGroupedBackground)).navigationTitle(String(localized: "干饭", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))).navigationBarTitleDisplayMode(.inline)
             .toolbar {
+                ToolbarItem(placement: .topBarLeading) { DiningModeMenu(cooking: $cooking) }
                 ToolbarItem(placement: .topBarTrailing) {
                     Menu {
                         Button(diningText("到店打卡"), systemImage: "mappin.circle") { showingCheckIn = true }
