@@ -20,10 +20,10 @@ identity_root="$(dirname "$(dirname "$common")")/AgentIdentity"
 atlas_root="$(dirname "$(dirname "$common")")/Atlas"
 
 : "${CONNECT_RTC_LIBRARY_DIR:?Provide the matching committed ios-arm64 Connect native output}"
-python3 - "$connect_root" "$identity_root" "$CONNECT_RTC_LIBRARY_DIR" "$ATLAS_BUILD_OUTPUT" "$atlas_root" <<'SDK'
-import hashlib,json,subprocess,sys
+python3 - "$connect_root" "$identity_root" "$CONNECT_RTC_LIBRARY_DIR" "$ATLAS_BUILD_OUTPUT" "$atlas_root" "$source_dir" <<'SDK'
+import hashlib,json,re,subprocess,sys
 from pathlib import Path
-connect,identity,native,output,atlas=map(Path,sys.argv[1:])
+connect,identity,native,output,atlas,source=map(Path,sys.argv[1:])
 receipts={}
 packages={'connect':('MyVnc','sdk/MyVnc.Realtime.Apple'),'identity':('AgentIdentity','packages/AgentIdentity-iOS'),'atlas':('Atlas','packages/Atlas-Releases-Apple')}
 for key,path,scope in [('connect',connect,['sdk/MyVnc.Realtime.Apple','native/rtc']),('identity',identity,['packages/AgentIdentity-iOS']),('atlas',atlas,['packages/Atlas-Releases-Apple'])]:
@@ -38,6 +38,13 @@ for key,path,scope in [('connect',connect,['sdk/MyVnc.Realtime.Apple','native/rt
     archive=subprocess.Popen(['git','-C',str(path),'archive',commit,package],stdout=subprocess.PIPE)
     subprocess.run(['tar','-x','-C',str(target)],stdin=archive.stdout,check=True)
     archive.stdout.close(); assert archive.wait()==0
+work=Path(__import__('os').environ['ATLAS_BUILD_WORK'])
+project=(source/'parent-app/ios/HappyLifeParent.xcodeproj/project.pbxproj').read_text()
+manifest=(work/'AgentIdentity/packages/AgentIdentity-iOS/Package.swift').read_text()
+app_pin=re.search(r'MyVnc\.git"; requirement = \{ kind = revision; revision = ([0-9a-f]{40});', project)
+sdk_pin=re.search(r'MyVnc\.git", revision: "([0-9a-f]{40})"', manifest)
+if not app_pin or not sdk_pin or app_pin[1] != sdk_pin[1]:
+    raise SystemExit("Linko Connect revision mismatch between the iOS project and AgentIdentity-iOS")
 native_commit=(native/'source-commit.txt').read_text().strip()
 subprocess.run(['git','-C',str(connect),'merge-base','--is-ancestor',native_commit,receipts['connect']],check=True)
 for line in (native/'native-source-sha256.txt').read_text().splitlines():
