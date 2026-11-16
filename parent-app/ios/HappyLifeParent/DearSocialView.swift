@@ -667,6 +667,7 @@ struct DearSocialView: View {
     @State private var inviteLink: URL?
     @State private var error = ""
     @State private var activityError = ""
+    @State private var activityListRequest = UUID()
     @State private var activityLoading = false
     @State private var notice = ""
     @State private var busy = false
@@ -1746,15 +1747,24 @@ struct DearSocialView: View {
 
     private func run(_ work: @escaping () async throws -> Void) {
         Task { busy = true; error = ""; notice = ""; defer { busy = false }
-            do { try await work() } catch { self.error = momentDisplayError(error) }
+            do { try await work() }
+            catch where isActivityLoadCancellation(error) { }
+            catch { self.error = momentDisplayError(error) }
         }
     }
+    private func isActivityLoadCancellation(_ error: Error) -> Bool {
+        let failure = error as NSError
+        return Task.isCancelled || error is CancellationError
+            || (failure.domain == NSURLErrorDomain && failure.code == NSURLErrorCancelled)
+    }
+
     private func refresh() async {
         guard !refreshingActivityList else { return }
         refreshingActivityList = true
         defer { refreshingActivityList = false }
         do { try await load() }
-        catch is CancellationError {} catch { self.error = momentDisplayError(error) }
+        catch where isActivityLoadCancellation(error) { }
+        catch { self.error = momentDisplayError(error) }
     }
     private func openPendingActivityLink() async {
         guard !Task.isCancelled, let link = store.pendingActivityLink else { return }
@@ -1797,28 +1807,43 @@ struct DearSocialView: View {
         }
         if spaceId == previousSpace && !spaceId.isEmpty { try await loadActivities() }
         do { invitations = try DearRecord.list(await store.call(base + "invites/username/pending")) }
+        catch where isActivityLoadCancellation(error) { throw CancellationError() }
         catch { self.error = String(localized: "活动邀请暂时无法读取：\(momentDisplayError(error))", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)) }
         do { try await loadRelationships() }
+        catch where isActivityLoadCancellation(error) { throw CancellationError() }
         catch { self.error = String(localized: "好友关系暂时无法读取：\(momentDisplayError(error))", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)) }
     }
     private func loadActivities() async throws {
-        guard !spaceId.isEmpty else { activityLoading = false; return }
-        activityLoading = true
-        defer { activityLoading = false }
+        let request = UUID()
+        activityListRequest = request
         let requestedSpace = spaceId
+        guard !requestedSpace.isEmpty else { activityLoading = false; return }
+        activityLoading = true
+        defer { if activityListRequest == request { activityLoading = false } }
+        func fetch() async throws -> [DearRecord] {
+            try DearRecord.list(await store.call(base + "spaces/\(requestedSpace)/activities"))
+        }
         let loaded: [DearRecord]
-        do { loaded = try DearRecord.list(await store.call(base + "spaces/\(requestedSpace)/activities")) }
-        catch {
+        do {
+            do { loaded = try await fetch() }
+            catch where isActivityLoadCancellation(error) && !Task.isCancelled
+                && requestedSpace == spaceId && activityListRequest == request {
+                loaded = try await fetch()
+            }
+        } catch {
+            guard requestedSpace == spaceId, activityListRequest == request,
+                  !isActivityLoadCancellation(error) else { throw CancellationError() }
             activityError = String(localized: "活动读取失败：\(momentDisplayError(error))", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))
             throw error
         }
-        guard requestedSpace == spaceId else { return }
+        guard requestedSpace == spaceId, activityListRequest == request, !Task.isCancelled else { return }
         activities = loaded
         activityError = ""
         let previousActivity = activityId
         if !loaded.contains(where: { $0.id == activityId }) && !joinedActivities.contains(where: { $0.id == activityId }) { activityId = ""; showingActivity = false }
         if activityId == previousActivity && !activityId.isEmpty {
             do { try await loadDetails() }
+            catch where isActivityLoadCancellation(error) { throw CancellationError() }
             catch { self.error = String(localized: "活动内容暂时无法读取：\(momentDisplayError(error))", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)) }
         }
     }
