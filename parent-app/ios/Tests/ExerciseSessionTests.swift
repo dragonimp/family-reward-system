@@ -26,6 +26,13 @@ import Foundation
         session.endedAt = start.addingTimeInterval(65)
         session.resume(at: start.addingTimeInterval(150))
         precondition(session.intervals.count == 2 && !session.running)
+        var skiing = ExerciseSession(kind: "滑雪", startedAt: start, intervals: [ExerciseInterval(start: start)])
+        skiing.intervals[0].distanceMeters = 125
+        skiing.pause(at: start.addingTimeInterval(12))
+        skiing.resume(at: start.addingTimeInterval(20))
+        skiing.intervals[1].distanceMeters = 75
+        skiing.pause(at: start.addingTimeInterval(30))
+        precondition(skiing.distanceMeters == 200 && skiing.steps == nil)
         let encoder = JSONEncoder(); encoder.dateEncodingStrategy = .iso8601
         let data = try encoder.encode(session)
         let decoder = JSONDecoder(); decoder.dateDecodingStrategy = .iso8601

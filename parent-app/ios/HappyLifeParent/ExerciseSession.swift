@@ -95,7 +95,7 @@ struct ExerciseSession: Codable, Identifiable {
         guard running, !intervals.isEmpty else { return }
         intervals[intervals.count - 1].end = now
         intervals[intervals.count - 1].steps = nil
-        intervals[intervals.count - 1].distanceMeters = nil
+        if kind != "滑雪" { intervals[intervals.count - 1].distanceMeters = nil }
     }
     mutating func resume(at now: Date) {
         guard !running, endedAt == nil else { return }

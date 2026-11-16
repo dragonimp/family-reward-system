@@ -19,6 +19,12 @@ with tempfile.TemporaryDirectory(prefix="happylife-parent-ipa-") as directory:
     app = Path(directory) / "Payload/Linko Moment.app"
     subprocess.run(["codesign", "--verify", "--deep", "--strict", str(app)], check=True)
     info = plistlib.loads((app / "Info.plist").read_bytes())
+    for bundle in [app, *sorted(app.rglob("*.appex"))]:
+        bundle_info = plistlib.loads((bundle / "Info.plist").read_bytes())
+        name = bundle_info.get("CFBundleName")
+        if not isinstance(name, str) or not name.strip() or "$(" in name or "${" in name:
+            raise SystemExit(f"Invalid CFBundleName in {bundle.relative_to(directory)}/Info.plist")
+
     flavor = os.environ.get('MOMENT_IOS_RELEASE_FLAVOR', 'successor')
     assert flavor in ('legacy', 'successor')
     expected = 'net.impx.happylife.parent' if flavor == 'legacy' else 'net.impx.happylife'

@@ -593,16 +593,26 @@ final class WatchStore: ObservableObject {
     private var activity: [String: Any]?
     private var id = UUID()
     private var kind = "徒步"
+    private var workoutDistanceType: HKQuantityType { Self.distanceType(for: kind) }
+
+    private static func distanceType(for kind: String) -> HKQuantityType {
+        HKQuantityType(kind == "滑雪" ? .distanceDownhillSnowSports : .distanceWalkingRunning)
+    }
     private var starts: [Date] = []
     private var stops: [Date] = []
     func start(kind: String, context: [String: Any]) async {
         guard !active, !saving, HKHealthStore.isHealthDataAvailable(), let user = context["userID"] as? String, !user.isEmpty else { message = String(localized: "请先在配对 iPhone 登录并连接健康数据。", bundle: AgentIdentityLanguage.appBundle()); return }
         do {
-            let read: Set<HKObjectType> = [HKQuantityType(.heartRate), HKQuantityType(.activeEnergyBurned), HKQuantityType(.distanceWalkingRunning), HKQuantityType(.stepCount)]
+            let read: Set<HKObjectType> = [HKQuantityType(.heartRate), HKQuantityType(.activeEnergyBurned), Self.distanceType(for: kind), HKQuantityType(.stepCount)]
             try await health.requestAuthorization(toShare: [HKObjectType.workoutType()], read: read)
             guard health.authorizationStatus(for: .workoutType()) == .sharingAuthorized else { message = String(localized: "请允许保存体能训练后重试。", bundle: AgentIdentityLanguage.appBundle()); return }
             let config = HKWorkoutConfiguration()
-            config.activityType = kind == "徒步" ? .hiking : kind == "慢跑" ? .running : .walking
+            switch kind {
+            case "滑雪": config.activityType = .downhillSkiing
+            case "徒步": config.activityType = .hiking
+            case "慢跑": config.activityType = .running
+            default: config.activityType = .walking
+            }
             config.locationType = .outdoor
             let session = try HKWorkoutSession(healthStore: health, configuration: config)
             let builder = session.associatedWorkoutBuilder()
@@ -643,7 +653,7 @@ final class WatchStore: ObservableObject {
                 try await Task.sleep(for: .milliseconds(100))
             }
             if !collectionEnded { try await builder.endCollection(at: end); collectionEnded = true }
-            distance = builder.statistics(for: HKQuantityType(.distanceWalkingRunning))?.sumQuantity()?.doubleValue(for: .meter()) ?? distance
+            distance = builder.statistics(for: workoutDistanceType)?.sumQuantity()?.doubleValue(for: .meter()) ?? distance
             let formatter = ISO8601DateFormatter()
             let intervals: [[String: Any]] = zip(starts, stops).enumerated().map { index, pair in
                 var row: [String: Any] = ["start": formatter.string(from: pair.0), "end": formatter.string(from: pair.1)]
@@ -678,7 +688,7 @@ final class WatchStore: ObservableObject {
                   abs(location.timestamp.timeIntervalSinceNow) <= 15, let start = starts.last, location.timestamp >= start else { continue }
             if let lastLocation {
                 let gap = location.timestamp.timeIntervalSince(lastLocation.timestamp)
-                guard gap >= 5, location.distance(from: lastLocation) >= 3, location.distance(from: lastLocation) / gap < 20 else { continue }
+                guard gap >= 5, location.distance(from: lastLocation) >= 3, location.distance(from: lastLocation) / gap < (kind == "滑雪" ? 50 : 20) else { continue }
                 if gap > 60 { routeSegment = UUID() }
             }
             var point: [String: Any] = ["latitude": location.coordinate.latitude, "longitude": location.coordinate.longitude, "recordedAt": formatter.string(from: location.timestamp), "segment": routeSegment.uuidString]
@@ -709,7 +719,7 @@ final class WatchStore: ObservableObject {
             guard self.active, self.running else { return }
             self.heart = workoutBuilder.statistics(for: HKQuantityType(.heartRate))?.mostRecentQuantity()?.doubleValue(for: HKUnit.count().unitDivided(by: .minute()))
             self.energy = workoutBuilder.statistics(for: HKQuantityType(.activeEnergyBurned))?.sumQuantity()?.doubleValue(for: .kilocalorie())
-            self.distance = workoutBuilder.statistics(for: HKQuantityType(.distanceWalkingRunning))?.sumQuantity()?.doubleValue(for: .meter())
+            self.distance = workoutBuilder.statistics(for: self.workoutDistanceType)?.sumQuantity()?.doubleValue(for: .meter())
             var values: [String: Double] = [:]
             if let heart = self.heart { values["heart"] = heart }
             if let energy = self.energy { values["energy"] = energy }
@@ -740,7 +750,8 @@ struct WatchWorkoutView: View {
                 Button(workout.running ? String(localized: "暂停", bundle: AgentIdentityLanguage.appBundle()) : String(localized: "继续", bundle: AgentIdentityLanguage.appBundle())) { workout.toggle() }.disabled(workout.saving)
                 Button(String(localized: "结束并保存", bundle: AgentIdentityLanguage.appBundle())) { Task { await workout.finish() } }.disabled(workout.saving)
             } else {
-                Picker(String(localized: "运动", bundle: AgentIdentityLanguage.appBundle()), selection: $kind) { ForEach(["徒步", "散步", "慢跑"], id: \.self) { Text($0) } }
+                Picker(String(localized: "运动", bundle: AgentIdentityLanguage.appBundle()), selection: $kind) { ForEach(["徒步", "散步", "慢跑"], id: \.self) { Text($0).tag($0) }
+                    Text(String(localized: "滑雪", bundle: AgentIdentityLanguage.appBundle())).tag("滑雪") }
                 Button(String(localized: "开始\(kind)", bundle: AgentIdentityLanguage.appBundle())) { Task {
                     connecting = true; error = nil
                     defer { connecting = false }

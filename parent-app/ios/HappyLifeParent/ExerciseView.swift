@@ -180,7 +180,8 @@ import UniformTypeIdentifiers
     }
     func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) { updateLocationTracking() }
     func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
-        guard tracking, active?.running == true, active?.routeEnabled == true else { return }
+        guard tracking, let active, active.running, active.routeEnabled == true else { return }
+        let skiing = active.kind == "滑雪"
         var changed = false
         for location in locations {
             let age = Date().timeIntervalSince(location.timestamp)
@@ -189,13 +190,17 @@ import UniformTypeIdentifiers
             if let previous = lastLocation {
                 let dt = location.timestamp.timeIntervalSince(previous.timestamp)
                 if dt > 60 { routeSegment = UUID(); lastLocation = nil }
-                else if dt < 3 || location.distance(from: previous) < 3 || location.distance(from: previous) / dt > 20 { continue }
+                else if dt < 3 || location.distance(from: previous) < 3 || location.distance(from: previous) / dt > (skiing ? 50 : 20) { continue }
             }
             let point = ExerciseRoutePoint(latitude: location.coordinate.latitude, longitude: location.coordinate.longitude,
                 recordedAt: location.timestamp, segment: routeSegment,
                 altitudeMeters: location.verticalAccuracy >= 0 && location.altitude.isFinite ? location.altitude : nil,
                 verticalAccuracyMeters: location.verticalAccuracy >= 0 ? location.verticalAccuracy : nil)
             if archive.active?.appendRoute(point) == true {
+                if skiing, let previous = lastLocation, let index = active.intervals.indices.last {
+                    let distance = archive.active?.intervals[index].distanceMeters ?? 0
+                    archive.active?.intervals[index].distanceMeters = distance + location.distance(from: previous)
+                }
                 lastLocation = location; lastLocationAt = location.timestamp; changed = true
                 locationMessage = String(localized: "正在记录轨迹", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))
             }
@@ -324,7 +329,7 @@ import UniformTypeIdentifiers
 
     private func observe() {
         stopObserving()
-        guard let active, active.running, let index = active.intervals.indices.last else { return }
+        guard let active, active.running, active.kind != "滑雪", let index = active.intervals.indices.last else { return }
         guard supported else { message = String(localized: "此设备不支持计步，可继续使用运动计时。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)); return }
         if CMPedometer.authorizationStatus() == .denied || CMPedometer.authorizationStatus() == .restricted {
             message = String(localized: "未获得运动与健身权限，可在系统设置中开启；计时仍可使用。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)); return
@@ -343,7 +348,7 @@ import UniformTypeIdentifiers
         }
     }
     private func reconcile() async {
-        guard let active, supported else { return }
+        guard let active, active.kind != "滑雪", supported else { return }
         // Query each active interval independently, excluding all paused time.
         busy = true
         defer { busy = false }
@@ -397,6 +402,19 @@ struct ExerciseView: View {
                         }
                     }
                 }
+                if exercise.active == nil {
+                    Section("运动项目") {
+                        LazyVGrid(columns: [GridItem(.adaptive(minimum: 92), spacing: 8)], spacing: 8) {
+                            exerciseTile("散步", icon: "figure.walk")
+                            exerciseTile("慢跑", icon: "figure.run")
+                            exerciseTile("徒步", icon: "figure.hiking")
+                            exerciseTile("爬山", icon: "mountain.2")
+                            exerciseTile("滑雪", icon: "figure.skiing.downhill")
+                            exerciseTile("自由运动", icon: "figure.mixed.cardio")
+                        }
+                        .padding(.vertical, 4)
+                    }
+                }
                 Section {
                     Picker(String(localized: "显示模式", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), selection: $mapMode) {
                         Label(String(localized: "数据", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), systemImage: "figure.walk").tag(false)
@@ -420,8 +438,10 @@ struct ExerciseView: View {
                                 Text(active.distanceMeters == nil && !exercise.distanceSupported ? String(localized: "此设备不支持距离估算", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)) : exerciseDistanceTitle(active))
                                     .font(.title.bold()).monospacedDigit()
                                     .accessibilityLabel(String(localized: "运动距离，\(exerciseDistanceTitle(active))", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)))
-                                Text(active.steps.map { String(localized: "\($0) 步", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)) } ?? String(localized: "步数待获取", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)))
-                                    .font(.title2).monospacedDigit()
+                                if active.kind != "滑雪" {
+                                    Text(active.steps.map { String(localized: "\($0) 步", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)) } ?? String(localized: "步数待获取", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)))
+                                        .font(.title2).monospacedDigit()
+                                }
                                 if let altitude = active.routePoints.last?.altitudeMeters { Text(String(format: String(localized: "海拔 %.1f 米", bundle: AgentIdentityLanguage.appBundle()), altitude)).font(.subheadline) }
                                 Text(active.running ? String(localized: "运动中", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)) : String(localized: "已暂停", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))).foregroundStyle(active.running ? .teal : .secondary)
                             }.frame(maxWidth: .infinity).padding(.vertical, 18)
@@ -434,11 +454,6 @@ struct ExerciseView: View {
                             Button(String(localized: "结束并保存", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), role: .destructive) { confirmFinish = true }.buttonStyle(.bordered)
                         }.disabled(exercise.busy)
                     } else {
-                        Picker(String(localized: "运动项目", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), selection: $kind) {
-                            Text(String(localized: "散步", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))).tag("散步"); Text(String(localized: "慢跑", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))).tag("慢跑"); Text(String(localized: "自由运动", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))).tag("自由运动")
-                            Text(String(localized: "徒步", bundle: AgentIdentityLanguage.appBundle())).tag("徒步")
-                            Text(String(localized: "爬山", bundle: AgentIdentityLanguage.appBundle())).tag("爬山")
-                        }.pickerStyle(.menu)
                         if kind == "爬山" { NavigationLink(String(localized: "附近山峰与导入路线", bundle: AgentIdentityLanguage.appBundle())) { HikingPlacesView(family: family) } }
                         Button {
                             exercise.start(kind: kind, map: mapMode, activity: activity)
@@ -454,8 +469,10 @@ struct ExerciseView: View {
                             .padding(.vertical, 8)
                         }.buttonStyle(.borderedProminent)
                     }
-                    Text(String(localized: "距离由系统计步估算。地图模式使用 GPS 记录轨迹，暂停时停止定位。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)))
-                        .font(.footnote).foregroundStyle(.secondary)
+                    if (exercise.active?.kind ?? kind) == "滑雪", exercise.active == nil {
+                        Text("打开地图可记录滑雪轨迹、距离和海拔。")
+                            .font(.footnote).foregroundStyle(.secondary)
+                    }
                 }
                 if let message = exercise.message {
                     Section(String(localized: "提示", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) {
@@ -489,7 +506,9 @@ struct ExerciseView: View {
                             HStack {
                                 Text(item.startedAt, format: .dateTime.year().month().day().hour().minute())
                                 Spacer()
-                                Text(item.steps.map { String(localized: "\($0) 步", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)) } ?? String(localized: "步数未获取", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)))
+                                if item.kind != "滑雪" {
+                                    Text(item.steps.map { String(localized: "\($0) 步", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)) } ?? String(localized: "步数未获取", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)))
+                                }
                             }.font(.caption).foregroundStyle(.secondary)
                         }.padding(.vertical, 4)
                             .swipeActions(allowsFullSwipe: false) {
@@ -570,6 +589,25 @@ struct ExerciseView: View {
         await exercise.sync()
         if let record = exercise.active ?? exercise.history.first { await health.read(record) }
     }
+    private func exerciseTile(_ value: String, icon: String) -> some View {
+        let selected = kind == value
+        return Button { kind = value } label: {
+            VStack(spacing: 6) {
+                Image(systemName: icon).font(.title3)
+                Text(exerciseKindTitle(value)).font(.subheadline.weight(.medium))
+                    .multilineTextAlignment(.center)
+            }
+            .padding(.horizontal, 4)
+            .padding(.vertical, 10)
+            .frame(maxWidth: .infinity, minHeight: 66)
+            .foregroundStyle(selected ? Color.teal : Color.primary)
+            .background(selected ? Color.teal.opacity(0.13) : Color.secondary.opacity(0.08),
+                        in: RoundedRectangle(cornerRadius: 12))
+        }
+        .buttonStyle(.plain)
+        .accessibilityAddTraits(selected ? .isSelected : [])
+    }
+
     private func receiveActivity() {
         guard let pending = family.pendingExerciseActivity else { return }
         family.pendingExerciseActivity = nil
@@ -590,6 +628,7 @@ private func exerciseKindTitle(_ value: String) -> String {
     switch value {
     case "爬山": return String(localized: "爬山", bundle: AgentIdentityLanguage.appBundle(), locale: locale)
     case "散步": return String(localized: "散步", bundle: AgentIdentityLanguage.appBundle(), locale: locale)
+    case "滑雪": return String(localized: "滑雪", bundle: AgentIdentityLanguage.appBundle(), locale: locale)
     case "徒步": return String(localized: "徒步", bundle: AgentIdentityLanguage.appBundle())
     case "慢跑": return String(localized: "慢跑", bundle: AgentIdentityLanguage.appBundle(), locale: locale)
     case "自由运动": return String(localized: "自由运动", bundle: AgentIdentityLanguage.appBundle(), locale: locale)
