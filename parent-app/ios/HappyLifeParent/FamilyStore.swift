@@ -3,6 +3,7 @@ import Foundation
 import SwiftUI
 import AgentIdentity
 import WatchConnectivity
+import HealthKit
 
 @MainActor final class PhotoTransferPresentation: ObservableObject {
     @Published var notice: String?
@@ -89,6 +90,17 @@ private actor PhotoPreviewLoader {
     @Published var watchMetricsUpdatedAt: Date?
     @Published var watchExerciseMetrics: [String: Double] = [:]
     var watchExerciseActivity: ExerciseActivity?
+    private let watchWorkoutLauncher = HKHealthStore()
+
+    func openWatchExerciseMode() async {
+        guard WCSession.isSupported(), HKHealthStore.isHealthDataAvailable(),
+              WCSession.default.isPaired, WCSession.default.isWatchAppInstalled else { return }
+        let configuration = HKWorkoutConfiguration()
+        configuration.activityType = .walking
+        do { try await watchWorkoutLauncher.startWatchApp(toHandle: configuration) }
+        catch { /* The phone exercise screen is usable without a reachable watch. */ }
+    }
+
     @Published private var activityTitles: [UUID: [UUID: String]] = [:]
     private var activityTitleOwner: String?
     private var activityTitleRevision = UUID()

@@ -1,9 +1,21 @@
 import AgentIdentityLocalization
 import AgentIdentityHTTP
 import SwiftUI
+import HealthKit
+import WatchKit
+
+@MainActor
+final class WatchExerciseLaunch: NSObject, WKApplicationDelegate, ObservableObject {
+    @Published private(set) var request: UUID?
+
+    func handle(_ workoutConfiguration: HKWorkoutConfiguration) {
+        request = UUID()
+    }
+}
 
 @main
 struct HappyLifeWatchApp: App {
+    @WKApplicationDelegateAdaptor private var exerciseLaunch: WatchExerciseLaunch
     @StateObject private var workout = WatchWorkout()
     @StateObject private var store: WatchStore
     @StateObject private var language: AgentIdentityLanguageStore
@@ -16,7 +28,7 @@ struct HappyLifeWatchApp: App {
 
     var body: some Scene {
         WindowGroup {
-            WatchHomeView().environmentObject(workout).environmentObject(store).environmentObject(language).environment(\.locale, language.locale)
+            WatchHomeView(exerciseLaunch: exerciseLaunch).environmentObject(workout).environmentObject(store).environmentObject(language).environment(\.locale, language.locale)
                 .task { await store.start(); await language.refresh() }
                 .onChange(of: scenePhase) { _, phase in
                     if phase == .active { store.retryWorkoutSync() }
@@ -27,6 +39,8 @@ struct HappyLifeWatchApp: App {
 }
 
 struct WatchHomeView: View {
+    @ObservedObject var exerciseLaunch: WatchExerciseLaunch
+    @State private var openingExercise = false
     @EnvironmentObject private var store: WatchStore
     @EnvironmentObject private var language: AgentIdentityLanguageStore
     @Environment(\.scenePhase) private var phase
@@ -43,7 +57,7 @@ struct WatchHomeView: View {
                     NavigationLink(String(localized: "活动", bundle: AgentIdentityLanguage.appBundle()), destination: WatchSocialSpacesView())
                 }
                 if store.menuSections["exercise"] == true {
-                    NavigationLink(String(localized: "运动", bundle: AgentIdentityLanguage.appBundle()), destination: WatchWorkoutView())
+                    Button(String(localized: "运动", bundle: AgentIdentityLanguage.appBundle())) { openingExercise = true }
                 }
                 NavigationLink(String(localized: "我的", bundle: AgentIdentityLanguage.appBundle())) {
                     List {
@@ -56,6 +70,10 @@ struct WatchHomeView: View {
                 }
                 if let error = store.menuError { Text(error).font(.footnote).foregroundStyle(.secondary) }
             }.navigationTitle("Linko Moment")
+                .navigationDestination(isPresented: $openingExercise) { WatchWorkoutView() }
+                .onChange(of: exerciseLaunch.request, initial: true) { _, request in
+                    if request != nil { openingExercise = true }
+                }
         }
         .task(id: phase == .active) {
             guard phase == .active else { return }

@@ -585,7 +585,8 @@ struct DearSocialView: View {
     @Environment(\.scenePhase) private var scenePhase
     @StateObject private var locations = MomentActivityLocations()
     @State private var showingLocationMap = false
-    @State private var refreshingActivityList = false
+    @State private var activityRefreshID = UUID()
+    var isActive = true
     @State private var exerciseArchive = ExerciseArchive()
     @State private var exerciseRevision = UUID()
     @ObservedObject var store: FamilyStore
@@ -827,7 +828,14 @@ struct DearSocialView: View {
                 if showLogout { ToolbarItem(placement: .topBarLeading) { Button(String(localized: "退出", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) { store.logout() } } }
             }
             .refreshable { await refresh() }
-            .task(id: store.pendingActivityLink?.id) { await refresh(); await openPendingActivityLink() }
+            .task(id: isActive ? store.identity.accountIdentifier : nil) {
+                guard isActive, store.identity.accountIdentifier != nil else { return }
+                await refresh()
+                await openPendingActivityLink()
+            }
+            .onChange(of: store.pendingActivityLink?.id) { _, link in
+                if isActive, link != nil { Task { await refresh(); await openPendingActivityLink() } }
+            }
             .alert("加入邀请中的活动？", isPresented: Binding(get: { invitationToOpen != nil }, set: { if !$0 { invitationToOpen = nil } })) {
                 Button("确认加入") {
                     if let link = invitationToOpen { invitationToOpen = nil; run { try await acceptActivityLink(link) } }
@@ -1759,12 +1767,26 @@ struct DearSocialView: View {
     }
 
     private func refresh() async {
-        guard !refreshingActivityList else { return }
-        refreshingActivityList = true
-        defer { refreshingActivityList = false }
-        do { try await load() }
-        catch where isActivityLoadCancellation(error) { }
-        catch { self.error = momentDisplayError(error) }
+        let request = UUID()
+        let account = store.identity.accountIdentifier
+        guard account != nil, !Task.isCancelled else { return }
+        activityRefreshID = request
+        for attempt in 0..<3 {
+            do {
+                try await load()
+                return
+            } catch where isActivityLoadCancellation(error) {
+                guard !Task.isCancelled, account == store.identity.accountIdentifier,
+                      request == activityRefreshID, attempt < 2 else { return }
+                do { try await Task.sleep(for: .milliseconds(200 * (attempt + 1))) }
+                catch { return }
+            } catch {
+                if request == activityRefreshID, account == store.identity.accountIdentifier {
+                    self.error = momentDisplayError(error)
+                }
+                return
+            }
+        }
     }
     private func openPendingActivityLink() async {
         guard !Task.isCancelled, let link = store.pendingActivityLink else { return }
@@ -1796,10 +1818,16 @@ struct DearSocialView: View {
 
     private func load() async throws {
         error = ""
+        let owner = store.identity.accountIdentifier
         let loaded = try DearRecord.list(await store.call(base + "tenants"))
-        joinedActivities = try DearRecord.list(await store.call(base + "activities/joined"))
+        let joined = try DearRecord.list(await store.call(base + "activities/joined"))
+        try Task.checkCancellation()
+        guard owner == store.identity.accountIdentifier else { throw CancellationError() }
+        joinedActivities = joined
         await store.photoSource.cacheShareActivities(joinedActivities.map(\.data))
         await store.photoSource.importSharedItems()
+        try Task.checkCancellation()
+        guard owner == store.identity.accountIdentifier else { throw CancellationError() }
         spaces = loaded
         let previousSpace = spaceId
         if !loaded.contains(where: { $0.id == spaceId && ($0.text("role") == "owner" || $0.text("role") == "member") }) {

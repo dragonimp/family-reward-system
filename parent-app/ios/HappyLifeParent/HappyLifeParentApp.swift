@@ -200,13 +200,16 @@ struct FamilyRoot: View {
             Group { if store.ready { FamilyHome(store: store) } else { growthUnavailable } }.tabItem { Label(String(localized: "带娃", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), systemImage: "person.3.fill") }
                 .badge(store.requests.filter { $0.text("status") == "pending" }.count).tag(1)
             case "activities" where activitiesEnabled:
-            DearSocialView(store: store).tabItem { Label(String(localized: "活动", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), systemImage: "photo.on.rectangle.angled") }.tag(2)
+            DearSocialView(isActive: selectedTab == 2, store: store).tabItem { Label(String(localized: "活动", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), systemImage: "photo.on.rectangle.angled") }.tag(2)
             case "exercise" where exerciseEnabled:
             Group { if store.ready { ExerciseView(userID: store.profile?.text("unifiedUserId") ?? "").id(store.profile?.text("unifiedUserId") ?? "") } else { growthUnavailable } }.tabItem { Label(String(localized: "运动", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), systemImage: "figure.walk") }.tag(3)
                 default: EmptyView()
                 }
             }
             AccountView(store: store).tabItem { Label(String(localized: "我的", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), systemImage: "person.crop.circle") }.badge(notifications.unreadCount).tag(4)
+        }
+        .task(id: selectedTab) {
+            if selectedTab == 3 && exerciseEnabled { await store.openWatchExerciseMode() }
         }
         .onChange(of: store.pendingExerciseContinuation) { _, value in if value != nil { exerciseEnabled = true; selectedTab = 3 } }
         .onChange(of: store.pendingExerciseActivity) { _, value in if value != nil { exerciseEnabled = true; selectedTab = 3 } }

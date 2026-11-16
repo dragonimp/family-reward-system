@@ -18,6 +18,7 @@ import UniformTypeIdentifiers
     @Published var busy = false
     @Published var syncing = false
     @Published var syncMessage: String?
+    @Published private(set) var conflicts: [ExerciseSession] = []
     @Published var locationMessage: String?
     private let locator = CLLocationManager()
     private var routeSegment = UUID()
@@ -272,14 +273,53 @@ import UniformTypeIdentifiers
             }
             archive.history.sort { $0.startedAt > $1.startedAt }
             save()
-            if !conflictingRecords.isEmpty {
-                let conflict = String(localized: "有 \(conflictingRecords.count) 条运动记录与云端冲突，本机副本已保留。", bundle: AgentIdentityLanguage.appBundle())
-                syncMessage = [conflict, activityShareError].compactMap { $0 }.joined(separator: " ")
-                return
-            }
+            conflicts = archive.history.filter { conflictingRecords.contains($0.id) }
+            if !conflicts.isEmpty { syncMessage = activityShareError; return }
             syncMessage = activityShareError ?? String(localized: "已同步到当前账号", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))
         } catch is CancellationError { }
         catch { syncMessage = String(localized: "同步未完成，本机记录已保留：\(error.localizedDescription)", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)) }
+    }
+
+    func resolveConflict(_ record: ExerciseSession, keepBoth: Bool) async {
+        guard !syncing, let api, conflicts.contains(where: { $0.id == record.id }),
+              DiningAccount.identity(api.profile?.text("unifiedUserId") ?? "") == DiningAccount.identity(userID) else { return }
+        syncing = true
+        defer {
+            syncing = false
+            if syncAgain { syncAgain = false; Task { await sync() } }
+        }
+        do {
+            let path = "/api/exercise/records/\(record.id.uuidString)"
+            let response = try await api.call(path)
+            let cloud = try ExerciseSession.syncDecoder().decode(
+                ExerciseSession.self, from: JSONSerialization.data(withJSONObject: response))
+            guard DiningAccount.identity(api.profile?.text("unifiedUserId") ?? "") == DiningAccount.identity(userID),
+                  cloud.id == record.id, cloud.endedAt != nil,
+                  let local = archive.history.first(where: { $0.id == record.id }),
+                  !(archive.pendingDeletions ?? []).contains(record.id) else { return }
+            var resolved = archive
+            resolved.history.removeAll { $0.id == record.id }
+            resolved.history.append(cloud)
+            resolved.uploaded = Array(Set((resolved.uploaded ?? []) + [cloud.id]))
+            if keepBoth {
+                var copy = local
+                copy.id = UUID()
+                resolved.history.append(copy)
+                if let share = resolved.activityShares?[local.id] {
+                    resolved.activityShares?[copy.id] = share
+                }
+            }
+            resolved.history.sort { $0.startedAt > $1.startedAt }
+            let snapshot = resolved
+            try persistence.sync { try snapshot.write(to: file) }
+            archive = snapshot
+            conflicts.removeAll { $0.id == record.id }
+            syncMessage = nil
+            NotificationCenter.default.post(name: .exerciseRecordsChanged, object: nil)
+            syncAgain = true
+        } catch {
+            syncMessage = String(localized: "未能解决冲突：\(momentDisplayError(error))", bundle: AgentIdentityLanguage.appBundle())
+        }
     }
 
     private func observe() {
@@ -343,6 +383,7 @@ struct ExerciseView: View {
     @State private var activity: ExerciseActivity?
     @State private var confirmFinish = false
     @State private var pendingDeletion: ExerciseSession?
+    @State private var showingSyncConflict = false
     init(userID: String) { _exercise = StateObject(wrappedValue: ExerciseStore.shared(userID: userID)) }
 
     var body: some View {
@@ -478,8 +519,21 @@ struct ExerciseView: View {
                         if exercise.syncing { ProgressView().controlSize(.small) }
                         Text(exercise.syncMessage ?? String(localized: "完成运动后自动同步", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))).font(.caption).foregroundStyle(.secondary).lineLimit(2)
                         Spacer()
+                        if !exercise.conflicts.isEmpty {
+                            Button("解决冲突") { showingSyncConflict = true }.disabled(exercise.syncing)
+                        }
                         Button(String(localized: "同步", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) { Task { await exercise.sync() } }.disabled(exercise.syncing)
                     }.padding(.horizontal).padding(.vertical, 8).background(.bar)
+                }
+                .onChange(of: exercise.conflicts.first?.id, initial: true) { _, id in
+                    showingSyncConflict = id != nil
+                }
+                .alert("运动同步冲突", isPresented: $showingSyncConflict, presenting: exercise.conflicts.first) { record in
+                    Button("保留两份") { Task { await exercise.resolveConflict(record, keepBoth: true) } }
+                    Button("使用云端记录", role: .destructive) { Task { await exercise.resolveConflict(record, keepBoth: false) } }
+                    Button("稍后处理", role: .cancel) {}
+                } message: { record in
+                    Text("\(exerciseKindTitle(record.kind)) · \(record.startedAt.formatted())。本机与云端记录不同，请选择保留哪份。")
                 }
                 .sheet(item: $selectedRoute) { item in
                     NavigationStack {
