@@ -108,6 +108,7 @@ import UniformTypeIdentifiers
     func continueRecord(_ record: ExerciseSession) {
         guard readable, active == nil, !busy, history.contains(where: { $0.id == record.id }) else { return }
         archive.active = record.continuation(at: Date())
+        archive.active?.routeEnabled = true
         save(); observe(); updateLocationTracking()
     }
     @discardableResult func importWatchRecords(_ records: [ExerciseSession]) -> Bool {
@@ -382,7 +383,7 @@ struct ExerciseView: View {
     @EnvironmentObject private var family: FamilyStore
     @Environment(\.scenePhase) private var phase
     @StateObject private var health = ExerciseHealth()
-    @State private var mapMode = false
+    @State private var showingHistory = false
     @State private var selectedRoute: ExerciseSession?
     @State private var kind = "散步"
     @State private var activity: ExerciseActivity?
@@ -443,7 +444,7 @@ struct ExerciseView: View {
                     } else {
                         HStack(spacing: 8) {
                             Button {
-                                exercise.start(kind: kind, map: mapMode, activity: activity)
+                                exercise.start(kind: kind, map: true, activity: activity)
                                 if exercise.active != nil { activity = nil; family.watchExerciseActivity = nil }
                             } label: {
                                 Label(String(localized: "开始\(exerciseKindTitle(kind))", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), systemImage: "play.fill")
@@ -451,13 +452,9 @@ struct ExerciseView: View {
                             }
                             .buttonStyle(.borderedProminent)
                             .disabled(exercise.busy)
-                            displayModeButtons
                         }
                     }
-                    if exercise.active != nil {
-                        HStack { Spacer(); displayModeButtons }
-                    }
-                    if mapMode {
+                    Group {
                         ExerciseRouteMap(points: exercise.active?.routePoints ?? [], live: exercise.active?.running == true)
                             .frame(height: 300).clipShape(RoundedRectangle(cornerRadius: 14))
                         if let message = exercise.locationMessage, exercise.active != nil {
@@ -467,10 +464,7 @@ struct ExerciseView: View {
                     if exercise.active == nil && kind == "爬山" {
                         NavigationLink(String(localized: "附近山峰与导入路线", bundle: AgentIdentityLanguage.appBundle())) { HikingPlacesView(family: family) }
                     }
-                    if (exercise.active?.kind ?? kind) == "滑雪", exercise.active == nil {
-                        Text("打开地图可记录滑雪轨迹、距离和海拔。")
-                            .font(.footnote).foregroundStyle(.secondary)
-                    }
+
                 }
                 if let message = exercise.message {
                     Section(String(localized: "提示", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) {
@@ -480,56 +474,19 @@ struct ExerciseView: View {
                         Button(String(localized: "打开系统设置", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) { if let url = URL(string: UIApplication.openSettingsURLString) { UIApplication.shared.open(url) } }
                     }
                 }
-                Section {
-                    if exercise.history.isEmpty {
-                        ContentUnavailableView(String(localized: "还没有运动记录", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), systemImage: "figure.walk", description: Text(String(localized: "完成一次运动后，时长、步数和公里数会保存在这里。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))))
-                    }
-                    ForEach(exercise.history) { item in
-                        VStack(alignment: .leading, spacing: 6) {
-                            HStack {
-                                Text(exerciseKindTitle(item.kind)).bold()
-                                Spacer()
-                                Text(ExerciseSession.clock(item.duration(at: item.endedAt ?? .now))).monospacedDigit()
-                                Button(role: .destructive) { pendingDeletion = item } label: {
-                                    Label(String(localized: "删除", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), systemImage: "trash")
-                                }.buttonStyle(.borderless).disabled(exercise.busy)
-                            }
-                            Button(String(localized: "继续\(item.kind)", bundle: AgentIdentityLanguage.appBundle())) { exercise.continueRecord(item) }.buttonStyle(.borderless).disabled(exercise.active != nil || exercise.busy)
-                            if let linked = item.activity { Text(family.exerciseActivityTitle(linked)).font(.subheadline).foregroundStyle(.secondary) }
-                            Text(exerciseDistanceTitle(item)).font(.headline).monospacedDigit()
-                            if let altitude = item.altitudeRange { Text(String(format: String(localized: "海拔 %.1f–%.1f 米", bundle: AgentIdentityLanguage.appBundle()), altitude.lowerBound, altitude.upperBound)).font(.caption) }
-                            if !item.routePoints.isEmpty {
-                                Button { selectedRoute = item } label: { Label(String(localized: "查看轨迹", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), systemImage: "map") }.buttonStyle(.borderless)
-                            }
-                            HStack {
-                                Text(item.startedAt, format: .dateTime.year().month().day().hour().minute())
-                                Spacer()
-                                if item.kind != "滑雪" {
-                                    Text(item.steps.map { String(localized: "\($0) 步", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)) } ?? String(localized: "步数未获取", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)))
-                                }
-                            }.font(.caption).foregroundStyle(.secondary)
-                        }.padding(.vertical, 4)
-                            .swipeActions(allowsFullSwipe: false) {
-                                Button(String(localized: "删除", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), role: .destructive) { pendingDeletion = item }
-                                    .disabled(exercise.busy)
-                            }
-                    }
-                } header: { Text(String(localized: "运动记录 · 当地时间", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) } footer: { Text(String(localized: "运动记录及轨迹仅同步到当前账号。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) }
+
             }.navigationTitle(String(localized: "运动", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))).readablePage()
+                .toolbar {
+                    ToolbarItem(placement: .topBarTrailing) {
+                        Button { showingHistory = true } label: {
+                            Label(String(localized: "运动记录", bundle: AgentIdentityLanguage.appBundle()), systemImage: "clock.arrow.circlepath")
+                                .labelStyle(.iconOnly)
+                        }
+                    }
+                }
+                .navigationDestination(isPresented: $showingHistory) { exerciseHistory }
                 .confirmationDialog(String(localized: "结束本次运动并保存记录？", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), isPresented: $confirmFinish, titleVisibility: .visible) {
                     Button(String(localized: "结束并保存", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) { Task { await exercise.finish() } }
-                }
-                .alert(String(localized: "删除这条运动记录？", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), isPresented: Binding(
-                    get: { pendingDeletion != nil },
-                    set: { if !$0 { pendingDeletion = nil } }
-                ), presenting: pendingDeletion) { item in
-                    Button(String(localized: "取消", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), role: .cancel) { pendingDeletion = nil }
-                    Button(String(localized: "删除", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), role: .destructive) {
-                        exercise.deleteRecord(id: item.id)
-                        pendingDeletion = nil
-                    }
-                } message: { item in
-                    Text(String(localized: "将删除这条\(item.kind)记录及轨迹，并同步到其他设备，删除后无法恢复。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)))
                 }
                 .safeAreaInset(edge: .bottom) {
                     HStack {
@@ -552,17 +509,9 @@ struct ExerciseView: View {
                 } message: { record in
                     Text("\(exerciseKindTitle(record.kind)) · \(record.startedAt.formatted())。本机与云端记录不同，请选择保留哪份。")
                 }
-                .sheet(item: $selectedRoute) { item in
-                    NavigationStack {
-                        ExerciseRouteMap(points: item.routePoints, live: false)
-                            .navigationTitle(exerciseKindTitle(item.kind))
-                            .navigationBarTitleDisplayMode(.inline)
-                            .toolbar { ToolbarItem(placement: .confirmationAction) { Button(String(localized: "完成", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) { selectedRoute = nil } } }
-                    }
-                }
                 .task {
                     exercise.connect(family)
-                    mapMode = exercise.active?.routeEnabled == true
+                    exercise.enableRoute()
                     receiveActivity()
                     if let id = family.pendingExerciseContinuation, let record = exercise.history.first(where: { $0.id == id }) { exercise.continueRecord(record); family.pendingExerciseContinuation = nil }
                     await family.refreshExerciseActivityTitles(); await exercise.refresh(); await refreshHealth()
@@ -572,7 +521,6 @@ struct ExerciseView: View {
                 }
                 .onChange(of: family.pendingExerciseActivity) { _, _ in receiveActivity() }
                 .onChange(of: family.profile?.text("unifiedUserId")) { _, _ in activity = nil; exercise.accountDidChange() }
-                .onChange(of: mapMode) { _, value in if value { exercise.enableRoute() } }
                 .onChange(of: phase) { _, value in
                     if value == .active { Task { await family.refreshExerciseActivityTitles(); await exercise.refresh(); await refreshHealth() } }
                     else { exercise.stopObserving() }
@@ -587,26 +535,66 @@ struct ExerciseView: View {
         await exercise.sync()
         if let record = exercise.active ?? exercise.history.first { await health.read(record) }
     }
-    private var displayModeButtons: some View {
-        HStack(spacing: 4) {
-            displayModeButton(false, title: String(localized: "数据", bundle: AgentIdentityLanguage.appBundle()), icon: "chart.bar")
-            displayModeButton(true, title: String(localized: "地图", bundle: AgentIdentityLanguage.appBundle()), icon: "map")
+    private var exerciseHistory: some View {
+        List {
+        Section {
+            if exercise.history.isEmpty {
+                ContentUnavailableView(String(localized: "还没有运动记录", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), systemImage: "figure.walk", description: Text(String(localized: "完成一次运动后，时长、步数和公里数会保存在这里。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))))
+            }
+            ForEach(exercise.history) { item in
+                VStack(alignment: .leading, spacing: 6) {
+                    HStack {
+                        Text(exerciseKindTitle(item.kind)).bold()
+                        Spacer()
+                        Text(ExerciseSession.clock(item.duration(at: item.endedAt ?? .now))).monospacedDigit()
+                        Button(role: .destructive) { pendingDeletion = item } label: {
+                            Label(String(localized: "删除", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), systemImage: "trash")
+                        }.buttonStyle(.borderless).disabled(exercise.busy)
+                    }
+                    Button(String(localized: "继续\(item.kind)", bundle: AgentIdentityLanguage.appBundle())) { exercise.continueRecord(item); if exercise.active != nil { showingHistory = false } }.buttonStyle(.borderless).disabled(exercise.active != nil || exercise.busy)
+                    if let linked = item.activity { Text(family.exerciseActivityTitle(linked)).font(.subheadline).foregroundStyle(.secondary) }
+                    Text(exerciseDistanceTitle(item)).font(.headline).monospacedDigit()
+                    if let altitude = item.altitudeRange { Text(String(format: String(localized: "海拔 %.1f–%.1f 米", bundle: AgentIdentityLanguage.appBundle()), altitude.lowerBound, altitude.upperBound)).font(.caption) }
+                    if !item.routePoints.isEmpty {
+                        Button { selectedRoute = item } label: { Label(String(localized: "查看轨迹", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), systemImage: "map") }.buttonStyle(.borderless)
+                    }
+                    HStack {
+                        Text(item.startedAt, format: .dateTime.year().month().day().hour().minute())
+                        Spacer()
+                        if item.kind != "滑雪" {
+                            Text(item.steps.map { String(localized: "\($0) 步", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)) } ?? String(localized: "步数未获取", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)))
+                        }
+                    }.font(.caption).foregroundStyle(.secondary)
+                }.padding(.vertical, 4)
+                    .swipeActions(allowsFullSwipe: false) {
+                        Button(String(localized: "删除", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), role: .destructive) { pendingDeletion = item }
+                            .disabled(exercise.busy)
+                    }
+            }
+        } header: { Text(String(localized: "运动记录 · 当地时间", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) } footer: { Text(String(localized: "运动记录及轨迹仅同步到当前账号。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) }
         }
-    }
-
-    private func displayModeButton(_ showsMap: Bool, title: String, icon: String) -> some View {
-        let selected = mapMode == showsMap
-        return Button { mapMode = showsMap } label: {
-            Image(systemName: icon)
-                .font(.body.weight(.semibold))
-                .frame(width: 44, height: 44)
-                .foregroundStyle(selected ? Color.teal : Color.secondary)
-                .background(selected ? Color.teal.opacity(0.14) : Color.secondary.opacity(0.08),
-                            in: RoundedRectangle(cornerRadius: 12))
-        }
-        .buttonStyle(.plain)
-        .accessibilityLabel(title)
-        .accessibilityAddTraits(selected ? .isSelected : [])
+        .navigationTitle(String(localized: "运动记录", bundle: AgentIdentityLanguage.appBundle()))
+        .navigationBarTitleDisplayMode(.inline)
+                .alert(String(localized: "删除这条运动记录？", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), isPresented: Binding(
+                    get: { pendingDeletion != nil },
+                    set: { if !$0 { pendingDeletion = nil } }
+                ), presenting: pendingDeletion) { item in
+                    Button(String(localized: "取消", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), role: .cancel) { pendingDeletion = nil }
+                    Button(String(localized: "删除", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), role: .destructive) {
+                        exercise.deleteRecord(id: item.id)
+                        pendingDeletion = nil
+                    }
+                } message: { item in
+                    Text(String(localized: "将删除这条\(item.kind)记录及轨迹，并同步到其他设备，删除后无法恢复。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)))
+                }
+                .sheet(item: $selectedRoute) { item in
+                    NavigationStack {
+                        ExerciseRouteMap(points: item.routePoints, live: false)
+                            .navigationTitle(exerciseKindTitle(item.kind))
+                            .navigationBarTitleDisplayMode(.inline)
+                            .toolbar { ToolbarItem(placement: .confirmationAction) { Button(String(localized: "完成", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) { selectedRoute = nil } } }
+                    }
+                }
     }
 
     private func exerciseTile(_ value: String, icon: String) -> some View {
@@ -638,7 +626,6 @@ struct ExerciseView: View {
         activity = pending
         family.watchExerciseActivity = pending
         kind = "徒步"
-        mapMode = true
     }
 
 }
