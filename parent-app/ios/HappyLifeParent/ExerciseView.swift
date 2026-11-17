@@ -447,7 +447,8 @@ struct ExerciseView: View {
                                 exercise.start(kind: kind, map: true, activity: activity)
                                 if exercise.active != nil { activity = nil; family.watchExerciseActivity = nil }
                             } label: {
-                                Label(String(localized: "开始\(exerciseKindTitle(kind))", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), systemImage: "play.fill")
+                                Text(String(localized: "开始\(exerciseKindTitle(kind))", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)))
+                                    .multilineTextAlignment(.center)
                                     .frame(maxWidth: .infinity, minHeight: 36)
                             }
                             .buttonStyle(.borderedProminent)
