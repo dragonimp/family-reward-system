@@ -394,17 +394,18 @@ struct ExerciseView: View {
 
     var body: some View {
         NavigationStack {
-            List {
+            VStack(spacing: 10) {
                 if let linked = exercise.active?.activity ?? activity {
-                    Section(String(localized: "关联活动", bundle: AgentIdentityLanguage.appBundle())) {
-                        Text(family.exerciseActivityTitle(linked))
+                    HStack {
+                        Text(family.exerciseActivityTitle(linked)).lineLimit(1)
+                        Spacer()
                         if exercise.active == nil {
                             Button(String(localized: "取消关联", bundle: AgentIdentityLanguage.appBundle())) { activity = nil; family.watchExerciseActivity = nil }
                         }
                     }
                 }
                 if exercise.active == nil {
-                    Section("运动项目") {
+                    Group {
                         LazyVGrid(columns: [GridItem(.adaptive(minimum: 92), spacing: 8)], spacing: 8) {
                             exerciseTile("散步", icon: "figure.walk")
                             exerciseTile("慢跑", icon: "figure.run")
@@ -416,10 +417,10 @@ struct ExerciseView: View {
                         .padding(.vertical, 4)
                     }
                 }
-                Section(exercise.active.map { exerciseKindTitle($0.kind) } ?? String(localized: "开始运动", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) {
+                Group {
                     if let active = exercise.active {
                         TimelineView(.periodic(from: .now, by: 1)) { context in
-                            VStack(spacing: 12) {
+                            VStack(spacing: 4) {
                                 Text(ExerciseSession.clock(active.duration(at: context.date)))
                                     .font(.system(size: 44, weight: .semibold, design: .rounded)).monospacedDigit()
                                     .accessibilityLabel(String(localized: "运动时长", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)))
@@ -432,7 +433,7 @@ struct ExerciseView: View {
                                 }
                                 if let altitude = active.routePoints.last?.altitudeMeters { Text(String(format: String(localized: "海拔 %.1f 米", bundle: AgentIdentityLanguage.appBundle()), altitude)).font(.subheadline) }
                                 Text(active.running ? String(localized: "运动中", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)) : String(localized: "已暂停", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))).foregroundStyle(active.running ? .teal : .secondary)
-                            }.frame(maxWidth: .infinity).padding(.vertical, 18)
+                            }.frame(maxWidth: .infinity).padding(.vertical, 4)
                         }
                         HStack {
                             Button(active.running ? String(localized: "暂停", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)) : String(localized: "继续", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) {
@@ -457,7 +458,7 @@ struct ExerciseView: View {
                     }
                     Group {
                         ExerciseRouteMap(points: exercise.active?.routePoints ?? [], live: exercise.active?.running == true)
-                            .frame(height: 300).clipShape(RoundedRectangle(cornerRadius: 14))
+                            .frame(maxWidth: .infinity, maxHeight: .infinity).layoutPriority(-1).clipShape(RoundedRectangle(cornerRadius: 14))
                         if let message = exercise.locationMessage, exercise.active != nil {
                             Text(message).font(.caption).foregroundStyle(.secondary)
                         }
@@ -468,15 +469,17 @@ struct ExerciseView: View {
 
                 }
                 if let message = exercise.message {
-                    Section(String(localized: "提示", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) {
-                        Text(message).font(.footnote)
+                    Menu {
                         Button(String(localized: "重试读取步数与距离", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) { Task { await exercise.refresh() } }
                         Button(String(localized: "重试保存记录", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) { exercise.retrySave() }
                         Button(String(localized: "打开系统设置", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) { if let url = URL(string: UIApplication.openSettingsURLString) { UIApplication.shared.open(url) } }
+                    } label: {
+                        Label(message, systemImage: "exclamationmark.circle")
+                            .font(.footnote).lineLimit(2)
                     }
                 }
 
-            }.navigationTitle(String(localized: "运动", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))).readablePage()
+            }.padding(.horizontal).padding(.vertical, 8).navigationBarTitleDisplayMode(.inline).navigationTitle(String(localized: "运动", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))).readablePage()
                 .toolbar {
                     ToolbarItem(placement: .topBarTrailing) {
                         Button { showingHistory = true } label: {
