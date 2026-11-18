@@ -43,7 +43,7 @@ pbx = (source / 'parent-app/ios/HappyLifeParent.xcodeproj/project.pbxproj').read
 versions = set(re.findall(r'MARKETING_VERSION = ([^;]+);', pbx))
 builds = set(re.findall(r'CURRENT_PROJECT_VERSION = ([^;]+);', pbx))
 assert len(versions) == len(builds) == 1
-version, build = next(iter(versions)), next(iter(builds))
+version, build = (value.strip().strip('"') for value in (next(iter(versions)), next(iter(builds))))
 assert re.fullmatch(r'[0-9]+(\.[0-9]+){1,2}', version)
 assert re.fullmatch(r'[0-9]+(\.[0-9]+)*', build)
 options = plistlib.loads((source / 'parent-app/ios/ExportOptions.example.plist').read_bytes())
