@@ -35,7 +35,9 @@ for key,path,scope in [('connect',connect,['sdk/MyVnc.Realtime.Apple','native/rt
     # Freeze only the public SDK inputs; unrelated concurrent app work stays outside the archive.
     directory,package=packages[key]
     target=Path(__import__('os').environ['ATLAS_BUILD_WORK'])/directory
-    archive=subprocess.Popen(['git','-C',str(path),'archive',commit,package],stdout=subprocess.PIPE)
+    archive_paths=[package]
+    if key=='atlas':archive_paths+=['scripts/validate-apple-bundle-info.py','scripts/validate-apple-privacy.py','api/Resources/Apple/purpose-inventory.v1.json']
+    archive=subprocess.Popen(['git','-C',str(path),'archive',commit,*archive_paths],stdout=subprocess.PIPE)
     subprocess.run(['tar','-x','-C',str(target)],stdin=archive.stdout,check=True)
     archive.stdout.close(); assert archive.wait()==0
 work=Path(__import__('os').environ['ATLAS_BUILD_WORK'])
@@ -84,6 +86,7 @@ with zipfile.ZipFile(Path(sys.argv[2])/'Linko-Moment-symbols.zip', 'w', zipfile.
     for item in (archive/'dSYMs').rglob('*'):
         if item.is_file(): output.write(item, str(item.relative_to(archive)))
 PY
+python3 "$ATLAS_BUILD_WORK/Atlas/scripts/validate-apple-privacy.py" "$ATLAS_BUILD_OUTPUT/Linko Moment.ipa" --inventory "$ATLAS_BUILD_WORK/Atlas/api/Resources/Apple/purpose-inventory.v1.json" > "$ATLAS_BUILD_OUTPUT/apple-privacy-preflight.json"
 printf '%s\n' "$commit" > "$ATLAS_BUILD_OUTPUT/source-commit.txt"
 shasum -a 256 "$ATLAS_BUILD_OUTPUT/Linko Moment.ipa" "$ATLAS_BUILD_OUTPUT/Linko-Moment-symbols.zip" > "$ATLAS_BUILD_OUTPUT/sha256.txt"
 echo 'PASS: signed IPA, symbols and source receipt ready'
