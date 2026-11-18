@@ -1,3 +1,3 @@
 "NSHealthShareUsageDescription" = "读取您授权的心率、活动能量、步数、距离和手表体能训练，用于显示本次运动数据。";
-"NSHealthUpdateUsageDescription" = "将您主动记录的手表运动保存到 Apple 健康，用于在手机和手表查看运动记录。";
+"NSHealthUpdateUsageDescription" = "将手表上记录的运动保存到 Apple 健康，并同步到您配对的 iPhone。";
 "NSLocationWhenInUseUsageDescription" = "记录运动轨迹、海拔，以及您主动进行的活动打卡位置。";
