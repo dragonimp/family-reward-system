@@ -1318,6 +1318,9 @@ private struct MomentAboutView: View {
                 NavigationLink { MomentTestInvitationView() } label: {
                     Label(String(localized: "测试邀请", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), systemImage: "square.and.arrow.up")
                 }
+                Link(destination: URL(string: "https://home.ai.impx.net/invite/apply/linko-family-ios")!) {
+                    Label(AgentIdentityLanguage.current.lowercased().hasPrefix("zh") ? "内测申请" : "Apply for internal testing", systemImage: "list.clipboard")
+                }
                 NavigationLink {
                     FeedbackWallView(identity: store.identity)
                 } label: {

@@ -17,6 +17,8 @@ public sealed class MomentAboutPage : ContentPage
             _ = AgentIdentity.Maui.InAppWebLinks.OpenAsync(new Uri("https://beian.miit.gov.cn/"))));
         content.Add(MomentStyle.Row("同行共创", action: () => _ = Navigation.PushAsync(new AtlasInformationPage(true))));
         content.Add(MomentStyle.Row("测试邀请", action: () => _ = Navigation.PushAsync(new TestInvitationPage())));
+        content.Add(MomentStyle.Row("内测申请", action: () =>
+            _ = AgentIdentity.Maui.InAppWebLinks.OpenAsync(new Uri("https://home.ai.impx.net/invite/apply/linko-family-ios"))));
         content.Add(MomentStyle.Row("意见反馈", action: () => _ = Navigation.PushAsync(new FeedbackWallPage(store))));
         Content = new ScrollView { Content = content };
     }
