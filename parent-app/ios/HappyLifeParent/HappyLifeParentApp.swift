@@ -589,6 +589,7 @@ struct AccountView: View {
     @Environment(\.openURL) private var openURL
     @State private var logout = false
     @State private var deleteAccount = false
+    @State private var avatarEditor = false
     @State private var userInfo: AgentIdentityUserInfo?
     @State private var resources: MomentResources?
     @State private var resourceError: String?
@@ -603,11 +604,11 @@ struct AccountView: View {
         NavigationStack {
             List {
                 Section(String(localized: "用户与权益", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) {
-                    AgentIdentityAccountRow(iconEmoji: userInfo?.iconEmoji,
+                    AgentIdentityAccountRow(iconEmoji: userInfo?.iconEmoji, avatarImage: userInfo?.avatarImage,
                                             username: userInfo?.username ?? store.profile?.text("username") ?? String(localized: "账号", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)),
                                             displayName: userInfo?.displayName,
                                             logoutTitle: String(localized: "退出登录", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) { label in
-                        Link(destination: URL(string: "https://auth.ai.xmkurt.com/personal/info")!) { label }
+                        Button { avatarEditor = true } label: { label }
                     } onLogout: { logout = true }
                     Link(destination: URL(string: "https://auth.ai.xmkurt.com/personal/info?section=password")!) {
                         Label(String(localized: "修改密码", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), systemImage: "key")
@@ -669,17 +670,35 @@ struct AccountView: View {
                 }
 
             }.readablePage().navigationTitle(String(localized: "我的", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)))
-                .task { await loadResources() }
-                .task(id: store.identity.isAuthenticated) {
-                    if store.identity.isAuthenticated {
-                        userInfo = try? await store.identity.userInfo(authority: URL(string: "https://auth.ai.xmkurt.com")!)
-                    } else { userInfo = nil }
+                .sheet(isPresented: $avatarEditor, onDismiss: { Task { await reloadAccount() } }) {
+                    NavigationStack {
+                        AgentIdentityProfileView(client: store.identity.nativeProfileClient()) { await reloadAccount() }
+                            .toolbar { ToolbarItem(placement: .cancellationAction) {
+                                Button(String(localized: "完成", bundle: AgentIdentityLanguage.appBundle())) { avatarEditor = false }
+                            } }
+                    }
                 }
+                .task { await loadResources() }
+                .task(id: store.identity.accountIdentifier) {
+                    userInfo = nil
+                    await reloadAccount()
+                }
+                .onAppear { Task { await reloadAccount() } }
                 .confirmationDialog(String(localized: "退出 Linko Moment？", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), isPresented: $logout, titleVisibility: .visible) { Button(String(localized: "退出登录", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), role: .destructive) { store.logout() } } message: { Text(String(localized: "本机登录凭据将清除。用户中心的浏览器登录状态由用户中心管理。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) }
                 .confirmationDialog(String(localized: "前往用户中心注销账号？", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), isPresented: $deleteAccount, titleVisibility: .visible) {
                     Link(String(localized: "继续注销", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), destination: URL(string: "https://auth.ai.xmkurt.com/personal/info?deleteAccount=1")!)
                 } message: { Text(String(localized: "账号注销会影响同一用户中心账号使用的其他应用。用户中心还会要求进一步确认。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) }
         }
+    }
+
+    @MainActor private func reloadAccount() async {
+        guard store.identity.isAuthenticated else { userInfo = nil; return }
+        let account = store.identity.accountIdentifier
+        do {
+            let current = try await store.identity.userInfo(authority: URL(string: "https://auth.ai.xmkurt.com")!)
+            guard store.identity.accountIdentifier == account else { return }
+            userInfo = current
+        } catch { /* Keep the last confirmed account presentation on transient failure. */ }
     }
 
     private func loadResources() async {
