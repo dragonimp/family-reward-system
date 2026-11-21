@@ -99,6 +99,81 @@ import UniformTypeIdentifiers
         }
     }
 
+    private var shareUpload: Task<Void, Never>?
+    private var lastShareUpload = Date.distantPast
+    private var shareUploadGeneration = UUID()
+
+    func friendShare(for workout: UUID) -> UUID? { archive.friendShares?[workout] }
+
+    func bindFriendShare(_ code: UUID, to workout: UUID) {
+        if archive.friendShares == nil { archive.friendShares = [:] }
+        archive.friendShares?[workout] = code
+        save()
+    }
+
+    func clearFriendShare(for workout: UUID) {
+        archive.friendShares?.removeValue(forKey: workout)
+        save()
+    }
+
+    func uploadFriendTrack(_ record: ExerciseSession, code: UUID) async throws {
+        guard let api, archive.friendShares?[record.id] == code else { return }
+        let points = record.routePoints
+        guard !points.isEmpty else { return }
+        let step = max(1, (points.count + 1997) / 1999)
+        var sampled = stride(from: 0, to: points.count - 1, by: step).map { points[$0] }
+        if let last = points.last { sampled.append(last) }
+        let encoder = JSONEncoder()
+        encoder.dateEncodingStrategy = .iso8601
+        let body = try JSONSerialization.jsonObject(with: encoder.encode(sampled))
+        _ = try await api.call("/api/exercise/shares/\(code.uuidString)/track", method: "PUT",
+                               body: ["workoutId": record.id.uuidString, "points": body], timeout: 15)
+    }
+
+    private func scheduleFriendTrack(_ record: ExerciseSession, force: Bool = false) {
+        guard let code = friendShare(for: record.id),
+              force || (shareUpload == nil && Date().timeIntervalSince(lastShareUpload) >= 15) else { return }
+        let previous = shareUpload
+        let generation = UUID()
+        shareUploadGeneration = generation
+        lastShareUpload = .now
+        shareUpload = Task { [weak self] in
+            _ = await previous?.result
+            guard let self, !Task.isCancelled else { return }
+            defer { if self.shareUploadGeneration == generation { self.shareUpload = nil } }
+            try? await self.uploadFriendTrack(record, code: code)
+        }
+    }
+
+    func joinFriendShare(_ code: UUID, kind: String, name: String) async throws {
+        guard let api, active == nil, readable, !busy else { return }
+        busy = true
+        defer { busy = false }
+        let now = Date()
+        let proposed = UUID()
+        let response = try await api.call("/api/exercise/shares/\(code.uuidString)/member", method: "PUT",
+                                          body: ["name": name, "workoutId": proposed.uuidString], timeout: 15) as? [String: Any]
+        guard let value = response?["workoutId"] as? String, let id = UUID(uuidString: value) else {
+            throw CocoaError(.coderReadCorrupt)
+        }
+        try Task.checkCancellation()
+        if let prior = history.first(where: { $0.id == id }) {
+            continueRecordAfterJoining(prior, code: code)
+        } else {
+            archive.active = ExerciseSession(id: id, kind: kind, startedAt: now,
+                                             intervals: [ExerciseInterval(start: now)], routeEnabled: true)
+            bindFriendShare(code, to: id)
+        }
+        observe()
+        updateLocationTracking()
+    }
+
+    private func continueRecordAfterJoining(_ record: ExerciseSession, code: UUID) {
+        archive.active = record.continuation(at: Date())
+        archive.active?.routeEnabled = true
+        bindFriendShare(code, to: record.id)
+    }
+
     func start(kind: String, activity: ExerciseActivity? = nil) {
         guard readable, active == nil, !busy else { return }
         let now = Date()
@@ -143,6 +218,7 @@ import UniformTypeIdentifiers
         completed.endedAt = now
         completed.route = completed.route?.filter { point in completed.intervals.contains { point.recordedAt >= $0.start && point.recordedAt <= ($0.end ?? now) } }
         completed.activityText = completed.activitySummary
+        scheduleFriendTrack(completed, force: true)
         archive.history.insert(completed, at: 0)
         archive.active = nil
         save()
@@ -157,7 +233,7 @@ import UniformTypeIdentifiers
     func stopObserving() { generation = UUID(); pedometer.stopUpdates() }
 
     func connect(_ store: FamilyStore) { api = store; store.exerciseStore = self }
-    func accountDidChange() { api = nil; stopLocationTracking(); stopObserving(); Self.stores.removeValue(forKey: userID) }
+    func accountDidChange() { shareUpload?.cancel(); api = nil; stopLocationTracking(); stopObserving(); Self.stores.removeValue(forKey: userID) }
     func enableRoute() {
         guard active != nil, readable else { return }
         archive.active?.routeEnabled = true; save(); updateLocationTracking()
@@ -207,7 +283,10 @@ import UniformTypeIdentifiers
                 locationMessage = String(localized: "正在记录轨迹", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))
             }
         }
-        if changed { save(sensorUpdate: true) }
+        if changed {
+            save(sensorUpdate: true)
+            if let tracked = archive.active { scheduleFriendTrack(tracked) }
+        }
         else if let last = locations.last, last.horizontalAccuracy > 65 { locationMessage = String(localized: "定位精度不足，可在系统设置中开启精确位置。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)) }
         if (archive.active?.route?.count ?? 0) >= 20_000 { stopLocationTracking(); locationMessage = String(localized: "本次轨迹已达记录上限，计时与计步继续。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)) }
     }
@@ -385,6 +464,8 @@ struct ExerciseView: View {
     @Environment(\.scenePhase) private var phase
     @StateObject private var health = ExerciseHealth()
     @State private var showingHistory = false
+    @State private var showingFriendWorkout = false
+    @State private var workoutToShare: ExerciseSession?
     @State private var selectedRoute: ExerciseSession?
     @State private var kind = "散步"
     @State private var activity: ExerciseActivity?
@@ -484,11 +565,20 @@ struct ExerciseView: View {
             }.padding(.horizontal).padding(.vertical, 8).navigationBarTitleDisplayMode(.inline).navigationTitle(String(localized: "运动", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))).readablePage()
                 .toolbar {
                     ToolbarItem(placement: .topBarTrailing) {
+                        Button { showingFriendWorkout = true } label: {
+                            Label(String(localized: "好友运动", bundle: AgentIdentityLanguage.appBundle()), systemImage: "person.2")
+                                .labelStyle(.iconOnly)
+                        }
+                    }
+                    ToolbarItem(placement: .topBarTrailing) {
                         Button { showingHistory = true } label: {
                             Label(String(localized: "运动记录", bundle: AgentIdentityLanguage.appBundle()), systemImage: "clock.arrow.circlepath")
                                 .labelStyle(.iconOnly)
                         }
                     }
+                }
+                .sheet(isPresented: $showingFriendWorkout) {
+                    ExerciseFriendShareView(exercise: exercise, family: family, workout: exercise.active)
                 }
                 .navigationDestination(isPresented: $showingHistory) { exerciseHistory }
                 .confirmationDialog(String(localized: "结束本次运动并保存记录？", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), isPresented: $confirmFinish, titleVisibility: .visible) {
@@ -561,6 +651,9 @@ struct ExerciseView: View {
                     if let linked = item.activity { Text(family.exerciseActivityTitle(linked)).font(.subheadline).foregroundStyle(.secondary) }
                     Text(exerciseDistanceTitle(item)).font(.headline).monospacedDigit()
                     if let altitude = item.altitudeRange { Text(String(format: String(localized: "海拔 %.1f–%.1f 米", bundle: AgentIdentityLanguage.appBundle()), altitude.lowerBound, altitude.upperBound)).font(.caption) }
+                    Button { workoutToShare = item } label: {
+                        Label(String(localized: "分享运动", bundle: AgentIdentityLanguage.appBundle()), systemImage: "person.2")
+                    }.buttonStyle(.borderless)
                     if !item.routePoints.isEmpty {
                         Button { selectedRoute = item } label: { Label(String(localized: "查看轨迹", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), systemImage: "map") }.buttonStyle(.borderless)
                     }
@@ -592,6 +685,9 @@ struct ExerciseView: View {
                     }
                 } message: { item in
                     Text(String(localized: "将删除这条\(item.kind)记录及轨迹，并同步到其他设备，删除后无法恢复。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)))
+                }
+                .sheet(item: $workoutToShare) { workout in
+                    ExerciseFriendShareView(exercise: exercise, family: family, workout: workout)
                 }
                 .sheet(item: $selectedRoute) { item in
                     NavigationStack {
@@ -1004,5 +1100,209 @@ private final class HikingGPXReader: NSObject, XMLParserDelegate {
         if element == "ele" && elevation { if let value = Double(text), value.isFinite, abs(value) < 20000 { highest = max(highest ?? value, value) }; elevation = false }
         if element == "trkpt" || element == "rtept" { if let point { segment.append(point) }; point = nil }
         if element == "trkseg" || element == "rte" { if !segment.isEmpty { segments.append(segment) }; active = false }
+    }
+}
+
+private struct ExerciseFriendShareView: View {
+    private struct Track: Decodable, Identifiable {
+        let id: Int
+        let name: String
+        let points: [ExerciseRoutePoint]
+        var color: Color {
+            let colors: [Color] = [.blue, .orange, .purple, .green, .red, .cyan, .indigo, .mint, .pink, .brown, .teal, .gray]
+            return colors[id >= 0 ? id % colors.count : 0]
+        }
+    }
+
+    private struct Board: Decodable {
+        let kind: String
+        let workoutId: UUID?
+        let isOwner: Bool
+        let tracks: [Track]
+    }
+
+    @ObservedObject var exercise: ExerciseStore
+    let family: FamilyStore
+    let workout: ExerciseSession?
+    @Environment(\.dismiss) private var dismiss
+    @State private var input = ""
+    @State private var code: UUID?
+    @State private var board: Board?
+    @State private var hidden = Set<Int>()
+    @State private var busy = false
+    @State private var error = ""
+    @State private var camera: MapCameraPosition = .automatic
+
+    private var path: String { "/api/exercise/shares" }
+    private var name: String {
+        let username = family.profile?.text("username") ?? ""
+        let nickname = family.profile?.text("displayName") ?? ""
+        let label = nickname.isEmpty ? username : nickname
+        return label.isEmpty ? String(localized: "活动成员", bundle: AgentIdentityLanguage.appBundle()) : String(label.prefix(100))
+    }
+
+    var body: some View {
+        NavigationStack {
+            VStack(spacing: 12) {
+                if let board {
+                    Text(exerciseKindTitle(board.kind)).font(.headline)
+                    trackMap(board)
+                    if board.workoutId == nil {
+                        Button(String(localized: "加入并记录轨迹", bundle: AgentIdentityLanguage.appBundle())) {
+                            perform {
+                                guard let code, exercise.active == nil else { return }
+                                try await exercise.joinFriendShare(code, kind: board.kind, name: name)
+                                try await refresh(code)
+                            }
+                        }.buttonStyle(.borderedProminent).disabled(busy || exercise.active != nil)
+                    }
+                    if let code, let workoutID = board.workoutId {
+                        if board.isOwner {
+                            ShareLink(item: code.uuidString) {
+                                Label(String(localized: "分享邀请码", bundle: AgentIdentityLanguage.appBundle()), systemImage: "square.and.arrow.up")
+                            }.buttonStyle(.bordered)
+                        }
+                        Button(board.isOwner ? String(localized: "停止共享", bundle: AgentIdentityLanguage.appBundle()) : String(localized: "退出共享", bundle: AgentIdentityLanguage.appBundle()), role: .destructive) {
+                            perform {
+                                let suffix = board.isOwner ? "" : "/member"
+                                _ = try await family.call(path + "/\(code.uuidString)" + suffix, method: "DELETE")
+                                exercise.clearFriendShare(for: workoutID)
+                                self.code = nil
+                                self.board = nil
+                            }
+                        }.disabled(busy)
+                    }
+                } else {
+                    if let workout {
+                        Button(String(localized: "创建运动分享", bundle: AgentIdentityLanguage.appBundle())) {
+                            perform {
+                                let response = try await family.call(path, method: "POST", body: [
+                                    "kind": workout.kind, "name": name, "workoutId": workout.id.uuidString
+                                ]) as? [String: Any]
+                                guard let value = response?["code"] as? String, let id = UUID(uuidString: value) else { throw CocoaError(.coderReadCorrupt) }
+                                exercise.bindFriendShare(id, to: workout.id)
+                                code = id
+                                try await refresh(id)
+                                try await exercise.uploadFriendTrack(current(workout), code: id)
+                            }
+                        }.buttonStyle(.borderedProminent).disabled(busy)
+                    }
+                    TextField(String(localized: "好友运动邀请码", bundle: AgentIdentityLanguage.appBundle()), text: $input)
+                        .textInputAutocapitalization(.never).autocorrectionDisabled()
+                        .textFieldStyle(.roundedBorder)
+                    Button(String(localized: "仅查看", bundle: AgentIdentityLanguage.appBundle())) {
+                        guard let id = UUID(uuidString: input.trimmingCharacters(in: .whitespacesAndNewlines)) else { return }
+                        perform {
+                            try await refresh(id)
+                            code = id
+                        }
+                    }.buttonStyle(.bordered).disabled(busy || UUID(uuidString: input.trimmingCharacters(in: .whitespacesAndNewlines)) == nil)
+                    Spacer()
+                }
+                if let status = error.isEmpty ? nil : error {
+                    Text(status).font(.footnote).foregroundStyle(.secondary)
+                }
+            }.padding()
+            .navigationTitle(String(localized: "好友运动", bundle: AgentIdentityLanguage.appBundle()))
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button(String(localized: "完成", bundle: AgentIdentityLanguage.appBundle())) { dismiss() }
+                }
+            }
+            .task {
+                if let workout, let saved = exercise.friendShare(for: workout.id) { code = saved }
+            }
+            .task(id: code) {
+                guard let code else { return }
+                while !Task.isCancelled {
+                    do {
+                        try await refresh(code)
+                        error = ""
+                    } catch is CancellationError { return }
+                    catch let APIError.http(status, _) where status == 404 {
+                        error = String(localized: "运动分享已失效", bundle: AgentIdentityLanguage.appBundle())
+                        if let workout, exercise.friendShare(for: workout.id) == code { exercise.clearFriendShare(for: workout.id) }
+                        board = nil
+                        self.code = nil
+                        return
+                    } catch { self.error = error.localizedDescription }
+                    do { try await Task.sleep(for: .seconds(12)) } catch { return }
+                }
+            }
+        }
+    }
+
+    private func current(_ fallback: ExerciseSession) -> ExerciseSession {
+        if let active = exercise.active, active.id == fallback.id { return active }
+        return exercise.history.first { $0.id == fallback.id } ?? fallback
+    }
+
+    private func perform(_ operation: @escaping () async throws -> Void) {
+        guard !busy else { return }
+        busy = true
+        error = ""
+        Task {
+            defer { busy = false }
+            do { try await operation() }
+            catch is CancellationError { }
+            catch { self.error = error.localizedDescription }
+        }
+    }
+
+    private func refresh(_ code: UUID) async throws {
+        let raw = try await family.call(path + "/\(code.uuidString)", timeout: 10)
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        let next = try decoder.decode(Board.self, from: JSONSerialization.data(withJSONObject: raw))
+        try Task.checkCancellation()
+        board = next
+    }
+
+    private func trackMap(_ board: Board) -> some View {
+        Map(position: $camera) {
+            ForEach(board.tracks.filter { !hidden.contains($0.id) }) { track in
+                ForEach(segments(track), id: \.id) { segment in
+                    if segment.points.count > 1 {
+                        MapPolyline(coordinates: segment.points.map(coordinate)).stroke(track.color, lineWidth: 4)
+                    }
+                }
+                if let point = track.points.last {
+                    Marker(track.name, systemImage: "location.fill", coordinate: coordinate(point)).tint(track.color)
+                }
+            }
+        }.clipShape(RoundedRectangle(cornerRadius: 12))
+            .overlay(alignment: .top) {
+                ScrollView(.horizontal) {
+                    HStack(spacing: 10) {
+                        ForEach(board.tracks) { track in
+                            let shown = !hidden.contains(track.id)
+                            Button {
+                                if shown { hidden.insert(track.id) } else { hidden.remove(track.id) }
+                                camera = .automatic
+                            } label: {
+                                Label(track.name, systemImage: shown ? "circle.fill" : "circle")
+                                    .foregroundStyle(shown ? track.color : .secondary)
+                                    .font(.subheadline.weight(.medium))
+                                    .padding(.horizontal, 8).padding(.vertical, 7)
+                            }.buttonStyle(.plain)
+                                .accessibilityAddTraits(shown ? .isSelected : [])
+                        }
+                    }.padding(.horizontal, 8)
+                }.scrollIndicators(.hidden).background(.regularMaterial)
+            }
+    }
+
+    private struct ShareSegment {
+        let id: UUID
+        let points: [ExerciseRoutePoint]
+    }
+
+    private func segments(_ track: Track) -> [ShareSegment] {
+        Dictionary(grouping: track.points, by: \.segment).map { ShareSegment(id: $0.key, points: $0.value) }
+    }
+
+    private func coordinate(_ point: ExerciseRoutePoint) -> CLLocationCoordinate2D {
+        CLLocationCoordinate2D(latitude: point.latitude, longitude: point.longitude)
     }
 }

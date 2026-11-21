@@ -1,6 +1,56 @@
 {
   "catalogVersion": 1,
   "messages": {
+    "moment.t6b4b7c567e07": {
+      "zh-Hans": "好友运动",
+      "en": "Workout with friends",
+      "iosKey": "好友运动"
+    },
+    "moment.tbf73cb8faae3": {
+      "zh-Hans": "分享运动",
+      "en": "Share workout",
+      "iosKey": "分享运动"
+    },
+    "moment.tc776c75be5f3": {
+      "zh-Hans": "加入并记录轨迹",
+      "en": "Join and record route",
+      "iosKey": "加入并记录轨迹"
+    },
+    "moment.t6165ad24e2a2": {
+      "zh-Hans": "分享邀请码",
+      "en": "Share invite code",
+      "iosKey": "分享邀请码"
+    },
+    "moment.t55f4bf0ef256": {
+      "zh-Hans": "停止共享",
+      "en": "Stop sharing",
+      "iosKey": "停止共享"
+    },
+    "moment.t2ddd9936618a": {
+      "zh-Hans": "退出共享",
+      "en": "Leave shared workout",
+      "iosKey": "退出共享"
+    },
+    "moment.t515ecd4a46d0": {
+      "zh-Hans": "创建运动分享",
+      "en": "Create workout share",
+      "iosKey": "创建运动分享"
+    },
+    "moment.tf57e62a57442": {
+      "zh-Hans": "好友运动邀请码",
+      "en": "Workout invite code",
+      "iosKey": "好友运动邀请码"
+    },
+    "moment.t39395c1df20e": {
+      "zh-Hans": "仅查看",
+      "en": "View only",
+      "iosKey": "仅查看"
+    },
+    "moment.tdfa6a174d6b9": {
+      "zh-Hans": "运动分享已失效",
+      "en": "This workout share has expired",
+      "iosKey": "运动分享已失效"
+    },
     "moment.t678bef1cb5ca": {
       "zh-Hans": "设为封面",
       "en": "Set as cover",

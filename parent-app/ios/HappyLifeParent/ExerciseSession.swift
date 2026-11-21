@@ -10,6 +10,7 @@ struct ExerciseArchive: Codable {
     var active: ExerciseSession?
     var history: [ExerciseSession] = []
     var activityShares: [UUID: UUID]?
+    var friendShares: [UUID: UUID]?
     var importedWatchIDs: [UUID]?
     var uploaded: [UUID]?
     var pendingDeletions: [UUID]?

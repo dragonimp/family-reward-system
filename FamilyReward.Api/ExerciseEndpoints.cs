@@ -47,6 +47,7 @@ internal static class ExerciseEndpoints
         var root = app.Configuration["Exercise:DataDirectory"] ?? Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "LinkoMoment", "exercise-records");
         var store = new ExerciseRecordStore(Path.GetFullPath(root));
+        app.MapExerciseShares(Path.GetFullPath(root));
         var group = app.MapGroup("/api/exercise/records").RequireAuthorization();
         static string? Owner(ClaimsPrincipal user) {
             var subject = user.FindFirstValue("sub") ?? user.FindFirstValue(ClaimTypes.NameIdentifier);

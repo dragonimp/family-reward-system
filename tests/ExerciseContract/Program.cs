@@ -48,6 +48,32 @@ client.DefaultRequestHeaders.Remove("X-Exercise-Test-Owner");client.DefaultReque
 await Expect(await client.DeleteAsync($"/api/exercise/records/{id.ToString("D").ToUpperInvariant()}"), HttpStatusCode.OK);
 await Expect(await client.PutAsJsonAsync($"/api/exercise/records/{id:D}", record), HttpStatusCode.Conflict);
 Console.WriteLine("PASS: altitude roundtrip, negative elevation, invalid accuracy rejection, legacy replay, immutable conflicts, GUID case variants, account isolation and deletion tombstones");
+const string shares = "/api/exercise/shares";
+using var created = await client.PostAsJsonAsync(shares, new { kind = "飞行", name = "Host", workoutId = id });
+await Expect(created, HttpStatusCode.OK);
+var code = (await created.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("code").GetGuid();
+var sharePath = $"{shares}/{code:D}";
+await Expect(await client.PutAsJsonAsync(sharePath + "/track", new { workoutId = id, points = record.Route }), HttpStatusCode.OK);
+using var guest = new HttpClient { BaseAddress = new Uri(address) };
+await Expect(await guest.GetAsync(sharePath), HttpStatusCode.Unauthorized);
+guest.DefaultRequestHeaders.Add("X-Exercise-Test-Owner", Guid.NewGuid().ToString());
+var view = await guest.GetFromJsonAsync<JsonElement>(sharePath);
+if (view.GetProperty("tracks").GetArrayLength() != 1 || view.GetProperty("workoutId").ValueKind != JsonValueKind.Null)
+    throw new Exception("Viewing must not join a workout");
+await Expect(await guest.PutAsJsonAsync(sharePath + "/track", new { workoutId = id, points = record.Route }), HttpStatusCode.Forbidden);
+var guestWorkout = Guid.NewGuid();
+await Expect(await guest.PutAsJsonAsync(sharePath + "/member", new { name = "Guest", workoutId = guestWorkout }), HttpStatusCode.OK);
+await Expect(await guest.PutAsJsonAsync(sharePath + "/track", new { workoutId = id, points = record.Route }), HttpStatusCode.Forbidden);
+await Expect(await guest.PutAsJsonAsync(sharePath + "/track", new { workoutId = guestWorkout, points = record.Route }), HttpStatusCode.OK);
+view = await client.GetFromJsonAsync<JsonElement>(sharePath);
+if (view.GetProperty("tracks").GetArrayLength() != 2 || view.GetProperty("tracks").EnumerateArray().Any(track => track.GetProperty("points").GetArrayLength() != 1))
+    throw new Exception("Both participant tracks must be present");
+await Expect(await guest.DeleteAsync(sharePath), HttpStatusCode.Forbidden);
+await Expect(await guest.DeleteAsync(sharePath + "/member"), HttpStatusCode.OK);
+await Expect(await guest.PutAsJsonAsync(sharePath + "/track", new { workoutId = guestWorkout, points = record.Route }), HttpStatusCode.Forbidden);
+await Expect(await client.DeleteAsync(sharePath), HttpStatusCode.NoContent);
+await Expect(await guest.GetAsync(sharePath), HttpStatusCode.NotFound);
+Console.WriteLine("PASS: workout share authentication, viewing, membership, isolated tracks and revocation");
 await app.StopAsync();
 
 sealed class FixtureAuthentication(IOptionsMonitor<AuthenticationSchemeOptions> options, ILoggerFactory log, UrlEncoder encoder) : AuthenticationHandler<AuthenticationSchemeOptions>(options, log, encoder) {
