@@ -13,8 +13,8 @@
     },
     "moment.nslocationwheninuseusagedescription": {
       "iosKey": "NSLocationWhenInUseUsageDescription",
-      "zh-Hans": "在活动拍照、打卡或搜索附近餐厅时获取位置；开启运动地图后记录并同步轨迹。仅当您主动开启活动位置共享时，向当前活动成员显示位置，离开活动或进入后台即停止。",
-      "en": "Use location for activity photos, check-ins, nearby dining, and workout routes. Only when you enable activity location sharing, show your position to current activity members. Sharing stops when you leave the activity or the app enters the background."
+      "zh-Hans": "允许获取位置，用于活动拍照、打卡、查找附近餐厅和记录运动轨迹。您创建或加入好友运动时，持有邀请码并已登录的人可查看这次运动的轨迹。活动位置共享单独开启，离开活动或进入后台时停止。",
+      "en": "Allow location access for activity photos, check-ins, nearby dining, and workout routes. When you create or join a shared workout, signed-in people with the invite code can view its route. Activity location sharing is separate and stops when you leave the activity or the app enters the background."
     },
     "moment.nshealthshareusagedescription": {
       "iosKey": "NSHealthShareUsageDescription",

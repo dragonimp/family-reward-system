@@ -3,7 +3,7 @@
 "NSMicrophoneUsageDescription" = "录制活动视频时采集声音。";
 "NSPhotoLibraryUsageDescription" = "自动匹配您已共享照片和视频的本机原件，核验一致后继续原下载请求。只读取您授权的照片，不修改或删除系统相册内容。";
 "NSPhotoLibraryAddUsageDescription" = "将您拍摄的照片和视频保存到系统相册，保留原件并共享到活动。";
-"NSLocationWhenInUseUsageDescription" = "在活动拍照、打卡或搜索附近餐厅时获取位置；开启运动地图后记录并同步轨迹。仅当您主动开启活动位置共享时，向当前活动成员显示位置，离开活动或进入后台即停止。";
+"NSLocationWhenInUseUsageDescription" = "允许获取位置，用于活动拍照、打卡、查找附近餐厅和记录运动轨迹。您创建或加入好友运动时，持有邀请码并已登录的人可查看这次运动的轨迹。活动位置共享单独开启，离开活动或进入后台时停止。";
 "NSLocalNetworkUsageDescription" = "通过 Linko Connect 与活动成员的设备连接，传输您共享的照片和视频原文件。";
 "NSHealthShareUsageDescription" = "读取您授权的心率、活动能量、步数、距离和手表体能训练，用于显示本次运动数据。";
 "NSHealthUpdateUsageDescription" = "将您主动记录的手表运动保存到 Apple 健康，用于在手机和手表查看运动记录。";

@@ -1,6 +1,11 @@
 {
   "catalogVersion": 1,
   "messages": {
+    "moment.tacb20b994748": {
+      "zh-Hans": "创建或加入后，持有邀请码并已登录的人可以查看你的运动轨迹。",
+      "en": "After you create or join, signed-in people with the invite code can view your workout route.",
+      "iosKey": "创建或加入后，持有邀请码并已登录的人可以查看你的运动轨迹。"
+    },
     "moment.t6b4b7c567e07": {
       "zh-Hans": "好友运动",
       "en": "Workout with friends",

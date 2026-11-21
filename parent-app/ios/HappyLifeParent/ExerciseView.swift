@@ -1199,6 +1199,10 @@ private struct ExerciseFriendShareView: View {
                     }.buttonStyle(.bordered).disabled(busy || UUID(uuidString: input.trimmingCharacters(in: .whitespacesAndNewlines)) == nil)
                     Spacer()
                 }
+                if (workout != nil && board == nil) || (board?.workoutId == nil && board != nil) {
+                    Text(String(localized: "创建或加入后，持有邀请码并已登录的人可以查看你的运动轨迹。", bundle: AgentIdentityLanguage.appBundle()))
+                        .font(.footnote).foregroundStyle(.secondary)
+                }
                 if let status = error.isEmpty ? nil : error {
                     Text(status).font(.footnote).foregroundStyle(.secondary)
                 }
