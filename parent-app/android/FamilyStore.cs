@@ -208,7 +208,7 @@ public sealed class FamilyStore
         {
             var message = new FamilyRecord(data).Text("error");
             if (string.IsNullOrEmpty(message)) message = new FamilyRecord(data).Text("message");
-            throw new FamilyApiException(string.IsNullOrEmpty(message) ? $"请求失败（{(int)response.StatusCode}）。" : message);
+            throw new FamilyApiException(string.IsNullOrEmpty(message) ? $"请求失败（{(int)response.StatusCode}）。" : message, response.StatusCode);
         }
         return data;
     }

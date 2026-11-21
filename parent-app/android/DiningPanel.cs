@@ -150,12 +150,12 @@ public sealed class DiningPanel : ContentView
             var stack = new VerticalStackLayout { Spacing = 4, Padding = new Thickness(4, 7) }; stack.Add(MomentStyle.Icon(item.Item1, false));
             stack.Add(new Label { Text = item.Item1, FontSize = 14, FontAttributes = FontAttributes.Bold, HorizontalTextAlignment = TextAlignment.Center, TextColor = MomentStyle.Ink });
             var tile = MomentStyle.Card(stack, new Thickness(0)); tile.BackgroundColor = active ? Color.FromArgb("#FFF0E2") : Colors.Transparent; tile.IsEnabled = !checkingIn;
-            var tap = new TapGestureRecognizer(); tap.Tapped += (_, _) => { if (selection != item.Item2) { ++generation; operation?.Cancel(); busy = false; selection = item.Item2; candidates = []; result = null; confirmed = false; } _ = Decide(); }; tile.GestureRecognizers.Add(tap); shortcuts.Add(tile, i);
+            var tap = new TapGestureRecognizer(); tap.Tapped += (_, _) => { if (selection != item.Item2) { ++generation; operation?.Cancel(); busy = false; selection = item.Item2; if (selection != "random") foodMap = null; candidates = []; result = null; confirmed = false; } _ = Decide(); }; tile.GestureRecognizers.Add(tap); shortcuts.Add(tile, i);
         }
         body.Add(MomentStyle.Card(shortcuts, new Thickness(4)));
         var location = new Grid { ColumnDefinitions = new ColumnDefinitionCollection { new(GridLength.Star), new(GridLength.Auto) } };
-        var positionName = archive.Circles.FirstOrDefault(c => c.Id == circleId)?.Name ?? temporaryPosition?.Name ?? "当前位置附近";
-        var position = MomentStyle.Action($"◎ {positionName} {(positionsExpanded ? "▴" : "▾")}", () => { positionsExpanded = !positionsExpanded; Render(); });
+        var positionName = foodMap?.Name ?? archive.Circles.FirstOrDefault(c => c.Id == circleId)?.Name ?? temporaryPosition?.Name ?? "当前位置附近";
+        var position = MomentStyle.Action($"◎ {positionName} {(positionsExpanded ? "▴" : "▾")}", () => _ = TogglePositions());
         position.HorizontalOptions = LayoutOptions.Start;
         position.IsEnabled = !Working;
         location.Add(position);
@@ -163,7 +163,7 @@ public sealed class DiningPanel : ContentView
         if (positionsExpanded)
         {
             var options = new VerticalStackLayout { Spacing = 2, MaximumWidthRequest = 280, HorizontalOptions = LayoutOptions.Start };
-            options.Add(MomentStyle.Action(circleId is null ? "当前位置    ✓" : "当前位置", () => _ = ChoosePosition(null)));
+            options.Add(MomentStyle.Action(circleId is null && foodMap is null ? "当前位置    ✓" : "当前位置", () => _ = ChoosePosition(null)));
             foreach (var circle in archive.Circles)
                 options.Add(MomentStyle.Action(circle.Id == circleId ? $"{circle.Name}    ✓" : circle.Name, () => _ = ChoosePosition(circle)));
             body.Add(MomentStyle.Card(options, new Thickness(6)));
@@ -181,10 +181,12 @@ public sealed class DiningPanel : ContentView
             ColumnDefinitions = new ColumnDefinitionCollection { new(GridLength.Star), new(GridLength.Star) }
         };
         socialActions.Add(MomentStyle.Action("一起干饭", () => _ = owner.Navigation.PushAsync(new DiningGatheringsPage(store, result))), 0, 0);
-        socialActions.Add(MomentStyle.Action("我的饭圈", () => _ = owner.Navigation.PushAsync(new DiningCirclePage(store, result))), 1, 0);
+        socialActions.Add(MomentStyle.Action("我的饭圈", () => _ = owner.Navigation.PushAsync(new DiningFoodMapsPage(store, Circles, () => owner.Navigation.PushAsync(new DiningCirclePage(store, result)), place => Navigate(place), foodMap?.Id))), 1, 0);
         body.Add(socialActions);
         if (result is { } place)
         {
+            foreach (var map in followedFoodMaps)
+                options.Add(MomentStyle.Action(map.Id == foodMap?.Id ? $"{map.Name}    ✓" : map.Name, () => _ = SelectFoodMap(map)));
             var card = new VerticalStackLayout { Spacing = 14 };
             card.Add(MomentStyle.Title("命运安排好了，走，干饭！", 18)); card.Add(MomentStyle.Title(place.Name, 25));
             if (place.Address.Length > 0) card.Add(MomentStyle.Caption("📍 " + place.Address));
@@ -343,6 +345,16 @@ public sealed class DiningPanel : ContentView
                 resultMood = "automatic"; resultMeal = null; confirmed = false; resultOperation = Guid.NewGuid();
                 message = result is null ? "附近 5 公里内暂无常去餐厅。" : familiar.Count == 1 ? "这个范围内只有一家常去餐厅。" : null;
                 return;
+            if (selection == "random" && foodMap is { } map)
+            {
+                var snapshot = await DiningFoodMapsPage.Read(store, map.Id);
+                if (current != generation) return;
+                var places = snapshot.Places.Select(p => p.Restaurant(snapshot.CoordinateSystem)).ToList();
+                result = DiningRecommendation.Pick(places, "automatic", archive, result?.Id, selection: "random");
+                resultMood = "automatic"; resultMeal = null; confirmed = false; resultOperation = Guid.NewGuid();
+                if (result is null) message = "这个饭圈还没有美食地点。";
+                return;
+            }
             }
             if (cachedFood != food || cachedMeal != mealKey || cachedDriving != driving || DateTimeOffset.UtcNow - fetchedAt > TimeSpan.FromMinutes(5)) candidates = [];
             if (candidates.Count == 0) {
@@ -598,6 +610,21 @@ public sealed class DiningPanel : ContentView
             return;
         }
         var modes = new[] { "驾车", "步行", "公交", "骑行" };
+        if (place.Provider == "mapkit" && place.Id.StartsWith("foodmap:", StringComparison.Ordinal))
+        {
+            try
+            {
+                var response = await SearchNearby(new Location(place.Latitude, place.Longitude), false, CancellationToken.None);
+                var center = response.GetProperty("searchCenter");
+                place = place with { Provider = "amap", Latitude = center.GetProperty("latitude").GetDouble(),
+                    Longitude = center.GetProperty("longitude").GetDouble() };
+            }
+            catch (Exception)
+            {
+                await owner.DisplayAlertAsync("无法导航", "目的地坐标暂时无法转换，请稍后重试。", "知道了");
+                return;
+            }
+        }
         var travel = await owner.DisplayActionSheetAsync("导航方式", "取消", null, modes);
         var mode = Array.IndexOf(modes, travel);
         if (mode < 0) return;
@@ -631,10 +658,10 @@ public sealed class DiningPanel : ContentView
     }
     private async Task Menu()
     {
-        var choice = await owner.DisplayActionSheetAsync("干饭", "取消", null, "到店打卡", "干饭记录与收藏", "我的生活圈");
+        var choice = await owner.DisplayActionSheetAsync("干饭", "取消", null, "到店打卡", "干饭记录与收藏", "我的饭圈");
         if (choice == "到店打卡") await CheckInNearby();
         else if (choice == "干饭记录与收藏") await Records();
-        else if (choice == "我的生活圈") await Circles();
+        else if (choice == "我的饭圈") await owner.Navigation.PushAsync(new DiningFoodMapsPage(store, Circles, () => owner.Navigation.PushAsync(new DiningCirclePage(store, result)), place => Navigate(place), foodMap?.Id));
     }
     private async Task Records()
     {
@@ -689,6 +716,28 @@ public sealed class DiningPanel : ContentView
         await Decide();
     }
 
+    private DiningFoodMapsPage.Map? foodMap;
+    private DiningFoodMapsPage.Map[] followedFoodMaps = [];
+
+    private async Task TogglePositions()
+    {
+        positionsExpanded = !positionsExpanded;
+        Render();
+        if (!positionsExpanded) return;
+        try { followedFoodMaps = await DiningFoodMapsPage.Discover(store, followed: true); }
+        catch (Exception) { followedFoodMaps = []; }
+        if (positionsExpanded) Render();
+    }
+
+    private async Task SelectFoodMap(DiningFoodMapsPage.Map map)
+    {
+        if (Working) return;
+        ResetPosition(resetMode: false);
+        foodMap = map;
+        selection = "random";
+        await Decide();
+    }
+
     public void ResetPosition(bool resetMode = true)
     {
         positionsExpanded = false;
@@ -708,9 +757,10 @@ public sealed class DiningPanel : ContentView
         {
             var circles = archive.Circles.ToArray();
             var choices = new[] { "新增常用地址" }.Concat(circles.Select((c, i) => $"{i + 1}. {c.Name}")).ToArray();
-            var index = Array.IndexOf(choices, await owner.DisplayActionSheetAsync("我的生活圈", "完成", null, choices));
+            var index = Array.IndexOf(choices, await owner.DisplayActionSheetAsync("常用地址", "完成", null, choices));
             if (index < 0) return;
             var circle = index > 0 ? circles[index - 1] : null;
+        foodMap = null;
             if (circle is not null)
             {
                 var option = await owner.DisplayActionSheetAsync(circle.Name, "取消", "删除", "编辑");

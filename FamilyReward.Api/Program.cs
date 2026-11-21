@@ -196,6 +196,7 @@ app.MapDiningAccounts(connectionString, DiningOwner);
 app.MapDiningGatherings(connectionString, DiningOwner);
 app.MapDiningCircle(connectionString, DiningOwner);
 app.MapPersonalKitchen(connectionString, request =>
+app.MapDiningFoodMaps(connectionString, DiningOwner);
 {
     if (!AgentIdentityAuthorizationExtensions.IsUserIdentity(request.HttpContext.User)) return null;
     var owner = FirstClaim(request, ClaimTypes.NameIdentifier, "sub", "user_id", "uid");

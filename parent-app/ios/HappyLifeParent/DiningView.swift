@@ -191,9 +191,17 @@ import CoreImage.CIFilterBuiltins
         selectCircle(nil)
         temporaryPosition = place
     }
+    @Published fileprivate var foodMap: FoodMapSummary?
+    fileprivate func selectFoodMap(_ map: FoodMapSummary) {
+        selectCircle(nil)
+        foodMap = map
+        selection = .random
+    }
+
     func selectCircle(_ id: UUID?) {
         guard !busy else { return }
         temporaryPosition = nil
+        foodMap = nil
         circleID = id; origin = nil; candidates = []; result = nil; walking = nil; confirmed = false
     }
     func saveCircle(_ name: String) async {
@@ -229,6 +237,7 @@ import CoreImage.CIFilterBuiltins
         guard selection != mode else { return }
         stop()
         selection = mode
+        if mode != .random { foodMap = nil }
         candidates = []; result = nil; confirmed = false
     }
     func decide() async {
@@ -246,6 +255,18 @@ import CoreImage.CIFilterBuiltins
         let radius: CLLocationDistance = trip.driving ? 8000 : 3000
         if resultMeal != mealKey { result = nil; confirmed = false }
         do {
+            if selection == .random, let foodMap {
+                let raw = try await family.call("/api/dining/food-maps/\(foodMap.id)")
+                let map = try JSONDecoder().decode(FoodMapSnapshot.self, from: JSONSerialization.data(withJSONObject: raw))
+                guard current == generation else { return }
+                let previous = result?.id
+                let places = map.places.map { $0.restaurant(native: map.nativeCoordinates) }
+                let alternatives = places.filter { $0.id != previous }
+                result = (alternatives.isEmpty ? places : alternatives).randomElement()
+                resultMood = .automatic; resultMeal = nil; confirmed = false; resultOperation = UUID()
+                if result == nil { message = diningText("这个饭圈还没有美食地点。") }
+                return
+            }
             if selection == .familiar {
                 let location: CLLocation
                 if let circle = archive.circles.first(where: { $0.id == circleID }) { location = CLLocation(latitude: circle.latitude, longitude: circle.longitude) }
@@ -377,7 +398,7 @@ import CoreImage.CIFilterBuiltins
               let data = try? JSONSerialization.data(withJSONObject: response) else { return nil }
         return try? JSONDecoder().decode(DiningMapDetails.self, from: data)
     }
-    func refreshLocation() { stop(); selection = .recommended; temporaryPosition = nil; circleID = nil; candidates = []; origin = nil; result = nil; walking = nil; confirmed = false }
+    func refreshLocation() { stop(); selection = .recommended; foodMap = nil; temporaryPosition = nil; circleID = nil; candidates = []; origin = nil; result = nil; walking = nil; confirmed = false }
     func stop() {
         generation = UUID(); search?.cancel(); directions?.cancel(); timeout?.cancel(); locator.stopUpdatingLocation()
         waiting?.resume(throwing: CancellationError()); waiting = nil; busy = false; checkingIn = false
@@ -534,6 +555,8 @@ struct DiningView: View {
     @State private var showingFilters = false
     @State private var showingGatherings = false
     @State private var showingDiningCircle = false
+    @State private var showingFoodMaps = false
+    @State private var followedFoodMaps: [FoodMapSummary] = []
     @State private var historySharePlace: DiningPlace?
     private let family: FamilyStore
     @State private var spinning = false
@@ -562,9 +585,18 @@ struct DiningView: View {
                     .disabled(model.checkingIn)
 
                     HStack(spacing: 8) {
-                        Button { showingLocations.toggle() } label: {
+                        Button {
+                            showingLocations.toggle()
+                            if showingLocations {
+                                Task {
+                                    guard let value = try? await family.call("/api/dining/food-maps/?followed=true"),
+                                          let data = try? JSONSerialization.data(withJSONObject: value) else { return }
+                                    followedFoodMaps = (try? JSONDecoder().decode([FoodMapSummary].self, from: data)) ?? []
+                                }
+                            }
+                        } label: {
                             HStack(spacing: 5) {
-                                Label(model.archive.circles.first(where: { $0.id == model.circleID })?.name ?? model.temporaryPosition?.name ?? diningText("当前位置附近"), systemImage: "location.circle")
+                                Label(model.foodMap?.name ?? model.archive.circles.first(where: { $0.id == model.circleID })?.name ?? model.temporaryPosition?.name ?? diningText("当前位置附近"), systemImage: "location.circle")
                                     .lineLimit(1)
                                 Image(systemName: showingLocations ? "chevron.up" : "chevron.down").font(.caption2).accessibilityHidden(true)
                             }
@@ -578,7 +610,7 @@ struct DiningView: View {
 
                     if showingLocations {
                         VStack(alignment: .leading, spacing: 0) {
-                            locationRow("当前位置", icon: "location.fill", marked: model.circleID == nil) {
+                            locationRow("当前位置", icon: "location.fill", marked: model.circleID == nil && model.foodMap == nil) {
                                 showingLocations = false; pickingPosition = true
                             }
                             ForEach(model.archive.circles) { circle in
@@ -586,6 +618,14 @@ struct DiningView: View {
                                 locationRow(circle.name, icon: "mappin", marked: model.circleID == circle.id) {
                                     showingLocations = false
                                     model.selectCircle(circle.id)
+                                    Task { await model.decide() }
+                                }
+                            }
+                            ForEach(followedFoodMaps) { map in
+                                Divider()
+                                locationRow(map.name, icon: "map", marked: model.foodMap?.id == map.id) {
+                                    showingLocations = false
+                                    model.selectFoodMap(map)
                                     Task { await model.decide() }
                                 }
                             }
@@ -599,7 +639,7 @@ struct DiningView: View {
 
                     HStack(spacing: 16) {
                         Button("一起干饭", systemImage: "person.2") { showingGatherings = true }
-                        Button("我的饭圈", systemImage: "bubble.left") { showingDiningCircle = true }
+                        Button("我的饭圈", systemImage: "map") { showingFoodMaps = true }
                     }.font(.subheadline)
                     if let syncMessage = model.syncMessage { Text(syncMessage).font(.caption).foregroundStyle(.secondary) }
                     if let place = model.result {
@@ -635,7 +675,7 @@ struct DiningView: View {
                     Menu {
                         Button(diningText("到店打卡"), systemImage: "mappin.circle") { showingCheckIn = true }
                         Button(String(localized: "干饭记录与收藏", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), systemImage: "clock") { showingRecords = true }
-                        Button(String(localized: "我的生活圈", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), systemImage: "location.circle") { showingCircles = true }
+                        Button("我的饭圈", systemImage: "map") { showingFoodMaps = true }
                     } label: { Image(systemName: "ellipsis.circle").accessibilityLabel(String(localized: "干饭菜单", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) }
                     .disabled(model.busy)
                 }
@@ -643,7 +683,6 @@ struct DiningView: View {
             .sheet(isPresented: $showingCheckIn, onDismiss: model.closeCheckIn) { DiningCheckInSheet(model: model) }
             .sheet(isPresented: $showingFilters) { filters }
             .sheet(isPresented: $showingRecords) { records }
-            .sheet(isPresented: $showingCircles) { circles }
             .onChange(of: model.busy) { _, busy in spinning = busy }
             .task {
                 await model.synchronize()
@@ -655,7 +694,11 @@ struct DiningView: View {
             .onDisappear { showingLocations = false; model.refreshLocation(); navigationPlace = nil }
             .onChange(of: active) { _, active in if !active { model.refreshLocation() } }
         }
-        .sheet(isPresented: $showingDiningCircle) { DiningCircleView(family: family, place: model.result) }
+        .sheet(isPresented: $showingFoodMaps) {
+            FoodMapsView(family: family, model: model, circles: { showingCircles = true }, social: { showingDiningCircle = true })
+                .sheet(isPresented: $showingCircles) { circles }
+                .sheet(isPresented: $showingDiningCircle) { DiningCircleView(family: family, place: model.result) }
+        }
         .sheet(isPresented: $pickingPosition) {
             DiningPlacePicker(model: model, restaurant: false) {
                 model.selectPosition($0); Task { await model.decide() }
@@ -969,7 +1012,7 @@ struct DiningView: View {
                 }
                 if model.busy { ProgressView() }
                 if let message = model.message { Text(message).foregroundStyle(.secondary) }
-            }.navigationTitle(String(localized: "我的生活圈", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))).toolbar { ToolbarItem(placement: .topBarTrailing) { Button(String(localized: "完成", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) { showingCircles = false } } }
+            }.navigationTitle("常用地址").toolbar { ToolbarItem(placement: .topBarTrailing) { Button(String(localized: "完成", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) { showingCircles = false } } }
             .sheet(isPresented: $managingAddress) {
                 VStack(spacing: 12) {
                     TextField("常用地址名称（如家附近）", text: $circleName).textFieldStyle(.roundedBorder)
@@ -1579,10 +1622,11 @@ struct DiningPlacePicker: View {
     @State private var searching = false
 
     init(model: DiningStore, restaurant: Bool, initial: CLLocationCoordinate2D? = nil,
-         canChoose: @escaping () -> Bool = { true }, choose: @escaping (DiningPlace) -> Void) {
+         initialQuery: String = "", canChoose: @escaping () -> Bool = { true }, choose: @escaping (DiningPlace) -> Void) {
         self.model = model
         self.restaurant = restaurant
         self.initial = initial
+        self._query = State(initialValue: initialQuery)
         self.choose = choose
         self.canChoose = canChoose
     }
@@ -1629,6 +1673,7 @@ struct DiningPlacePicker: View {
             .navigationTitle(restaurant ? "选择餐厅" : "调整位置")
             .toolbar { ToolbarItem(placement: .cancellationAction) { Button("取消") { dismiss() } } }
             .task {
+                if !query.isEmpty { await search(); return }
                 if let initial { move(initial) }
                 else if let location = try? await model.locate() {
                     if center == nil { move(location.coordinate) }
@@ -1672,5 +1717,578 @@ struct DiningPlacePicker: View {
         guard canChoose() else { return }
         choose(makePlace(item.name ?? "地点", item.placemark.title ?? "", item.placemark.coordinate))
         dismiss()
+    }
+}
+
+fileprivate struct FoodMapSummary: Decodable, Identifiable {
+    let id: UUID
+    let name: String
+    let followed: Bool
+}
+
+private struct FoodMapPoint: Codable, Identifiable {
+    let id: UUID
+    let name, category, locationText, description: String
+    let latitude, longitude, x, y: Double
+    let visits: Int
+    let rating: Double?
+    func restaurant(native: Bool) -> DiningPlace {
+        DiningPlace(id: "foodmap:\(id)", name: name, address: locationText, latitude: latitude,
+                    longitude: longitude, category: category, provider: native ? "mapkit" : "amap", distanceMeters: 0)
+    }
+}
+
+private struct FoodMapSnapshot: Codable {
+    let id: UUID
+    let name: String
+    let latitude, longitude: Double?
+    let coordinateSystem: String?
+    let canApprove: Bool?
+    var nativeCoordinates: Bool { coordinateSystem == "wgs84" }
+    var center: CLLocationCoordinate2D? {
+        guard nativeCoordinates, let latitude, let longitude else { return nil }
+        return CLLocationCoordinate2D(latitude: latitude, longitude: longitude)
+    }
+    let dataVersion: Int
+    let full: Bool
+    var places: [FoodMapPoint]
+}
+
+private struct FoodMapPendingPoint: Decodable, Identifiable {
+    let id: UUID
+    let name, category, locationText: String
+}
+
+private struct FoodMapsView: View {
+    static let path = "/api/dining/food-maps"
+    let family: FamilyStore
+    let model: DiningStore
+    let circles: () -> Void
+    let social: () -> Void
+    @Environment(\.dismiss) private var dismiss
+    @State private var query = ""
+    @State private var maps: [FoodMapSummary] = []
+    @State private var selected: FoodMapSummary?
+    @State private var snapshot: FoodMapSnapshot?
+    @State private var point: FoodMapPoint?
+    @State private var status = ""
+    @State private var name = ""
+    @State private var category = ""
+    @State private var locationText = ""
+    @State private var introduction = ""
+    @State private var creating = false
+    @State private var editing = false
+    @State private var draft: CLLocationCoordinate2D?
+    @State private var pendingPoints: [FoodMapPendingPoint] = []
+    @State private var pilotAddress: String?
+    @State private var chooseCenterAfterForm = false
+    @State private var showingDetail = false
+    @State private var busy = false
+    @State private var note = ""
+    @State private var stars = 5
+    @State private var reviewText: [String] = []
+    @Environment(\.scenePhase) private var scenePhase
+
+    private struct Pending: Codable {
+        let method: String
+        let path: String
+        let json: Data?
+        let gpsLatitude: Double?
+        let gpsLongitude: Double?
+    }
+
+    var body: some View {
+        NavigationStack {
+            List {
+                Section {
+                    Button("常用地址", action: circles)
+                    Button("饭搭子动态", action: social)
+                }
+                if let selected, let snapshot {
+                    Section(selected.name) {
+                        FoodNativeMap(map: snapshot, draft: $draft) { coordinate in
+                            draft = coordinate
+                        } select: { place in
+                            point = place; reviewText = []; note = ""; showingDetail = true
+                        }
+                        .id(snapshot.id)
+                        .frame(height: 320)
+                        Text("长按地图放置标记，拖动橙色标记可调整位置。").font(.caption)
+                        if snapshot.center == nil {
+                            Text("旧饭圈保留原有地点列表，地图暂未配准。").font(.caption)
+                        }
+                        if draft != nil {
+                            Button("确认位置并填写美食信息") { beginPlaceForm() }
+                            Button("取消选点") { draft = nil }
+                        }
+                        Button("检查更新") { Task { await flushIfPossible(); await open(selected, delta: true) } }
+                        Button("添加美食（当前位置）") {
+                            Task {
+                                await run { draft = try await model.locate().coordinate }
+                            }
+                        }
+                        Button("返回饭圈列表") { self.selected = nil; self.snapshot = nil; point = nil; draft = nil; pendingPoints = []; Task { await discover() } }
+                    }
+                    Section("美食地点") {
+                        ForEach(snapshot.places) { place in
+                            Button { point = place; reviewText = []; note = "" } label: {
+                                VStack(alignment: .leading) {
+                                    Text(place.name)
+                                    Text("\(place.category) · \(place.locationText)").font(.caption)
+                                    Text("\(place.visits) 人去过" + (place.rating.map { " · ⭐ \($0.formatted()) / 5" } ?? "")).font(.caption)
+                                }
+                            }
+                        }
+                    }
+                    if snapshot.canApprove == true {
+                        Section("美食审核") {
+                            Button("查看待审核地点") { Task { await loadPending(selected.id) } }
+                            ForEach(pendingPoints) { item in
+                                VStack(alignment: .leading) {
+                                    Text(item.name)
+                                    Text("\(item.category) · \(item.locationText)").font(.caption)
+                                    Button("审核通过") { Task { await approve(item, in: selected) } }
+                                }
+                            }
+                        }
+                    }
+                    if let point, !showingDetail {
+                        Section(point.name) {
+                            if !point.description.isEmpty { Text(point.description) }
+                            Button("我去过") { Task { await write("/places/\(point.id)/visit") } }
+                            Picker("评分", selection: $stars) { ForEach(1...5, id: \.self) { Text("\($0) 星").tag($0) } }
+                            TextField("点评（选填）", text: $note)
+                            Button("提交评分") { Task { await write("/places/\(point.id)/review", body: ["stars": stars, "note": note]) } }
+                            Button("查看在线点评") { Task { await loadReviews(point) } }
+                            ForEach(reviewText.indices, id: \.self) { Text(reviewText[$0]) }
+                            Button("带我去") {
+                                model.navigate(DiningPlace(id: "foodmap:\(point.id)", name: point.name, address: point.locationText,
+                                    latitude: point.latitude, longitude: point.longitude, category: point.category,
+                                    provider: snapshot.nativeCoordinates ? "manual" : "amap", distanceMeters: 0),
+                                    provider: snapshot.nativeCoordinates ? "apple" : "amap")
+                            }
+                        }
+                    }
+                } else {
+                    Section("发现饭圈") {
+                        TextField("搜索饭圈名称", text: $query).onSubmit { Task { await discover() } }
+                        Button("搜索") { Task { await discover() } }
+                        Button("查找附近饭圈") { Task { await discover(nearby: true) } }
+                        Button("创建饭圈") { creating = true; pilotAddress = nil; name = ""; editing = true }
+                        Button("厦门软件园二期试点") {
+                            creating = true
+                            name = "厦门软件园二期饭圈"
+                            pilotAddress = "福建省厦门市思明区软件园二期望海路10号"
+                            showingPicker = true
+                        }
+                    }
+                    ForEach(maps) { map in
+                        VStack(alignment: .leading, spacing: 10) {
+                            if map.followed { Button(map.name) { Task { await open(map) } } }
+                            else { Text(map.name) }
+                            Button(map.followed ? "取消关注" : "关注") { Task { await follow(map) } }
+                        }.buttonStyle(.borderless)
+                    }
+                }
+                if !status.isEmpty { Text(status).font(.caption).foregroundStyle(.secondary) }
+            }
+            .disabled(busy)
+            .navigationTitle("我的饭圈")
+            .toolbar { Button("完成") { dismiss() } }
+            .task {
+                await flushIfPossible()
+                if let map = model.foodMap { await open(map) } else { await discover() }
+            }
+            .onChange(of: scenePhase) { _, phase in
+                if phase == .active { Task { await flushIfPossible() } }
+            }
+            .sheet(isPresented: $editing, onDismiss: {
+                if chooseCenterAfterForm { chooseCenterAfterForm = false; showingPicker = true }
+            }) {
+                NavigationStack {
+                    Form {
+                        TextField(creating ? "饭圈名称" : "美食名称", text: $name)
+                        if !creating {
+                            TextField("美食类型", text: $category)
+                            TextField("文字位置描述", text: $locationText)
+                            TextField("美食介绍（选填）", text: $introduction)
+                        }
+                        if creating {
+                            Button("选择饭圈中心") { chooseCenterAfterForm = true; editing = false }
+                                .disabled(name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                        } else {
+                            Button("提交审核") {
+                                guard let draft else { return }
+                                editing = false
+                                Task { await add(coordinate: draft) }
+                            }.disabled([name, category, locationText].contains { $0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty })
+                        }
+                    }.navigationTitle(creating ? "创建饭圈" : "添加美食地点")
+                        .toolbar { Button("取消") { editing = false } }
+                }
+            }
+            .sheet(isPresented: $showingPicker) {
+                DiningPlacePicker(model: model, restaurant: false, initialQuery: pilotAddress ?? "") { place in
+                    Task { await add(coordinate: CLLocationCoordinate2D(latitude: place.latitude, longitude: place.longitude)) }
+                }
+            }
+            .sheet(isPresented: $showingDetail) {
+                if let point {
+                    NavigationStack {
+                        Form {
+                            Text(point.category)
+                            Text(point.locationText)
+                            if !point.description.isEmpty { Text(point.description) }
+                            Text("\(point.visits) 人去过")
+                            if let rating = point.rating { Text("\(rating.formatted()) / 5") }
+                            Button("点评与打卡") { showingDetail = false }
+                        }
+                        .navigationTitle(point.name)
+                        .toolbar { Button("完成") { showingDetail = false } }
+                    }
+                }
+            }
+        }
+    }
+
+    @State private var showingPicker = false
+
+    private func beginPlaceForm() {
+        creating = false
+        name = ""; category = ""; locationText = ""; introduction = ""
+        editing = true
+    }
+
+    private func loadPending(_ id: UUID) async {
+        await run { pendingPoints = try decode([FoodMapPendingPoint].self, await family.call(Self.path + "/\(id)/pending")) }
+    }
+
+    private func approve(_ item: FoodMapPendingPoint, in map: FoodMapSummary) async {
+        await run {
+            _ = try await family.call(Self.path + "/\(map.id)/places/\(item.id)/approve", method: "PUT")
+            pendingPoints.removeAll { $0.id == item.id }
+        }
+        if status.isEmpty { await open(map, delta: true) }
+    }
+
+    private var account: String? { family.identity.isAuthenticated ? family.identity.accountIdentifier : nil }
+
+    private func file(_ name: String) throws -> URL {
+        guard let account else { throw URLError(.userAuthenticationRequired) }
+        let key = SHA256.hash(data: Data(DiningAccount.identity(account).utf8)).map { String(format: "%02x", $0) }.joined()
+        let root = URL.applicationSupportDirectory.appending(path: "FoodMaps/\(key)", directoryHint: .isDirectory)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        return root.appending(path: name)
+    }
+
+    private func decode<T: Decodable>(_ type: T.Type, _ value: Any) throws -> T {
+        try JSONDecoder().decode(type, from: JSONSerialization.data(withJSONObject: value))
+    }
+
+    private func save(_ map: FoodMapSnapshot) {
+        do {
+            try JSONEncoder().encode(map).write(to: file(map.id.uuidString), options: [.atomic, .completeFileProtectionUntilFirstUserAuthentication])
+        } catch { status = "本地地点缓存保存失败。" }
+    }
+
+    private func discover(nearby: Bool = false) async {
+        await run {
+            var items = [URLQueryItem(name: "query", value: query)]
+            if nearby {
+                let gps = try await model.locate()
+                items += [URLQueryItem(name: "latitude", value: String(gps.coordinate.latitude)),
+                          URLQueryItem(name: "longitude", value: String(gps.coordinate.longitude)),
+                          URLQueryItem(name: "coordinateSystem", value: "wgs84")]
+            }
+            var url = URLComponents()
+            url.queryItems = items
+            maps = try decode([FoodMapSummary].self, await family.call(Self.path + "/" + (url.string ?? "")))
+            let data = try JSONSerialization.data(withJSONObject: maps.filter(\.followed).map { ["id": $0.id.uuidString, "name": $0.name, "followed": true] })
+            if query.isEmpty && !nearby { try data.write(to: file("followed.json"), options: [.atomic, .completeFileProtectionUntilFirstUserAuthentication]) }
+        } networkFallback: {
+            if let cached = try? Data(contentsOf: file("followed.json")), let list = try? JSONDecoder().decode([FoodMapSummary].self, from: cached) {
+                maps = list
+            }
+        }
+    }
+
+    private func open(_ map: FoodMapSummary, delta: Bool = false) async {
+        await run {
+            let cached = try? JSONDecoder().decode(FoodMapSnapshot.self, from: Data(contentsOf: file(map.id.uuidString)))
+            let baseline = delta ? (snapshot ?? cached) : nil
+            let path = Self.path + "/\(map.id)" + (baseline.map { "?since=\($0.dataVersion)" } ?? "")
+            var value = try decode(FoodMapSnapshot.self, await family.call(path))
+            if !value.full, let baseline {
+                var merged = Dictionary(uniqueKeysWithValues: baseline.places.map { ($0.id, $0) })
+                for place in value.places { merged[place.id] = place }
+                value.places = merged.values.sorted { ($0.name, $0.id.uuidString) < ($1.name, $1.id.uuidString) }
+            }
+            selected = map; snapshot = value
+            save(value)
+        } networkFallback: {
+            if let mapFile = try? file(map.id.uuidString), let data = try? Data(contentsOf: mapFile),
+               let value = try? JSONDecoder().decode(FoodMapSnapshot.self, from: data) {
+                selected = map; snapshot = value
+            }
+        }
+    }
+
+    private func follow(_ map: FoodMapSummary) async {
+        await run {
+            _ = try await family.call(Self.path + "/\(map.id)/follow", method: map.followed ? "DELETE" : "PUT")
+            if map.followed {
+                if let url = try? file(map.id.uuidString), FileManager.default.fileExists(atPath: url.path) { try FileManager.default.removeItem(at: url) }
+                let cached = try file("followed.json")
+                if FileManager.default.fileExists(atPath: cached.path) { try FileManager.default.removeItem(at: cached) }
+            }
+        }
+        await discover()
+    }
+
+    private func converted(_ point: CLLocationCoordinate2D) async throws -> (latitude: Double, longitude: Double) {
+        let payload = try await family.call("/api/dining/nearby", method: "POST",
+            body: ["latitude": point.latitude, "longitude": point.longitude])
+        let center = try decode(DiningMapDetails.self, payload).searchCenter
+        return (center.latitude, center.longitude)
+    }
+
+    private func add(coordinate: CLLocationCoordinate2D) async {
+        let map = selected
+        await run {
+            var body: [String: Any] = ["id": UUID().uuidString, "name": name]
+            if !creating, let map {
+                body["category"] = category; body["locationText"] = locationText; body["description"] = introduction
+                if snapshot?.nativeCoordinates == true {
+                    body["latitude"] = coordinate.latitude; body["longitude"] = coordinate.longitude
+                    body["coordinateSystem"] = "wgs84"
+                    try await submit(method: "PUT", path: "/\(map.id)/places", body: body)
+                } else {
+                    try await submit(method: "PUT", path: "/\(map.id)/places", body: body, gps: (coordinate.latitude, coordinate.longitude))
+                }
+            } else {
+                body["latitude"] = coordinate.latitude; body["longitude"] = coordinate.longitude; body["coordinateSystem"] = "wgs84"
+                _ = try await family.call(Self.path + "/", method: "POST", body: body)
+            }
+        }
+        if status.isEmpty {
+            if !creating, let map {
+                draft = nil
+                await open(map, delta: true)
+                if status.isEmpty { status = "已提交审核。" }
+            } else { await discover() }
+        }
+    }
+
+    private func write(_ path: String, body: [String: Any]? = nil) async {
+        guard let selected else { return }
+        await run { try await submit(method: "PUT", path: "/\(selected.id)" + path, body: body) }
+        if status.isEmpty { await open(selected, delta: true) }
+    }
+
+    private func submit(method: String, path: String, body: [String: Any]?, gps: (Double, Double)? = nil) async throws {
+        let json = try body.map { try JSONSerialization.data(withJSONObject: $0) }
+        let item = Pending(method: method, path: path, json: json, gpsLatitude: gps?.0, gpsLongitude: gps?.1)
+        let url = try file("pending.json")
+        var pending = try pendingAt(url)
+        pending.append(item)
+        try storePending(pending, to: url)
+        do { try await flush() }
+        catch let error as URLError where Self.transient.contains(error.code) {
+            status = "已保存，联网后可同步。"
+        }
+    }
+
+    private static let transient: Set<URLError.Code> = [.notConnectedToInternet, .networkConnectionLost, .timedOut, .cannotConnectToHost]
+
+    private func pendingAt(_ url: URL) throws -> [Pending] {
+        guard FileManager.default.fileExists(atPath: url.path) else { return [] }
+        return try JSONDecoder().decode([Pending].self, from: Data(contentsOf: url))
+    }
+
+    private func storePending(_ items: [Pending], to url: URL) throws {
+        try JSONEncoder().encode(items).write(to: url, options: [.atomic, .completeFileProtectionUntilFirstUserAuthentication])
+    }
+
+    private func flushIfPossible() async {
+        await run { try await flush() }
+    }
+
+    private func flush() async throws {
+        let current = account
+        let url = try file("pending.json")
+        var pending = try pendingAt(url)
+        var rejected: Error?
+        while let item = pending.first {
+            guard current == account else { throw CancellationError() }
+            do {
+                var body = try item.json.flatMap { try JSONSerialization.jsonObject(with: $0) as? [String: Any] }
+                if let lat = item.gpsLatitude, let lon = item.gpsLongitude {
+                    let coordinates = try await converted(CLLocationCoordinate2D(latitude: lat, longitude: lon))
+                    body?["latitude"] = coordinates.latitude; body?["longitude"] = coordinates.longitude; body?["coordinateSystem"] = "gcj02"
+                }
+                guard current == account else { throw CancellationError() }
+                _ = try await family.call(Self.path + item.path, method: item.method, body: body)
+            } catch let APIError.http(code, detail) where [400, 404, 409].contains(code) {
+                rejected = APIError.http(code, detail)
+            }
+            guard current == account else { throw CancellationError() }
+            pending.removeFirst()
+            try storePending(pending, to: url)
+        }
+        if let rejected { throw rejected }
+    }
+
+    private func loadReviews(_ point: FoodMapPoint) async {
+        guard let selected else { return }
+        await run {
+            let value = try await family.call(Self.path + "/\(selected.id)/places/\(point.id)/reviews")
+            reviewText = (value as? [[String: Any]] ?? []).compactMap { $0["note"] as? String }
+        }
+    }
+
+    private func run(_ action: () async throws -> Void, networkFallback: () -> Void = {}) async {
+        guard !busy, account != nil else { return }
+        busy = true; status = ""
+        defer { busy = false }
+        do { try await action() }
+        catch let failure as URLError where Self.transient.contains(failure.code) {
+            networkFallback()
+            status = "网络暂不可用，已缓存的地点仍可浏览。"
+        }
+        catch { status = error.localizedDescription }
+    }
+}
+
+private struct FoodNativeMap: UIViewRepresentable {
+    let map: FoodMapSnapshot
+    @Binding var draft: CLLocationCoordinate2D?
+    let placeDraft: (CLLocationCoordinate2D) -> Void
+    let select: (FoodMapPoint) -> Void
+
+    func makeCoordinator() -> Coordinator { Coordinator(self) }
+
+    func makeUIView(context: Context) -> MKMapView {
+        let view = MKMapView()
+        view.pointOfInterestFilter = .excludingAll
+        view.delegate = context.coordinator
+        let press = UILongPressGestureRecognizer(target: context.coordinator, action: #selector(Coordinator.press(_:)))
+        view.addGestureRecognizer(press)
+        if let center = map.center {
+            view.setRegion(MKCoordinateRegion(center: center, latitudinalMeters: 2200, longitudinalMeters: 2200), animated: false)
+            view.addOverlay(MKCircle(center: center, radius: 1000))
+        }
+        return view
+    }
+
+    func updateUIView(_ view: MKMapView, context: Context) {
+        let coordinator = context.coordinator
+        coordinator.parent = self
+        let current = Dictionary(uniqueKeysWithValues: view.annotations.compactMap { annotation -> (UUID, Pin)? in
+            guard let pin = annotation as? Pin, let id = pin.id else { return nil }
+            return (id, pin)
+        })
+        let visiblePlaces = map.nativeCoordinates ? map.places : []
+        let wanted = Set(visiblePlaces.map(\.id))
+        view.removeAnnotations(current.filter { !wanted.contains($0.key) }.map(\.value))
+        for place in visiblePlaces {
+            let coordinate = CLLocationCoordinate2D(latitude: place.latitude, longitude: place.longitude)
+            if let pin = current[place.id] {
+                pin.title = place.name
+                if pin.coordinate.latitude != coordinate.latitude || pin.coordinate.longitude != coordinate.longitude { pin.coordinate = coordinate }
+            } else {
+                view.addAnnotation(Pin(id: place.id, title: place.name, coordinate: coordinate))
+            }
+        }
+        if let draft {
+            if let pin = coordinator.draftPin {
+                if !coordinator.dragging && (pin.coordinate.latitude != draft.latitude || pin.coordinate.longitude != draft.longitude) {
+                    pin.coordinate = draft
+                    view.setCenter(draft, animated: true)
+                }
+            } else {
+                let pin = Pin(id: nil, title: "待确认位置", coordinate: draft)
+                coordinator.draftPin = pin
+                view.addAnnotation(pin)
+                view.setCenter(draft, animated: true)
+            }
+        } else if let pin = coordinator.draftPin {
+            view.removeAnnotation(pin)
+            coordinator.draftPin = nil
+        }
+    }
+
+    final class Pin: NSObject, MKAnnotation {
+        let id: UUID?
+        var title: String?
+        @objc dynamic var coordinate: CLLocationCoordinate2D
+        init(id: UUID?, title: String, coordinate: CLLocationCoordinate2D) {
+            self.id = id
+            self.title = title
+            self.coordinate = coordinate
+        }
+    }
+
+    final class Coordinator: NSObject, MKMapViewDelegate {
+        var parent: FoodNativeMap
+        var draftPin: Pin?
+        var dragging = false
+        init(_ parent: FoodNativeMap) { self.parent = parent }
+
+        @objc func press(_ recognizer: UILongPressGestureRecognizer) {
+            guard recognizer.state == .began, !dragging, let map = recognizer.view as? MKMapView else { return }
+            let point = recognizer.location(in: map)
+            // An existing pin owns its drag gesture.
+            if map.annotations.contains(where: { annotation in
+                guard let view = map.view(for: annotation), annotation is Pin else { return false }
+                return view.bounds.insetBy(dx: -10, dy: -10).contains(recognizer.location(in: view))
+            }) { return }
+            parent.placeDraft(map.convert(point, toCoordinateFrom: map))
+        }
+
+        func mapView(_ mapView: MKMapView, rendererFor overlay: any MKOverlay) -> MKOverlayRenderer {
+            guard let circle = overlay as? MKCircle else { return MKOverlayRenderer(overlay: overlay) }
+            let renderer = MKCircleRenderer(circle: circle)
+            renderer.fillColor = UIColor.systemOrange.withAlphaComponent(0.08)
+            renderer.strokeColor = UIColor.systemOrange.withAlphaComponent(0.65)
+            renderer.lineWidth = 2
+            return renderer
+        }
+
+        func mapView(_ mapView: MKMapView, viewFor annotation: any MKAnnotation) -> MKAnnotationView? {
+            guard let pin = annotation as? Pin else { return nil }
+            let kind = pin.id == nil ? "draft" : "food"
+            let marker = (mapView.dequeueReusableAnnotationView(withIdentifier: kind) as? MKPinAnnotationView)
+                ?? MKPinAnnotationView(annotation: pin, reuseIdentifier: kind)
+            marker.annotation = pin
+            marker.pinTintColor = pin.id == nil ? .systemOrange : .systemRed
+            marker.isDraggable = pin.id == nil
+            marker.canShowCallout = false
+            marker.accessibilityLabel = pin.title
+            return marker
+        }
+
+        func mapView(_ mapView: MKMapView, didSelect view: MKAnnotationView) {
+            guard let pin = view.annotation as? Pin, let id = pin.id,
+                  let place = parent.map.places.first(where: { $0.id == id }) else { return }
+            mapView.deselectAnnotation(pin, animated: false)
+            parent.select(place)
+        }
+
+        func mapView(_ mapView: MKMapView, annotationView view: MKAnnotationView,
+                     didChange newState: MKAnnotationView.DragState, fromOldState oldState: MKAnnotationView.DragState) {
+            guard let pin = view.annotation as? Pin, pin.id == nil else { return }
+            switch newState {
+            case .starting: dragging = true
+            case .ending:
+                dragging = false
+                parent.placeDraft(pin.coordinate)
+                view.setDragState(.none, animated: false)
+            case .canceling:
+                dragging = false
+                if let original = parent.draft { pin.coordinate = original }
+                view.setDragState(.none, animated: false)
+            default: break
+            }
+        }
     }
 }
