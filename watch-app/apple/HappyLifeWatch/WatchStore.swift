@@ -608,6 +608,7 @@ final class WatchStore: ObservableObject {
             guard health.authorizationStatus(for: .workoutType()) == .sharingAuthorized else { message = String(localized: "请允许保存体能训练后重试。", bundle: AgentIdentityLanguage.appBundle()); return }
             let config = HKWorkoutConfiguration()
             switch kind {
+            case "飞行": config.activityType = .other
             case "滑雪": config.activityType = .downhillSkiing
             case "徒步": config.activityType = .hiking
             case "慢跑": config.activityType = .running
@@ -657,7 +658,7 @@ final class WatchStore: ObservableObject {
             let formatter = ISO8601DateFormatter()
             let intervals: [[String: Any]] = zip(starts, stops).enumerated().map { index, pair in
                 var row: [String: Any] = ["start": formatter.string(from: pair.0), "end": formatter.string(from: pair.1)]
-                if let distance { row["distanceMeters"] = index == 0 ? distance : 0 }
+                if kind != "飞行", let distance { row["distanceMeters"] = index == 0 ? distance : 0 }
                 return row
             }
             var record: [String: Any] = ["id": id.uuidString, "kind": kind, "startedAt": formatter.string(from: starts[0]), "endedAt": formatter.string(from: end), "intervals": intervals]
@@ -688,8 +689,10 @@ final class WatchStore: ObservableObject {
                   abs(location.timestamp.timeIntervalSinceNow) <= 15, let start = starts.last, location.timestamp >= start else { continue }
             if let lastLocation {
                 let gap = location.timestamp.timeIntervalSince(lastLocation.timestamp)
-                guard gap >= 5, location.distance(from: lastLocation) >= 3, location.distance(from: lastLocation) / gap < (kind == "滑雪" ? 50 : 20) else { continue }
+                let maxSpeed: Double = kind == "飞行" ? 360 : (kind == "滑雪" ? 50 : 20)
+                guard gap >= 5 else { continue }
                 if gap > 60 { routeSegment = UUID() }
+                else if location.distance(from: lastLocation) < 3 || location.distance(from: lastLocation) / gap > maxSpeed { continue }
             }
             var point: [String: Any] = ["latitude": location.coordinate.latitude, "longitude": location.coordinate.longitude, "recordedAt": formatter.string(from: location.timestamp), "segment": routeSegment.uuidString]
             if location.verticalAccuracy >= 0, location.altitude.isFinite {
@@ -751,7 +754,8 @@ struct WatchWorkoutView: View {
                 Button(String(localized: "结束并保存", bundle: AgentIdentityLanguage.appBundle())) { Task { await workout.finish() } }.disabled(workout.saving)
             } else {
                 Picker(String(localized: "运动", bundle: AgentIdentityLanguage.appBundle()), selection: $kind) { ForEach(["徒步", "散步", "慢跑"], id: \.self) { Text($0).tag($0) }
-                    Text(String(localized: "滑雪", bundle: AgentIdentityLanguage.appBundle())).tag("滑雪") }
+                    Text(String(localized: "滑雪", bundle: AgentIdentityLanguage.appBundle())).tag("滑雪")
+                    Text(String(localized: "飞行", bundle: AgentIdentityLanguage.appBundle())).tag("飞行") }
                 Button(String(localized: "开始\(kind)", bundle: AgentIdentityLanguage.appBundle())) { Task {
                     connecting = true; error = nil
                     defer { connecting = false }

@@ -188,6 +188,7 @@
 "已是朋友" = "Friends";
 "打开系统设置" = "Open Settings";
 "辈分" = "Generation";
+"飞行" = "Flight";
 "我的期待" = "What I hope for";
 "位置访问未获授权，请在系统设置中开启。" = "Location access is not authorized. Enable it in Settings.";
 "编辑" = "Edit";
@@ -283,6 +284,7 @@
 "账号注销会影响同一用户中心账号使用的其他应用。用户中心还会要求进一步确认。" = "Deleting this account affects other apps using the same User Center account. User Center requires further confirmation.";
 "分享邀请" = "Share invitation";
 "解绑后手表将退出当前孩子，需重新扫码才能使用。" = "The watch will sign out of the child’s account and must be paired again.";
+"暂停回放" = "Pause replay";
 "群组简介" = "Group description";
 "家长资料暂时无法读取。" = "The parent profile is temporarily unavailable.";
 "修改会话名称" = "Rename chat";
@@ -406,6 +408,7 @@
 "生成孩子授权码" = "Create child authorization code";
 "活动与分享" = "Activities and sharing";
 "删除这项分享？" = "Delete this share?";
+"点评 %lld 条" = "%lld comments";
 "接受" = "Accept";
 " 积分" = " points";
 "仅自己可见" = "Only visible to you";
@@ -440,6 +443,7 @@
 "发送邀请" = "Send invitation";
 "写心愿" = "Make a wish";
 "撤销此分享链接？" = "Revoke this share link?";
+"取消点赞" = "Unlike";
 "退出登录" = "Sign out";
 "照片预览读取失败（%lld），请刷新相册。" = "Unable to load photo preview (%lld). Refresh the album.";
 "关闭时仅自己和管理员可见。开启后，审核通过才会出现在公开墙，其他用户可点赞或点踩。" = "When off, only you and administrators can see this. When on, it appears on the public wall after approval, where others can vote up or down.";
@@ -450,6 +454,7 @@
 "开车 10 分钟内" = "Up to 10 min drive";
 "在当前位置打卡" = "Check in here";
 "等待家长选择孩子并确认绑定" = "Waiting for a parent to select a child and confirm pairing";
+"回放位置" = "Replay position";
 "有人请求原图时需要通知提醒。请在系统设置中允许 Linko Moment 发送通知，并保持 App 打开完成传输。" = "Notifications alert you when someone requests an original photo. Allow Linko Moment notifications in Settings and keep the app open to finish the transfer.";
 "申请加入" = "Request to join";
 "已公开 %lld" = "%lld public";
@@ -470,6 +475,7 @@
 "已通过" = "Approved";
 "关闭" = "Close";
 "获取当前位置" = "Get current location";
+"带我去" = "Directions";
 "不填写" = "Not provided";
 "已添加好友" = "Friend added";
 "平均心率 %.0f 次/分" = "Average heart rate %.0f bpm";
@@ -578,6 +584,7 @@
 "分享时间：%@" = "Shared at: %@";
 "记录内容" = "Record description";
 "烧烤" = "Barbecue";
+"轨迹进度" = "Route progress";
 "还没有加入族谱" = "You have not joined a family tree";
 "家长调整" = "Parent adjustment";
 "备注（默认地址）" = "Note (address by default)";
@@ -650,6 +657,7 @@
 "关联人物" = "Link person";
 "构图建议" = "Composition tips";
 "朋友" = "Friend";
+"设为封面" = "Set as cover";
 "改为活动访客" = "Make activity guest";
 "解除这只手表与当前孩子的绑定？" = "Unlink this watch from the current child?";
 "选择日期" = "Select date";
@@ -834,6 +842,7 @@
 "详细使用手册" = "Detailed user guide";
 "设置 Linko Moment App 内的主题外观。" = "Set the appearance theme in Linko Moment.";
 "生活分享" = "Life sharing";
+"播放轨迹" = "Play route";
 "申请记录" = "My requests";
 "打卡已保存，海拔 %.1f 米。" = "Check-in saved. Altitude: %.1f m.";
 "只显示当前成员位置" = "Show only current member locations";
@@ -947,6 +956,7 @@
 "设为空间成员" = "Make space member";
 "人类成员" = "People";
 "邀请地址无效。" = "The invitation address is invalid.";
+"点赞" = "Like";
 "按附近距离或以往选择推荐。" = "Picked using distance or your previous choices.";
 "下一步" = "Next step";
 "还没有约定" = "No commitments yet";
@@ -1112,6 +1122,7 @@
 "人均消费暂无数据" = "Price per person unavailable";
 "请输入手表上显示的 8 位设备码。" = "Enter the 8-digit device code shown on the watch.";
 "还没有活动" = "No activities yet";
+"点外卖" = "Delivery";
 "运动已保存并加入同步队列，手机接收后会同步到账号和关联活动。" = "Workout saved and queued. After receiving it, iPhone will sync it to your account and linked activity.";
 "散步" = "Walking";
 "反馈服务返回错误（%lld），请稍后重试。" = "The feedback service returned an error (%lld). Please try again later.";
@@ -1320,7 +1331,3 @@
 "暂无排行" = "No rankings yet";
 "仅可删除没有其他成员、照片或日常记录的活动。" = "Only activities without other members, photos, or moments can be deleted.";
 "活动与照片" = "Activities and photos";
-"带我去" = "Directions";
-"点外卖" = "Delivery";
-
-"滑雪" = "Skiing";

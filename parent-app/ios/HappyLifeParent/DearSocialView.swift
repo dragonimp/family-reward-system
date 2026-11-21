@@ -976,19 +976,64 @@ struct DearSocialView: View {
         notice = String(localized: "活动封面已更新，分享页将使用这项照片或视频的预览图。", bundle: AgentIdentityLanguage.appBundle())
     }
 
+    private func reactionIcon(_ icon: String, count: Int, color: Color) -> some View {
+        Image(systemName: icon)
+            .foregroundStyle(color)
+            .frame(minWidth: 20, minHeight: 24)
+            .overlay(alignment: .topTrailing) {
+                if count > 0 {
+                    Text(count > 9 ? "…" : String(count))
+                        .font(.system(size: 9, weight: .bold))
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 3)
+                        .frame(minWidth: 13, minHeight: 13)
+                        .background(.red, in: Capsule())
+                        .offset(x: 6, y: -3)
+                }
+            }
+    }
+
+    private func photoReactions(_ photo: DearRecord) -> some View {
+        let comments = Int(photo.number("commentCount"))
+        let likes = Int(photo.number("likeCount"))
+        let liked = photo.flag("likedByMe")
+        return HStack(spacing: 10) {
+            Button { selectedPhoto = photo } label: {
+                reactionIcon("text.bubble", count: comments, color: .accentColor)
+            }.accessibilityLabel(String(localized: "点评 \(comments) 条", bundle: AgentIdentityLanguage.appBundle()))
+            Button {
+                let tenant = activityTenantId, activity = activityId
+                run {
+                    let response = try await store.call(base + "tenants/\(tenant)/activities/\(activity)/native-photos/\(photo.id)/like",
+                                                        method: "PUT", body: ["liked": !liked])
+                    guard tenant == activityTenantId, activity == activityId,
+                          let result = response as? [String: Any],
+                          let index = photos.firstIndex(where: { $0.id == photo.id }) else { return }
+                    var updated = photos[index].data
+                    updated["likeCount"] = result["likeCount"]
+                    updated["likedByMe"] = result["likedByMe"]
+                    photos[index] = DearRecord(data: updated)
+                }
+            } label: {
+                reactionIcon(liked ? "heart.fill" : "heart", count: likes, color: .red)
+            }
+            .accessibilityLabel(Text(liked ? String(localized: "取消点赞", bundle: AgentIdentityLanguage.appBundle()) : String(localized: "点赞", bundle: AgentIdentityLanguage.appBundle())))
+            .accessibilityValue(Text(String(likes)))
+            .disabled(busy || photo.data["likedByMe"] == nil)
+        }.buttonStyle(.borderless)
+    }
+
     private func photoActions(_ photo: DearRecord) -> some View {
         HStack(spacing: 16) {
             if selectedActivity?.flag("canEdit") == true {
-                Button(String(localized: "设为活动封面", bundle: AgentIdentityLanguage.appBundle())) { run { try await setActivityCover(photo) } }
+                Button(String(localized: "设为封面", bundle: AgentIdentityLanguage.appBundle())) { run { try await setActivityCover(photo) } }
                     .disabled(busy || !photo.flag("thumbnailAvailable"))
             }
             if photo.flag("canDelete") {
-                Button("删除分享", role: .destructive) { photoToDelete = photo }
+                Button("删除", role: .destructive) { photoToDelete = photo }
                     .disabled(busy || batchDeleting || batchDownloading)
             }
-            Button { selectedPhoto = photo } label: {
-                Label("\(Int(photo.number("commentCount")))", systemImage: "text.bubble")
-            }.accessibilityLabel("照片点评 \(Int(photo.number("commentCount"))) 条")
+            photoReactions(photo)
             DearPhotoDirectionsButton(photo: photo)
             Spacer(minLength: 0)
             if selectingPhotoDownloads && photoViewMode == "list" {
@@ -1059,11 +1104,12 @@ struct DearSocialView: View {
             .accessibilityLabel("\(nickname)，\(photo.text("originalFileName"))")
             .contextMenu {
                 if selectedActivity?.flag("canEdit") == true {
-                    Button { run { try await setActivityCover(photo) } } label: { Label(String(localized: "设为活动封面", bundle: AgentIdentityLanguage.appBundle()), systemImage: "photo") }
+                    Button { run { try await setActivityCover(photo) } } label: { Label(String(localized: "设为封面", bundle: AgentIdentityLanguage.appBundle()), systemImage: "photo") }
                         .disabled(busy || !photo.flag("thumbnailAvailable"))
                 }
-                if photo.flag("canDelete") { Button("删除分享", role: .destructive) { photoToDelete = photo } }
+                if photo.flag("canDelete") { Button("删除", role: .destructive) { photoToDelete = photo } }
             }
+            photoReactions(photo).font(.caption2)
             DearPhotoDirectionsButton(photo: photo).font(.caption2).lineLimit(1)
         }
     }
@@ -1196,7 +1242,7 @@ struct DearSocialView: View {
                     Button(batchDownloading ? "正在获取…" : sharingSelectedOriginals ? "分享原文件" : "获取原文件") { Task { await downloadSelectedPhotos(share: sharingSelectedOriginals) } }
                         .disabled(selectedPhotoIDs.isEmpty || batchDownloading || batchDeleting)
                     Spacer()
-                    Button(batchDeleting ? "正在删除…" : "删除分享", role: .destructive) { showingBatchDelete = true }
+                    Button(batchDeleting ? "正在删除…" : "删除", role: .destructive) { showingBatchDelete = true }
                         .disabled(!canDeleteSelectedPhotos || batchDownloading || batchDeleting)
                 }
                 Text("分享者和活动 owner 可删除分享；iPhone 相册原件保留。") .font(.caption).foregroundStyle(.secondary)
@@ -1384,7 +1430,7 @@ struct DearSocialView: View {
                 activityActions
             }
         }
-        .fullScreenCover(item: $selectedPhoto) { selectedPhoto in
+        .fullScreenCover(item: $selectedPhoto, onDismiss: { run { try await loadPhotos() } }) { selectedPhoto in
                 DearPhotoGalleryView(store: store, photos: photos, initialPhotoID: selectedPhoto.id,
                                      spaceID: activityTenantId, activityID: activityId,
                                      allowsDeletion: true,
@@ -1403,7 +1449,7 @@ struct DearSocialView: View {
         } message: { Text("优先使用照片自带定位；未记录定位时使用此处填写的地点。") }
         .confirmationDialog("删除这项分享？", isPresented: Binding(get: { photoToDelete != nil }, set: { if !$0 { photoToDelete = nil } }), titleVisibility: .visible) {
             if let photo = photoToDelete {
-                Button("删除分享", role: .destructive) {
+                Button("删除", role: .destructive) {
                     let tenant = activityTenantId, activity = activityId
                     run {
                         _ = try await store.photoSource.revoke(photoID: photo.id, spaceID: tenant, activityID: activity)
@@ -2562,7 +2608,7 @@ private struct DearPhotoDetailView: View {
                 if let originalError { Text(originalError).font(.footnote).foregroundStyle(.red) }
                 if active { DearPhotoCommentsView(store: store, spaceID: spaceID, activityID: activityID, photoID: photo.id) }
                 if canDelete {
-                    Button(String(localized: "删除分享", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), role: .destructive) { showingDelete = true }.disabled(deleting)
+                    Button(String(localized: "删除", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), role: .destructive) { showingDelete = true }.disabled(deleting)
                 }
                 if !store.photoSource.isSourceDevice(photo) {
                     Text("原文件可从共享设备或服务器缓存获取。服务器最多缓存 1 GB，较久未使用的文件可能被淘汰；未缓存时需等待共享设备上线。")
@@ -2573,7 +2619,7 @@ private struct DearPhotoDetailView: View {
             .padding()
         }
         .confirmationDialog(String(localized: "删除这项分享？", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), isPresented: $showingDelete, titleVisibility: .visible) {
-            Button(String(localized: "删除分享", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), role: .destructive) { Task { await deleteSharedMedia() } }
+            Button(String(localized: "删除", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), role: .destructive) { Task { await deleteSharedMedia() } }
             Button(String(localized: "取消", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), role: .cancel) { }
         } message: { Text(String(localized: "活动成员将无法再获取此文件；iPhone 相册中的原文件不会删除。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) }
         .task(id: path + String(active)) {

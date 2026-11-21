@@ -1,6 +1,51 @@
 {
   "catalogVersion": 1,
   "messages": {
+    "moment.t678bef1cb5ca": {
+      "zh-Hans": "设为封面",
+      "en": "Set as cover",
+      "iosKey": "设为封面"
+    },
+    "moment.t048f35b38382": {
+      "zh-Hans": "飞行",
+      "en": "Flight",
+      "iosKey": "飞行"
+    },
+    "moment.t920ded6f4f83": {
+      "zh-Hans": "播放轨迹",
+      "en": "Play route",
+      "iosKey": "播放轨迹"
+    },
+    "moment.t17cc2d94edae": {
+      "zh-Hans": "暂停回放",
+      "en": "Pause replay",
+      "iosKey": "暂停回放"
+    },
+    "moment.t5699f5885d41": {
+      "zh-Hans": "轨迹进度",
+      "en": "Route progress",
+      "iosKey": "轨迹进度"
+    },
+    "moment.t3c352ba39a10": {
+      "zh-Hans": "回放位置",
+      "en": "Replay position",
+      "iosKey": "回放位置"
+    },
+    "moment.t3ab399c75fa6": {
+      "zh-Hans": "取消点赞",
+      "en": "Unlike",
+      "iosKey": "取消点赞"
+    },
+    "moment.taced5d7f9fc9": {
+      "zh-Hans": "点赞",
+      "en": "Like",
+      "iosKey": "点赞"
+    },
+    "moment.t3297683017af": {
+      "zh-Hans": "点评 %lld 条",
+      "en": "%lld comments",
+      "iosKey": "点评 %lld 条"
+    },
     "moment.td4507ecfd49d": {
       "zh-Hans": "点外卖",
       "en": "Delivery",

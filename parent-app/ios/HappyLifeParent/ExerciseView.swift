@@ -99,10 +99,10 @@ import UniformTypeIdentifiers
         }
     }
 
-    func start(kind: String, map: Bool, activity: ExerciseActivity? = nil) {
+    func start(kind: String, activity: ExerciseActivity? = nil) {
         guard readable, active == nil, !busy else { return }
         let now = Date()
-        archive.active = ExerciseSession(kind: kind, startedAt: now, intervals: [ExerciseInterval(start: now)], activity: activity, routeEnabled: map)
+        archive.active = ExerciseSession(kind: kind, startedAt: now, intervals: [ExerciseInterval(start: now)], activity: activity, routeEnabled: true)
         save(); observe(); updateLocationTracking()
     }
     func continueRecord(_ record: ExerciseSession) {
@@ -182,7 +182,8 @@ import UniformTypeIdentifiers
     func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) { updateLocationTracking() }
     func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
         guard tracking, let active, active.running, active.routeEnabled == true else { return }
-        let skiing = active.kind == "滑雪"
+        let usesGPSDistance = active.kind == "滑雪" || active.kind == "飞行"
+        let maxSpeed: Double = active.kind == "飞行" ? 360 : (usesGPSDistance ? 50 : 20)
         var changed = false
         for location in locations {
             let age = Date().timeIntervalSince(location.timestamp)
@@ -191,14 +192,14 @@ import UniformTypeIdentifiers
             if let previous = lastLocation {
                 let dt = location.timestamp.timeIntervalSince(previous.timestamp)
                 if dt > 60 { routeSegment = UUID(); lastLocation = nil }
-                else if dt < 3 || location.distance(from: previous) < 3 || location.distance(from: previous) / dt > (skiing ? 50 : 20) { continue }
+                else if dt < 3 || location.distance(from: previous) < 3 || location.distance(from: previous) / dt > maxSpeed { continue }
             }
             let point = ExerciseRoutePoint(latitude: location.coordinate.latitude, longitude: location.coordinate.longitude,
                 recordedAt: location.timestamp, segment: routeSegment,
                 altitudeMeters: location.verticalAccuracy >= 0 && location.altitude.isFinite ? location.altitude : nil,
                 verticalAccuracyMeters: location.verticalAccuracy >= 0 ? location.verticalAccuracy : nil)
             if archive.active?.appendRoute(point) == true {
-                if skiing, let previous = lastLocation, let index = active.intervals.indices.last {
+                if usesGPSDistance, let previous = lastLocation, let index = active.intervals.indices.last {
                     let distance = archive.active?.intervals[index].distanceMeters ?? 0
                     archive.active?.intervals[index].distanceMeters = distance + location.distance(from: previous)
                 }
@@ -330,7 +331,7 @@ import UniformTypeIdentifiers
 
     private func observe() {
         stopObserving()
-        guard let active, active.running, active.kind != "滑雪", let index = active.intervals.indices.last else { return }
+        guard let active, active.running, active.kind != "滑雪", active.kind != "飞行", let index = active.intervals.indices.last else { return }
         guard supported else { message = String(localized: "此设备不支持计步，可继续使用运动计时。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)); return }
         if CMPedometer.authorizationStatus() == .denied || CMPedometer.authorizationStatus() == .restricted {
             message = String(localized: "未获得运动与健身权限，可在系统设置中开启；计时仍可使用。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)); return
@@ -349,7 +350,7 @@ import UniformTypeIdentifiers
         }
     }
     private func reconcile() async {
-        guard let active, active.kind != "滑雪", supported else { return }
+        guard let active, active.kind != "滑雪", active.kind != "飞行", supported else { return }
         // Query each active interval independently, excluding all paused time.
         busy = true
         defer { busy = false }
@@ -412,6 +413,7 @@ struct ExerciseView: View {
                             exerciseTile("徒步", icon: "figure.hiking")
                             exerciseTile("爬山", icon: "mountain.2")
                             exerciseTile("滑雪", icon: "figure.skiing.downhill")
+                            exerciseTile("飞行", icon: "airplane")
                             exerciseTile("自由运动", icon: "figure.mixed.cardio")
                         }
                         .padding(.vertical, 4)
@@ -427,7 +429,7 @@ struct ExerciseView: View {
                                 Text(active.distanceMeters == nil && !exercise.distanceSupported ? String(localized: "此设备不支持距离估算", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)) : exerciseDistanceTitle(active))
                                     .font(.title.bold()).monospacedDigit()
                                     .accessibilityLabel(String(localized: "运动距离，\(exerciseDistanceTitle(active))", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)))
-                                if active.kind != "滑雪" {
+                                if active.kind != "滑雪", active.kind != "飞行" {
                                     Text(active.steps.map { String(localized: "\($0) 步", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)) } ?? String(localized: "步数待获取", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)))
                                         .font(.title2).monospacedDigit()
                                 }
@@ -445,7 +447,7 @@ struct ExerciseView: View {
                     } else {
                         HStack(spacing: 8) {
                             Button {
-                                exercise.start(kind: kind, map: true, activity: activity)
+                                exercise.start(kind: kind, activity: activity)
                                 if exercise.active != nil { activity = nil; family.watchExerciseActivity = nil }
                             } label: {
                                 Text(String(localized: "开始\(exerciseKindTitle(kind))", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)))
@@ -565,7 +567,7 @@ struct ExerciseView: View {
                     HStack {
                         Text(item.startedAt, format: .dateTime.year().month().day().hour().minute())
                         Spacer()
-                        if item.kind != "滑雪" {
+                        if item.kind != "滑雪", item.kind != "飞行" {
                             Text(item.steps.map { String(localized: "\($0) 步", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)) } ?? String(localized: "步数未获取", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)))
                         }
                     }.font(.caption).foregroundStyle(.secondary)
@@ -593,7 +595,7 @@ struct ExerciseView: View {
                 }
                 .sheet(item: $selectedRoute) { item in
                     NavigationStack {
-                        ExerciseRouteMap(points: item.routePoints, live: false)
+                        ExerciseRouteReplay(points: item.routePoints)
                             .navigationTitle(exerciseKindTitle(item.kind))
                             .navigationBarTitleDisplayMode(.inline)
                             .toolbar { ToolbarItem(placement: .confirmationAction) { Button(String(localized: "完成", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) { selectedRoute = nil } } }
@@ -639,6 +641,7 @@ private func exerciseKindTitle(_ value: String) -> String {
     switch value {
     case "爬山": return String(localized: "爬山", bundle: AgentIdentityLanguage.appBundle(), locale: locale)
     case "散步": return String(localized: "散步", bundle: AgentIdentityLanguage.appBundle(), locale: locale)
+    case "飞行": return String(localized: "飞行", bundle: AgentIdentityLanguage.appBundle(), locale: locale)
     case "滑雪": return String(localized: "滑雪", bundle: AgentIdentityLanguage.appBundle(), locale: locale)
     case "徒步": return String(localized: "徒步", bundle: AgentIdentityLanguage.appBundle())
     case "慢跑": return String(localized: "慢跑", bundle: AgentIdentityLanguage.appBundle(), locale: locale)
@@ -648,9 +651,48 @@ private func exerciseKindTitle(_ value: String) -> String {
 }
 
 
+private struct ExerciseRouteReplay: View {
+    let points: [ExerciseRoutePoint]
+    @State private var progress = 0.0
+    @State private var playing = false
+
+    var body: some View {
+        let lastIndex = max(0, points.count - 1)
+        VStack(spacing: 12) {
+            ExerciseRouteMap(points: points, live: false, replayIndex: lastIndex > 0 ? Int(progress) : nil)
+            if lastIndex > 0 {
+                HStack {
+                    Button {
+                        if !playing && progress >= Double(lastIndex) { progress = 0 }
+                        playing.toggle()
+                    } label: {
+                        Image(systemName: playing ? "pause.fill" : "play.fill")
+                            .frame(width: 44, height: 44)
+                    }.accessibilityLabel(Text(playing ? String(localized: "暂停回放", bundle: AgentIdentityLanguage.appBundle()) : String(localized: "播放轨迹", bundle: AgentIdentityLanguage.appBundle())))
+                    Slider(value: $progress, in: 0...Double(lastIndex), onEditingChanged: { editing in
+                        if editing { playing = false }
+                    }).accessibilityLabel(Text(String(localized: "轨迹进度", bundle: AgentIdentityLanguage.appBundle())))
+                    Text(ExerciseSession.clock(points[Int(progress)].recordedAt.timeIntervalSince(points[0].recordedAt)))
+                        .monospacedDigit()
+                }.padding(.horizontal)
+            }
+        }
+        .task(id: playing) {
+            guard playing else { return }
+            let step = max(1, Double(lastIndex) / 300)
+            while !Task.isCancelled && progress < Double(lastIndex) {
+                do { try await Task.sleep(for: .milliseconds(100)) } catch { return }
+                progress = min(Double(lastIndex), progress + step)
+            }
+            playing = false
+        }
+    }
+}
+
 private struct ExerciseRouteMap: View {
     let points: [ExerciseRoutePoint]
     let live: Bool
+    var replayIndex: Int? = nil
     @State private var position: MapCameraPosition = .automatic
     private struct Segment: Identifiable {
         let id: UUID
@@ -672,6 +714,9 @@ private struct ExerciseRouteMap: View {
             }
             if let first = points.first { Marker(String(localized: "起点", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), systemImage: "flag.fill", coordinate: coordinate(first)).tint(.green) }
             if let last = points.last { Marker(live ? String(localized: "当前位置", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)) : String(localized: "终点", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), systemImage: "figure.walk", coordinate: coordinate(last)).tint(.teal) }
+            if let replayIndex, points.indices.contains(replayIndex) {
+                Marker(String(localized: "回放位置", bundle: AgentIdentityLanguage.appBundle()), systemImage: "location.fill", coordinate: coordinate(points[replayIndex])).tint(.orange)
+            }
             if live { UserAnnotation() }
         }
         .mapStyle(.standard(elevation: .flat, pointsOfInterest: .excludingAll))
