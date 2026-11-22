@@ -210,6 +210,7 @@ internal static class LinkoSocialGateway
             if (s.Length == 5 && s[4] == "moments") return method is "GET" or "POST";
             if (s.Length == 5 && s[4] == "checkins") return method is "GET" or "POST";
             if (s.Length == 6 && s[4] == "checkins" && Guid.TryParse(s[5], out _)) return method == "PATCH";
+            if (s.Length == 7 && s[4] == "checkins" && Guid.TryParse(s[5], out _) && s[6] == "location") return method == "PATCH";
             if (s.Length == 5 && s[4] == "members") return method == "GET";
             if (s.Length == 6 && s[4] == "members" && s[5].Length is > 0 and <= 200 &&
                 s[5].All(c => !char.IsControl(c) && c is not ('/' or '\\' or '?' or '#')))

@@ -195,14 +195,17 @@ private enum PhotoDisplayImage {
 }
 
 private struct DearPhotoDirectionsButton: View {
-    let photo: DearRecord
+    var photo: DearRecord? = nil
+    var checkIn: DearRecord? = nil
     var fillsActionSlot = false
     @State private var mapOpenFailed = false
 
     var body: some View {
-        if let point = DearActivityMapPoint.points(checkIns: [], photos: [photo]).first {
-            let name = point.placeName.isEmpty ? String(localized: "拍摄位置", bundle: AgentIdentityLanguage.appBundle()) : point.placeName
-            let destination = DiningPlace(id: photo.id, name: name, address: "",
+        if let point = DearActivityMapPoint.points(checkIns: checkIn.map { [$0] } ?? [], photos: photo.map { [$0] } ?? []).first {
+            let fallback = checkIn == nil ? String(localized: "拍摄位置", bundle: AgentIdentityLanguage.appBundle()) :
+                String(localized: "打卡位置", bundle: AgentIdentityLanguage.appBundle())
+            let name = point.placeName.isEmpty ? fallback : point.placeName
+            let destination = DiningPlace(id: point.id, name: name, address: "",
                 latitude: point.coordinate.latitude, longitude: point.coordinate.longitude,
                 category: "", provider: "gps", distanceMeters: 0)
             Menu {
@@ -223,7 +226,8 @@ private struct DearPhotoDirectionsButton: View {
                 Image(systemName: "map")
                     .frame(maxWidth: fillsActionSlot ? .infinity : nil, minHeight: fillsActionSlot ? 44 : nil)
                     .contentShape(Rectangle())
-                    .accessibilityLabel(String(localized: "打开地图", bundle: AgentIdentityLanguage.appBundle()))
+                    .accessibilityLabel(checkIn == nil ? String(localized: "打开地图", bundle: AgentIdentityLanguage.appBundle()) :
+                        String(localized: "去那里", bundle: AgentIdentityLanguage.appBundle()))
             }
             .buttonStyle(.borderless)
             .popover(isPresented: $mapOpenFailed) {
@@ -652,6 +656,7 @@ struct DearSocialView: View {
     @StateObject private var checkInLocator = DearCheckInLocator()
     @State private var showingCheckIn = false
     @State private var selectedCheckIn: DearRecord?
+    @State private var removingCheckInLocation = false
     @State private var pendingCheckIn = false
     @State private var checkInNote = ""
     @State private var checkInRequestID = UUID()
@@ -1441,10 +1446,13 @@ struct DearSocialView: View {
                     if entry.checkIn {
                         if !entry.record.text("address").isEmpty { Label(entry.record.text("address"), systemImage: "mappin.and.ellipse").font(.caption).foregroundStyle(.secondary) }
                         HStack {
-                            Label(String(format: "海拔 %.1f 米", entry.record.number("altitudeMeters")), systemImage: "mountain.2").font(.caption)
+                            if let altitude = entry.record.data["altitudeMeters"] as? Double {
+                                Label(String(format: "海拔 %.1f 米", altitude), systemImage: "mountain.2").font(.caption)
+                            }
                             Spacer()
+                            DearPhotoDirectionsButton(checkIn: entry.record)
                             Button(entry.record.flag("canEdit") ? "查看 / 编辑" : "查看打卡") {
-                                pendingCheckIn = false; selectedCheckIn = entry.record; checkInNote = entry.record.text("note")
+                                pendingCheckIn = false; removingCheckInLocation = false; selectedCheckIn = entry.record; checkInNote = entry.record.text("note")
                                 error = ""; checkInLocator.clear(); showingCheckIn = true
                             }.font(.caption).disabled(busy || pendingCheckIn)
                         }
@@ -1817,10 +1825,21 @@ struct DearSocialView: View {
                 Section(String(localized: "当前位置", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) {
                     if checkInLocator.fetching { ProgressView(String(localized: "正在获取位置和地址…", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) }
                     if !checkInLocator.error.isEmpty { Text(checkInLocator.error).foregroundStyle(.red) }
-                    if let selectedCheckIn {
+                    if let selectedCheckIn,
+                       checkInLocator.location != nil || (!removingCheckInLocation && selectedCheckIn.data["latitude"] is NSNumber) {
                         Text(checkInLocator.location == nil ? selectedCheckIn.text("address") : checkInLocator.address)
                         Text(String(format: String(localized: "纬度 %.6f，经度 %.6f", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), checkInLocator.location?.coordinate.latitude ?? selectedCheckIn.number("latitude"), checkInLocator.location?.coordinate.longitude ?? selectedCheckIn.number("longitude")))
                         Text(String(format: String(localized: "海拔 %.1f 米", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), checkInLocator.location?.altitude ?? selectedCheckIn.number("altitudeMeters")))
+                        DearPhotoDirectionsButton(checkIn: selectedCheckIn)
+                        if selectedCheckIn.flag("canEdit") {
+                            Button(String(localized: "删除位置", bundle: AgentIdentityLanguage.appBundle()), role: .destructive) {
+                                if checkInNote == selectedCheckIn.text("address") || checkInNote == checkInLocator.address {
+                                    checkInNote = ""
+                                }
+                                checkInLocator.clear()
+                                removingCheckInLocation = true
+                            }
+                        }
                     }
                     if selectedCheckIn?.flag("canEdit") == true {
                         Button(String(localized: "重新定位", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) { checkInLocator.locate() }.disabled(checkInLocator.fetching)
@@ -1835,7 +1854,10 @@ struct DearSocialView: View {
             }
             .navigationTitle(selectedCheckIn?.flag("canEdit") == true ? String(localized: "修改打卡", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)) : String(localized: "打卡详情", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)))
             .onChange(of: checkInLocator.address) { _, address in
-                if checkInNote.isEmpty { checkInNote = address }
+                if !address.isEmpty, checkInLocator.location != nil {
+                    removingCheckInLocation = false
+                    if checkInNote.isEmpty { checkInNote = address }
+                }
             }
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) { Button(String(localized: "关闭", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) { showingCheckIn = false } }
@@ -2215,13 +2237,17 @@ struct DearSocialView: View {
         let note = checkInNote.trimmingCharacters(in: .whitespacesAndNewlines)
         guard note.count <= 1000 else { throw APIError.message(String(localized: "备注不能超过 1000 字。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) }
         let location = checkInLocator.location
+        let clearLocation = removingCheckInLocation && location == nil
+        let suffix = clearLocation ? "/location" : ""
         let address = location == nil ? selectedCheckIn.text("address") : checkInLocator.address
-        _ = try await store.call(base + "tenants/\(activityTenantId)/activities/\(activityId)/checkins/\(selectedCheckIn.id)", method: "PATCH", body: [
-            "latitude": location?.coordinate.latitude ?? selectedCheckIn.number("latitude"),
-            "longitude": location?.coordinate.longitude ?? selectedCheckIn.number("longitude"),
-            "altitudeMeters": location?.altitude ?? selectedCheckIn.number("altitudeMeters"),
-            "address": address, "note": note.isEmpty ? address : note
-        ])
+        var body: [String: Any] = ["note": note]
+        if !clearLocation && (location != nil || selectedCheckIn.data["latitude"] is NSNumber) {
+            body["latitude"] = location?.coordinate.latitude ?? selectedCheckIn.number("latitude")
+            body["longitude"] = location?.coordinate.longitude ?? selectedCheckIn.number("longitude")
+            body["altitudeMeters"] = location?.altitude ?? selectedCheckIn.number("altitudeMeters")
+            body["address"] = address
+        }
+        _ = try await store.call(base + "tenants/\(activityTenantId)/activities/\(activityId)/checkins/\(selectedCheckIn.id)\(suffix)", method: "PATCH", body: body)
         showingCheckIn = false; self.selectedCheckIn = nil; try await loadCheckIns(); notice = String(localized: "打卡已更新。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))
     }
     private func loadMembers() async throws {

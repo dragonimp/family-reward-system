@@ -43,7 +43,7 @@ internal sealed class MomentActivityMapPage : ContentPage
                     foreach (var row in visits.EnumerateArray()) Add(row, "address");
                 }
                 if (ct.IsCancellationRequested || account != store.SessionVersion) return;
-                void Add(JsonElement row, string name) { if (!row.TryGetProperty("latitude", out var lat) || !row.TryGetProperty("longitude", out var lon) || !lat.TryGetDouble(out var x) || !lon.TryGetDouble(out var y) || !double.IsFinite(x) || !double.IsFinite(y) || Math.Abs(x)>90 || Math.Abs(y)>180) return; var text=row.TryGetProperty(name,out var label)?label.ToString():"活动地点"; points.Add(new {latitude=x,longitude=y,name=text}); }
+                void Add(JsonElement row, string name) { if (!row.TryGetProperty("latitude", out var lat) || !row.TryGetProperty("longitude", out var lon) || lat.ValueKind != JsonValueKind.Number || lon.ValueKind != JsonValueKind.Number || !lat.TryGetDouble(out var x) || !lon.TryGetDouble(out var y) || !double.IsFinite(x) || !double.IsFinite(y) || Math.Abs(x)>90 || Math.Abs(y)>180) return; var text=row.TryGetProperty(name,out var label)?label.ToString():"活动地点"; points.Add(new {latitude=x,longitude=y,name=text}); }
                 status.Text = points.Count == 0 ? onlyMembers ? "暂无成员共享位置。" : "暂无活动打卡或在线成员位置。" : $"{points.Count} 个地点 · 位置共享由成员自行开启";
                 await map.EvaluateJavaScriptAsync("window.updatePoints&&window.updatePoints("+JsonSerializer.Serialize(points)+")");
                 await Task.Delay(5000, ct);
