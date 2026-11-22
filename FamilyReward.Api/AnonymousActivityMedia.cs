@@ -16,10 +16,9 @@ internal static class AnonymousActivityMedia
             if (!response.IsSuccessStatusCode) return Results.StatusCode(503);
             using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync(ct));
             var title = WebUtility.HtmlEncode(document.RootElement.GetProperty("title").GetString() ?? "活动照片与视频");
-            var nonce = Convert.ToHexString(System.Security.Cryptography.RandomNumberGenerator.GetBytes(16));
-            context.Response.Headers.ContentSecurityPolicy = $"default-src 'self'; img-src 'self' data:; media-src 'self'; style-src 'unsafe-inline'; script-src 'nonce-{nonce}'; base-uri 'none'; frame-ancestors 'none'";
+            context.Response.Headers.ContentSecurityPolicy = "default-src 'none'; frame-src 'self'; img-src 'self'; style-src 'unsafe-inline'; base-uri 'none'; frame-ancestors 'none'";
             using var reader = new StreamReader(typeof(AnonymousActivityMedia).Assembly.GetManifestResourceStream("MomentAnonymousMediaPage")!);
-            var html = (await reader.ReadToEndAsync(ct)).Replace("%%TITLE%%", title).Replace("%%TOKEN%%", token).Replace("%%NONCE%%", nonce);
+            var html = (await reader.ReadToEndAsync(ct)).Replace("%%TITLE%%", title).Replace("%%TOKEN%%", token);
             return Results.Content(html, "text/html; charset=utf-8");
         }).AllowAnonymous();
         app.MapMethods("/api/dear/public/media-shares/{token}", ["GET"], async (string token, HttpContext context, IConfiguration config, IHttpClientFactory clients, CancellationToken ct) => {
