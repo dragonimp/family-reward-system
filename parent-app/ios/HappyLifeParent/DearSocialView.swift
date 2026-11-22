@@ -721,6 +721,15 @@ struct DearSocialView: View {
         }
     }
     private var base: String { "/api/dear/social/" }
+    @State private var coverRevisions: [UUID: UUID] = [:]
+
+    private func activityCoverPath(_ item: DearRecord) -> String? {
+        guard let activity = UUID(uuidString: item.id),
+              let tenant = UUID(uuidString: item.text("sourceTenantId")) ?? UUID(uuidString: spaceId) else { return nil }
+        let path = "/api/dear/public/activities/\(tenant.uuidString)/\(activity.uuidString)/cover"
+        return coverRevisions[activity].map { path + "?rev=" + $0.uuidString } ?? path
+    }
+
     @State private var showingRelationships = false
 
     private var spaceTitle: some View {
@@ -798,8 +807,9 @@ struct DearSocialView: View {
                 }
                 if selectedSpace?.text("role") == "owner" || !joinedActivities.isEmpty {
                     Section {
-                        Text("日期按设备当地时区显示").font(.caption).foregroundStyle(.secondary)
-                        if activityLoading { Text(String(localized: "正在读取已有活动…", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))).foregroundStyle(.secondary) }
+                        if activityLoading && allActivities.isEmpty {
+                            ProgressView(String(localized: "正在读取已有活动…", bundle: AgentIdentityLanguage.appBundle()))
+                        }
                         if !activityError.isEmpty { Text(activityError).foregroundStyle(.red) }
                         if allActivities.isEmpty && !activityLoading && activityError.isEmpty { Text(String(localized: "还没有活动", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))).foregroundStyle(.secondary) }
                         else {
@@ -810,16 +820,18 @@ struct DearSocialView: View {
                                         activityId = item.id
                                         showingActivity = true
                                     } label: {
-                                    HStack {
-                                        VStack(alignment: .leading, spacing: 4) {
-                                            Text(item.text("title")).font(.body.weight(.medium))
-                                            Text(activityDate(item)).font(.caption).foregroundStyle(.secondary)
-                                            if !item.text("description").isEmpty {
-                                                Text(item.text("description")).font(.caption).foregroundStyle(.secondary).lineLimit(2)
+                                        HStack(spacing: 12) {
+                                            ActivityListCoverThumbnail(store: store, path: activityCoverPath(item))
+                                            VStack(alignment: .leading, spacing: 4) {
+                                                Text(item.text("title")).font(.body.weight(.medium)).lineLimit(2)
+                                                Text(activityDate(item)).font(.caption).foregroundStyle(.secondary)
+                                                if !item.text("description").isEmpty {
+                                                    Text(item.text("description")).font(.caption).foregroundStyle(.secondary).lineLimit(2)
+                                                }
                                             }
+                                            Spacer(minLength: 0)
                                         }
-                                        Spacer()
-                                    }
+                                        .contentShape(Rectangle())
                                     }.buttonStyle(.plain)
                                     Menu {
                                         Button(String(localized: "活动管理", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), systemImage: "gearshape") {
@@ -852,6 +864,8 @@ struct DearSocialView: View {
                                 .font(.subheadline.weight(.semibold)).disabled(busy)
                             }
                         }.textCase(nil)
+                    } footer: {
+                        Text("日期按设备当地时区显示")
                     }
                 }
                 if showLogout {
@@ -1018,7 +1032,9 @@ struct DearSocialView: View {
     }
 
     private func setActivityCover(_ photo: DearRecord) async throws {
-        _ = try await store.call(base + "tenants/\(activityTenantId)/activities/\(activityId)/cover", method: "PUT", body: ["photoId": photo.id])
+        let activity = activityId
+        _ = try await store.call(base + "tenants/\(activityTenantId)/activities/\(activity)/cover", method: "PUT", body: ["photoId": photo.id])
+        if let id = UUID(uuidString: activity) { coverRevisions[id] = UUID() }
         notice = String(localized: "活动封面已更新，分享页将使用这项照片或视频的预览图。", bundle: AgentIdentityLanguage.appBundle())
     }
 
@@ -2432,6 +2448,32 @@ private struct DearBatchProgress: View {
     var body: some View {
         if active || (presentation.progress ?? 0) > 0 && (presentation.progress ?? 0) < 1 {
             ProgressView(value: presentation.progress ?? 0)
+        }
+    }
+}
+
+private struct ActivityListCoverThumbnail: View {
+    let store: FamilyStore
+    let path: String?
+    @State private var image: UIImage?
+
+    var body: some View {
+        ZStack {
+            RoundedRectangle(cornerRadius: 9).fill(.quaternary)
+            if let image {
+                Image(uiImage: image).resizable().scaledToFill()
+            } else {
+                Image(systemName: "photo.on.rectangle")
+                    .font(.system(size: 17)).foregroundStyle(.secondary)
+            }
+        }
+        .frame(width: 64, height: 48)
+        .clipShape(RoundedRectangle(cornerRadius: 9))
+        .accessibilityHidden(true)
+        .task(id: path) {
+            image = nil
+            guard let path, let thumbnail = try? await store.authenticatedImage(path), !Task.isCancelled else { return }
+            image = thumbnail
         }
     }
 }
