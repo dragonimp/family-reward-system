@@ -1125,6 +1125,22 @@ struct DearSocialView: View {
             .contentShape(Rectangle())
     }
 
+    private func photoTimelineMetadata(_ photo: DearRecord) -> some View {
+        let source = UUID(uuidString: photo.text("sourceDeviceId"))
+        let current = store.photoSource.currentDeviceID.flatMap { UUID(uuidString: $0) }
+        let isLocal = source != nil && source == current
+        return HStack(spacing: 6) {
+            Text(photo.dateText("createdAt"))
+            if source != nil {
+                Image(systemName: "iphone")
+                    .foregroundStyle(isLocal ? Color.accentColor : Color.secondary)
+                    .accessibilityLabel(Text(verbatim: store.photoSource.deviceDescription(photo.data)))
+            }
+        }
+        .font(.caption2)
+        .foregroundStyle(.secondary)
+    }
+
     @ViewBuilder private func photoTimelineRow(_ photo: DearRecord) -> some View {
         if photoViewMode == "list" {
             HStack(alignment: .top, spacing: 12) {
@@ -1132,8 +1148,7 @@ struct DearSocialView: View {
                 VStack(alignment: .leading, spacing: 7) {
                     Text(photo.text("sourceDisplayName").isEmpty ? "活动成员" : photo.text("sourceDisplayName")).font(.subheadline.bold()).lineLimit(1)
                     DearPhotoPlaceView(photo: photo).font(.caption2).foregroundStyle(.secondary)
-                    Text(store.photoSource.deviceDescription(photo.data)).font(.caption2).foregroundStyle(.secondary).lineLimit(2)
-                    Text(photo.dateText("createdAt")).font(.caption2).foregroundStyle(.secondary)
+                    photoTimelineMetadata(photo)
                     if photo.text("contentType").hasPrefix("video/") { Label("视频", systemImage: "play.circle").font(.caption2) }
                     photoActions(photo)
                 }.frame(maxWidth: .infinity, alignment: .leading)
@@ -1141,8 +1156,7 @@ struct DearSocialView: View {
         } else {
             VStack(alignment: .leading, spacing: 10) {
                 photoLink(photo)
-                Text(store.photoSource.deviceDescription(photo.data)).font(.caption2).foregroundStyle(.secondary).lineLimit(2)
-                    Text(photo.dateText("createdAt")).font(.caption2).foregroundStyle(.secondary)
+                photoTimelineMetadata(photo)
                 photoActions(photo)
             }.padding(.vertical, 8)
         }
