@@ -196,6 +196,7 @@ private enum PhotoDisplayImage {
 
 private struct DearPhotoDirectionsButton: View {
     let photo: DearRecord
+    var fillsActionSlot = false
     @State private var mapOpenFailed = false
 
     var body: some View {
@@ -220,6 +221,8 @@ private struct DearPhotoDirectionsButton: View {
                 }
             } label: {
                 Image(systemName: "map")
+                    .frame(maxWidth: fillsActionSlot ? .infinity : nil, minHeight: fillsActionSlot ? 44 : nil)
+                    .contentShape(Rectangle())
                     .accessibilityLabel(String(localized: "打开地图", bundle: AgentIdentityLanguage.appBundle()))
             }
             .buttonStyle(.borderless)
@@ -1023,62 +1026,76 @@ struct DearSocialView: View {
             }
     }
 
-    private func photoReactions(_ photo: DearRecord) -> some View {
+    @ViewBuilder private func photoReactions(_ photo: DearRecord, fillsActionSlot: Bool = false) -> some View {
         let comments = Int(photo.number("commentCount"))
         let likes = Int(photo.number("likeCount"))
         let liked = photo.flag("likedByMe")
-        return HStack(spacing: 10) {
-            Button { selectedPhoto = photo } label: {
-                reactionIcon("text.bubble", count: comments, color: .accentColor)
-            }.accessibilityLabel(String(localized: "点评 \(comments) 条", bundle: AgentIdentityLanguage.appBundle()))
-            Button {
-                let tenant = activityTenantId, activity = activityId
-                guard pendingLikes.insert(photo.id).inserted else { return }
-                Task {
-                    defer { pendingLikes.remove(photo.id) }
-                    do {
-                        let response = try await store.call(base + "tenants/\(tenant)/activities/\(activity)/native-photos/\(photo.id)/like",
-                                                            method: "PUT", body: ["liked": !liked])
-                        guard tenant == activityTenantId, activity == activityId,
-                              let result = response as? [String: Any],
-                              let index = photos.firstIndex(where: { $0.id == photo.id }) else { return }
-                        var updated = photos[index].data
-                        updated["likeCount"] = result["likeCount"]
-                        updated["likedByMe"] = result["likedByMe"]
-                        photos[index] = DearRecord(data: updated)
-                    } catch { showActivityToast(momentDisplayError(error)) }
-                }
-            } label: {
-                reactionIcon(liked ? "heart.fill" : "heart", count: likes, color: .red)
+        Button {
+            let tenant = activityTenantId, activity = activityId
+            guard pendingLikes.insert(photo.id).inserted else { return }
+            Task {
+                defer { pendingLikes.remove(photo.id) }
+                do {
+                    let response = try await store.call(base + "tenants/\(tenant)/activities/\(activity)/native-photos/\(photo.id)/like",
+                                                        method: "PUT", body: ["liked": !liked])
+                    guard tenant == activityTenantId, activity == activityId,
+                          let result = response as? [String: Any],
+                          let index = photos.firstIndex(where: { $0.id == photo.id }) else { return }
+                    var updated = photos[index].data
+                    updated["likeCount"] = result["likeCount"]
+                    updated["likedByMe"] = result["likedByMe"]
+                    photos[index] = DearRecord(data: updated)
+                } catch { showActivityToast(momentDisplayError(error)) }
             }
-            .accessibilityLabel(Text(liked ? String(localized: "取消点赞", bundle: AgentIdentityLanguage.appBundle()) : String(localized: "点赞", bundle: AgentIdentityLanguage.appBundle())))
-            .accessibilityValue(Text(String(likes)))
-            .disabled(pendingLikes.contains(photo.id))
-        }.buttonStyle(.borderless)
+        } label: {
+            reactionIcon(liked ? "heart.fill" : "heart", count: likes, color: .red)
+                .frame(maxWidth: fillsActionSlot ? .infinity : nil, minHeight: fillsActionSlot ? 44 : nil)
+                .contentShape(Rectangle())
+        }
+        .accessibilityLabel(Text(liked ? String(localized: "取消点赞", bundle: AgentIdentityLanguage.appBundle()) : String(localized: "点赞", bundle: AgentIdentityLanguage.appBundle())))
+        .accessibilityValue(Text(String(likes)))
+        .disabled(pendingLikes.contains(photo.id))
+        Button { selectedPhoto = photo } label: {
+            reactionIcon("text.bubble", count: comments, color: .accentColor)
+                .frame(maxWidth: fillsActionSlot ? .infinity : nil, minHeight: fillsActionSlot ? 44 : nil)
+                .contentShape(Rectangle())
+        }.accessibilityLabel(String(localized: "点评 \(comments) 条", bundle: AgentIdentityLanguage.appBundle()))
     }
 
     private func photoActions(_ photo: DearRecord) -> some View {
-        HStack(spacing: 16) {
+        HStack(spacing: 0) {
             if selectedActivity?.flag("canEdit") == true {
-                Button(String(localized: "设为封面", bundle: AgentIdentityLanguage.appBundle())) { run { try await setActivityCover(photo) } }
-                    .disabled(busy || !photo.flag("thumbnailAvailable"))
+                Button { run { try await setActivityCover(photo) } } label: {
+                    photoActionIcon("photo")
+                }
+                .accessibilityLabel(String(localized: "设为封面", bundle: AgentIdentityLanguage.appBundle()))
+                .disabled(busy || !photo.flag("thumbnailAvailable"))
             }
             if photo.flag("canDelete") {
-                Button("删除", role: .destructive) { photoToDelete = photo }
-                    .disabled(busy || batchDeleting || batchDownloading)
+                Button(role: .destructive) { photoToDelete = photo } label: {
+                    photoActionIcon("trash").foregroundStyle(.red)
+                }
+                .accessibilityLabel(String(localized: "删除", bundle: AgentIdentityLanguage.appBundle()))
+                .disabled(busy || batchDeleting || batchDownloading)
             }
-            photoReactions(photo)
             if photo.flag("canMove") {
                 Button { changeActivity(photo, kind: "native-photos") } label: {
-                    Image(systemName: "arrow.right.folder")
+                    photoActionIcon("arrow.right.folder")
                 }.accessibilityLabel(String(localized: "更改所属活动", bundle: AgentIdentityLanguage.appBundle()))
             }
-            DearPhotoDirectionsButton(photo: photo)
-            Spacer(minLength: 0)
+            DearPhotoDirectionsButton(photo: photo, fillsActionSlot: true)
             if selectingPhotoDownloads && photoViewMode == "list" {
-                Image(systemName: selectedPhotoIDs.contains(photo.id) ? "checkmark.circle.fill" : "circle").foregroundStyle(.teal)
+                photoActionIcon(selectedPhotoIDs.contains(photo.id) ? "checkmark.circle.fill" : "circle")
+                    .foregroundStyle(.teal)
             }
+            photoReactions(photo, fillsActionSlot: true)
         }.font(.caption).buttonStyle(.borderless)
+    }
+
+    private func photoActionIcon(_ name: String) -> some View {
+        Image(systemName: name)
+            .frame(maxWidth: .infinity, minHeight: 44)
+            .contentShape(Rectangle())
     }
 
     @ViewBuilder private func photoTimelineRow(_ photo: DearRecord) -> some View {
@@ -1151,8 +1168,8 @@ struct DearSocialView: View {
                 }
                 if photo.flag("canDelete") { Button("删除", role: .destructive) { photoToDelete = photo } }
             }
-            photoReactions(photo).font(.caption2)
             DearPhotoDirectionsButton(photo: photo).font(.caption2).lineLimit(1)
+            HStack(spacing: 10) { photoReactions(photo) }.font(.caption2).buttonStyle(.borderless)
         }
     }
 
