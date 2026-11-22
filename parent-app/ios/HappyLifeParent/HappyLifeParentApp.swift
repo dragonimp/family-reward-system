@@ -85,7 +85,10 @@ extension View {
     var body: some Scene { WindowGroup { FamilyRoot(store: store, identity: store.identity, notifications: store.notifications).agentIdentityInAppLinks(session: store.identity, trustedOrigins: [URL(string: "https://auth.ai.xmkurt.com")!]).environmentObject(store.language).tint(.teal).onAppear {
         photoPushDelegate.connect(store: store)
     }.onOpenURL { url in
-        if let link = MomentActivityLink(url: url) {
+        if let code = WorkoutInvitation.code(in: url) {
+            store.notifications.showingInbox = false
+            store.pendingWorkoutInvitation = code
+        } else if let link = MomentActivityLink(url: url) {
             store.notifications.showingInbox = false
             store.pendingActivityLink = link
         }
@@ -213,6 +216,9 @@ struct FamilyRoot: View {
         }
         .onChange(of: store.pendingExerciseContinuation) { _, value in if value != nil { exerciseEnabled = true; selectedTab = 3 } }
         .onChange(of: store.pendingExerciseActivity) { _, value in if value != nil { exerciseEnabled = true; selectedTab = 3 } }
+        .onChange(of: store.pendingWorkoutInvitation, initial: true) { _, value in
+            if value != nil { exerciseEnabled = true; selectedTab = 3 }
+        }
         .onAppear { if store.pendingActivityLink != nil { activitiesEnabled = true; selectedTab = 2 } }
         .onChange(of: store.pendingActivityLink?.id) { _, id in if id != nil { activitiesEnabled = true; selectedTab = 2 } }
         .onChange(of: [diningEnabled, growthEnabled, activitiesEnabled, exerciseEnabled]) { _, enabled in

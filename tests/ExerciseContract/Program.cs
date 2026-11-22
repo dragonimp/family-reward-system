@@ -65,6 +65,13 @@ var code = (await created.Content.ReadFromJsonAsync<JsonElement>()).GetProperty(
 var sharePath = $"{shares}/{code:D}";
 await Expect(await client.PutAsJsonAsync(sharePath + "/track", new { workoutId = id, points = record.Route }), HttpStatusCode.OK);
 using var guest = new HttpClient { BaseAddress = new Uri(address) };
+using var landing = await guest.GetAsync($"/api/exercise/share-invitations/{code:D}");
+await Expect(landing, HttpStatusCode.OK);
+var preview = await landing.Content.ReadAsStringAsync();
+if (landing.Content.Headers.ContentType?.MediaType != "text/html" || !preview.Contains("og:image") ||
+    !preview.Contains($"linkomoment://workout?code={code:D}") || preview.Contains("recordedAt"))
+    throw new Exception("Workout invitation must provide public link metadata and avoid leaking route data");
+Console.WriteLine("PASS: public workout invitation renders metadata and a matching app link");
 await Expect(await guest.GetAsync(sharePath), HttpStatusCode.Unauthorized);
 guest.DefaultRequestHeaders.Add("X-Exercise-Test-Owner", Guid.NewGuid().ToString());
 var view = await guest.GetFromJsonAsync<JsonElement>(sharePath);

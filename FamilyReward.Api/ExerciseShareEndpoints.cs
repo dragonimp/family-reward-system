@@ -13,6 +13,15 @@ internal static class ExerciseShareEndpoints
 
     public static void MapExerciseShares(this WebApplication app, string exerciseRoot)
     {
+        app.MapMethods("/api/exercise/share-invitations/{code:guid}", ["GET", "HEAD"], (Guid code, HttpResponse response) =>
+        {
+            response.Headers.CacheControl = "no-store";
+            response.Headers["Referrer-Policy"] = "no-referrer";
+            response.Headers["X-Robots-Tag"] = "noindex, nofollow";
+            response.Headers.XContentTypeOptions = "nosniff";
+            return code == Guid.Empty ? Results.NotFound() : Results.Content(InvitationPage(code), "text/html; charset=utf-8");
+        }).AllowAnonymous();
+
         var root = Path.Combine(exerciseRoot, "shares");
         var routes = app.MapGroup("/api/exercise/shares").RequireAuthorization();
         routes.MapPost("", async (Create input, ClaimsPrincipal user, CancellationToken ct) =>
@@ -92,6 +101,41 @@ internal static class ExerciseShareEndpoints
             File.Delete(FilePath(root, code));
             return Results.NoContent();
         });
+    }
+
+    private static string InvitationPage(Guid code)
+    {
+        const string origin = "https://happylife.ai.impx.net";
+        const string icon = origin + "/api/dear/public/brand/icon.png";
+        const string title = "Linko Moment · 好友运动邀请";
+        const string description = "打开 Linko Moment，查看好友运动或加入并记录自己的轨迹。";
+        var appLink = $"linkomoment://workout?code={code:D}";
+        var page = $"{origin}/api/exercise/share-invitations/{code:D}";
+        return $$"""
+            <!doctype html><html lang="zh-CN"><head><meta charset="utf-8">
+            <meta name="viewport" content="width=device-width,initial-scale=1">
+            <title>{{title}}</title><meta name="description" content="{{description}}">
+            <meta property="og:type" content="website"><meta property="og:title" content="{{title}}">
+            <meta property="og:description" content="{{description}}"><meta property="og:image" content="{{icon}}">
+            <meta property="og:url" content="{{page}}">
+            <meta name="apple-itunes-app" content="app-id=6828813434, app-argument={{appLink}}">
+            <style>
+            :root{color-scheme:light dark;font-family:system-ui,sans-serif}body{margin:0;padding:40px 16px;background:#eaf4ef;color:#15382e}
+            main{box-sizing:border-box;max-width:470px;margin:auto;padding:30px;background:#fff;border-radius:24px}
+            img{border-radius:12px}h1{font-size:26px;margin:16px 0 8px}p,label{font-size:15px;line-height:1.6}
+            a{display:block;text-align:center;padding:12px;border-radius:12px;margin-top:10px;color:#195743}a.primary{background:#146755;color:white;text-decoration:none;font-weight:600}
+            input{box-sizing:border-box;width:100%;padding:10px;font:15px system-ui;border:1px solid #819b92;border-radius:8px}
+            @media(prefers-color-scheme:dark){body{background:#101d19;color:#e5f4ee}main{background:#182e26}a{color:#9adbc4} }
+            </style></head><body><main><img src="{{icon}}" width="48" height="48" alt="Linko Moment">
+            <h1>好友运动邀请</h1><p>{{description}}</p>
+            <a class="primary" href="{{appLink}}">在 App 中打开</a>
+            <p>如果微信无法打开 App，请点右上角「···」，选择在系统浏览器中打开。</p>
+            <label for="code">也可以复制邀请码，在 App 的「运动 → 好友运动」里打开。</label>
+            <input id="code" readonly value="{{code:D}}">
+            <a href="https://home.ai.impx.net/invite/SW2wL0kd3pX20t6xSNLXsDK4" rel="noreferrer">安装测试版</a>
+            <a href="https://apps.apple.com/app/id6828813434" rel="noreferrer">App Store 正式版</a>
+            </main></body></html>
+            """;
     }
 
     private static bool ValidName(string? value) => !string.IsNullOrWhiteSpace(value) && value.Length <= 100;

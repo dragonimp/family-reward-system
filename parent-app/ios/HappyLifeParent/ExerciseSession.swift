@@ -1,5 +1,26 @@
 import Foundation
 
+enum WorkoutInvitation {
+    private static let domain = "happylife.ai.impx.net"
+    private static let path = "/api/exercise/share-invitations"
+
+    static func url(for code: UUID) -> URL {
+        URL(string: "https://\(domain)\(path)/\(code.uuidString.lowercased())")!
+    }
+
+    static func code(in url: URL) -> UUID? {
+        if url.scheme?.lowercased() == "https", url.host?.lowercased() == domain,
+           url.path.hasPrefix(path + "/") {
+            return UUID(uuidString: String(url.path.dropFirst(path.count + 1)))
+        }
+        guard let scheme = url.scheme?.lowercased(), ["linkomoment", "linkofamily"].contains(scheme),
+              url.host?.lowercased() == "workout", url.path.isEmpty || url.path == "/" else { return nil }
+        let value = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems?
+            .first(where: { $0.name == "code" })?.value
+        return value.flatMap(UUID.init(uuidString:))
+    }
+}
+
 struct ExerciseActivity: Codable, Equatable, Identifiable {
     var tenantID: UUID
     var id: UUID

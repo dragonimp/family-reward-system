@@ -135,6 +135,7 @@ private actor PhotoPreviewLoader {
         activityTitles = titles
     }
 
+    @Published var pendingWorkoutInvitation: UUID?
     @Published var pendingExerciseActivity: ExerciseActivity?
     @Published var pendingActivityLink: MomentActivityLink?
     @Published var profile: Record?

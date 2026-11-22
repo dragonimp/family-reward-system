@@ -2,6 +2,11 @@ import Foundation
 
 @main struct ExerciseSessionTests {
     static func main() throws {
+        let invite = UUID()
+        precondition(WorkoutInvitation.code(in: WorkoutInvitation.url(for: invite)) == invite)
+        precondition(WorkoutInvitation.code(in: URL(string: "linkomoment://workout?code=\(invite.uuidString)")!) == invite)
+        precondition(WorkoutInvitation.code(in: URL(string: "https://example.org/api/exercise/share-invitations/\(invite.uuidString)")!) == nil)
+        print("PASS: workout link roundtrip and untrusted origin rejection")
         let start = ISO8601DateFormatter().date(from: "2026-10-29T23:59:50Z")!
         var session = ExerciseSession(kind: "散步", startedAt: start, intervals: [ExerciseInterval(start: start)])
         precondition(session.running && session.steps == nil)

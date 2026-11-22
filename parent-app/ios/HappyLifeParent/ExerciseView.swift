@@ -543,6 +543,7 @@ struct ExerciseView: View {
     @StateObject private var health = ExerciseHealth()
     @State private var showingHistory = false
     @State private var showingFriendWorkout = false
+    @State private var workoutInvitation: UUID?
     @State private var workoutToShare: ExerciseSession?
     @State private var workoutToEdit: ExerciseSession?
     @State private var selectedRoute: ExerciseSession?
@@ -652,7 +653,7 @@ struct ExerciseView: View {
                         }
                     }
                     ToolbarItem(placement: .topBarTrailing) {
-                        Button { showingFriendWorkout = true } label: {
+                        Button { workoutInvitation = nil; showingFriendWorkout = true } label: {
                             Label(String(localized: "好友运动", bundle: AgentIdentityLanguage.appBundle()), systemImage: "person.2")
                                 .labelStyle(.iconOnly)
                         }
@@ -665,7 +666,14 @@ struct ExerciseView: View {
                     }
                 }
                 .sheet(isPresented: $showingFriendWorkout) {
-                    ExerciseFriendShareView(exercise: exercise, family: family, workout: exercise.active)
+                    ExerciseFriendShareView(exercise: exercise, family: family, workout: workoutInvitation == nil ? exercise.active : nil, invitation: workoutInvitation)
+                }
+                .onChange(of: family.pendingWorkoutInvitation, initial: true) { _, invitation in
+                    guard let invitation else { return }
+                    exercise.connect(family)
+                    workoutInvitation = invitation
+                    showingFriendWorkout = true
+                    family.pendingWorkoutInvitation = nil
                 }
                 .sheet(item: $workoutToEdit) { record in
                     ExerciseActivityEditor(store: family, scope: record.activity?.tenantID,
@@ -1220,6 +1228,7 @@ private struct ExerciseFriendShareView: View {
     @ObservedObject var exercise: ExerciseStore
     let family: FamilyStore
     let workout: ExerciseSession?
+    var invitation: UUID? = nil
     @Environment(\.dismiss) private var dismiss
     @State private var input = ""
     @State private var code: UUID?
@@ -1254,8 +1263,8 @@ private struct ExerciseFriendShareView: View {
                     }
                     if let code, let workoutID = board.workoutId {
                         if board.isOwner {
-                            ShareLink(item: code.uuidString) {
-                                Label(String(localized: "分享邀请码", bundle: AgentIdentityLanguage.appBundle()), systemImage: "square.and.arrow.up")
+                            ShareLink(item: WorkoutInvitation.url(for: code)) {
+                                Label(String(localized: "分享运动", bundle: AgentIdentityLanguage.appBundle()), systemImage: "square.and.arrow.up")
                             }.buttonStyle(.bordered)
                         }
                         Button(board.isOwner ? String(localized: "停止共享", bundle: AgentIdentityLanguage.appBundle()) : String(localized: "退出共享", bundle: AgentIdentityLanguage.appBundle()), role: .destructive) {
@@ -1310,8 +1319,13 @@ private struct ExerciseFriendShareView: View {
                     Button(String(localized: "完成", bundle: AgentIdentityLanguage.appBundle())) { dismiss() }
                 }
             }
-            .task {
-                if let workout, let saved = exercise.friendShare(for: workout.id) { code = saved }
+            .task(id: invitation) {
+                if let invitation {
+                    hidden.removeAll()
+                    board = nil
+                    code = invitation
+                    input = invitation.uuidString
+                } else if let workout, let saved = exercise.friendShare(for: workout.id) { code = saved }
             }
             .task(id: code) {
                 guard let code else { return }
