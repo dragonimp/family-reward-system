@@ -597,11 +597,12 @@ private struct DearActivityMapView: View {
 
 private struct DearTimelineEntry: Identifiable {
     let id: String
-    enum Kind { case photo, moment, checkIn, exercise }
+    enum Kind { case photo, moment, checkIn, exercise, pending }
     let kind: Kind
     var checkIn: Bool { kind == .checkIn }
     let record: DearRecord
     var exercise: ExerciseSession? = nil
+    var draft: MomentLocalDraft? = nil
 }
 
 struct DearSocialView: View {
@@ -636,7 +637,7 @@ struct DearSocialView: View {
     @State private var selectedPhotoIDs = Set<String>()
     @State private var sharingSelectedOriginals = false
     @State private var originalShare: MomentOriginalShare?
-    @State private var diningDrafts: [MomentLocalDraft] = []
+    @State private var activityDrafts: [MomentLocalDraft] = []
     @State private var showingActivityDining = false
     @State private var batchOriginalURLs: [URL] = []
     @State private var savingBatchToPhotos = false
@@ -1135,7 +1136,9 @@ struct DearSocialView: View {
         let current = store.photoSource.currentDeviceID.flatMap { UUID(uuidString: $0) }
         let isLocal = source != nil && source == current
         return HStack(spacing: 6) {
-            Text(photo.dateText("createdAt"))
+            Text(photo.text("sourceDisplayName").isEmpty ? "活动成员" : photo.text("sourceDisplayName"))
+                .fontWeight(.semibold).lineLimit(1)
+            Text(photo.dateText("createdAt")).lineLimit(1)
             if source != nil {
                 Image(systemName: "iphone")
                     .foregroundStyle(isLocal ? Color.accentColor : Color.secondary)
@@ -1151,9 +1154,8 @@ struct DearSocialView: View {
             HStack(alignment: .top, spacing: 12) {
                 photoLink(photo).frame(width: 112, height: 112)
                 VStack(alignment: .leading, spacing: 7) {
-                    Text(photo.text("sourceDisplayName").isEmpty ? "活动成员" : photo.text("sourceDisplayName")).font(.subheadline.bold()).lineLimit(1)
-                    DearPhotoPlaceView(photo: photo).font(.caption2).foregroundStyle(.secondary)
                     photoTimelineMetadata(photo)
+                    DearPhotoPlaceView(photo: photo).font(.caption2).foregroundStyle(.secondary)
                     if photo.text("contentType").hasPrefix("video/") { Label("视频", systemImage: "play.circle").font(.caption2) }
                     photoActions(photo)
                 }.frame(maxWidth: .infinity, alignment: .leading)
@@ -1328,8 +1330,6 @@ struct DearSocialView: View {
 
     private var activityPhotoSection: some View {
         Section {
-            MomentPendingActivityView(source: store.photoSource, spaceID: activityTenantId, activityID: activityId)
-
             ForEach(capturedMedia.filter { $0.target.activityID == activityId && $0.target.spaceID == activityTenantId && $0.target.accountID == store.identity.accountIdentifier }) { capture in
                 Text(savingCaptures.contains(capture.id) ? "正在保存拍摄内容…" : "这项拍摄内容尚未加入同步队列，可以重试或另存。")
                     .font(.caption).foregroundStyle(.secondary)
@@ -1383,11 +1383,10 @@ struct DearSocialView: View {
         let shared = moments.filter { row in
             !(UUID(uuidString: row.id).map { published.contains($0) } ?? false) && !records.contains { UUID(uuidString: row.text("requestId")) == $0.id }
         }.map { DearTimelineEntry(id: "moment:" + $0.id, kind: .moment, record: $0) }
-        let syncedRequests = Set(moments.compactMap { UUID(uuidString: $0.text("requestId")) })
-        let pendingDining = diningDrafts.filter { !syncedRequests.contains($0.id) }.map { draft in
-            DearTimelineEntry(id: "dining:" + draft.id.uuidString, kind: .moment,
-                record: DearRecord(data: ["text": (draft.displayName ?? "") + " · 待同步",
-                    "createdAt": ISO8601DateFormatter().string(from: draft.createdAt)]))
+        let syncedRequests = Set((moments + checkIns + photos).compactMap { UUID(uuidString: $0.text("requestId")) })
+        let pending = activityDrafts.filter { !syncedRequests.contains($0.id) }.map { draft in
+            DearTimelineEntry(id: "draft:" + draft.id.uuidString, kind: .pending,
+                record: DearRecord(data: ["createdAt": ISO8601DateFormatter().string(from: draft.createdAt)]), draft: draft)
         }
         let exercises = records.map { record in
             DearTimelineEntry(id: "exercise:" + record.id.uuidString, kind: .exercise,
@@ -1395,7 +1394,7 @@ struct DearSocialView: View {
         }
         let located = checkIns.map { DearTimelineEntry(id: "checkin:" + $0.id, kind: .checkIn, record: $0) }
         let media = photos.map { DearTimelineEntry(id: "photo:" + $0.id, kind: .photo, record: $0) }
-        return (shared + pendingDining + located + media + exercises).sorted {
+        return (shared + pending + located + media + exercises).sorted {
             let left = $0.record.sortDate
             let right = $1.record.sortDate
             return left == right ? $0.id < $1.id : left > right
@@ -1412,6 +1411,9 @@ struct DearSocialView: View {
                     .frame(height: 460)
                     .listRowInsets(EdgeInsets())
                     .id(activityId)
+                ForEach(activityDrafts.filter { $0.lastError != nil }) { draft in
+                    MomentPendingActivityRow(source: store.photoSource, draft: draft)
+                }
             } else {
 
             if photoViewMode == "tiles" {
@@ -1434,38 +1436,10 @@ struct DearSocialView: View {
                     }
                 } else if entry.kind == .photo {
                     photoTimelineRow(entry.record)
+                } else if let draft = entry.draft {
+                    MomentPendingActivityRow(source: store.photoSource, draft: draft)
                 } else {
-                VStack(alignment: .leading, spacing: 8) {
-                    HStack {
-                        Label(entry.record.text("authorName"), systemImage: entry.checkIn ? "location.fill" : "text.bubble.fill")
-                            .font(.subheadline.weight(.semibold))
-                        Spacer()
-                        Text(entry.checkIn ? "打卡" : "分享").font(.caption).foregroundStyle(.secondary)
-                    }
-                    Text(entry.record.text(entry.checkIn ? "note" : "text")).textSelection(.enabled)
-                    if entry.checkIn {
-                        if !entry.record.text("address").isEmpty { Label(entry.record.text("address"), systemImage: "mappin.and.ellipse").font(.caption).foregroundStyle(.secondary) }
-                        HStack {
-                            if let altitude = entry.record.data["altitudeMeters"] as? Double {
-                                Label(String(format: "海拔 %.1f 米", altitude), systemImage: "mountain.2").font(.caption)
-                            }
-                            Spacer()
-                            DearPhotoDirectionsButton(checkIn: entry.record)
-                            Button(entry.record.flag("canEdit") ? "查看 / 编辑" : "查看打卡") {
-                                pendingCheckIn = false; removingCheckInLocation = false; selectedCheckIn = entry.record; checkInNote = entry.record.text("note")
-                                error = ""; checkInLocator.clear(); showingCheckIn = true
-                            }.font(.caption).disabled(busy || pendingCheckIn)
-                        }
-                    } else if entry.record.flag("canDelete") {
-                        Button("删除日常分享", role: .destructive) { run { try await deleteMoment(entry.record) } }.font(.caption)
-                    }
-                    if entry.record.flag(entry.checkIn ? "canEdit" : "canMove") {
-                        Button(String(localized: "更改所属活动", bundle: AgentIdentityLanguage.appBundle())) {
-                            changeActivity(entry.record, kind: entry.checkIn ? "checkins" : "moments")
-                        }.buttonStyle(.borderless).font(.caption)
-                    }
-                    Text(entry.record.dateText("createdAt")).font(.caption2).foregroundStyle(.secondary)
-                }.padding(.vertical, 6)
+                    activityRecordRow(entry)
                 }
             }
             if activityTimeline.isEmpty {
@@ -1476,6 +1450,11 @@ struct DearSocialView: View {
         } header: {
             HStack {
                 Text(String(localized: "活动动态", bundle: AgentIdentityLanguage.appBundle()))
+                let pendingCount = activityDrafts.filter { $0.lastError == nil }.count
+                if pendingCount > 0 {
+                    Label("\(pendingCount) 项待同步", systemImage: "arrow.triangle.2.circlepath")
+                        .font(.caption2).foregroundStyle(.secondary)
+                }
                 Spacer()
                 Button {
                     if sharingSelectedOriginals {
@@ -1512,9 +1491,54 @@ struct DearSocialView: View {
         }
     }
 
-    private func refreshDiningDrafts() {
-        diningDrafts = store.photoSource.pendingDrafts(spaceID: activityTenantId, activityID: activityId)
-            .filter { $0.kind == "moments" && $0.displayName?.hasPrefix("干饭 · ") == true }
+    private func activityRecordRow(_ entry: DearTimelineEntry) -> some View {
+        let record = entry.record
+        let note = record.text(entry.checkIn ? "note" : "text")
+        let address = entry.checkIn ? record.text("address") : ""
+        return VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 8) {
+                Label(record.text("authorName"), systemImage: entry.checkIn ? "location.fill" : "text.bubble.fill")
+                    .font(.subheadline.weight(.semibold)).lineLimit(1)
+                Text(record.dateText("createdAt"))
+                    .font(.caption2).foregroundStyle(.secondary).lineLimit(1)
+                Spacer(minLength: 0)
+                if entry.checkIn { DearPhotoDirectionsButton(checkIn: record) }
+                if entry.checkIn || record.flag("canDelete") || record.flag("canMove") {
+                    Menu {
+                        if entry.checkIn {
+                            Button(record.flag("canEdit") ? "查看 / 编辑" : "查看打卡") {
+                                pendingCheckIn = false; removingCheckInLocation = false
+                                selectedCheckIn = record; checkInNote = note
+                                error = ""; checkInLocator.clear(); showingCheckIn = true
+                            }.disabled(busy || pendingCheckIn)
+                        }
+                        if record.flag(entry.checkIn ? "canEdit" : "canMove") {
+                            Button("更改所属活动", systemImage: "arrow.right.folder") {
+                                changeActivity(record, kind: entry.checkIn ? "checkins" : "moments")
+                            }
+                        }
+                        if !entry.checkIn && record.flag("canDelete") {
+                            Button(role: .destructive) {
+                                run { try await deleteMoment(record) }
+                            } label: {
+                                Label("删除日常分享", systemImage: "trash")
+                            }
+                        }
+                    } label: {
+                        Image(systemName: "ellipsis.circle").accessibilityLabel("动态操作")
+                    }.buttonStyle(.borderless)
+                }
+            }
+            if !note.isEmpty { Text(note).textSelection(.enabled) }
+            if !address.isEmpty && address != note {
+                Label(address, systemImage: "mappin.and.ellipse").font(.caption).foregroundStyle(.secondary)
+            }
+        }.padding(.vertical, 6)
+    }
+
+    private func refreshActivityDrafts() {
+        activityDrafts = store.photoSource.pendingDrafts(spaceID: activityTenantId, activityID: activityId)
+
     }
 
     private var activityDetail: some View {
@@ -1559,8 +1583,8 @@ struct DearSocialView: View {
         }
         .navigationTitle(selectedActivity?.text("title") ?? "活动详情")
         .navigationBarTitleDisplayMode(.inline)
-        .onReceive(store.photoSource.$draftRevision) { _ in refreshDiningDrafts() }
-        .onChange(of: activityId, initial: true) { _, _ in refreshDiningDrafts() }
+        .onReceive(store.photoSource.$draftRevision) { _ in refreshActivityDrafts() }
+        .onChange(of: activityTenantId + "/" + activityId, initial: true) { _, _ in refreshActivityDrafts() }
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 activityActions
@@ -3226,35 +3250,39 @@ struct MomentShareLink: View {
     }
 }
 
-private struct MomentPendingActivityView: View {
+private struct MomentPendingActivityRow: View {
     @ObservedObject var source: DearPhotoSource
-    let spaceID: String
-    let activityID: String
+    let draft: MomentLocalDraft
+
     var body: some View {
-        let drafts = source.pendingDrafts(spaceID: spaceID, activityID: activityID)
-        if !drafts.isEmpty {
-            VStack(alignment: .leading, spacing: 8) {
-                HStack {
-                    Label(String(localized: "已存本机 · 待同步", bundle: AgentIdentityLanguage.appBundle()), systemImage: "internaldrive")
-                    Spacer()
-                    Button(String(localized: "重试同步", bundle: AgentIdentityLanguage.appBundle())) { source.retryDrafts() }
-                }.font(.caption)
-                ForEach(drafts) { draft in
-                    HStack(spacing: 8) {
-                        if let local = try? source.draftStore().file(draft) {
-                            MomentDraftPreview(url: local, video: draft.contentType?.hasPrefix("video/") == true)
-                                .frame(width: 56, height: 56).clipped()
-                        } else { Image(systemName: draft.kind == "checkins" ? "location.circle" : "square.and.pencil") }
-                        VStack(alignment: .leading, spacing: 3) {
-                            Text(draft.displayName ?? String(localized: "活动记录", bundle: AgentIdentityLanguage.appBundle())).font(.caption).lineLimit(2)
-                            Text(draft.createdAt, style: .time).font(.caption2).foregroundStyle(.secondary)
-                            if let error = draft.lastError { Text(error).font(.caption2).foregroundStyle(.secondary).lineLimit(2) }
-                        }
+        HStack(spacing: 8) {
+            if draft.kind == "media", let store = try? source.draftStore(), let local = store.file(draft) {
+                MomentDraftPreview(url: local, video: draft.contentType?.hasPrefix("video/") == true)
+                    .frame(width: 44, height: 44).clipShape(.rect(cornerRadius: 6))
+            } else {
+                Image(systemName: draft.kind == "checkins" ? "location.circle" : "square.and.pencil")
+            }
+            VStack(alignment: .leading, spacing: 3) {
+                HStack(spacing: 8) {
+                    Text("我").font(.subheadline.weight(.semibold))
+                    Text(draft.createdAt, style: .time).font(.caption2).foregroundStyle(.secondary)
+                    if let error = draft.lastError {
+                        Image(systemName: "exclamationmark.circle").foregroundStyle(.orange)
+                            .accessibilityLabel(Text(error))
                     }
                 }
+                if let name = draft.displayName, !name.isEmpty {
+                    Text(name).font(.caption).lineLimit(2)
+                }
             }
-        } else if !source.draftStatus.isEmpty {
-            Text(source.draftStatus).font(.caption).foregroundStyle(.secondary)
+            Spacer()
+            if source.isRetryingDraft(draft.id) {
+                ProgressView().accessibilityLabel("正在重试")
+            } else if draft.lastError != nil {
+                Button { source.retryDrafts(id: draft.id) } label: {
+                    Image(systemName: "arrow.clockwise").accessibilityLabel("重试同步")
+                }.buttonStyle(.borderless)
+            }
         }
     }
 }

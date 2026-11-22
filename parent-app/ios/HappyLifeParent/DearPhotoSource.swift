@@ -19,7 +19,7 @@ import UniformTypeIdentifiers
     @Published private(set) var draftRevision = UUID()
     @Published private(set) var syncRevision = UUID()
     @Published private(set) var networkAvailable = false
-    @Published private(set) var draftStatus = ""
+    private var requestedDraftRetries = Set<UUID>()
     private var draftSync: Task<Void, Never>?
     private var draftNetwork: NWPathMonitor?
     private struct SharedPhoto: Codable {
@@ -106,7 +106,8 @@ import UniformTypeIdentifiers
         monitor.start(queue: DispatchQueue(label: "moment.activity.network"))
         pump = Task {
             while !Task.isCancelled {
-                await syncDrafts()
+                retryDrafts()
+                await draftSync?.value
                 if !enabledForSession { await enableExistingDevice() }
                 if enabledForSession { await poll() }
                 try? await Task.sleep(for: .seconds(10))
@@ -116,7 +117,7 @@ import UniformTypeIdentifiers
 
     func stop() {
         draftNetwork?.cancel(); draftNetwork = nil
-        draftSync?.cancel(); draftSync = nil; draftRevision = UUID()
+        draftSync?.cancel(); draftSync = nil; requestedDraftRetries.removeAll(); draftRevision = UUID()
         for task in localReads.values { task.cancel() }; localReads.removeAll(); fileVerifiers.removeAll(); legacyLibraryAttempts.removeAll(); legacyRead?.cancel(); legacyRead = nil
         generation = UUID(); originalsRevision = UUID(); librarySearch?.cancel(); librarySearch = nil; cacheTask?.cancel(); cacheTask = nil; cachedShares.removeAll(); cacheRetries.removeAll(); currentDeviceID = nil; pump?.cancel(); pump = nil; enabledForSession = false
         for task in sourceTasks.values { task.cancel() }; sourceTasks.removeAll()
@@ -339,21 +340,33 @@ import UniformTypeIdentifiers
         draftRevision = UUID(); start(); retryDrafts()
     }
 
-    func retryDrafts() {
+    func retryDrafts(id: UUID? = nil) {
+        if let id, requestedDraftRetries.insert(id).inserted { draftRevision = UUID() }
         guard draftSync == nil else { return }
-        draftSync = Task { await syncDrafts(); draftSync = nil }
+        let expected = generation
+        draftSync = Task {
+            if id == nil { await syncDrafts() }
+            while expected == generation, !Task.isCancelled, !requestedDraftRetries.isEmpty {
+                let requested = requestedDraftRetries
+                await syncDrafts(only: requested)
+                guard expected == generation, !Task.isCancelled else { return }
+                requestedDraftRetries.subtract(requested)
+                draftRevision = UUID()
+            }
+            if expected == generation { draftSync = nil }
+        }
     }
 
-    private var syncingDrafts = false
-    private func syncDrafts() async {
-        guard !syncingDrafts, !Task.isCancelled, let account = store?.identity.accountIdentifier, let store else { return }
+    func isRetryingDraft(_ id: UUID) -> Bool { requestedDraftRetries.contains(id) }
+
+    private func syncDrafts(only requested: Set<UUID>? = nil) async {
+        guard !Task.isCancelled, let account = store?.identity.accountIdentifier, let store else { return }
         let expected = generation
-        syncingDrafts = true
         var completed = false
-        defer { syncingDrafts = false; if completed { syncRevision = UUID() } }
+        defer { if completed, expected == generation { syncRevision = UUID() } }
         do {
             let local = try draftStore()
-            for var draft in try local.entries() {
+            for var draft in try local.entries() where requested?.contains(draft.id) != false {
                 guard expected == generation, !Task.isCancelled, store.identity.accountIdentifier == account else { return }
                 do {
                     if draft.kind == "media", let url = local.file(draft), let mime = draft.contentType {
@@ -366,16 +379,16 @@ import UniformTypeIdentifiers
                     guard expected == generation, store.identity.accountIdentifier == account, !Task.isCancelled else { return }
                     try local.remove(draft)
                     completed = true
-                    draftRevision = UUID(); draftStatus = ""
+                    draftRevision = UUID()
                 } catch {
-                    guard store.identity.accountIdentifier == account else { return }
+                    guard expected == generation, store.identity.accountIdentifier == account, !Task.isCancelled else { return }
                     draft.lastError = momentDisplayError(error)
-                    try local.save(draft); draftStatus = draft.lastError ?? ""; draftRevision = UUID()
+                    try local.save(draft); draftRevision = UUID()
                     // Leave each draft durable; retry on resume or the next pump tick.
-                    if error is URLError || error is CancellationError { return }
+                    if requested == nil, error is URLError || error is CancellationError { return }
                 }
             }
-        } catch { draftStatus = momentDisplayError(error); draftRevision = UUID() }
+        } catch { if expected == generation { draftRevision = UUID() } }
     }
 
     private func uploadMedia(at sourceURL: URL, contentType: String, spaceID: String, activityID: String, name: String, locationName: String, assetIdentifier: String? = nil, operationID: UUID, recordedAt: Date, capturedAt: Date?) async throws {
