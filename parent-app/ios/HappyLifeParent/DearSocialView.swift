@@ -864,8 +864,6 @@ struct DearSocialView: View {
                                 .font(.subheadline.weight(.semibold)).disabled(busy)
                             }
                         }.textCase(nil)
-                    } footer: {
-                        Text("日期按设备当地时区显示")
                     }
                 }
                 if showLogout {
@@ -1211,7 +1209,9 @@ struct DearSocialView: View {
                     DatePicker("活动日期", selection: $newActivityDate, displayedComponents: .date)
                     TextField("活动介绍（可选）", text: $newActivityDescription, axis: .vertical).lineLimit(3...5)
                 }
-                Section { Text("创建到\(selectedSpace?.text("name") ?? "当前空间") · 日期按当地时区保存") .font(.footnote).foregroundStyle(.secondary) }
+                if let space = selectedSpace {
+                    LabeledContent(String(localized: "我的空间", bundle: AgentIdentityLanguage.appBundle()), value: space.text("name"))
+                }
             }
             .navigationTitle("新增活动")
             .toolbar {
