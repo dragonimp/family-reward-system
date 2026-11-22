@@ -53,6 +53,7 @@ struct ExerciseSession: Codable, Identifiable {
     var intervals: [ExerciseInterval]
     var activity: ExerciseActivity?
     var activityText: String?
+    var metadataRevision: UUID?
     var routeEnabled: Bool?
     var route: [ExerciseRoutePoint]?
     var routePoints: [ExerciseRoutePoint] { (route ?? []).filter(\.valid) }

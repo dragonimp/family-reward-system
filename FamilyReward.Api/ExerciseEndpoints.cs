@@ -14,7 +14,11 @@ internal static class ExerciseEndpoints
     internal sealed record Record(Guid Id, string Kind, DateTimeOffset StartedAt, DateTimeOffset? EndedAt,
         Interval[] Intervals, bool? RouteEnabled, Point[]? Route,
         [property: System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)] Activity? Activity = null,
-        [property: System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)] string? ActivityText = null);
+        [property: System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)] string? ActivityText = null,
+        [property: System.Text.Json.Serialization.JsonPropertyOrder(-1), System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)] Guid? MetadataRevision = null);
+    internal sealed record Metadata(string Kind, Activity? Activity, string ActivityText);
+    internal static readonly string[] EditableKinds = ["散步", "慢跑", "徒步", "爬山", "滑雪", "飞行", "自由运动"];
+
     internal static bool Valid(Record r)
     {
         if (r.Id == Guid.Empty || string.IsNullOrWhiteSpace(r.Kind) || r.Kind.Length > 40 || r.EndedAt is not { } end ||
@@ -65,8 +69,20 @@ internal static class ExerciseEndpoints
         group.MapPut("/{id:guid}", async (Guid id, Record record, ClaimsPrincipal user, CancellationToken ct) => {
             var owner = Owner(user); if (owner == null) return Results.Unauthorized();
             if (id != record.Id || !Valid(record)) return Results.BadRequest(new { error = "运动记录或轨迹无效，请保留本机记录后重试。" });
-            return await store.Put(owner, record, ct) ? Results.Ok(new { id, saved = true }) : Results.Conflict(new { error = "这条运动记录已删除，或已存在不同内容。" });
+            return await store.Put(owner, record with { MetadataRevision = null }, ct) ? Results.Ok(new { id, saved = true }) : Results.Conflict(new { error = "这条运动记录已删除，或已存在不同内容。" });
         }).WithMetadata(new RequestSizeLimitAttribute(5 * 1024 * 1024));
+        group.MapPatch("/{id:guid}/metadata", async (Guid id, Metadata input, ClaimsPrincipal user, CancellationToken ct) =>
+        {
+            var owner = Owner(user);
+            if (owner == null) return Results.Unauthorized();
+            if (!EditableKinds.Contains(input.Kind)) return Results.BadRequest();
+            return await store.UpdateMetadata(owner, id, input, ct) switch
+            {
+                true => Results.Ok(),
+                false => Results.BadRequest(),
+                null => Results.NotFound()
+            };
+        });
         group.MapDelete("/{id:guid}", async (Guid id, ClaimsPrincipal user, CancellationToken ct) => {
             var owner = Owner(user); if (owner == null) return Results.Unauthorized();
             await store.Delete(owner, id, ct); return Results.Ok(new { id, deleted = true });
@@ -97,15 +113,59 @@ internal sealed class ExerciseRecordStore(string root)
             .Where(n => n != null && (n.EndsWith(".json") || n.EndsWith(".deleted")))
             .Select(n => Path.GetFileNameWithoutExtension(n)!).Where(n => Guid.TryParseExact(n, "N", out _)).Distinct()
             .Where(n => after == null || string.CompareOrdinal(n, Key(after.Value)) > 0).Order(StringComparer.Ordinal).Take(101).ToArray() : [];
-        return new { records = keys.Take(100).Select(k => new { id = Guid.ParseExact(k, "N"), deleted = File.Exists(Path.Combine(folder, k + ".deleted")) }),
+        return new { records = keys.Take(100).Select(k =>
+            {
+                var id = Guid.ParseExact(k, "N");
+                var deleted = File.Exists(Path.Combine(folder, k + ".deleted"));
+                return new { id, deleted, metadataRevision = deleted ? null : ReadMetadataRevision(Path.Combine(folder, k + ".json")) };
+            }),
             next = keys.Length > 100 ? (Guid?)Guid.ParseExact(keys[99], "N") : null };
     }
+    // Edited records serialize the revision first. The records index doesn't need to
+    // read or deserialize GPS routes just to tell clients a title or type changed.
+    private static Guid? ReadMetadataRevision(string path)
+    {
+        Span<byte> prefix = stackalloc byte[128];
+        try
+        {
+            using var file = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
+            var length = file.ReadAtLeast(prefix, prefix.Length, false);
+            var reader = new Utf8JsonReader(prefix[..length], isFinalBlock: false, default);
+            if (reader.Read() && reader.Read() && reader.TokenType == JsonTokenType.PropertyName &&
+                reader.ValueTextEquals("metadataRevision"u8) && reader.Read() && reader.TokenType == JsonTokenType.String &&
+                reader.TryGetGuid(out var revision)) return revision;
+        }
+        catch (FileNotFoundException) { }
+        catch (JsonException) { }
+        return null;
+    }
+
     public byte[]? Read(string owner, Guid id) {
         var folder = Folder(owner); var file = Path.Combine(folder, Key(id) + ".json");
         if (File.Exists(Path.Combine(folder, Key(id) + ".deleted"))) return null;
         try { var bytes = File.ReadAllBytes(file); return File.Exists(Path.Combine(folder, Key(id) + ".deleted")) ? null : bytes; }
         catch (FileNotFoundException) { return null; } catch (DirectoryNotFoundException) { return null; }
     }
+    public async Task<bool?> UpdateMetadata(string owner, Guid id, ExerciseEndpoints.Metadata input, CancellationToken ct)
+    {
+        var folder = Folder(owner);
+        await using var held = await Lock(folder, ct);
+        var bytes = Read(owner, id);
+        if (bytes == null) return null;
+        var record = JsonSerializer.Deserialize<ExerciseEndpoints.Record>(bytes, Json);
+        if (record == null) return false;
+        var replacement = record with { Kind = input.Kind, Activity = input.Activity, ActivityText = input.ActivityText, MetadataRevision = Guid.NewGuid() };
+        if (!ExerciseEndpoints.Valid(replacement)) return false;
+        var temp = Path.Combine(folder, Guid.NewGuid().ToString("N") + ".tmp");
+        try
+        {
+            await File.WriteAllBytesAsync(temp, JsonSerializer.SerializeToUtf8Bytes(replacement, Json), ct);
+            File.Move(temp, Path.Combine(folder, Key(id) + ".json"), overwrite: true);
+        }
+        finally { File.Delete(temp); }
+        return true;
+    }
+
     private static bool SameMeasurement(ExerciseEndpoints.Record left, ExerciseEndpoints.Record right) =>
         left.Id == right.Id && left.Kind == right.Kind && left.StartedAt == right.StartedAt && left.EndedAt == right.EndedAt &&
         left.Intervals.SequenceEqual(right.Intervals) && (left.RouteEnabled ?? false) == (right.RouteEnabled ?? false) &&

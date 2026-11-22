@@ -29,6 +29,16 @@ client.DefaultRequestHeaders.Remove("X-Exercise-Test-Owner");client.DefaultReque
 var read = await client.GetFromJsonAsync<ExerciseEndpoints.Record>($"/api/exercise/records/{id:D}");
 if(read?.Route?[0].AltitudeMeters != -3.5 || read.Route[0].VerticalAccuracyMeters != 8) throw new Exception("Altitude not preserved");
 await Expect(await client.PutAsJsonAsync($"/api/exercise/records/{id:D}", record), HttpStatusCode.OK);
+var edit = new ExerciseEndpoints.Metadata("飞行", new ExerciseEndpoints.Activity(Guid.NewGuid(), Guid.NewGuid(), "Target"), "飞行");
+await Expect(await client.PatchAsJsonAsync($"/api/exercise/records/{id:D}/metadata", edit), HttpStatusCode.OK);
+var edited = await client.GetFromJsonAsync<ExerciseEndpoints.Record>($"/api/exercise/records/{id:D}");
+if (edited?.Kind != "飞行" || edited.Activity != edit.Activity || edited.MetadataRevision == null ||
+    edited.Route?.Single() != record.Route?.Single() || edited.Intervals.Single() != record.Intervals.Single())
+    throw new Exception("Metadata updates must preserve measurements");
+var listing = await client.GetFromJsonAsync<JsonElement>("/api/exercise/records");
+if (!listing.GetProperty("records").EnumerateArray().Any(x => x.GetProperty("metadataRevision").GetGuid() == edited.MetadataRevision))
+    throw new Exception("Metadata edit must be discoverable by other devices");
+Console.WriteLine("PASS: workout edits and cross-device metadata revision preserve route and measurements");
 var shared = record with { Id = Guid.NewGuid(), ActivityText = "徒步 · 00:01:00\n0.06 公里" };
 await Expect(await client.PutAsJsonAsync($"/api/exercise/records/{shared.Id:D}", shared), HttpStatusCode.OK);
 var sharedRead = await client.GetFromJsonAsync<ExerciseEndpoints.Record>($"/api/exercise/records/{shared.Id:D}");

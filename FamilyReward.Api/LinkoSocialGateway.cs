@@ -205,6 +205,8 @@ internal static class LinkoSocialGateway
             if (s.Length == 5 && s[4] == "locations") return method == "GET";
             if (s.Length == 5 && s[4] == "location-sharing") return method is "POST" or "PUT" or "DELETE";
             if (s.Length == 5 && s[4] == "cover") return method == "PUT";
+            if (s.Length == 7 && s[4] is ("checkins" or "moments" or "native-photos") &&
+                Guid.TryParse(s[5], out _) && s[6] == "activity") return method == "PUT";
             if (s.Length == 5 && s[4] == "moments") return method is "GET" or "POST";
             if (s.Length == 5 && s[4] == "checkins") return method is "GET" or "POST";
             if (s.Length == 6 && s[4] == "checkins" && Guid.TryParse(s[5], out _)) return method == "PATCH";

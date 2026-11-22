@@ -395,6 +395,7 @@ private struct DearActivityMapView: View {
     @State private var cameraPosition: MapCameraPosition = .automatic
     var startSharingOnOpen = false
     var initialMembersOnly = true
+    var embedded = false
     @State private var initializedMap = false
     @State private var membersOnly = true
     @State private var selectedPointID: String?
@@ -504,7 +505,7 @@ private struct DearActivityMapView: View {
                 }
                 .padding(12)
             }
-            if !membersOnly && !photos.isEmpty {
+            if !embedded && !membersOnly && !photos.isEmpty {
                 HStack {
                     Text(String(localized: "活动照片与视频", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))).font(.subheadline.bold())
                     Spacer()
@@ -529,7 +530,7 @@ private struct DearActivityMapView: View {
                 }
                 .frame(height: 112)
             }
-            if !membersOnly {
+            if !embedded && !membersOnly {
             List(visiblePoints) { point in
                 Button {
                     selectedPointID = point.id
@@ -548,11 +549,11 @@ private struct DearActivityMapView: View {
             }
         }
         }
-        .navigationTitle(String(localized: "\(title) · 地图", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)))
-        .navigationBarTitleDisplayMode(.inline)
         .safeAreaInset(edge: .bottom) {
-            Toggle(String(localized: "共享我的位置", bundle: AgentIdentityLanguage.appBundle()), isOn: Binding(get: { locations.sharing }, set: { locations.setSharing($0) }))
-                .font(.subheadline).padding(.horizontal, 16).padding(.vertical, 10).background(.regularMaterial)
+            if !embedded {
+                Toggle(String(localized: "共享我的位置", bundle: AgentIdentityLanguage.appBundle()), isOn: Binding(get: { locations.sharing }, set: { locations.setSharing($0) }))
+                    .font(.subheadline).padding(.horizontal, 16).padding(.vertical, 10).background(.regularMaterial)
+            }
         }
         .fullScreenCover(item: $selectedPhoto) { selectedPhoto in
                 DearPhotoGalleryView(store: store, photos: photos, initialPhotoID: selectedPhoto.id,
@@ -566,6 +567,7 @@ private struct DearActivityMapView: View {
         }
         .onDisappear { locations.mapVisible = false }
         .onChange(of: membersOnly) { _, _ in selectedPointID = nil; fitAllPoints() }
+        .onChange(of: points.map(\.id)) { _, _ in fitAllPoints() }
         .onChange(of: locations.members.map(\.id)) { _, _ in fitAllPoints() }
         .onChange(of: locations.members.map { "\($0.id):\($0.coordinate.latitude):\($0.coordinate.longitude)" }) { _, _ in if membersOnly { fitAllPoints() } }
     }
@@ -687,6 +689,34 @@ struct DearSocialView: View {
     @State private var notice = ""
     @State private var busy = false
 
+    private struct RecordMove: Identifiable {
+        let record: DearRecord
+        let kind: String
+        var id: String { kind + record.id }
+    }
+
+    @State private var recordMove: RecordMove?
+    @State private var exerciseToEdit: ExerciseSession?
+    @State private var pendingLikes = Set<String>()
+
+    private func changeActivity(_ record: DearRecord, kind: String) {
+        recordMove = RecordMove(record: record, kind: kind)
+    }
+
+    private func moveRecord(_ move: RecordMove, to target: ExerciseActivity) async throws {
+        guard let source = UUID(uuidString: activityId), source != target.id,
+              let tenant = UUID(uuidString: activityTenantId), tenant == target.tenantID else { return }
+        try await store.call("/api/dear/social/tenants/\(tenant.uuidString)/activities/\(source.uuidString)/\(move.kind)/\(move.record.id)/activity",
+                             method: "PUT", body: ["activityId": target.id.uuidString])
+        if move.kind == "native-photos" {
+            try? await store.photoSource.rebindSharedPhoto(id: move.record.id, tenant: tenant, activity: target.id)
+            photos.removeAll { UUID(uuidString: $0.id) == UUID(uuidString: move.record.id) }
+        } else if move.kind == "checkins" {
+            checkIns.removeAll { UUID(uuidString: $0.id) == UUID(uuidString: move.record.id) }
+        } else {
+            moments.removeAll { UUID(uuidString: $0.id) == UUID(uuidString: move.record.id) }
+        }
+    }
     private var base: String { "/api/dear/social/" }
     private var selectedSpace: DearRecord? { spaces.first { $0.id == spaceId } }
     private var allActivities: [DearRecord] {
@@ -1003,23 +1033,27 @@ struct DearSocialView: View {
             }.accessibilityLabel(String(localized: "点评 \(comments) 条", bundle: AgentIdentityLanguage.appBundle()))
             Button {
                 let tenant = activityTenantId, activity = activityId
-                run {
-                    let response = try await store.call(base + "tenants/\(tenant)/activities/\(activity)/native-photos/\(photo.id)/like",
-                                                        method: "PUT", body: ["liked": !liked])
-                    guard tenant == activityTenantId, activity == activityId,
-                          let result = response as? [String: Any],
-                          let index = photos.firstIndex(where: { $0.id == photo.id }) else { return }
-                    var updated = photos[index].data
-                    updated["likeCount"] = result["likeCount"]
-                    updated["likedByMe"] = result["likedByMe"]
-                    photos[index] = DearRecord(data: updated)
+                guard pendingLikes.insert(photo.id).inserted else { return }
+                Task {
+                    defer { pendingLikes.remove(photo.id) }
+                    do {
+                        let response = try await store.call(base + "tenants/\(tenant)/activities/\(activity)/native-photos/\(photo.id)/like",
+                                                            method: "PUT", body: ["liked": !liked])
+                        guard tenant == activityTenantId, activity == activityId,
+                              let result = response as? [String: Any],
+                              let index = photos.firstIndex(where: { $0.id == photo.id }) else { return }
+                        var updated = photos[index].data
+                        updated["likeCount"] = result["likeCount"]
+                        updated["likedByMe"] = result["likedByMe"]
+                        photos[index] = DearRecord(data: updated)
+                    } catch { showActivityToast(momentDisplayError(error)) }
                 }
             } label: {
                 reactionIcon(liked ? "heart.fill" : "heart", count: likes, color: .red)
             }
             .accessibilityLabel(Text(liked ? String(localized: "取消点赞", bundle: AgentIdentityLanguage.appBundle()) : String(localized: "点赞", bundle: AgentIdentityLanguage.appBundle())))
             .accessibilityValue(Text(String(likes)))
-            .disabled(busy || photo.data["likedByMe"] == nil)
+            .disabled(pendingLikes.contains(photo.id))
         }.buttonStyle(.borderless)
     }
 
@@ -1034,6 +1068,11 @@ struct DearSocialView: View {
                     .disabled(busy || batchDeleting || batchDownloading)
             }
             photoReactions(photo)
+            if photo.flag("canMove") {
+                Button { changeActivity(photo, kind: "native-photos") } label: {
+                    Image(systemName: "arrow.right.folder")
+                }.accessibilityLabel(String(localized: "更改所属活动", bundle: AgentIdentityLanguage.appBundle()))
+            }
             DearPhotoDirectionsButton(photo: photo)
             Spacer(minLength: 0)
             if selectingPhotoDownloads && photoViewMode == "list" {
@@ -1103,6 +1142,9 @@ struct DearSocialView: View {
             }.buttonStyle(.plain).disabled(batchDownloading || batchDeleting)
             .accessibilityLabel("\(nickname)，\(photo.text("originalFileName"))")
             .contextMenu {
+                if photo.flag("canMove") {
+                    Button(String(localized: "更改所属活动", bundle: AgentIdentityLanguage.appBundle())) { changeActivity(photo, kind: "native-photos") }
+                }
                 if selectedActivity?.flag("canEdit") == true {
                     Button { run { try await setActivityCover(photo) } } label: { Label(String(localized: "设为封面", bundle: AgentIdentityLanguage.appBundle()), systemImage: "photo") }
                         .disabled(busy || !photo.flag("thumbnailAvailable"))
@@ -1297,6 +1339,16 @@ struct DearSocialView: View {
 
     private var activityTimelineSection: some View {
         Section {
+            if photoViewMode == "map" {
+                DearActivityMapView(locations: locations, store: store, title: selectedActivity?.text("title") ?? "",
+                                    spaceID: activityTenantId, activityID: activityId,
+                                    points: DearActivityMapPoint.points(checkIns: checkIns, photos: photos), photos: photos,
+                                    initialMembersOnly: false, embedded: true)
+                    .frame(height: 460)
+                    .listRowInsets(EdgeInsets())
+                    .id(activityId)
+            } else {
+
             if photoViewMode == "tiles" {
                 ForEach(Array(photoGridRows.enumerated()), id: \.offset) { _, row in
                     HStack(alignment: .top, spacing: 4) {
@@ -1310,6 +1362,10 @@ struct DearSocialView: View {
                     ActivityExerciseTimelineRow(record: exercise) {
                         store.pendingExerciseContinuation = exercise.id
                         showingActivity = false
+                    }
+                    if store.profile?.text("unifiedUserId").isEmpty == false {
+                        Button(String(localized: "修改运动", bundle: AgentIdentityLanguage.appBundle())) { exerciseToEdit = exercise }
+                            .buttonStyle(.borderless)
                     }
                 } else if entry.kind == .photo {
                     photoTimelineRow(entry.record)
@@ -1335,6 +1391,11 @@ struct DearSocialView: View {
                     } else if entry.record.flag("canDelete") {
                         Button("删除日常分享", role: .destructive) { run { try await deleteMoment(entry.record) } }.font(.caption)
                     }
+                    if entry.record.flag(entry.checkIn ? "canEdit" : "canMove") {
+                        Button(String(localized: "更改所属活动", bundle: AgentIdentityLanguage.appBundle())) {
+                            changeActivity(entry.record, kind: entry.checkIn ? "checkins" : "moments")
+                        }.buttonStyle(.borderless).font(.caption)
+                    }
                     Text(entry.record.dateText("createdAt")).font(.caption2).foregroundStyle(.secondary)
                 }.padding(.vertical, 6)
                 }
@@ -1342,6 +1403,7 @@ struct DearSocialView: View {
             if activityTimeline.isEmpty {
                 if busy { ProgressView("正在异步加载活动照片与动态…").font(.subheadline) }
                 else { Text("还没有动态，拍照、写日常或打卡，留下活动的第一刻。").foregroundStyle(.secondary).font(.subheadline) }
+            }
             }
         } header: {
             HStack {
@@ -1351,6 +1413,7 @@ struct DearSocialView: View {
                     if sharingSelectedOriginals {
                         Task { await downloadSelectedPhotos(share: true) }
                     } else {
+                        if photoViewMode == "map" { photoViewMode = "tiles" }
                         selectingPhotoDownloads = true
                         sharingSelectedOriginals = true
                         selectedPhotoIDs.removeAll()
@@ -1371,6 +1434,10 @@ struct DearSocialView: View {
                     Button(String(localized: "大图", bundle: AgentIdentityLanguage.appBundle()), systemImage: "rectangle") { photoViewMode = "grid" }
                     Button(String(localized: "紧凑", bundle: AgentIdentityLanguage.appBundle()), systemImage: "list.bullet") { photoViewMode = "list" }
                     Button(String(localized: "网格 · 每行5张", bundle: AgentIdentityLanguage.appBundle()), systemImage: "square.grid.3x3") { photoViewMode = "tiles" }
+                    Button(String(localized: "地图", bundle: AgentIdentityLanguage.appBundle()), systemImage: "map") {
+                        exitPhotoShareSelection()
+                        photoViewMode = "map"
+                    }
                 } label: { Image(systemName: "slider.horizontal.3") }
                 .accessibilityLabel(String(localized: "展示样式", bundle: AgentIdentityLanguage.appBundle()))
             }.textCase(nil)
@@ -1420,6 +1487,7 @@ struct DearSocialView: View {
         .navigationDestination(isPresented: $showingLocationMap) {
             DearActivityMapView(locations: locations, store: store, title: selectedActivity?.text("title") ?? "", spaceID: activityTenantId, activityID: activityId,
                                 points: DearActivityMapPoint.points(checkIns: checkIns, photos: photos), photos: photos, startSharingOnOpen: true)
+                .navigationTitle(String(localized: "地图", bundle: AgentIdentityLanguage.appBundle()))
         }
         .navigationTitle(selectedActivity?.text("title") ?? "活动详情")
         .navigationBarTitleDisplayMode(.inline)
@@ -1428,6 +1496,22 @@ struct DearSocialView: View {
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 activityActions
+            }
+        }
+        .sheet(item: $recordMove) { move in
+            ExerciseActivityEditor(store: store, scope: UUID(uuidString: activityTenantId),
+                                   selected: UUID(uuidString: activityId), workoutKind: nil) { target, _ in
+                if let target { try await moveRecord(move, to: target) }
+            }
+        }
+        .sheet(item: $exerciseToEdit) { record in
+            if let owner = store.profile?.text("unifiedUserId"), !owner.isEmpty {
+                let exercise = store.exerciseStore ?? ExerciseStore.shared(userID: owner)
+                ExerciseActivityEditor(store: store, scope: record.activity?.tenantID,
+                                       selected: record.activity?.id, workoutKind: record.kind) { target, kind in
+                    exercise.connect(store)
+                    try await exercise.editWorkout(id: record.id, kind: kind ?? record.kind, activity: target)
+                }
             }
         }
         .fullScreenCover(item: $selectedPhoto, onDismiss: { run { try await loadPhotos() } }) { selectedPhoto in
@@ -1598,10 +1682,6 @@ struct DearSocialView: View {
                     } label: {
                         Label(String(localized: "共享我的位置", bundle: AgentIdentityLanguage.appBundle()), systemImage: "location.fill")
                     }
-                    let points = DearActivityMapPoint.points(checkIns: checkIns, photos: photos)
-                    NavigationLink {
-                        DearActivityMapView(locations: locations, store: store, title: selectedActivity?.text("title") ?? "活动地图", spaceID: activityTenantId, activityID: activityId, points: points, photos: photos, initialMembersOnly: false)
-                    } label: { Label("活动地图", systemImage: "map") }
                 } label: { Image(systemName: "ellipsis").accessibilityLabel("更多活动操作") }
     }
 
@@ -1946,6 +2026,12 @@ struct DearSocialView: View {
         guard !activityTenantId.isEmpty, !activityId.isEmpty else { return }
         let tenant = activityTenantId, activity = activityId
         let loaded = try DearRecord.list(await store.call(base + "tenants/\(tenant)/activities/\(activity)/live/photos"))
+        guard !Task.isCancelled, tenant == activityTenantId, activity == activityId else { return }
+        if let tenantID = UUID(uuidString: tenant), let targetID = UUID(uuidString: activity) {
+            for photo in loaded where photo.flag("canMove") && store.photoSource.isSourceDevice(photo) {
+                try? await store.photoSource.rebindSharedPhoto(id: photo.id, tenant: tenantID, activity: targetID)
+            }
+        }
         guard !Task.isCancelled, tenant == activityTenantId, activity == activityId else { return }
         photos = loaded.sorted { $0.sortDate == $1.sortDate ? $0.id < $1.id : $0.sortDate > $1.sortDate }
     }

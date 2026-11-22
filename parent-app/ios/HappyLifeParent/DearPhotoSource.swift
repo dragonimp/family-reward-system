@@ -25,7 +25,7 @@ import UniformTypeIdentifiers
     private struct SharedPhoto: Codable {
         let id: String
         let spaceID: String
-        let activityID: String
+        var activityID: String
         let fileName: String
         let length: Int
         let sha256: String
@@ -458,6 +458,19 @@ import UniformTypeIdentifiers
         }
     }
 
+
+    func rebindSharedPhoto(id: String, tenant: UUID, activity: UUID) async throws {
+        guard let photoID = UUID(uuidString: id) else { return }
+        let root = try directory(for: await currentSubject())
+        var index = try readIndex(at: root)
+        guard let row = index.photos.firstIndex(where: {
+            UUID(uuidString: $0.id) == photoID && UUID(uuidString: $0.spaceID) == tenant
+        }), UUID(uuidString: index.photos[row].activityID) != activity else { return }
+        let key = index.photos[row].id + index.photos[row].sha256
+        index.photos[row].activityID = activity.uuidString
+        try writeIndex(index, at: root)
+        cachedShares.remove(key)
+    }
 
     func revoke(photoID: String, spaceID: String, activityID: String) async throws -> Bool {
         guard UUID(uuidString: photoID) != nil, UUID(uuidString: spaceID) != nil,

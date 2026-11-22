@@ -174,6 +174,69 @@ import UniformTypeIdentifiers
         bindFriendShare(code, to: record.id)
     }
 
+    func editWorkout(id: UUID, kind: String, activity target: ExerciseActivity?) async throws {
+        guard readable, !busy, !syncing else {
+            throw APIError.message(String(localized: "运动正在同步，请稍后重试。", bundle: AgentIdentityLanguage.appBundle()))
+        }
+        if var current = active, current.id == id {
+            current.kind = kind
+            current.activity = target
+            current.activityText = nil
+            archive.active = current
+            save()
+            refreshTrackingAfterEdit()
+            return
+        }
+        guard let api, let index = archive.history.firstIndex(where: { $0.id == id }) else { throw CancellationError() }
+        let original = archive.history[index]
+        busy = true
+        defer { busy = false }
+        var edited = original
+        edited.kind = kind
+        edited.activity = target
+        edited.activityText = nil
+        edited.activityText = edited.activitySummary
+        if let source = original.activity, let target {
+            let moment = archive.activityShares?[id] ?? id
+            let path = "/api/dear/social/tenants/\(source.tenantID.uuidString)/activities/\(source.id.uuidString)/moments/\(moment.uuidString)/activity"
+            do {
+                let result = try await api.call(path, method: "PUT", body: [
+                    "activityId": target.id.uuidString, "text": edited.activitySummary
+                ]) as? [String: Any]
+                if let value = result?["id"] as? String, let momentID = UUID(uuidString: value) {
+                    if archive.activityShares == nil { archive.activityShares = [:] }
+                    archive.activityShares?[id] = momentID
+                }
+            } catch APIError.http(404, _) {
+                archive.activityShares?.removeValue(forKey: id)
+            }
+        }
+        let encoder = JSONEncoder()
+        encoder.dateEncodingStrategy = .iso8601
+        let metadata = try JSONSerialization.jsonObject(with: encoder.encode(edited)) as? [String: Any] ?? [:]
+        let recordPath = "/api/exercise/records/\(id.uuidString)"
+        do {
+            _ = try await api.call(recordPath + "/metadata", method: "PATCH", body: [
+                "kind": kind, "activity": metadata["activity"] ?? NSNull(), "activityText": edited.activitySummary
+            ])
+        } catch APIError.http(404, _) {
+            _ = try await api.call(recordPath, method: "PUT", body: metadata)
+        }
+        try Task.checkCancellation()
+        guard DiningAccount.identity(api.profile?.text("unifiedUserId") ?? "") == DiningAccount.identity(userID),
+              let index = archive.history.firstIndex(where: { $0.id == id }) else { throw CancellationError() }
+        archive.history[index] = edited
+        if !save() { throw CocoaError(.fileWriteUnknown) }
+        NotificationCenter.default.post(name: .exerciseActivityPublished, object: nil)
+        Task { await sync() }
+    }
+
+    private func refreshTrackingAfterEdit() {
+        stopObserving()
+        observe()
+        updateLocationTracking()
+    }
+
     func start(kind: String, activity: ExerciseActivity? = nil) {
         guard readable, active == nil, !busy else { return }
         let now = Date()
@@ -308,12 +371,15 @@ import UniformTypeIdentifiers
                 guard DiningAccount.identity(api.profile?.text("unifiedUserId") ?? "") == DiningAccount.identity(userID) else { return }
                 archive.pendingDeletions?.removeAll { $0 == id }; save()
             }
-            var remote: [UUID: Bool] = [:]; var cursor: String?
+            var remote: [UUID: Bool] = [:]; var revisions: [UUID: UUID] = [:]; var cursor: String?
             repeat {
                 let page = try await api.call("/api/exercise/records" + (cursor.map { "?after=" + $0 } ?? "")) as? [String: Any] ?? [:]
                 guard DiningAccount.identity(api.profile?.text("unifiedUserId") ?? "") == DiningAccount.identity(userID) else { return }
                 for entry in page["records"] as? [[String: Any]] ?? [] {
-                    if let raw = entry["id"] as? String, let id = UUID(uuidString: raw) { remote[id] = entry["deleted"] as? Bool ?? false }
+                    if let raw = entry["id"] as? String, let id = UUID(uuidString: raw) {
+                        remote[id] = entry["deleted"] as? Bool ?? false
+                        revisions[id] = (entry["metadataRevision"] as? String).flatMap(UUID.init(uuidString:))
+                    }
                 }
                 let next = page["next"] as? String
                 if next == cursor && next != nil { throw APIError.message(String(localized: "服务器分页无效，请稍后重试。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) }
@@ -325,6 +391,18 @@ import UniformTypeIdentifiers
             save()
             let encoder = JSONEncoder(); encoder.dateEncodingStrategy = .iso8601
             let decoder = ExerciseSession.syncDecoder()
+            for (id, revision) in revisions where remote[id] == false {
+                guard archive.history.contains(where: { $0.id == id && $0.metadataRevision != revision }) else { continue }
+                let value = try await api.call("/api/exercise/records/\(id.uuidString)")
+                let record = try decoder.decode(ExerciseSession.self, from: JSONSerialization.data(withJSONObject: value))
+                guard DiningAccount.identity(api.profile?.text("unifiedUserId") ?? "") == DiningAccount.identity(userID) else { return }
+                if let index = archive.history.firstIndex(where: { $0.id == id }), record.id == id, record.endedAt != nil {
+                    archive.history[index].kind = record.kind
+                    archive.history[index].activity = record.activity
+                    archive.history[index].activityText = record.activityText
+                    archive.history[index].metadataRevision = record.metadataRevision
+                }
+            }
             var conflictingRecords = Set<UUID>()
             for record in archive.history where remote[record.id] == nil || !(archive.uploaded ?? []).contains(record.id) {
                 guard !(archive.pendingDeletions ?? []).contains(record.id) else { continue }
@@ -466,6 +544,7 @@ struct ExerciseView: View {
     @State private var showingHistory = false
     @State private var showingFriendWorkout = false
     @State private var workoutToShare: ExerciseSession?
+    @State private var workoutToEdit: ExerciseSession?
     @State private var selectedRoute: ExerciseSession?
     @State private var kind = "散步"
     @State private var activity: ExerciseActivity?
@@ -564,6 +643,14 @@ struct ExerciseView: View {
 
             }.padding(.horizontal).padding(.vertical, 8).navigationBarTitleDisplayMode(.inline).navigationTitle(String(localized: "运动", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))).readablePage()
                 .toolbar {
+                    if let current = exercise.active {
+                        ToolbarItem(placement: .topBarTrailing) {
+                            Button { workoutToEdit = current } label: {
+                                Label(String(localized: "修改运动", bundle: AgentIdentityLanguage.appBundle()), systemImage: "pencil")
+                                    .labelStyle(.iconOnly)
+                            }
+                        }
+                    }
                     ToolbarItem(placement: .topBarTrailing) {
                         Button { showingFriendWorkout = true } label: {
                             Label(String(localized: "好友运动", bundle: AgentIdentityLanguage.appBundle()), systemImage: "person.2")
@@ -579,6 +666,12 @@ struct ExerciseView: View {
                 }
                 .sheet(isPresented: $showingFriendWorkout) {
                     ExerciseFriendShareView(exercise: exercise, family: family, workout: exercise.active)
+                }
+                .sheet(item: $workoutToEdit) { record in
+                    ExerciseActivityEditor(store: family, scope: record.activity?.tenantID,
+                                           selected: record.activity?.id, workoutKind: record.kind) { target, kind in
+                        try await exercise.editWorkout(id: record.id, kind: kind ?? record.kind, activity: target)
+                    }
                 }
                 .navigationDestination(isPresented: $showingHistory) { exerciseHistory }
                 .confirmationDialog(String(localized: "结束本次运动并保存记录？", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), isPresented: $confirmFinish, titleVisibility: .visible) {
@@ -651,6 +744,9 @@ struct ExerciseView: View {
                     if let linked = item.activity { Text(family.exerciseActivityTitle(linked)).font(.subheadline).foregroundStyle(.secondary) }
                     Text(exerciseDistanceTitle(item)).font(.headline).monospacedDigit()
                     if let altitude = item.altitudeRange { Text(String(format: String(localized: "海拔 %.1f–%.1f 米", bundle: AgentIdentityLanguage.appBundle()), altitude.lowerBound, altitude.upperBound)).font(.caption) }
+                    Button { workoutToEdit = item } label: {
+                        Label(String(localized: "修改运动", bundle: AgentIdentityLanguage.appBundle()), systemImage: "pencil")
+                    }.buttonStyle(.borderless)
                     Button { workoutToShare = item } label: {
                         Label(String(localized: "分享运动", bundle: AgentIdentityLanguage.appBundle()), systemImage: "person.2")
                     }.buttonStyle(.borderless)
@@ -1308,5 +1404,85 @@ private struct ExerciseFriendShareView: View {
 
     private func coordinate(_ point: ExerciseRoutePoint) -> CLLocationCoordinate2D {
         CLLocationCoordinate2D(latitude: point.latitude, longitude: point.longitude)
+    }
+}
+
+struct ExerciseActivityEditor: View {
+    let store: FamilyStore
+    let scope: UUID?
+    let selected: UUID?
+    let workoutKind: String?
+    let save: (ExerciseActivity?, String?) async throws -> Void
+
+    @Environment(\.dismiss) private var dismiss
+    @State private var targets: [ExerciseActivity] = []
+    @State private var selection: UUID?
+    @State private var kind = ""
+    @State private var loading = true
+    @State private var saving = false
+    @State private var error = ""
+
+    private var choices: [String] { ["散步", "慢跑", "徒步", "爬山", "滑雪", "飞行", "自由运动"] }
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                if let workoutKind {
+                    Picker(String(localized: "运动类型", bundle: AgentIdentityLanguage.appBundle()), selection: $kind) {
+                        ForEach(choices.contains(workoutKind) ? choices : choices + [workoutKind], id: \.self) {
+                            Text(exerciseKindTitle($0)).tag($0)
+                        }
+                    }
+                }
+                Section(String(localized: "所属活动", bundle: AgentIdentityLanguage.appBundle())) {
+                    if loading { ProgressView() }
+                    if !targets.isEmpty {
+                        Picker(String(localized: "所属活动", bundle: AgentIdentityLanguage.appBundle()), selection: $selection) {
+                            if selected == nil {
+                                Text(String(localized: "未关联活动", bundle: AgentIdentityLanguage.appBundle())).tag(nil as UUID?)
+                            }
+                            ForEach(targets) { Text($0.title).tag(Optional($0.id)) }
+                        }.labelsHidden()
+                    }
+                }
+                if !error.isEmpty { Text(error).foregroundStyle(.red) }
+            }
+            .navigationTitle(workoutKind == nil
+                ? String(localized: "更改所属活动", bundle: AgentIdentityLanguage.appBundle())
+                : String(localized: "修改运动", bundle: AgentIdentityLanguage.appBundle()))
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button(String(localized: "取消", bundle: AgentIdentityLanguage.appBundle())) { dismiss() }.disabled(saving)
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button(String(localized: "保存", bundle: AgentIdentityLanguage.appBundle())) {
+                        saving = true
+                        Task {
+                            defer { saving = false }
+                            do {
+                                try await save(targets.first { $0.id == selection }, workoutKind == nil ? nil : kind)
+                                dismiss()
+                            } catch { self.error = error.localizedDescription }
+                        }
+                    }.disabled(saving || loading || (selection == selected && (workoutKind == nil || kind == workoutKind)) ||
+                               (selection != nil && !targets.contains { $0.id == selection }))
+                }
+            }
+            .task {
+                selection = selected
+                kind = workoutKind ?? ""
+                defer { loading = false }
+                do {
+                    let rows = try await store.call("/api/dear/social/activities/joined") as? [[String: Any]] ?? []
+                    targets = rows.compactMap { row in
+                        guard let tenant = (row["sourceTenantId"] as? String).flatMap(UUID.init(uuidString:)),
+                              scope == nil || scope == tenant,
+                              let id = (row["id"] as? String).flatMap(UUID.init(uuidString:)),
+                              let title = row["title"] as? String else { return nil }
+                        return ExerciseActivity(tenantID: tenant, id: id, title: title)
+                    }.sorted { $0.title.localizedStandardCompare($1.title) == .orderedAscending }
+                } catch { self.error = error.localizedDescription }
+            }
+        }
     }
 }

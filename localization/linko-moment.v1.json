@@ -1,6 +1,36 @@
 {
   "catalogVersion": 1,
   "messages": {
+    "moment.t975aee5e6bea": {
+      "zh-Hans": "运动正在同步，请稍后重试。",
+      "en": "Workouts are syncing. Try again shortly.",
+      "iosKey": "运动正在同步，请稍后重试。"
+    },
+    "moment.t7892d138e711": {
+      "zh-Hans": "修改运动",
+      "en": "Edit workout",
+      "iosKey": "修改运动"
+    },
+    "moment.ta33b386975c1": {
+      "zh-Hans": "更改所属活动",
+      "en": "Change activity",
+      "iosKey": "更改所属活动"
+    },
+    "moment.t1e2cc8092218": {
+      "zh-Hans": "所属活动",
+      "en": "Activity",
+      "iosKey": "所属活动"
+    },
+    "moment.t64f9bcea4f25": {
+      "zh-Hans": "未关联活动",
+      "en": "No linked activity",
+      "iosKey": "未关联活动"
+    },
+    "moment.tad2e2ae4bd85": {
+      "zh-Hans": "运动类型",
+      "en": "Workout type",
+      "iosKey": "运动类型"
+    },
     "moment.tacb20b994748": {
       "zh-Hans": "创建或加入后，持有邀请码并已登录的人可以查看你的运动轨迹。",
       "en": "After you create or join, signed-in people with the invite code can view your workout route.",
