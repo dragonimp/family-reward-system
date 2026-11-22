@@ -21,17 +21,16 @@ if [[ -n "${ATLAS_BUILD_WORK:-}" ]]; then dotnet_args+=(-p:UseArtifactsOutput=tr
 dotnet publish "$root/FamilyReward.Api/FamilyReward.Api.csproj" -c Release -r linux-x64 --self-contained false "${dotnet_args[@]}" -p:SharedProjectsRoot="$shared_projects_root" -o "$stage/api"
 rsync -a --exclude=node_modules --exclude=dist "$root/frontend/" "$stage/frontend/"
 mkdir -p "$stage/shared-sdk"
-git -C "$shared_projects_root/AgentFree" archive HEAD packages/agentfree-webapp-chat | tar -x -C "$stage/shared-sdk"
+git -C "$shared_projects_root/AgentFree" archive HEAD packages/agentfree-webapp-chat scripts/run-web-tool.mjs src/AgentFree.Web | tar -x -C "$stage/shared-sdk"
 git -C "$identity_root" archive HEAD src/AgentIdentity.WebSdk | tar -x -C "$stage/shared-sdk"
 shared_chat_package="$stage/shared-sdk/packages/agentfree-webapp-chat"
 shared_identity_package="$stage/shared-sdk/src/AgentIdentity.WebSdk"
 # Compile the committed public SDK inputs; generated output is never an implicit dependency.
 npm --prefix "$shared_identity_package" ci
 npm --prefix "$shared_identity_package" run build
-mkdir -p "$shared_chat_package/dist"
-if [[ ! -s "$shared_chat_package/dist/index.js" ]]; then
-  echo 'Pinned Orbit WebApp package must be built by the release orchestrator.' >&2; exit 2
-fi
+npm --prefix "$stage/shared-sdk/src/AgentFree.Web" ci
+ATLAS_BUILD_OUTPUT= ATLAS_BUILD_WORK="$stage/orbit-build" npm --prefix "$shared_chat_package" run build
+test -s "$shared_chat_package/dist/index.js"
 node - "$stage/frontend/package.json" "$shared_chat_package" "$shared_identity_package" <<'NODE'
 const fs = require('fs');
 const [manifestPath, chatPackage, identityPackage] = process.argv.slice(2);
