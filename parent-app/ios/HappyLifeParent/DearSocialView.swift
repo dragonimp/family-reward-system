@@ -884,7 +884,6 @@ struct DearSocialView: View {
                     } label: { Image(systemName: "ellipsis.circle").accessibilityLabel(String(localized: "空间菜单", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) }
                     .disabled(busy)
                 }
-                ToolbarItem(placement: .topBarTrailing) { MomentNotificationButton(notifications: store.notifications) }
                 if showLogout { ToolbarItem(placement: .topBarLeading) { Button(String(localized: "退出", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) { store.logout() } } }
             }
             .refreshable { await refresh() }
@@ -3131,22 +3130,6 @@ private struct MomentPhotoRequestProgress: View {
                 do { try await Task.sleep(for: .seconds(2)) } catch { return }
             }
         }
-    }
-}
-
-struct MomentNotificationButton: View {
-    @ObservedObject var notifications: MomentNotifications
-    var pendingRequests: Int = 0
-    private var count: Int { notifications.unreadCount + pendingRequests }
-    var body: some View {
-        Button { notifications.open() } label: {
-            Image(systemName: count > 0 ? "bell.badge" : "bell")
-                .overlay(alignment: .topTrailing) {
-                    if count > 0 {
-                        Text(count > 99 ? "99+" : "\(count)").font(.caption2.bold()).foregroundStyle(.white).padding(3).background(.red, in: Capsule()).offset(x: 10, y: -8)
-                    }
-                }
-        }.accessibilityLabel(String(localized: "消息通知，\(count) 条待处理或未读", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)))
     }
 }
 

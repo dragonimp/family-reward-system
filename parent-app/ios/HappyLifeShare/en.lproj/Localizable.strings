@@ -290,6 +290,7 @@
 "修改会话名称" = "Rename chat";
 "原文件发送进度" = "Original file transfer progress";
 "登录已过期，请重新登录。" = "Your session has expired. Sign in again.";
+"消息中心" = "Message Center";
 "规则名称" = "Rule name";
 "正在生成邀请链接…" = "Creating invitation link…";
 "邀请" = "Invite";

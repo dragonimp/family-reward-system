@@ -209,7 +209,7 @@ struct FamilyRoot: View {
                 default: EmptyView()
                 }
             }
-            AccountView(store: store).tabItem { Label(String(localized: "我的", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), systemImage: "person.crop.circle") }.badge(notifications.unreadCount).tag(4)
+            AccountView(store: store, notifications: notifications).tabItem { Label(String(localized: "我的", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), systemImage: "person.crop.circle") }.badge(notifications.unreadCount).tag(4)
         }
         .task(id: selectedTab) {
             if selectedTab == 3 && exerciseEnabled { await store.openWatchExerciseMode() }
@@ -233,7 +233,6 @@ struct FamilyRoot: View {
 
 struct FamilyHome: View {
     @ObservedObject var store: FamilyStore
-    private var pendingRequests: Int { store.requests.filter { $0.text("status") == "pending" }.count }
     var body: some View {
         NavigationStack {
             List {
@@ -282,9 +281,6 @@ struct FamilyHome: View {
                         NavigationLink { FamilyConnectionsView(store: store) } label: { Label(String(localized: "亲子互动", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), systemImage: "heart.text.square") }
                         Button { Task { await store.load() } } label: { Label(String(localized: "刷新", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), systemImage: "arrow.clockwise") }
                     } label: { Image(systemName: "ellipsis.circle").accessibilityLabel(String(localized: "带娃管理菜单", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) }
-                }
-                ToolbarItem(placement: .topBarTrailing) {
-                    MomentNotificationButton(notifications: store.notifications, pendingRequests: pendingRequests)
                 }
             }
             .refreshable { await store.load() }
@@ -592,6 +588,7 @@ struct FamilyInvitationHub: View {
 struct AccountView: View {
     @EnvironmentObject private var language: AgentIdentityLanguageStore
     @ObservedObject var store: FamilyStore
+    @ObservedObject var notifications: MomentNotifications
     @Environment(\.openURL) private var openURL
     @State private var logout = false
     @State private var deleteAccount = false
@@ -625,9 +622,9 @@ struct AccountView: View {
                     NavigationLink { RemoteRecords(store: store, title: String(localized: "套餐权益", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), path: "/api/subscription", mode: .subscription) } label: {
                         Label(String(localized: "套餐权益", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), systemImage: "checkmark.seal")
                     }
-                    Button { store.notifications.open() } label: {
-                        Label(store.language.text("messages.title"), systemImage: "bell.badge")
-                    }
+                    Button { notifications.open() } label: {
+                        Label(String(localized: "消息中心", bundle: AgentIdentityLanguage.appBundle()), systemImage: "bell")
+                    }.badge(notifications.unreadCount)
                     NavigationLink { AgentIdentityLanguageSettingsView(store: store.language) } label: {
                         Label(store.language.text("language.settings"), systemImage: "character.bubble")
                     }

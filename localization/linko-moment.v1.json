@@ -1,6 +1,11 @@
 {
   "catalogVersion": 1,
   "messages": {
+    "moment.t18b7db54924f": {
+      "zh-Hans": "消息中心",
+      "en": "Message Center",
+      "iosKey": "消息中心"
+    },
     "moment.t33c7321b142b": {
       "zh-Hans": "好友关注",
       "en": "Following",
