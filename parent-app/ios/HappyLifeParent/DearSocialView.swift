@@ -721,6 +721,32 @@ struct DearSocialView: View {
         }
     }
     private var base: String { "/api/dear/social/" }
+    @State private var showingRelationships = false
+
+    private var spaceTitle: some View {
+        let heading = String(localized: "我的空间", bundle: AgentIdentityLanguage.appBundle())
+        return Menu {
+            Picker(heading, selection: $spaceId) {
+                ForEach(visibleSpaces) { space in Text(space.text("name")).tag(space.id) }
+            }
+        } label: {
+            VStack(spacing: 1) {
+                if let current = selectedSpace {
+                    Text(heading).font(.caption).foregroundStyle(.secondary)
+                    HStack(spacing: 4) {
+                        Text(current.text("name")).font(.headline).lineLimit(1)
+                        Image(systemName: "chevron.down").font(.caption2.weight(.semibold))
+                    }
+                } else {
+                    Text(heading).font(.headline).lineLimit(1)
+                }
+            }.foregroundStyle(.primary)
+        }
+        .disabled(visibleSpaces.isEmpty)
+        .accessibilityLabel(heading)
+        .accessibilityValue(selectedSpace?.text("name") ?? "")
+    }
+
     private var selectedSpace: DearRecord? { spaces.first { $0.id == spaceId } }
     private var allActivities: [DearRecord] {
         let combined = activities + joinedActivities.filter { joined in !activities.contains { $0.id == joined.id } }
@@ -764,35 +790,11 @@ struct DearSocialView: View {
                         }
                     }
                 }
-                Section {
-                    NavigationLink { relationshipsPage } label: { Label(String(localized: "好友关系 · 跨空间", bundle: AgentIdentityLanguage.appBundle()), systemImage: "person.2") }
-                }
-                Section(String(localized: "我的空间", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) {
-                    if visibleSpaces.isEmpty { Text(String(localized: "请用右上角“…”新增个人空间。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) .foregroundStyle(.secondary) }
-                    else {
-                        HStack {
-                            Picker("", selection: $spaceId) {
-                                ForEach(visibleSpaces) { item in Text(item.text("name")).tag(item.id) }
-                            }
-                            .labelsHidden()
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            Menu {
-                                if selectedSpace?.text("role") == "owner" {
-                                    Button(String(localized: "编辑基本信息", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), systemImage: "pencil") {
-                                        editedSpaceName = selectedSpace?.text("name") ?? ""
-                                        showingSpaceRename = true
-                                    }
-                                }
-                                Button(String(localized: "查看空间成员", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), systemImage: "person.2") { run { try await loadSpaceMembers() } }
-                                if selectedSpace?.text("role") == "owner" {
-                                    Button(String(localized: "删除空间", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), systemImage: "trash", role: .destructive) { showingSpaceDelete = true }
-                                }
-                            } label: { Image(systemName: "ellipsis.circle").accessibilityLabel(String(localized: "管理当前空间", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) }
-                            .disabled(busy)
-                        }
+                if visibleSpaces.isEmpty {
+                    Section {
+                        Text(String(localized: "请用右上角“…”新增个人空间。", bundle: AgentIdentityLanguage.appBundle()))
+                            .foregroundStyle(.secondary)
                     }
-                    Text(String(localized: "每个人管理自己的空间，同一活动可收藏到多个空间。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)))
-                        .font(.caption).foregroundStyle(.secondary)
                 }
                 if selectedSpace?.text("role") == "owner" || !joinedActivities.isEmpty {
                     Section {
@@ -859,13 +861,24 @@ struct DearSocialView: View {
             .listStyle(.insetGrouped)
             .readablePage()
             .navigationTitle(String(localized: "活动与分享", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)))
+            .navigationBarTitleDisplayMode(.inline)
             .toolbar {
+                ToolbarItem(placement: .principal) { spaceTitle }
                 ToolbarItem(placement: .topBarTrailing) {
                     Menu {
+                        Button(String(localized: "好友关注", bundle: AgentIdentityLanguage.appBundle()), systemImage: "person.2") {
+                            showingRelationships = true
+                        }
+                        Divider()
                         Button(String(localized: "新增空间", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), systemImage: "plus") { spaceName = ""; showingSpaceCreate = true }
                         if selectedSpace?.text("role") == "owner" {
                             Button(String(localized: "修改空间名称", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), systemImage: "pencil") { editedSpaceName = selectedSpace?.text("name") ?? ""; showingSpaceRename = true }
                             Button(String(localized: "删除空间", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), systemImage: "trash", role: .destructive) { showingSpaceDelete = true }
+                        }
+                        if selectedSpace != nil {
+                            Button(String(localized: "查看空间成员", bundle: AgentIdentityLanguage.appBundle()), systemImage: "person.2") {
+                                run { try await loadSpaceMembers() }
+                            }
                         }
                         Button(String(localized: "刷新", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), systemImage: "arrow.clockwise") { run { try await load() } }
                     } label: { Image(systemName: "ellipsis.circle").accessibilityLabel(String(localized: "空间菜单", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) }
@@ -891,6 +904,7 @@ struct DearSocialView: View {
             } message: { Text("确认后使用当前登录账号接受活动邀请，并查看活动内容。") }
             .onChange(of: spaceId) { _, _ in if !showingActivity { activityId = ""; selectedPhoto = nil; showingActivityManagement = false; photos = [] }; activities = []; activityError = ""; activityLoading = true; run { try await loadActivities() } }
             .navigationDestination(isPresented: $showingActivity) { activityDetail }
+            .navigationDestination(isPresented: $showingRelationships) { relationshipsPage }
             .sheet(isPresented: $showingActivityManagement) { activityManagement }
             .sheet(isPresented: $showingAnonymousShares) {
                 MomentAnonymousMediaSharesView(store: store, tenant: activityTenantId, activity: activityId, title: selectedActivity?.text("title") ?? "")

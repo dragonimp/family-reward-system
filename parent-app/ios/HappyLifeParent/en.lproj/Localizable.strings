@@ -413,6 +413,7 @@
 "点评 %lld 条" = "%lld comments";
 "接受" = "Accept";
 " 积分" = " points";
+"好友关注" = "Following";
 "仅自己可见" = "Only visible to you";
 "暂无菜系或主打餐品信息。" = "Cuisine and specialties are unavailable.";
 "照片标识无效。" = "The photo ID is invalid.";

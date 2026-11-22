@@ -1,6 +1,11 @@
 {
   "catalogVersion": 1,
   "messages": {
+    "moment.t33c7321b142b": {
+      "zh-Hans": "好友关注",
+      "en": "Following",
+      "iosKey": "好友关注"
+    },
     "moment.t975aee5e6bea": {
       "zh-Hans": "运动正在同步，请稍后重试。",
       "en": "Workouts are syncing. Try again shortly.",
