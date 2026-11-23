@@ -232,14 +232,15 @@ private struct NookRoomView: View {
     @State private var filter = ""
     @State private var saveError = false
     @State private var placementError: String?
+    @State private var orientationError = false
 
     private var assets: [NookItem] { room.items.filter { !$0.preview } }
     private var visibleItems: [NookItem] {
         room.items.filter { filter.isEmpty || $0.name.localizedStandardContains(filter) || $0.category.localizedStandardContains(filter) }
     }
 
-    private var sceneSection: some View {
-        Section {
+    private func roomCanvas(height: CGFloat) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
             NookScene(room: room, selected: selected, overhead: overhead) { id, x, z in
                 guard let index = room.items.firstIndex(where: { $0.id == id }) else { return false }
                 var next = room
@@ -253,20 +254,25 @@ private struct NookRoomView: View {
                 guard persist(next) else { saveError = true; return false }
                 return true
             } select: { id in
-                    selected = id
-                    if !overhead { enlarged = room.items.first { $0.id == id } }
-                }
-            .frame(minHeight: 240, idealHeight: 310)
-            Toggle("俯视摆放", isOn: $overhead)
-            Text(overhead ? "按住物品拖到空位。双指可缩放。" : "拖动旋转视角，双指缩放。")
-                .font(.footnote).foregroundStyle(.secondary)
-            if let placementError { Label(placementError, systemImage: "exclamationmark.triangle").foregroundStyle(.orange) }
-            if let item = room.items.first(where: { $0.id == selected }) {
-                Button("放大展示", systemImage: "arrow.up.left.and.arrow.down.right") { enlarged = item }
-                Button("编辑 \(item.name)", systemImage: "slider.horizontal.3") { itemDraft = item }
-                if let warning = warning(item) { Label(warning, systemImage: "exclamationmark.triangle").foregroundStyle(.orange) }
+                selected = id
+                if !overhead { enlarged = room.items.first { $0.id == id } }
             }
-        }
+            .frame(height: height)
+            .clipShape(RoundedRectangle(cornerRadius: 20))
+            Toggle("俯视摆放", isOn: $overhead)
+            Text(overhead ? "直接拖动物品；也可先选物品，再点空位。" : "拖动物品可搬动。拖空白处旋转视角，双指缩放。")
+                .font(.caption).foregroundStyle(.secondary)
+            if let placementError {
+                Text(placementError).font(.caption).foregroundStyle(.orange)
+            }
+            if let item = room.items.first(where: { $0.id == selected }) {
+                HStack {
+                    Button("放大", systemImage: "arrow.up.left.and.arrow.down.right") { enlarged = item }
+                    Spacer()
+                    Button("编辑物品", systemImage: "slider.horizontal.3") { itemDraft = item }
+                }.font(.footnote)
+            }
+        }.padding(.horizontal, 12)
     }
 
     private var assetSection: some View {
@@ -300,18 +306,25 @@ private struct NookRoomView: View {
 
     var body: some View {
         GeometryReader { geometry in
-            if geometry.size.width > geometry.size.height && geometry.size.width >= 600 {
-                HStack(spacing: 0) {
-                    List { sceneSection }.frame(width: geometry.size.width * 0.58)
+            if geometry.size.width > geometry.size.height {
+                HStack(alignment: .top, spacing: 0) {
+                    roomCanvas(height: max(115, geometry.size.height - 103))
+                        .frame(width: geometry.size.width * 0.58)
                     Divider()
                     List { assetSection }
                 }
             } else {
-                List { sceneSection; assetSection }
+                VStack(spacing: 6) {
+                    roomCanvas(height: max(160, min(360, geometry.size.height * 0.54)))
+                    List { assetSection }
+                }
             }
         }
         .navigationTitle(Text(verbatim: room.name))
         .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                NookOrientationMenu { orientationError = true }.frame(width: 34, height: 34)
+            }
             Menu("房间操作", systemImage: "ellipsis.circle") {
                 Button("编辑房间", systemImage: "pencil") { editRoom = true }
                 Button("虚拟装修", systemImage: "paintpalette") { decorate = true }
@@ -333,6 +346,11 @@ private struct NookRoomView: View {
                 selected = item.id
                 return true
             }
+        }
+        .alert("当前窗口无法切换方向", isPresented: $orientationError) {
+            Button("好", role: .cancel) {}
+        } message: {
+            Text("请检查设备方向锁定。iPad 分屏时可调整窗口宽度。")
         }
         .alert("保存未完成", isPresented: $saveError) { Button("好", role: .cancel) {} }
     }
@@ -575,6 +593,36 @@ private struct NookDecorationView: View {
     }
 }
 
+private struct NookOrientationMenu: UIViewRepresentable {
+    let failed: @MainActor () -> Void
+
+    func makeUIView(context: Context) -> UIButton {
+        let button = UIButton(type: .system)
+        button.setImage(UIImage(systemName: "iphone.landscape"), for: .normal)
+        button.accessibilityLabel = "切换横竖屏"
+        button.showsMenuAsPrimaryAction = true
+        return button
+    }
+
+    func updateUIView(_ button: UIButton, context: Context) {
+        func action(_ title: String, orientation: UIInterfaceOrientationMask) -> UIAction {
+            UIAction(title: title) { [weak button] _ in
+                guard let window = button?.window, let scene = window.windowScene else { failed(); return }
+                var controller = window.rootViewController
+                while let presented = controller?.presentedViewController { controller = presented }
+                controller?.setNeedsUpdateOfSupportedInterfaceOrientations()
+                scene.requestGeometryUpdate(.iOS(interfaceOrientations: orientation)) { _ in
+                    Task { @MainActor in failed() }
+                }
+            }
+        }
+        button.menu = UIMenu(title: "房间显示方向", children: [
+            action("横屏", orientation: .landscape),
+            action("竖屏", orientation: .portrait)
+        ])
+    }
+}
+
 private struct NookScene: UIViewRepresentable {
     let room: NookRoom
     let selected: UUID?
@@ -603,9 +651,10 @@ private struct NookScene: UIViewRepresentable {
     func updateUIView(_ view: SCNView, context: Context) {
         let coordinator = context.coordinator
         coordinator.parent = self
-        view.allowsCameraControl = !overhead
+        view.allowsCameraControl = isolated && !overhead
         if coordinator.sceneKey == sceneKey { return }
-        let zoom = coordinator.lastOverhead == overhead && overhead ? view.pointOfView?.camera?.orthographicScale : nil
+        let previousCamera = coordinator.lastOverhead == overhead ? view.pointOfView : nil
+        let zoom = previousCamera?.camera?.orthographicScale
         coordinator.lastOverhead = overhead
         coordinator.sceneKey = sceneKey
         let scene = SCNScene()
@@ -634,9 +683,13 @@ private struct NookScene: UIViewRepresentable {
             camera.camera?.orthographicScale = zoom ?? extent * 1.35
         } else {
             camera.camera?.usesOrthographicProjection = true
-            camera.camera?.orthographicScale = max(room.height, (room.length + room.width) * 0.70)
-            camera.position = SCNVector3(extent * 1.35, extent * 1.30, extent * 1.35)
-            camera.look(at: SCNVector3(0, room.height * 0.30, 0))
+            camera.camera?.orthographicScale = zoom ?? max(room.height * 1.4, (room.length + room.width) * 0.62)
+            camera.position = SCNVector3(extent * 1.32, extent * 1.92, extent * 1.32)
+            camera.look(at: SCNVector3(0, room.height * 0.28, 0))
+            if let previousCamera {
+                camera.position = previousCamera.position
+                camera.orientation = previousCamera.orientation
+            }
         }
         scene.rootNode.addChildNode(camera)
         let ambient = SCNNode()
@@ -683,6 +736,14 @@ private struct NookScene: UIViewRepresentable {
                 at: SCNVector3(-border/2, y, back-border/2), color: trim)
         }
         if !overhead {
+            let width = min(room.length * 0.48, 2.5)
+            let depth = min(room.width * 0.42, 1.6)
+            box(scene, width: width, height: 0.008, depth: depth,
+                at: SCNVector3(room.length * 0.12, 0.004, room.width * 0.20),
+                color: UIColor(red: 0.91, green: 0.66, blue: 0.64, alpha: 1))
+            box(scene, width: width * 0.87, height: 0.010, depth: depth * 0.78,
+                at: SCNVector3(room.length * 0.12, 0.005, room.width * 0.20),
+                color: UIColor(red: 0.97, green: 0.81, blue: 0.69, alpha: 1))
             addWallPanels(to: scene, back: back, border: border, trim: trim)
         }
     }
@@ -853,15 +914,27 @@ private struct NookScene: UIViewRepresentable {
             }
         }
 
+        private func floorPoint(_ point: CGPoint, in view: SCNView) -> SCNVector3? {
+            let near = view.unprojectPoint(SCNVector3(Float(point.x), Float(point.y), 0))
+            let far = view.unprojectPoint(SCNVector3(Float(point.x), Float(point.y), 1))
+            let dy = far.y - near.y
+            guard abs(dy) > 0.00001 else { return nil }
+            let t = -near.y / dy
+            let x = near.x + (far.x - near.x) * t
+            let z = near.z + (far.z - near.z) * t
+            guard t >= 0, x.isFinite, z.isFinite else { return nil }
+            return SCNVector3(x, 0, z)
+        }
+
+        private var orbitAngle: Double?
+
         func gestureRecognizerShouldBegin(_ gestureRecognizer: UIGestureRecognizer) -> Bool {
-            guard parent.overhead, !parent.isolated, let view = gestureRecognizer.view as? SCNView else { return false }
+            guard !parent.isolated, let view = gestureRecognizer.view as? SCNView else { return false }
             if gestureRecognizer is UIPinchGestureRecognizer { return moving == nil }
-            let point = gestureRecognizer.location(in: view)
-            if let pan = gestureRecognizer as? UIPanGestureRecognizer {
-                let delta = pan.translation(in: view)
-                return asset(at: CGPoint(x: point.x - delta.x, y: point.y - delta.y), in: view) != nil
-            }
-            return false
+            guard let pan = gestureRecognizer as? UIPanGestureRecognizer else { return false }
+            if !parent.overhead { return true }
+            let point = pan.location(in: view), delta = pan.translation(in: view)
+            return asset(at: CGPoint(x: point.x - delta.x, y: point.y - delta.y), in: view) != nil
         }
 
         @objc func zoom(_ gesture: UIPinchGestureRecognizer) {
@@ -872,39 +945,52 @@ private struct NookScene: UIViewRepresentable {
 
         @objc func tap(_ gesture: UITapGestureRecognizer) {
             guard let view = gesture.view as? SCNView, moving == nil else { return }
-            parent.select(asset(at: gesture.location(in: view), in: view)?.1)
+            let point = gesture.location(in: view)
+            if let (_, id) = asset(at: point, in: view) {
+                parent.select(id)
+            } else if parent.overhead, let id = parent.selected, let floor = floorPoint(point, in: view) {
+                _ = parent.move(id, Double(floor.x), Double(floor.z))
+            }
         }
 
         @objc func drag(_ gesture: UIPanGestureRecognizer) {
-            guard parent.overhead, let view = gesture.view as? SCNView else { return }
+            guard let view = gesture.view as? SCNView else { return }
             let point = gesture.location(in: view)
-            let depth = view.projectPoint(SCNVector3Zero).z
-            func floor(_ point: CGPoint) -> SCNVector3 {
-                view.unprojectPoint(SCNVector3(Float(point.x), Float(point.y), depth))
-            }
             if gesture.state == .began {
                 let delta = gesture.translation(in: view)
                 let start = CGPoint(x: point.x - delta.x, y: point.y - delta.y)
-                guard let (node, id) = asset(at: start, in: view) else { return }
-                moving = (node, id, node.position, floor(start))
+                if let (node, id) = asset(at: start, in: view), let anchor = floorPoint(start, in: view) {
+                    moving = (node, id, node.position, anchor)
+                } else if !parent.overhead, let camera = view.pointOfView {
+                    orbitAngle = atan2(Double(camera.position.x), Double(camera.position.z))
+                }
+            }
+            if let angle = orbitAngle, let camera = view.pointOfView {
+                let next = angle - Double(gesture.translation(in: view).x) * 0.012
+                let radius = hypot(Double(camera.position.x), Double(camera.position.z))
+                camera.position.x = Float(sin(next) * radius)
+                camera.position.z = Float(cos(next) * radius)
+                camera.look(at: SCNVector3(0, parent.room.height * 0.28, 0))
+                if gesture.state == .ended || gesture.state == .cancelled || gesture.state == .failed { orbitAngle = nil }
+                return
             }
             guard let drag = moving else { return }
-            switch gesture.state {
-            case .cancelled, .failed:
+            if gesture.state == .cancelled || gesture.state == .failed {
                 drag.node.position = drag.original
                 moving = nil
-            case .began, .changed, .ended:
-                let position = floor(point)
-                let x = drag.original.x + position.x - drag.anchor.x
-                let z = drag.original.z + position.z - drag.anchor.z
-                let valid = x.isFinite && z.isFinite
-                if valid { drag.node.position = SCNVector3(x, 0, z) }
-                if gesture.state == .ended {
-                    moving = nil
-                    if !valid || !parent.move(drag.id, Double(x), Double(z)) { drag.node.position = drag.original }
-                    parent.select(drag.id)
-                }
-            default: break
+                return
+            }
+            guard let position = floorPoint(point, in: view) else {
+                if gesture.state == .ended { drag.node.position = drag.original; moving = nil }
+                return
+            }
+            let x = drag.original.x + position.x - drag.anchor.x
+            let z = drag.original.z + position.z - drag.anchor.z
+            drag.node.position = SCNVector3(x, 0, z)
+            if gesture.state == .ended {
+                moving = nil
+                if !parent.move(drag.id, Double(x), Double(z)) { drag.node.position = drag.original }
+                if parent.overhead { parent.select(drag.id) }
             }
         }
     }

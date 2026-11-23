@@ -254,7 +254,7 @@ struct FamilyRoot: View {
 
     private var businessPager: some View {
         TabView(selection: $selectedTab) {
-            ForEach(enabledBusinessTabs, id: \.self) { key in
+            ForEach(enabledBusinessTabs.filter { $0 != "nook" }, id: \.self) { key in
                 switch key {
             case "dining":
             Group {
@@ -271,14 +271,6 @@ struct FamilyRoot: View {
             DearSocialView(isActive: selectedTab == 2, store: store).tag(2)
             case "exercise":
             Group { if store.ready { ExerciseView(userID: store.profile?.text("unifiedUserId") ?? "").id(store.profile?.text("unifiedUserId") ?? "") } else { growthUnavailable } }.tag(3)
-            case "nook":
-                Group {
-                    if let account = identity.accountIdentifier, !account.isEmpty {
-                        NookView(account: account, title: store.displayModuleName("nook")).id(account)
-                    } else {
-                        ProgressView()
-                    }
-                }.tag(5)
                 default: EmptyView()
                 }
             }
@@ -290,6 +282,12 @@ struct FamilyRoot: View {
         Group {
             if activeTab == 4 {
                 AccountView(store: store, notifications: notifications)
+            } else if activeTab == 5 {
+                if let account = identity.accountIdentifier, !account.isEmpty {
+                    NookView(account: account, title: store.displayModuleName("nook")).id(account)
+                } else {
+                    ProgressView()
+                }
             } else {
                 businessPager
             }
