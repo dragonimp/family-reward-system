@@ -1,5 +1,7 @@
 import CryptoKit
 import MapKit
+import PhotosUI
+import Vision
 import SceneKit
 import SwiftUI
 
@@ -39,6 +41,7 @@ private struct NookItem: Codable, Identifiable {
     var value = 0.0
     var preview = false
     var idle = false
+    var photo: Data?
 
     var footprint: (Double, Double) {
         let angle = rotation * .pi / 180
@@ -193,6 +196,7 @@ private struct NookRoomView: View {
     let save: (NookRoom) -> Bool
     @State private var selected: UUID?
     @State private var itemDraft: NookItem?
+    @State private var enlarged: NookItem?
     @State private var editRoom = false
     @State private var decorate = false
     @State private var overhead = false
@@ -204,46 +208,66 @@ private struct NookRoomView: View {
         room.items.filter { filter.isEmpty || $0.name.localizedStandardContains(filter) || $0.category.localizedStandardContains(filter) }
     }
 
-    var body: some View {
-        List {
-            Section {
-                NookScene(room: room, selected: selected, overhead: overhead) { x, z in
-                    guard let id = selected, let index = room.items.firstIndex(where: { $0.id == id }) else { return }
-                    update { $0.items[index].x = x; $0.items[index].z = z }
-                } select: { selected = $0 }
-                .frame(height: 310)
-                Toggle("俯视摆放", isOn: $overhead)
-                Text(overhead ? "点选物品后拖动可摆放。双指可缩放。" : "拖动旋转视角，双指缩放。")
-                    .font(.footnote).foregroundStyle(.secondary)
-                if let item = room.items.first(where: { $0.id == selected }) {
-                    Button("编辑 \(item.name)", systemImage: "slider.horizontal.3") { itemDraft = item }
-                    if let warning = warning(item) { Label(warning, systemImage: "exclamationmark.triangle").foregroundStyle(.orange) }
+    private var sceneSection: some View {
+        Section {
+            NookScene(room: room, selected: selected, overhead: overhead) { x, z in
+                guard let id = selected, let index = room.items.firstIndex(where: { $0.id == id }) else { return }
+                update { $0.items[index].x = x; $0.items[index].z = z }
+            } select: { id in
+                    selected = id
+                    if !overhead { enlarged = room.items.first { $0.id == id } }
+                }
+            .frame(minHeight: 240, idealHeight: 310)
+            Toggle("俯视摆放", isOn: $overhead)
+            Text(overhead ? "点选物品后拖动可摆放。双指可缩放。" : "拖动旋转视角，双指缩放。")
+                .font(.footnote).foregroundStyle(.secondary)
+            if let item = room.items.first(where: { $0.id == selected }) {
+                Button("放大展示", systemImage: "arrow.up.left.and.arrow.down.right") { enlarged = item }
+                Button("编辑 \(item.name)", systemImage: "slider.horizontal.3") { itemDraft = item }
+                if let warning = warning(item) { Label(warning, systemImage: "exclamationmark.triangle").foregroundStyle(.orange) }
+            }
+        }
+    }
+
+    private var assetSection: some View {
+        Section("资产与预览") {
+            LabeledContent("自有资产", value: "\(assets.count) 件")
+            LabeledContent("参考总值", value: assets.reduce(0) { $0 + $1.value }.formatted(.currency(code: "CNY")))
+            TextField("搜索名称或类别", text: $filter)
+            ForEach(visibleItems) { item in
+                Button {
+                    selected = item.id
+                    enlarged = item
+                } label: {
+                    HStack {
+                        Label(item.name, systemImage: selected == item.id ? "checkmark.circle.fill" : "cube")
+                        Spacer()
+                        Text(item.preview ? "意向预览" : item.category).foregroundStyle(.secondary)
+                    }
+                }
+                .contextMenu {
+                    Button("编辑") { itemDraft = item }
+                    Button("移除", role: .destructive) {
+                        update { $0.items.removeAll { $0.id == item.id } }
+                        if selected == item.id { selected = nil }
+                    }
                 }
             }
-            Section("资产与预览") {
-                LabeledContent("自有资产", value: "\(assets.count) 件")
-                LabeledContent("参考总值", value: assets.reduce(0) { $0 + $1.value }.formatted(.currency(code: "CNY")))
-                TextField("搜索名称或类别", text: $filter)
-                ForEach(visibleItems) { item in
-                    Button {
-                        selected = item.id
-                    } label: {
-                        HStack {
-                            Label(item.name, systemImage: selected == item.id ? "checkmark.circle.fill" : "cube")
-                            Spacer()
-                            Text(item.preview ? "意向预览" : item.category).foregroundStyle(.secondary)
-                        }
-                    }
-                    .contextMenu {
-                        Button("编辑") { itemDraft = item }
-                        Button("移除", role: .destructive) {
-                            update { $0.items.removeAll { $0.id == item.id } }
-                            if selected == item.id { selected = nil }
-                        }
-                    }
+            Button("录入自有物品", systemImage: "plus") { itemDraft = NookItem() }
+            Button("添加意向预览", systemImage: "cube.transparent") { itemDraft = NookItem(preview: true) }
+        }
+    }
+
+    var body: some View {
+        GeometryReader { geometry in
+            if geometry.size.width > geometry.size.height && geometry.size.width >= 600 {
+                HStack(spacing: 0) {
+                    List { sceneSection }.frame(width: geometry.size.width * 0.58)
+                    Divider()
+                    List { assetSection }
                 }
-                Button("录入自有物品", systemImage: "plus") { itemDraft = NookItem() }
-                Button("添加意向预览", systemImage: "cube.transparent") { itemDraft = NookItem(preview: true) }
+            } else {
+                List { sceneSection; assetSection }
             }
         }
         .navigationTitle(Text(verbatim: room.name))
@@ -252,6 +276,9 @@ private struct NookRoomView: View {
                 Button("编辑房间", systemImage: "pencil") { editRoom = true }
                 Button("虚拟装修", systemImage: "paintpalette") { decorate = true }
             }
+        }
+        .fullScreenCover(item: $enlarged) { item in
+            NookItemPreview(item: item)
         }
         .sheet(isPresented: $editRoom) { NookRoomForm(room: room, save: persist) }
         .sheet(isPresented: $decorate) {
@@ -300,9 +327,58 @@ private struct NookItemForm: View {
     @State var item: NookItem
     let save: (NookItem) -> Bool
     @State private var error = false
+    @State private var camera = false
+    @State private var photo: PhotosPickerItem?
+    @State private var recognitionStatus: String?
+    @State private var recognizing = false
+
+    @MainActor private func recognize(_ load: () async throws -> Data?) async {
+        guard !recognizing else { return }
+        recognizing = true
+        defer { recognizing = false }
+        do {
+            guard let data = try await load(), let image = UIImage(data: data) else {
+                recognitionStatus = "无法读取照片。"
+                return
+            }
+            let ratio = min(1, 720 / max(image.size.width, image.size.height))
+            let size = CGSize(width: max(1, image.size.width * ratio), height: max(1, image.size.height * ratio))
+            let format = UIGraphicsImageRendererFormat()
+            format.scale = 1
+            let thumb = UIGraphicsImageRenderer(size: size, format: format).image { _ in
+                image.draw(in: CGRect(origin: .zero, size: size))
+            }
+            guard let jpeg = thumb.jpegData(compressionQuality: 0.72) else { throw CocoaError(.fileWriteUnknown) }
+            item.photo = jpeg
+            if let candidate = try await NookPhotoRecognition.suggest(jpeg) {
+                if item.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { item.name = candidate.name; item.category = candidate.category }
+                recognitionStatus = "识别建议：\(candidate.name) · \(candidate.category)。请核对后保存。"
+            } else {
+                recognitionStatus = "未能可靠识别这件物品，可填写名称和分类。"
+            }
+        } catch {
+            recognitionStatus = "照片读取或识别失败，可手动填写。"
+        }
+    }
+
     var body: some View {
         NavigationStack {
             Form {
+                if !item.preview {
+                    Section("照片识别") {
+                        if let data = item.photo, let image = UIImage(data: data) {
+                            Image(uiImage: image).resizable().scaledToFit().frame(maxHeight: 160)
+                        }
+                        if UIImagePickerController.isSourceTypeAvailable(.camera) {
+                            Button("拍照识别", systemImage: "camera") { camera = true }.disabled(recognizing)
+                        }
+                        PhotosPicker(selection: $photo, matching: .images) {
+                            Label("选照片识别", systemImage: "photo")
+                        }.disabled(recognizing)
+                        if recognizing { ProgressView("正在设备上识别…") }
+                        if let recognitionStatus { Text(recognitionStatus).font(.footnote).foregroundStyle(.secondary) }
+                    }
+                }
                 TextField("物品名称", text: $item.name)
                 Picker("分类", selection: $item.category) {
                     ForEach(["家具","家电","收纳","厨具","服饰","其他"], id: \.self) { Text($0).tag($0) }
@@ -323,6 +399,25 @@ private struct NookItemForm: View {
                 }
                 if error { Text("保存失败，请重试。").foregroundStyle(.red) }
             }
+            .task(id: photo) {
+                guard let photo else { return }
+                await recognize { try await photo.loadTransferable(type: Data.self) }
+            }
+            .fullScreenCover(isPresented: $camera) {
+                DearCamera(mode: .photo) { result in
+                    camera = false
+                    switch result {
+                    case .success(let capture):
+                        guard let url = capture?.0 else { return }
+                        Task {
+                            defer { try? FileManager.default.removeItem(at: url) }
+                            await recognize { try Data(contentsOf: url) }
+                        }
+                    case .failure:
+                        recognitionStatus = "拍摄未完成，请检查相机权限后重试。"
+                    }
+                }.ignoresSafeArea()
+            }
             .navigationTitle(item.preview ? "意向商品" : "自有物品")
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) { Button("取消") { dismiss() } }
@@ -330,10 +425,70 @@ private struct NookItemForm: View {
                     Button("保存") {
                         item.name = item.name.trimmingCharacters(in: .whitespacesAndNewlines)
                         if save(item) { dismiss() } else { error = true }
-                    }.disabled(item.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ||
+                    }.disabled(recognizing || item.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ||
                                 ![item.length,item.width,item.height].allSatisfy { (1...10000).contains($0) } || !(0...100000000).contains(item.value))
                 }
             }
+        }
+    }
+}
+
+private enum NookPhotoRecognition {
+    struct Candidate: Sendable {
+        let name: String
+        let category: String
+    }
+
+    nonisolated static func suggest(_ bytes: Data) async throws -> Candidate? {
+        try await Task.detached(priority: .userInitiated) { () throws -> Candidate? in
+            let request = VNClassifyImageRequest()
+            try VNImageRequestHandler(data: bytes).perform([request])
+            let matches: [(String, String, String)] = [
+                ("sofa", "沙发", "家具"), ("couch", "沙发", "家具"),
+                ("chair", "椅子", "家具"), ("table", "桌子", "家具"),
+                ("desk", "书桌", "家具"), ("bed", "床", "家具"),
+                ("refrigerator", "冰箱", "家电"), ("microwave", "微波炉", "家电"),
+                ("television", "电视", "家电"), ("vacuum", "吸尘器", "家电"),
+                ("shelf", "置物架", "收纳"), ("cabinet", "柜子", "收纳"),
+                ("luggage", "行李箱", "收纳"), ("kettle", "水壶", "厨具"),
+                ("pan", "锅具", "厨具"), ("cup", "杯子", "厨具"),
+                ("shoe", "鞋", "服饰"), ("jacket", "夹克", "服饰"),
+                ("book", "书籍", "其他"), ("plant", "植物", "其他")
+            ]
+            for observation in (request.results ?? []).prefix(8) where observation.confidence >= 0.35 {
+                let words = Set(observation.identifier.lowercased().split { !$0.isLetter }.map(String.init))
+                if let match = matches.first(where: { words.contains($0.0) }) {
+                    return Candidate(name: match.1, category: match.2)
+                }
+            }
+            return nil
+        }.value
+    }
+}
+
+private struct NookItemPreview: View {
+    @Environment(\.dismiss) private var dismiss
+    let item: NookItem
+
+    private var stage: NookRoom {
+        var copy = item
+        copy.x = 0
+        copy.z = 0
+        let extent = max(copy.length, copy.width, copy.height) * copy.scale / 100
+        return NookRoom(name: item.name, length: extent * 1.5, width: extent * 1.5, height: extent, items: [copy])
+    }
+
+    var body: some View {
+        NavigationStack {
+            VStack {
+                NookScene(room: stage, selected: nil, overhead: false, move: { _, _ in }, select: { _ in }, isolated: true)
+                    .accessibilityLabel("物品 3D 预览")
+                Text("\(item.length.formatted()) × \(item.width.formatted()) × \(item.height.formatted()) 厘米")
+                    .font(.footnote).padding(.bottom, 8)
+            }
+            .navigationTitle(Text(verbatim: item.name))
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar { ToolbarItem(placement: .confirmationAction) { Button("完成") { dismiss() } } }
         }
     }
 }
@@ -374,6 +529,7 @@ private struct NookScene: UIViewRepresentable {
     let overhead: Bool
     let move: (Double, Double) -> Void
     let select: (UUID?) -> Void
+    var isolated = false
 
     func makeCoordinator() -> Coordinator { Coordinator(self) }
     func makeUIView(context: Context) -> SCNView {
@@ -403,8 +559,10 @@ private struct NookScene: UIViewRepresentable {
             room.finish.wall == "浅蓝" ? .systemBlue.withAlphaComponent(0.35) : UIColor(white: 0.91, alpha: 1)
         box(scene, width: room.length, height: 0.05, depth: room.width, at: SCNVector3(0,-0.025,0),
             color: room.finish.floor == "木地板" ? .brown : .systemGray4)
-        box(scene, width: 0.05, height: room.height, depth: room.width, at: SCNVector3(-room.length/2,room.height/2,0), color: wall)
-        box(scene, width: room.length, height: room.height, depth: 0.05, at: SCNVector3(0,room.height/2,-room.width/2), color: wall)
+        if !isolated {
+            box(scene, width: 0.05, height: room.height, depth: room.width, at: SCNVector3(-room.length/2,room.height/2,0), color: wall)
+            box(scene, width: room.length, height: room.height, depth: 0.05, at: SCNVector3(0,room.height/2,-room.width/2), color: wall)
+        }
         for item in room.items {
             let height = item.height * item.scale / 100
             let node = box(scene, width: item.length * item.scale / 100, height: height, depth: item.width * item.scale / 100,
@@ -441,7 +599,9 @@ private struct NookScene: UIViewRepresentable {
     private var sceneKey: Data? {
         let encoder = JSONEncoder()
         encoder.outputFormatting = .sortedKeys
-        return try? encoder.encode(SceneState(room: room, selected: selected, overhead: overhead))
+        var geometry = room
+        for index in geometry.items.indices { geometry.items[index].photo = nil }
+        return try? encoder.encode(SceneState(room: geometry, selected: selected, overhead: overhead))
     }
     private struct SceneState: Encodable { let room: NookRoom; let selected: UUID?; let overhead: Bool }
 

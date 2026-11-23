@@ -1,5 +1,5 @@
 "NSMotionUsageDescription" = "在您开始运动后读取本机步数和估算距离，用于散步、慢跑等运动记录。";
-"NSCameraUsageDescription" = "拍摄照片、录制视频并共享到活动，也用于扫描手表二维码完成绑定。";
+"NSCameraUsageDescription" = "用于拍摄活动照片和视频、拍摄并识别小小窝的物品，或扫描手表配对二维码。";
 "NSMicrophoneUsageDescription" = "录制活动视频时采集声音。";
 "NSPhotoLibraryUsageDescription" = "自动匹配您已共享照片和视频的本机原件，核验一致后继续原下载请求。只读取您授权的照片，不修改或删除系统相册内容。";
 "NSPhotoLibraryAddUsageDescription" = "将您拍摄的照片和视频保存到系统相册，保留原件并共享到活动。";

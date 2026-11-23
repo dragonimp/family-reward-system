@@ -1,4 +1,4 @@
-"NSCameraUsageDescription" = "Take activity photos and videos, or scan a watch pairing QR code when you choose these features.";
+"NSCameraUsageDescription" = "Take activity photos and videos, photograph items for recognition in Little Nook, or scan a watch pairing QR code.";
 "NSMicrophoneUsageDescription" = "Record sound when you choose to record an activity video.";
 "NSPhotoLibraryUsageDescription" = "Find the local originals of photos and videos you shared so you can download the matching original. Only the photos you authorize are read; your library is not changed or deleted.";
 "NSPhotoLibraryAddUsageDescription" = "Save the photos and videos you capture to your photo library so you can keep and share the originals.";

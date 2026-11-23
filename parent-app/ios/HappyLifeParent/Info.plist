@@ -7,7 +7,7 @@
 	<key>NSMotionUsageDescription</key>
 	<string>在您开始运动后读取本机步数和估算距离，用于散步、慢跑等运动记录。</string>
 	<key>NSCameraUsageDescription</key>
-	<string>拍摄照片、录制视频并共享到活动，也用于扫描手表二维码完成绑定。</string>
+	<string>用于拍摄活动照片和视频、拍摄并识别小小窝的物品，或扫描手表配对二维码。</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>录制活动视频时采集声音。</string>
 	<key>PHPhotoLibraryPreventAutomaticLimitedAccessAlert</key>
