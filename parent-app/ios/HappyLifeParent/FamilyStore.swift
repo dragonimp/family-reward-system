@@ -155,16 +155,53 @@ private actor PhotoPreviewLoader {
     @Published var ledgerPage = 1
     @Published var ledgerTotal = 0
     @Published var moduleSections: [String: Bool] = ["dining": true, "growth": true, "activities": true, "exercise": true]
-    private static let defaultModuleOrder = ["dining", "growth", "activities", "exercise"]
+    private static let defaultModuleOrder = ["dining", "growth", "activities", "exercise", "nook"]
+    @Published private var savedModuleNames = UserDefaults.standard.dictionary(forKey: "moment.moduleNames") as? [String: [String: String]] ?? [:]
+    @Published private var savedNookVisibility = UserDefaults.standard.dictionary(forKey: "moment.nook.visibility") as? [String: Bool] ?? [:]
+
+    func defaultModuleName(_ key: String) -> String {
+        let names = ["dining": "干饭", "growth": "带娃", "activities": "活动", "exercise": "运动", "nook": "小小窝🐌"]
+        let name = names[key] ?? key
+        return AgentIdentityLanguage.appBundle().localizedString(forKey: name, value: name, table: nil)
+    }
+
+    func moduleName(_ key: String) -> String {
+        guard let owner = identity.accountIdentifier else { return defaultModuleName(key) }
+        if let name = savedModuleNames[owner]?[key] { return name }
+        if key == "nook", let data = UserDefaults.standard.data(forKey: "moment.nook.names"),
+           let old = try? JSONDecoder().decode([String: String].self, from: data), let name = old[owner] {
+            return name
+        }
+        return defaultModuleName(key)
+    }
+
+    func renameModule(_ key: String, to value: String, owner: String) {
+        guard identity.accountIdentifier == owner, Self.defaultModuleOrder.contains(key) else { return }
+        let name = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        savedModuleNames[owner, default: [:]][key] = String(name.prefix(16))
+        UserDefaults.standard.set(savedModuleNames, forKey: "moment.moduleNames")
+    }
+
+    func displayModuleName(_ key: String) -> String {
+        let name = moduleName(key)
+        return name.isEmpty ? defaultModuleName(key) : name
+    }
+
+    func isModuleEnabled(_ key: String) -> Bool {
+        if key == "nook" {
+            guard let owner = identity.accountIdentifier else { return true }
+            return savedNookVisibility[owner] ?? true
+        }
+        return moduleSections[key] ?? true
+    }
     @Published private var savedModuleOrders: [String: [String]] =
         UserDefaults.standard.dictionary(forKey: "moment.moduleOrders") as? [String: [String]] ?? [:]
 
     var moduleOrder: [String] {
-        guard let owner = identity.accountIdentifier, let order = savedModuleOrders[owner],
-              order.count == Self.defaultModuleOrder.count, Set(order) == Set(Self.defaultModuleOrder) else {
-            return Self.defaultModuleOrder
-        }
-        return order
+        let previous = identity.accountIdentifier.flatMap { savedModuleOrders[$0] } ?? []
+        var seen = Set<String>()
+        let ordered = previous.filter { Self.defaultModuleOrder.contains($0) && seen.insert($0).inserted }
+        return ordered + Self.defaultModuleOrder.filter { !seen.contains($0) }
     }
 
     @discardableResult
@@ -324,6 +361,12 @@ private actor PhotoPreviewLoader {
         } catch { if identity.accountIdentifier == owner { modulePreferenceError = "栏目设置暂未同步，当前显示本账号缓存。请稍后重试。" } }
     }
     func setModule(_ key: String, enabled: Bool) async {
+        if key == "nook" {
+            guard let owner = identity.accountIdentifier else { return }
+            savedNookVisibility[owner] = enabled
+            UserDefaults.standard.set(savedNookVisibility, forKey: "moment.nook.visibility")
+            return
+        }
         guard !modulePreferenceSaving, ["dining", "growth", "activities", "exercise"].contains(key) else { return }
         if modulePreferenceVersion == 0 { await refreshModulePreferences() }
         guard let owner = identity.accountIdentifier, modulePreferenceOwner == owner, modulePreferenceVersion > 0 else { return }

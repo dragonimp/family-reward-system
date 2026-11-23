@@ -104,21 +104,7 @@ struct FamilyRoot: View {
     @ObservedObject var identity: AgentIdentitySession
     @ObservedObject var notifications: MomentNotifications
     @State private var selectedTab = 0
-    @AppStorage("moment.nook.names") private var nookNamesData = Data()
-    private var nookName: String {
-        guard let account = identity.accountIdentifier else { return "小小窝🐌" }
-        return nookNames[account] ?? "小小窝🐌"
-    }
-    private var nookNames: [String: String] {
-        (try? JSONDecoder().decode([String: String].self, from: nookNamesData)) ?? [:]
-    }
-    private func saveNookName(_ value: String) {
-        guard let account = identity.accountIdentifier, !account.isEmpty else { return }
-        var names = nookNames
-        let clean = value.trimmingCharacters(in: .whitespacesAndNewlines)
-        names[account] = clean.isEmpty ? nil : String(clean.prefix(16))
-        if let data = try? JSONEncoder().encode(names) { nookNamesData = data }
-    }
+    private var nookEnabled: Bool { store.isModuleEnabled("nook") }
 
     private var diningEnabled: Bool { get { store.moduleSections["dining"] ?? true } nonmutating set { Task { await store.setModule("dining", enabled: newValue) } } }
     private var growthEnabled: Bool { get { store.moduleSections["growth"] ?? true } nonmutating set { Task { await store.setModule("growth", enabled: newValue) } } }
@@ -207,15 +193,15 @@ struct FamilyRoot: View {
         HStack(spacing: 0) {
             ForEach(store.moduleOrder, id: \.self) { key in
                 switch key {
-                case "dining" where diningEnabled: bottomTab(0, "干饭", "fork.knife")
+                case "dining" where diningEnabled: bottomTab(0, store.displayModuleName("dining"), "fork.knife")
                 case "growth" where growthEnabled:
-                    bottomTab(1, "带娃", "person.3.fill", badge: store.requests.filter { $0.text("status") == "pending" }.count)
-                case "activities" where activitiesEnabled: bottomTab(2, "活动", "photo.on.rectangle.angled")
-                case "exercise" where exerciseEnabled: bottomTab(3, "运动", "figure.walk")
+                    bottomTab(1, store.displayModuleName("growth"), "person.3.fill", badge: store.requests.filter { $0.text("status") == "pending" }.count)
+                case "activities" where activitiesEnabled: bottomTab(2, store.displayModuleName("activities"), "photo.on.rectangle.angled")
+                case "exercise" where exerciseEnabled: bottomTab(3, store.displayModuleName("exercise"), "figure.walk")
+                case "nook" where nookEnabled: bottomTab(5, store.displayModuleName("nook"), "house")
                 default: EmptyView()
                 }
             }
-            bottomTab(5, nookName, "house")
             bottomTab(4, "我的", "person.crop.circle", badge: notifications.unreadCount)
         }
         .padding(.top, 4)
@@ -223,7 +209,7 @@ struct FamilyRoot: View {
         .overlay(alignment: .top) { Divider() }
     }
     private func bottomTab(_ tab: Int, _ name: String, _ icon: String, badge: Int = 0) -> some View {
-        let title = tab == 5 ? name : AgentIdentityLanguage.appBundle().localizedString(forKey: name, value: name, table: nil)
+        let title = tab != 4 ? name : AgentIdentityLanguage.appBundle().localizedString(forKey: name, value: name, table: nil)
         return Button {
             selectedTab = tab
         } label: {
@@ -266,16 +252,15 @@ struct FamilyRoot: View {
             DearSocialView(isActive: selectedTab == 2, store: store).tag(2)
             case "exercise" where exerciseEnabled:
             Group { if store.ready { ExerciseView(userID: store.profile?.text("unifiedUserId") ?? "").id(store.profile?.text("unifiedUserId") ?? "") } else { growthUnavailable } }.tag(3)
+            case "nook" where nookEnabled:
+                NavigationStack {
+                    Form { ModuleNameButton(store: store, key: "nook") }
+                        .navigationTitle(Text(verbatim: store.displayModuleName("nook")))
+                }.tag(5)
                 default: EmptyView()
                 }
             }
-            NavigationStack {
-                Form {
-                    NookNameSection(name: nookName, save: saveNookName)
-                        .id(identity.accountIdentifier)
-                }.navigationTitle(nookName)
-            }.tag(5)
-            AccountView(store: store, notifications: notifications, nookName: nookName, saveNookName: saveNookName).tag(4)
+            AccountView(store: store, notifications: notifications).tag(4)
         }
         .tabViewStyle(.page(indexDisplayMode: .never))
         .safeAreaInset(edge: .bottom, spacing: 0) { bottomTabs }
@@ -289,12 +274,12 @@ struct FamilyRoot: View {
         }
         .onAppear { if store.pendingActivityLink != nil { activitiesEnabled = true; selectedTab = 2 } }
         .onChange(of: store.pendingActivityLink?.id) { _, id in if id != nil { activitiesEnabled = true; selectedTab = 2 } }
-        .onChange(of: [diningEnabled, growthEnabled, activitiesEnabled, exerciseEnabled]) { _, enabled in
-            if selectedTab < 4 && !enabled[selectedTab] { selectedTab = 4 }
+        .onChange(of: [diningEnabled, growthEnabled, activitiesEnabled, exerciseEnabled, true, nookEnabled]) { _, enabled in
+            if enabled.indices.contains(selectedTab) && !enabled[selectedTab] { selectedTab = 4 }
         }
         .onAppear {
-            let enabled = [diningEnabled, growthEnabled, activitiesEnabled, exerciseEnabled]
-            if selectedTab < 4 && !enabled[selectedTab] { selectedTab = 4 }
+            let enabled = [diningEnabled, growthEnabled, activitiesEnabled, exerciseEnabled, true, nookEnabled]
+            if enabled.indices.contains(selectedTab) && !enabled[selectedTab] { selectedTab = 4 }
         }
     }
 }
@@ -657,8 +642,6 @@ struct AccountView: View {
     @EnvironmentObject private var language: AgentIdentityLanguageStore
     @ObservedObject var store: FamilyStore
     @ObservedObject var notifications: MomentNotifications
-    let nookName: String
-    let saveNookName: (String) -> Void
     @Environment(\.openURL) private var openURL
     @State private var logout = false
     @State private var deleteAccount = false
@@ -702,7 +685,7 @@ struct AccountView: View {
                 Section(String(localized: "应用与设置", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) {
                     NavigationLink { ExerciseWatchConnectionView(family: store) } label: { Label(String(localized: "连接手表", bundle: AgentIdentityLanguage.appBundle()), systemImage: "applewatch") }
 
-                    NavigationLink { MomentSectionSettings(store: store, nookName: nookName, saveNookName: saveNookName) } label: { Label(String(localized: "栏目设置", bundle: AgentIdentityLanguage.appBundle()), systemImage: "square.grid.2x2") }
+                    NavigationLink { MomentSectionSettings(store: store) } label: { Label(String(localized: "栏目设置", bundle: AgentIdentityLanguage.appBundle()), systemImage: "square.grid.2x2") }
                     NavigationLink { FamilyChatView(store: store) } label: {
                         Label(String(localized: "AI 对话", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), systemImage: "bubble.left.and.bubble.right.fill")
                     }
@@ -1452,14 +1435,15 @@ func momentDisplayError(_ error: Error) -> String {
 
 private struct MomentSectionSettings: View {
     @ObservedObject var store: FamilyStore
-    let nookName: String
-    let saveNookName: (String) -> Void
     var body: some View {
         Form {
-            NookNameSection(name: nookName, save: saveNookName)
             ForEach(store.moduleOrder, id: \.self) { key in
-                Toggle(["dining": String(localized: "干饭", bundle: AgentIdentityLanguage.appBundle()), "growth": String(localized: "带娃", bundle: AgentIdentityLanguage.appBundle()), "activities": String(localized: "活动", bundle: AgentIdentityLanguage.appBundle()), "exercise": String(localized: "运动", bundle: AgentIdentityLanguage.appBundle())][key] ?? key,
-                       isOn: Binding(get: { store.moduleSections[key] ?? true }, set: { value in Task { await store.setModule(key, enabled: value) } }))
+                HStack {
+                    Toggle(isOn: Binding(get: { store.isModuleEnabled(key) }, set: { value in Task { await store.setModule(key, enabled: value) } })) {
+                        Text(verbatim: store.displayModuleName(key))
+                    }
+                    ModuleNameButton(store: store, key: key)
+                }
                     .draggable(key)
                     .dropDestination(for: String.self) { values, _ in
                         guard let moving = values.first else { return false }
@@ -1468,7 +1452,7 @@ private struct MomentSectionSettings: View {
                     .accessibilityAction(named: Text("上移")) { store.shiftModule(key, by: -1) }
                     .accessibilityAction(named: Text("下移")) { store.shiftModule(key, by: 1) }
             }.disabled(store.modulePreferenceSaving)
-            Text("长按栏目拖动排序。启用状态随账号同步，顺序保存在本机。「我的」始终保留。").font(.footnote).foregroundStyle(.secondary)
+            Text("长按拖动可调整顺序，点铅笔可改名。名称、顺序和小小窝开关保存在本机，其他栏目开关随账号同步。「我的」始终保留。").font(.footnote).foregroundStyle(.secondary)
             if let error = store.modulePreferenceError { Text(error).foregroundStyle(.secondary) }
             Button("重新同步") { Task { await store.refreshModulePreferences() } }
         }.navigationTitle(String(localized: "栏目设置", bundle: AgentIdentityLanguage.appBundle()))
@@ -1476,31 +1460,35 @@ private struct MomentSectionSettings: View {
     }
 }
 
-private struct NookNameSection: View {
-    let name: String
-    let save: (String) -> Void
+private struct ModuleNameButton: View {
+    @ObservedObject var store: FamilyStore
+    let key: String
     @State private var editing = false
     @State private var draft = ""
+    @State private var owner: String?
 
     var body: some View {
-        Section {
-            Button {
-                draft = name
-                editing = true
-            } label: {
-                LabeledContent {
-                    Text(verbatim: name).lineLimit(1)
-                } label: {
-                    Label("修改栏目名称", systemImage: "pencil")
-                }
+        Button {
+            owner = store.identity.accountIdentifier
+            draft = store.displayModuleName(key)
+            editing = true
+        } label: {
+            Label("修改栏目名称", systemImage: "pencil")
+                .labelStyle(.iconOnly)
+                .frame(width: 44, height: 44)
+        }
+        .buttonStyle(.borderless)
+        .accessibilityLabel(Text("修改栏目名称：\(store.displayModuleName(key))"))
+        .disabled(store.identity.accountIdentifier == nil)
+        .alert("修改栏目名称", isPresented: $editing) {
+            TextField(store.defaultModuleName(key), text: $draft)
+            Button("取消", role: .cancel) {}
+            Button("保存") {
+                if let owner { store.renameModule(key, to: draft, owner: owner) }
             }
-            .alert("修改栏目名称", isPresented: $editing) {
-                TextField("小小窝🐌", text: $draft)
-                Button("取消", role: .cancel) {}
-                Button("保存") { save(draft) }
-            } message: {
-                Text("最多 16 个字符，留空恢复默认名称。")
-            }
+            .disabled(draft.trimmingCharacters(in: .whitespacesAndNewlines).count > 16)
+        } message: {
+            Text("最多 16 个字符，留空恢复默认名称。")
         }
     }
 }
