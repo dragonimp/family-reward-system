@@ -27,6 +27,11 @@ private struct NookFinish: Codable, Identifiable {
     var light = "日间"
 }
 
+private enum NookMaterial: String, CaseIterable, Identifiable {
+    case cabinet = "木质收纳柜", sofa = "布艺沙发", table = "木桌", bed = "软包床", appliance = "家电", photo = "我的物品照片"
+    var id: String { rawValue }
+}
+
 private struct NookItem: Codable, Identifiable {
     var id = UUID()
     var name = ""
@@ -42,6 +47,30 @@ private struct NookItem: Codable, Identifiable {
     var preview = false
     var idle = false
     var photo: Data?
+    var material: String?
+
+    var appearance: NookMaterial {
+        if let material, let choice = NookMaterial(rawValue: material), choice != .photo || photo != nil { return choice }
+        if name.contains("沙发") { return .sofa }
+        if name.contains("床") { return .bed }
+        if name.contains("桌") { return .table }
+        return category == "家电" ? .appliance : .cabinet
+    }
+
+    func overlaps(_ other: NookItem) -> Bool {
+        func axes(_ item: NookItem) -> [SIMD2<Double>] {
+            let angle = item.rotation * .pi / 180
+            return [SIMD2(cos(angle), sin(angle)), SIMD2(-sin(angle), cos(angle))]
+        }
+        func dot(_ a: SIMD2<Double>, _ b: SIMD2<Double>) -> Double { a.x * b.x + a.y * b.y }
+        let a = axes(self), b = axes(other)
+        let delta = SIMD2(other.x - x, other.z - z)
+        return (a + b).allSatisfy { axis in
+            let own = (abs(dot(axis, a[0])) * length + abs(dot(axis, a[1])) * width) * scale / 200
+            let theirs = (abs(dot(axis, b[0])) * other.length + abs(dot(axis, b[1])) * other.width) * other.scale / 200
+            return abs(dot(delta, axis)) < own + theirs - 0.001
+        }
+    }
 
     var footprint: (Double, Double) {
         let angle = rotation * .pi / 180
@@ -202,6 +231,7 @@ private struct NookRoomView: View {
     @State private var overhead = false
     @State private var filter = ""
     @State private var saveError = false
+    @State private var placementError: String?
 
     private var assets: [NookItem] { room.items.filter { !$0.preview } }
     private var visibleItems: [NookItem] {
@@ -210,17 +240,27 @@ private struct NookRoomView: View {
 
     private var sceneSection: some View {
         Section {
-            NookScene(room: room, selected: selected, overhead: overhead) { x, z in
-                guard let id = selected, let index = room.items.firstIndex(where: { $0.id == id }) else { return }
-                update { $0.items[index].x = x; $0.items[index].z = z }
+            NookScene(room: room, selected: selected, overhead: overhead) { id, x, z in
+                guard let index = room.items.firstIndex(where: { $0.id == id }) else { return false }
+                var next = room
+                next.items[index].x = x
+                next.items[index].z = z
+                if let reason = blocked(next.items[index], in: next) {
+                    placementError = reason
+                    return false
+                }
+                placementError = nil
+                guard persist(next) else { saveError = true; return false }
+                return true
             } select: { id in
                     selected = id
                     if !overhead { enlarged = room.items.first { $0.id == id } }
                 }
             .frame(minHeight: 240, idealHeight: 310)
             Toggle("俯视摆放", isOn: $overhead)
-            Text(overhead ? "点选物品后拖动可摆放。双指可缩放。" : "拖动旋转视角，双指缩放。")
+            Text(overhead ? "按住物品拖到空位。双指可缩放。" : "拖动旋转视角，双指缩放。")
                 .font(.footnote).foregroundStyle(.secondary)
+            if let placementError { Label(placementError, systemImage: "exclamationmark.triangle").foregroundStyle(.orange) }
             if let item = room.items.first(where: { $0.id == selected }) {
                 Button("放大展示", systemImage: "arrow.up.left.and.arrow.down.right") { enlarged = item }
                 Button("编辑 \(item.name)", systemImage: "slider.horizontal.3") { itemDraft = item }
@@ -308,17 +348,24 @@ private struct NookRoomView: View {
         if !persist(next) { saveError = true }
     }
 
-    private func warning(_ item: NookItem) -> String? {
+    private func blocked(_ item: NookItem, in room: NookRoom) -> String? {
         let (x, z) = item.footprint
-        let clearance = min(room.length/2 - abs(item.x) - x, room.width/2 - abs(item.z) - z)
-        if clearance < 0 || item.height * item.scale / 100 > room.height { return "物品超出房间边界。" }
-        if room.items.contains(where: { other in
-            guard other.id != item.id else { return false }
-            let (ox, oz) = other.footprint
-            return abs(other.x-item.x) < x+ox && abs(other.z-item.z) < z+oz
-        }) { return "与另一物品的占地范围重叠。" }
-        if clearance < 0.6 { return "距最近墙面不足 60 厘米。" }
+        if abs(item.x) + x > room.length / 2 + 0.001 ||
+            abs(item.z) + z > room.width / 2 + 0.001 ||
+            item.height * item.scale / 100 > room.height {
+            return "放不下：超出房间边界。"
+        }
+        if room.items.contains(where: { $0.id != item.id && item.overlaps($0) }) {
+            return "这个位置已有物品，请拖到空位。"
+        }
         return nil
+    }
+
+    private func warning(_ item: NookItem) -> String? {
+        if let reason = blocked(item, in: room) { return reason }
+        let (x, z) = item.footprint
+        let clearance = min(room.length / 2 - abs(item.x) - x, room.width / 2 - abs(item.z) - z)
+        return clearance < 0.6 ? "距最近墙面不足 60 厘米。" : nil
     }
 }
 
@@ -382,6 +429,11 @@ private struct NookItemForm: View {
                 TextField("物品名称", text: $item.name)
                 Picker("分类", selection: $item.category) {
                     ForEach(["家具","家电","收纳","厨具","服饰","其他"], id: \.self) { Text($0).tag($0) }
+                }
+                Picker("房间内的展示", selection: Binding(get: { item.appearance }, set: { item.material = $0.rawValue })) {
+                    ForEach(NookMaterial.allCases.filter { $0 != .photo || item.photo != nil }) { choice in
+                        Text(choice.rawValue).tag(choice)
+                    }
                 }
                 number("长（厘米）", $item.length)
                 number("宽（厘米）", $item.width)
@@ -481,7 +533,7 @@ private struct NookItemPreview: View {
     var body: some View {
         NavigationStack {
             VStack {
-                NookScene(room: stage, selected: nil, overhead: false, move: { _, _ in }, select: { _ in }, isolated: true)
+                NookScene(room: stage, selected: nil, overhead: false, move: { _, _, _ in false }, select: { _ in }, isolated: true)
                     .accessibilityLabel("物品 3D 预览")
                 Text("\(item.length.formatted()) × \(item.width.formatted()) × \(item.height.formatted()) 厘米")
                     .font(.footnote).padding(.bottom, 8)
@@ -501,7 +553,7 @@ private struct NookDecorationView: View {
     var body: some View {
         NavigationStack {
             Form {
-                NookScene(room: room, selected: nil, overhead: false, move: { _, _ in }, select: { _ in }).frame(height: 240)
+                NookScene(room: room, selected: nil, overhead: false, move: { _, _, _ in false }, select: { _ in }).frame(height: 240)
                 Picker("墙面", selection: $room.finish.wall) { ForEach(["暖白","灰绿","浅蓝"], id: \.self) { Text($0).tag($0) } }
                 Picker("地面", selection: $room.finish.floor) { ForEach(["木地板","瓷砖"], id: \.self) { Text($0).tag($0) } }
                 Picker("灯光", selection: $room.finish.light) { ForEach(["日间","暖色"], id: \.self) { Text($0).tag($0) } }
@@ -527,7 +579,7 @@ private struct NookScene: UIViewRepresentable {
     let room: NookRoom
     let selected: UUID?
     let overhead: Bool
-    let move: (Double, Double) -> Void
+    let move: (UUID, Double, Double) -> Bool
     let select: (UUID?) -> Void
     var isolated = false
 
@@ -535,6 +587,7 @@ private struct NookScene: UIViewRepresentable {
     func makeUIView(context: Context) -> SCNView {
         let view = SCNView()
         view.antialiasingMode = .multisampling4X
+        view.preferredFramesPerSecond = 60
         let tap = UITapGestureRecognizer(target: context.coordinator, action: #selector(Coordinator.tap(_:)))
         let drag = UIPanGestureRecognizer(target: context.coordinator, action: #selector(Coordinator.drag(_:)))
         drag.maximumNumberOfTouches = 1
@@ -552,26 +605,30 @@ private struct NookScene: UIViewRepresentable {
         coordinator.parent = self
         view.allowsCameraControl = !overhead
         if coordinator.sceneKey == sceneKey { return }
+        let zoom = coordinator.lastOverhead == overhead && overhead ? view.pointOfView?.camera?.orthographicScale : nil
+        coordinator.lastOverhead = overhead
         coordinator.sceneKey = sceneKey
         let scene = SCNScene()
-        scene.background.contents = UIColor.systemGroupedBackground
-        let wall: UIColor = room.finish.wall == "灰绿" ? .systemMint.withAlphaComponent(0.65) :
-            room.finish.wall == "浅蓝" ? .systemBlue.withAlphaComponent(0.35) : UIColor(white: 0.91, alpha: 1)
-        box(scene, width: room.length, height: 0.05, depth: room.width, at: SCNVector3(0,-0.025,0),
-            color: room.finish.floor == "木地板" ? .brown : .systemGray4)
+        scene.background.contents = UIColor(red: 0.88, green: 0.90, blue: 0.91, alpha: 1)
+        let wall: UIColor = room.finish.wall == "灰绿" ? UIColor(red: 0.66, green: 0.75, blue: 0.68, alpha: 1) :
+            room.finish.wall == "浅蓝" ? UIColor(red: 0.69, green: 0.77, blue: 0.85, alpha: 1) : UIColor(red: 0.93, green: 0.89, blue: 0.82, alpha: 1)
+        let wood = room.finish.floor == "木地板"
+        let floor = box(scene, width: room.length, height: 0.10, depth: room.width, at: SCNVector3(0,-0.05,0),
+                        color: wood ? UIColor(red: 0.73, green: 0.56, blue: 0.40, alpha: 1) : .systemGray4)
+        if let material = floor.geometry?.firstMaterial {
+            material.diffuse.contents = floorTexture(wood: wood)
+            material.diffuse.wrapS = .repeat
+            material.diffuse.wrapT = .repeat
+            material.diffuse.contentsTransform = SCNMatrix4MakeScale(Float(max(1, room.length / 1.8)), 5, 1)
+        }
         if !isolated {
-            box(scene, width: 0.05, height: room.height, depth: room.width, at: SCNVector3(-room.length/2,room.height/2,0), color: wall)
-            box(scene, width: room.length, height: room.height, depth: 0.05, at: SCNVector3(0,room.height/2,-room.width/2), color: wall)
+            let trim = UIColor(red: 0.94, green: 0.93, blue: 0.89, alpha: 1)
+            box(scene, width: 0.08, height: room.height, depth: room.width, at: SCNVector3(-room.length/2-0.04,room.height/2,0), color: wall)
+            box(scene, width: room.length, height: room.height, depth: 0.08, at: SCNVector3(0,room.height/2,-room.width/2-0.04), color: wall)
+            box(scene, width: 0.035, height: 0.10, depth: room.width, at: SCNVector3(-room.length/2,0.05,0), color: trim)
+            box(scene, width: room.length, height: 0.10, depth: 0.035, at: SCNVector3(0,0.05,-room.width/2), color: trim)
         }
-        for item in room.items {
-            let height = item.height * item.scale / 100
-            let node = box(scene, width: item.length * item.scale / 100, height: height, depth: item.width * item.scale / 100,
-                           at: SCNVector3(item.x,height/2,item.z),
-                           color: selected == item.id ? .systemOrange : item.preview ? .systemPurple : .systemTeal)
-            node.name = item.id.uuidString
-            node.opacity = item.preview ? 0.48 : 1
-            node.eulerAngles.y = Float(-item.rotation * .pi / 180)
-        }
+        for item in room.items { scene.rootNode.addChildNode(assetNode(item)) }
         let camera = SCNNode()
         camera.camera = SCNCamera()
         let extent = max(room.length, room.width, room.height)
@@ -580,7 +637,7 @@ private struct NookScene: UIViewRepresentable {
             camera.position = SCNVector3(0, extent * 2, 0)
             camera.eulerAngles.x = -.pi/2
             camera.camera?.usesOrthographicProjection = true
-            camera.camera?.orthographicScale = extent * 1.35
+            camera.camera?.orthographicScale = zoom ?? extent * 1.35
         } else {
             camera.position = SCNVector3(extent * 0.95, extent * 0.95, extent * 1.3)
             camera.look(at: SCNVector3(0, room.height/4, 0))
@@ -589,9 +646,19 @@ private struct NookScene: UIViewRepresentable {
         let ambient = SCNNode()
         ambient.light = SCNLight()
         ambient.light?.type = .ambient
-        ambient.light?.intensity = 850
+        ambient.light?.intensity = 390
         ambient.light?.color = room.finish.light == "暖色" ? UIColor(red: 1, green: 0.81, blue: 0.62, alpha: 1) : UIColor.white
         scene.rootNode.addChildNode(ambient)
+        let key = SCNNode()
+        key.light = SCNLight()
+        key.light?.type = .directional
+        key.light?.intensity = 780
+        key.light?.castsShadow = true
+        key.light?.shadowRadius = 4
+        key.light?.shadowSampleCount = 8
+        key.light?.shadowColor = UIColor.black.withAlphaComponent(0.23)
+        key.eulerAngles = SCNVector3(-0.9, -0.55, 0)
+        scene.rootNode.addChildNode(key)
         view.scene = scene
         view.pointOfView = camera
     }
@@ -600,7 +667,7 @@ private struct NookScene: UIViewRepresentable {
         let encoder = JSONEncoder()
         encoder.outputFormatting = .sortedKeys
         var geometry = room
-        for index in geometry.items.indices { geometry.items[index].photo = nil }
+        for index in geometry.items.indices { if geometry.items[index].appearance != .photo { geometry.items[index].photo = nil } }
         return try? encoder.encode(SceneState(room: geometry, selected: selected, overhead: overhead))
     }
     private struct SceneState: Encodable { let room: NookRoom; let selected: UUID?; let overhead: Bool }
@@ -609,46 +676,187 @@ private struct NookScene: UIViewRepresentable {
                                       at position: SCNVector3, color: UIColor) -> SCNNode {
         let shape = SCNBox(width: width, height: height, length: depth, chamferRadius: 0)
         shape.firstMaterial?.diffuse.contents = color
+        shape.firstMaterial?.lightingModel = .physicallyBased
+        shape.firstMaterial?.roughness.contents = 0.82
         let node = SCNNode(geometry: shape)
         node.position = position
         scene.rootNode.addChildNode(node)
         return node
     }
 
+    private func floorTexture(wood: Bool) -> UIImage {
+        let size = CGSize(width: 192, height: 192)
+        return UIGraphicsImageRenderer(size: size).image { context in
+            let cg = context.cgContext
+            for row in 0..<6 {
+                let tone = CGFloat((row * 13) % 7) / 85
+                cg.setFillColor((wood ? UIColor(red: 0.74 + tone, green: 0.57 + tone, blue: 0.43 + tone, alpha: 1) :
+                                 UIColor(white: 0.83 + tone, alpha: 1)).cgColor)
+                cg.fill(CGRect(x: 0, y: row * 32, width: 192, height: 32))
+                cg.setFillColor(UIColor.black.withAlphaComponent(0.14).cgColor)
+                cg.fill(CGRect(x: 0, y: row * 32, width: 192, height: 1))
+                if wood {
+                    cg.fill(CGRect(x: (row * 55) % 192, y: row * 32, width: 1, height: 32))
+                    for strand in 0..<3 {
+                        cg.setFillColor(UIColor.black.withAlphaComponent(0.035).cgColor)
+                        cg.fill(CGRect(x: 0, y: row * 32 + 5 + strand * 8, width: 192, height: 1))
+                    }
+                } else {
+                    cg.fill(CGRect(x: 96, y: row * 32, width: 1, height: 32))
+                }
+            }
+        }
+    }
+
+    private func assetNode(_ item: NookItem) -> SCNNode {
+        let root = SCNNode()
+        root.name = item.id.uuidString
+        root.position = SCNVector3(item.x, 0, item.z)
+        root.eulerAngles.y = Float(-item.rotation * .pi / 180)
+        root.scale = SCNVector3(item.length * item.scale / 100, item.height * item.scale / 100, item.width * item.scale / 100)
+        root.opacity = item.preview ? 0.58 : 1
+        let wood = UIColor(red: 0.52, green: 0.34, blue: 0.21, alpha: 1)
+        let fabric = UIColor(red: 0.30, green: 0.44, blue: 0.43, alpha: 1)
+        let pale = UIColor(red: 0.92, green: 0.87, blue: 0.78, alpha: 1)
+        func part(_ w: CGFloat, _ h: CGFloat, _ d: CGFloat, _ y: Float, _ color: UIColor, x: Float = 0, z: Float = 0) {
+            let shape = SCNBox(width: w, height: h, length: d, chamferRadius: min(0.055, min(w, min(h, d)) / 4))
+            shape.firstMaterial?.diffuse.contents = color
+            shape.firstMaterial?.lightingModel = .physicallyBased
+            shape.firstMaterial?.roughness.contents = 0.78
+            let node = SCNNode(geometry: shape)
+            node.position = SCNVector3(x, y, z)
+            root.addChildNode(node)
+        }
+        switch item.appearance {
+        case .sofa:
+            part(1, 0.28, 0.92, 0.20, fabric)
+            part(0.78, 0.18, 0.70, 0.41, pale, z: 0.10)
+            part(1, 0.64, 0.16, 0.68, fabric, z: -0.41)
+            for x: Float in [-0.43, 0.43] { part(0.14, 0.44, 0.85, 0.47, fabric, x: x) }
+        case .table:
+            part(1, 0.11, 1, 0.945, wood)
+            for x: Float in [-0.39, 0.39] {
+                for z: Float in [-0.39, 0.39] { part(0.10, 0.89, 0.10, 0.445, wood, x: x, z: z) }
+            }
+        case .bed:
+            part(1, 0.25, 0.96, 0.19, wood)
+            part(0.96, 0.24, 0.9, 0.43, pale, z: 0.035)
+            part(0.96, 0.63, 0.10, 0.685, fabric, z: -0.44)
+            part(0.78, 0.13, 0.20, 0.60, .white, z: -0.27)
+            part(0.96, 0.09, 0.59, 0.57, fabric, z: 0.18)
+        case .appliance:
+            part(0.97, 0.97, 0.87, 0.5, .lightGray)
+            part(0.94, 0.70, 0.09, 0.63, .systemGray3, z: 0.44)
+            part(0.04, 0.26, 0.04, 0.59, .darkGray, x: -0.30, z: 0.48)
+        case .cabinet:
+            part(1, 0.94, 0.88, 0.53, wood)
+            for y: Float in [0.23, 0.53, 0.83] {
+                part(0.91, 0.27, 0.07, y, pale, z: 0.45)
+                part(0.26, 0.035, 0.04, y + 0.035, wood, z: 0.49)
+            }
+        case .photo:
+            if overhead { part(0.96, 0.025, 0.96, 0.05, pale) }
+            else { part(0.96, 0.96, 0.09, 0.5, pale) }
+            if let data = item.photo, let image = UIImage(data: data) {
+                let plane = SCNPlane(width: 0.90, height: 0.90)
+                let fit = CGSize(width: item.length * 2, height: (overhead ? item.width : item.height) * 2)
+                let scale = min(720 / max(fit.width, fit.height), 1)
+                let size = CGSize(width: max(1, fit.width * scale), height: max(1, fit.height * scale))
+                let format = UIGraphicsImageRendererFormat()
+                format.scale = 1
+                let texture = UIGraphicsImageRenderer(size: size, format: format).image { _ in
+                    pale.setFill(); UIRectFill(CGRect(origin: .zero, size: size))
+                    let ratio = min(size.width / image.size.width, size.height / image.size.height)
+                    let w = image.size.width * ratio, h = image.size.height * ratio
+                    image.draw(in: CGRect(x: (size.width-w)/2, y: (size.height-h)/2, width: w, height: h))
+                }
+                plane.firstMaterial?.diffuse.contents = texture
+                plane.firstMaterial?.lightingModel = .constant
+                let picture = SCNNode(geometry: plane)
+                if overhead {
+                    picture.position = SCNVector3(0, 0.065, 0)
+                    picture.eulerAngles.x = -.pi / 2
+                } else {
+                    picture.position = SCNVector3(0, 0.50, 0.049)
+                }
+                root.addChildNode(picture)
+            }
+        }
+        if selected == item.id {
+            part(1, 0.012, 1, 0.006, UIColor(red: 0.93, green: 0.62, blue: 0.25, alpha: 1))
+        }
+        return root
+    }
+
     final class Coordinator: NSObject, UIGestureRecognizerDelegate {
         var parent: NookScene
         var sceneKey: Data?
+        var lastOverhead = false
+        private var moving: (node: SCNNode, id: UUID, original: SCNVector3, anchor: SCNVector3)?
         init(_ parent: NookScene) { self.parent = parent }
-        func gestureRecognizerShouldBegin(_ gestureRecognizer: UIGestureRecognizer) -> Bool {
-            parent.overhead && (gestureRecognizer is UIPinchGestureRecognizer || parent.selected != nil)
+
+        private func asset(at point: CGPoint, in view: SCNView) -> (SCNNode, UUID)? {
+            guard var node = view.hitTest(point, options: nil).first?.node else { return nil }
+            while true {
+                if let id = node.name.flatMap(UUID.init(uuidString:)) { return (node, id) }
+                guard let next = node.parent else { return nil }
+                node = next
+            }
         }
+
+        func gestureRecognizerShouldBegin(_ gestureRecognizer: UIGestureRecognizer) -> Bool {
+            guard parent.overhead, !parent.isolated, let view = gestureRecognizer.view as? SCNView else { return false }
+            if gestureRecognizer is UIPinchGestureRecognizer { return moving == nil }
+            let point = gestureRecognizer.location(in: view)
+            if let pan = gestureRecognizer as? UIPanGestureRecognizer {
+                let delta = pan.translation(in: view)
+                return asset(at: CGPoint(x: point.x - delta.x, y: point.y - delta.y), in: view) != nil
+            }
+            return false
+        }
+
         @objc func zoom(_ gesture: UIPinchGestureRecognizer) {
             guard let camera = (gesture.view as? SCNView)?.pointOfView?.camera else { return }
             camera.orthographicScale = min(160, max(0.5, camera.orthographicScale / gesture.scale))
             gesture.scale = 1
         }
+
         @objc func tap(_ gesture: UITapGestureRecognizer) {
-            guard let view = gesture.view as? SCNView else { return }
-            let id = view.hitTest(gesture.location(in: view), options: nil).first?.node.name.flatMap(UUID.init(uuidString:))
-            parent.select(id)
+            guard let view = gesture.view as? SCNView, moving == nil else { return }
+            parent.select(asset(at: gesture.location(in: view), in: view)?.1)
         }
+
         @objc func drag(_ gesture: UIPanGestureRecognizer) {
-            guard parent.overhead, let id = parent.selected, let view = gesture.view as? SCNView,
-                  let node = view.scene?.rootNode.childNode(withName: id.uuidString, recursively: false) else { return }
+            guard parent.overhead, let view = gesture.view as? SCNView else { return }
             let point = gesture.location(in: view)
-            if gesture.state == .cancelled || gesture.state == .failed {
-                if let item = parent.room.items.first(where: { $0.id == id }) {
-                    node.position.x = Float(item.x)
-                    node.position.z = Float(item.z)
-                }
-                return
-            }
             let depth = view.projectPoint(SCNVector3Zero).z
-            let next = view.unprojectPoint(SCNVector3(Float(point.x),Float(point.y),depth))
-            guard next.x.isFinite, next.z.isFinite else { return }
-            node.position.x = next.x
-            node.position.z = next.z
-            if gesture.state == .ended { parent.move(Double(next.x), Double(next.z)) }
+            func floor(_ point: CGPoint) -> SCNVector3 {
+                view.unprojectPoint(SCNVector3(Float(point.x), Float(point.y), depth))
+            }
+            if gesture.state == .began {
+                let delta = gesture.translation(in: view)
+                let start = CGPoint(x: point.x - delta.x, y: point.y - delta.y)
+                guard let (node, id) = asset(at: start, in: view) else { return }
+                moving = (node, id, node.position, floor(start))
+            }
+            guard let drag = moving else { return }
+            switch gesture.state {
+            case .cancelled, .failed:
+                drag.node.position = drag.original
+                moving = nil
+            case .began, .changed, .ended:
+                let position = floor(point)
+                let x = drag.original.x + position.x - drag.anchor.x
+                let z = drag.original.z + position.z - drag.anchor.z
+                let valid = x.isFinite && z.isFinite
+                if valid { drag.node.position = SCNVector3(x, 0, z) }
+                if gesture.state == .ended {
+                    moving = nil
+                    if !valid || !parent.move(drag.id, Double(x), Double(z)) { drag.node.position = drag.original }
+                    parent.select(drag.id)
+                }
+            default: break
+            }
         }
     }
 }
