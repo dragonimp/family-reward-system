@@ -325,9 +325,11 @@ private struct NookRoomView: View {
             ToolbarItem(placement: .topBarTrailing) {
                 NookOrientationMenu { orientationError = true }.frame(width: 34, height: 34)
             }
-            Menu("房间操作", systemImage: "ellipsis.circle") {
-                Button("编辑房间", systemImage: "pencil") { editRoom = true }
-                Button("虚拟装修", systemImage: "paintpalette") { decorate = true }
+            ToolbarItem(placement: .topBarTrailing) {
+                Menu("房间操作", systemImage: "ellipsis.circle") {
+                    Button("编辑房间", systemImage: "pencil") { editRoom = true }
+                    Button("虚拟装修", systemImage: "paintpalette") { decorate = true }
+                }
             }
         }
         .fullScreenCover(item: $enlarged) { item in
