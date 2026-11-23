@@ -281,7 +281,11 @@ struct FamilyRoot: View {
     private var main: some View {
         Group {
             if activeTab == 4 {
-                AccountView(store: store, notifications: notifications)
+                VStack(spacing: 0) {
+                    AccountView(store: store, notifications: notifications)
+                        .frame(maxHeight: .infinity)
+                    bottomTabs.fixedSize(horizontal: false, vertical: true)
+                }
             } else if activeTab == 5 {
                 if let account = identity.accountIdentifier, !account.isEmpty {
                     NookView(account: account, title: store.displayModuleName("nook")).id(account)
@@ -292,7 +296,9 @@ struct FamilyRoot: View {
                 businessPager
             }
         }
-        .safeAreaInset(edge: .bottom, spacing: 0) { bottomTabs }
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            if activeTab != 4 { bottomTabs }
+        }
         .task(id: activeTab) {
             if activeTab == 3 && exerciseEnabled { await store.openWatchExerciseMode() }
         }
