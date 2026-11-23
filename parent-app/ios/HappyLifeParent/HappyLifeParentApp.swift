@@ -272,9 +272,12 @@ struct FamilyRoot: View {
             case "exercise":
             Group { if store.ready { ExerciseView(userID: store.profile?.text("unifiedUserId") ?? "").id(store.profile?.text("unifiedUserId") ?? "") } else { growthUnavailable } }.tag(3)
             case "nook":
-                NavigationStack {
-                    Form { ModuleNameButton(store: store, key: "nook") }
-                        .navigationTitle(Text(verbatim: store.displayModuleName("nook")))
+                Group {
+                    if let account = identity.accountIdentifier, !account.isEmpty {
+                        NookView(account: account, title: store.displayModuleName("nook")).id(account)
+                    } else {
+                        ProgressView()
+                    }
                 }.tag(5)
                 default: EmptyView()
                 }
