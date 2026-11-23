@@ -104,6 +104,22 @@ struct FamilyRoot: View {
     @ObservedObject var identity: AgentIdentitySession
     @ObservedObject var notifications: MomentNotifications
     @State private var selectedTab = 0
+    @AppStorage("moment.nook.names") private var nookNamesData = Data()
+    private var nookName: String {
+        guard let account = identity.accountIdentifier else { return "小小窝🐌" }
+        return nookNames[account] ?? "小小窝🐌"
+    }
+    private var nookNames: [String: String] {
+        (try? JSONDecoder().decode([String: String].self, from: nookNamesData)) ?? [:]
+    }
+    private func saveNookName(_ value: String) {
+        guard let account = identity.accountIdentifier, !account.isEmpty else { return }
+        var names = nookNames
+        let clean = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        names[account] = clean.isEmpty ? nil : String(clean.prefix(16))
+        if let data = try? JSONEncoder().encode(names) { nookNamesData = data }
+    }
+
     private var diningEnabled: Bool { get { store.moduleSections["dining"] ?? true } nonmutating set { Task { await store.setModule("dining", enabled: newValue) } } }
     private var growthEnabled: Bool { get { store.moduleSections["growth"] ?? true } nonmutating set { Task { await store.setModule("growth", enabled: newValue) } } }
     private var activitiesEnabled: Bool { get { store.moduleSections["activities"] ?? true } nonmutating set { Task { await store.setModule("activities", enabled: newValue) } } }
@@ -187,6 +203,50 @@ struct FamilyRoot: View {
                     }.padding().navigationTitle("Linko Moment")
                 }
     }
+    private var bottomTabs: some View {
+        HStack(spacing: 0) {
+            ForEach(store.moduleOrder, id: \.self) { key in
+                switch key {
+                case "dining" where diningEnabled: bottomTab(0, "干饭", "fork.knife")
+                case "growth" where growthEnabled:
+                    bottomTab(1, "带娃", "person.3.fill", badge: store.requests.filter { $0.text("status") == "pending" }.count)
+                case "activities" where activitiesEnabled: bottomTab(2, "活动", "photo.on.rectangle.angled")
+                case "exercise" where exerciseEnabled: bottomTab(3, "运动", "figure.walk")
+                default: EmptyView()
+                }
+            }
+            bottomTab(5, nookName, "house")
+            bottomTab(4, "我的", "person.crop.circle", badge: notifications.unreadCount)
+        }
+        .padding(.top, 4)
+        .background(.regularMaterial)
+        .overlay(alignment: .top) { Divider() }
+    }
+    private func bottomTab(_ tab: Int, _ name: String, _ icon: String, badge: Int = 0) -> some View {
+        let title = tab == 5 ? name : AgentIdentityLanguage.appBundle().localizedString(forKey: name, value: name, table: nil)
+        return Button {
+            selectedTab = tab
+        } label: {
+            VStack(spacing: 4) {
+                Image(systemName: icon).font(.system(size: 21))
+                    .overlay(alignment: .topTrailing) {
+                        if badge > 0 {
+                            Text(badge > 99 ? "99+" : String(badge))
+                                .font(.system(size: 9, weight: .bold)).padding(3)
+                                .foregroundStyle(.white).background(.red, in: Capsule())
+                                .offset(x: 10, y: -5)
+                        }
+                    }
+                Text(verbatim: title).font(.caption2).lineLimit(1).padding(.horizontal, 2)
+            }
+            .frame(maxWidth: .infinity, minHeight: 48)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .foregroundStyle(selectedTab == tab ? Color.accentColor : Color.secondary)
+        .accessibilityLabel(badge > 0 ? "\(title), \(badge)" : title)
+        .accessibilityAddTraits(selectedTab == tab ? .isSelected : [])
+    }
     private var main: some View {
         TabView(selection: $selectedTab) {
             ForEach(store.moduleOrder, id: \.self) { key in
@@ -198,19 +258,27 @@ struct FamilyRoot: View {
                 } else {
                     ProgressView()
                 }
-            }.tabItem { Label(String(localized: "干饭", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), systemImage: "fork.knife") }.tag(0)
+            }.tag(0)
             case "growth" where growthEnabled:
-            Group { if store.ready { FamilyHome(store: store) } else { growthUnavailable } }.tabItem { Label(String(localized: "带娃", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), systemImage: "person.3.fill") }
-                .badge(store.requests.filter { $0.text("status") == "pending" }.count).tag(1)
+            Group { if store.ready { FamilyHome(store: store) } else { growthUnavailable } }
+                .tag(1)
             case "activities" where activitiesEnabled:
-            DearSocialView(isActive: selectedTab == 2, store: store).tabItem { Label(String(localized: "活动", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), systemImage: "photo.on.rectangle.angled") }.tag(2)
+            DearSocialView(isActive: selectedTab == 2, store: store).tag(2)
             case "exercise" where exerciseEnabled:
-            Group { if store.ready { ExerciseView(userID: store.profile?.text("unifiedUserId") ?? "").id(store.profile?.text("unifiedUserId") ?? "") } else { growthUnavailable } }.tabItem { Label(String(localized: "运动", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), systemImage: "figure.walk") }.tag(3)
+            Group { if store.ready { ExerciseView(userID: store.profile?.text("unifiedUserId") ?? "").id(store.profile?.text("unifiedUserId") ?? "") } else { growthUnavailable } }.tag(3)
                 default: EmptyView()
                 }
             }
-            AccountView(store: store, notifications: notifications).tabItem { Label(String(localized: "我的", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), systemImage: "person.crop.circle") }.badge(notifications.unreadCount).tag(4)
+            NavigationStack {
+                Form {
+                    NookNameSection(name: nookName, save: saveNookName)
+                        .id(identity.accountIdentifier)
+                }.navigationTitle(nookName)
+            }.tag(5)
+            AccountView(store: store, notifications: notifications, nookName: nookName, saveNookName: saveNookName).tag(4)
         }
+        .tabViewStyle(.page(indexDisplayMode: .never))
+        .safeAreaInset(edge: .bottom, spacing: 0) { bottomTabs }
         .task(id: selectedTab) {
             if selectedTab == 3 && exerciseEnabled { await store.openWatchExerciseMode() }
         }
@@ -589,6 +657,8 @@ struct AccountView: View {
     @EnvironmentObject private var language: AgentIdentityLanguageStore
     @ObservedObject var store: FamilyStore
     @ObservedObject var notifications: MomentNotifications
+    let nookName: String
+    let saveNookName: (String) -> Void
     @Environment(\.openURL) private var openURL
     @State private var logout = false
     @State private var deleteAccount = false
@@ -632,7 +702,7 @@ struct AccountView: View {
                 Section(String(localized: "应用与设置", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) {
                     NavigationLink { ExerciseWatchConnectionView(family: store) } label: { Label(String(localized: "连接手表", bundle: AgentIdentityLanguage.appBundle()), systemImage: "applewatch") }
 
-                    NavigationLink { MomentSectionSettings(store: store) } label: { Label(String(localized: "栏目设置", bundle: AgentIdentityLanguage.appBundle()), systemImage: "square.grid.2x2") }
+                    NavigationLink { MomentSectionSettings(store: store, nookName: nookName, saveNookName: saveNookName) } label: { Label(String(localized: "栏目设置", bundle: AgentIdentityLanguage.appBundle()), systemImage: "square.grid.2x2") }
                     NavigationLink { FamilyChatView(store: store) } label: {
                         Label(String(localized: "AI 对话", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), systemImage: "bubble.left.and.bubble.right.fill")
                     }
@@ -1382,8 +1452,11 @@ func momentDisplayError(_ error: Error) -> String {
 
 private struct MomentSectionSettings: View {
     @ObservedObject var store: FamilyStore
+    let nookName: String
+    let saveNookName: (String) -> Void
     var body: some View {
         Form {
+            NookNameSection(name: nookName, save: saveNookName)
             ForEach(store.moduleOrder, id: \.self) { key in
                 Toggle(["dining": String(localized: "干饭", bundle: AgentIdentityLanguage.appBundle()), "growth": String(localized: "带娃", bundle: AgentIdentityLanguage.appBundle()), "activities": String(localized: "活动", bundle: AgentIdentityLanguage.appBundle()), "exercise": String(localized: "运动", bundle: AgentIdentityLanguage.appBundle())][key] ?? key,
                        isOn: Binding(get: { store.moduleSections[key] ?? true }, set: { value in Task { await store.setModule(key, enabled: value) } }))
@@ -1400,5 +1473,34 @@ private struct MomentSectionSettings: View {
             Button("重新同步") { Task { await store.refreshModulePreferences() } }
         }.navigationTitle(String(localized: "栏目设置", bundle: AgentIdentityLanguage.appBundle()))
             .task { await store.refreshModulePreferences() }
+    }
+}
+
+private struct NookNameSection: View {
+    let name: String
+    let save: (String) -> Void
+    @State private var editing = false
+    @State private var draft = ""
+
+    var body: some View {
+        Section {
+            Button {
+                draft = name
+                editing = true
+            } label: {
+                LabeledContent {
+                    Text(verbatim: name).lineLimit(1)
+                } label: {
+                    Label("修改栏目名称", systemImage: "pencil")
+                }
+            }
+            .alert("修改栏目名称", isPresented: $editing) {
+                TextField("小小窝🐌", text: $draft)
+                Button("取消", role: .cancel) {}
+                Button("保存") { save(draft) }
+            } message: {
+                Text("最多 16 个字符，留空恢复默认名称。")
+            }
+        }
     }
 }
