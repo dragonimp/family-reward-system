@@ -229,15 +229,34 @@ struct FamilyRoot: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .foregroundStyle(selectedTab == tab ? Color.accentColor : Color.secondary)
+        .foregroundStyle(activeTab == tab ? Color.accentColor : Color.secondary)
         .accessibilityLabel(badge > 0 ? "\(title), \(badge)" : title)
-        .accessibilityAddTraits(selectedTab == tab ? .isSelected : [])
+        .accessibilityAddTraits(activeTab == tab ? .isSelected : [])
     }
-    private var main: some View {
+    private var enabledBusinessTabs: [String] {
+        store.moduleOrder.filter { store.isModuleEnabled($0) }
+    }
+
+    private func tabTag(for key: String) -> Int? {
+        switch key {
+        case "dining": 0
+        case "growth": 1
+        case "activities": 2
+        case "exercise": 3
+        case "nook": 5
+        default: nil
+        }
+    }
+
+    private var activeTab: Int {
+        enabledBusinessTabs.contains { tabTag(for: $0) == selectedTab } ? selectedTab : 4
+    }
+
+    private var businessPager: some View {
         TabView(selection: $selectedTab) {
-            ForEach(store.moduleOrder, id: \.self) { key in
+            ForEach(enabledBusinessTabs, id: \.self) { key in
                 switch key {
-            case "dining" where diningEnabled:
+            case "dining":
             Group {
                 if let account = identity.accountIdentifier, !account.isEmpty {
                     DiningModesView(userID: account, family: store).id(account)
@@ -245,14 +264,14 @@ struct FamilyRoot: View {
                     ProgressView()
                 }
             }.tag(0)
-            case "growth" where growthEnabled:
+            case "growth":
             Group { if store.ready { FamilyHome(store: store) } else { growthUnavailable } }
                 .tag(1)
-            case "activities" where activitiesEnabled:
+            case "activities":
             DearSocialView(isActive: selectedTab == 2, store: store).tag(2)
-            case "exercise" where exerciseEnabled:
+            case "exercise":
             Group { if store.ready { ExerciseView(userID: store.profile?.text("unifiedUserId") ?? "").id(store.profile?.text("unifiedUserId") ?? "") } else { growthUnavailable } }.tag(3)
-            case "nook" where nookEnabled:
+            case "nook":
                 NavigationStack {
                     Form { ModuleNameButton(store: store, key: "nook") }
                         .navigationTitle(Text(verbatim: store.displayModuleName("nook")))
@@ -260,12 +279,21 @@ struct FamilyRoot: View {
                 default: EmptyView()
                 }
             }
-            AccountView(store: store, notifications: notifications).tag(4)
         }
         .tabViewStyle(.page(indexDisplayMode: .never))
+    }
+
+    private var main: some View {
+        Group {
+            if activeTab == 4 {
+                AccountView(store: store, notifications: notifications)
+            } else {
+                businessPager
+            }
+        }
         .safeAreaInset(edge: .bottom, spacing: 0) { bottomTabs }
-        .task(id: selectedTab) {
-            if selectedTab == 3 && exerciseEnabled { await store.openWatchExerciseMode() }
+        .task(id: activeTab) {
+            if activeTab == 3 && exerciseEnabled { await store.openWatchExerciseMode() }
         }
         .onChange(of: store.pendingExerciseContinuation) { _, value in if value != nil { exerciseEnabled = true; selectedTab = 3 } }
         .onChange(of: store.pendingExerciseActivity) { _, value in if value != nil { exerciseEnabled = true; selectedTab = 3 } }
@@ -274,12 +302,8 @@ struct FamilyRoot: View {
         }
         .onAppear { if store.pendingActivityLink != nil { activitiesEnabled = true; selectedTab = 2 } }
         .onChange(of: store.pendingActivityLink?.id) { _, id in if id != nil { activitiesEnabled = true; selectedTab = 2 } }
-        .onChange(of: [diningEnabled, growthEnabled, activitiesEnabled, exerciseEnabled, true, nookEnabled]) { _, enabled in
-            if enabled.indices.contains(selectedTab) && !enabled[selectedTab] { selectedTab = 4 }
-        }
-        .onAppear {
-            let enabled = [diningEnabled, growthEnabled, activitiesEnabled, exerciseEnabled, true, nookEnabled]
-            if enabled.indices.contains(selectedTab) && !enabled[selectedTab] { selectedTab = 4 }
+        .onChange(of: enabledBusinessTabs) { _, _ in
+            if activeTab == 4 && selectedTab != 4 { selectedTab = 4 }
         }
     }
 }
