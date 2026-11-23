@@ -609,9 +609,9 @@ private struct NookScene: UIViewRepresentable {
         coordinator.lastOverhead = overhead
         coordinator.sceneKey = sceneKey
         let scene = SCNScene()
-        scene.background.contents = UIColor(red: 0.88, green: 0.90, blue: 0.91, alpha: 1)
-        let wall: UIColor = room.finish.wall == "灰绿" ? UIColor(red: 0.66, green: 0.75, blue: 0.68, alpha: 1) :
-            room.finish.wall == "浅蓝" ? UIColor(red: 0.69, green: 0.77, blue: 0.85, alpha: 1) : UIColor(red: 0.93, green: 0.89, blue: 0.82, alpha: 1)
+        scene.background.contents = UIColor(red: 0.88, green: 0.92, blue: 0.82, alpha: 1)
+        let wall: UIColor = room.finish.wall == "灰绿" ? UIColor(red: 0.76, green: 0.85, blue: 0.66, alpha: 1) :
+            room.finish.wall == "浅蓝" ? UIColor(red: 0.72, green: 0.84, blue: 0.91, alpha: 1) : UIColor(red: 0.99, green: 0.89, blue: 0.73, alpha: 1)
         let wood = room.finish.floor == "木地板"
         let floor = box(scene, width: room.length, height: 0.10, depth: room.width, at: SCNVector3(0,-0.05,0),
                         color: wood ? UIColor(red: 0.73, green: 0.56, blue: 0.40, alpha: 1) : .systemGray4)
@@ -621,13 +621,7 @@ private struct NookScene: UIViewRepresentable {
             material.diffuse.wrapT = .repeat
             material.diffuse.contentsTransform = SCNMatrix4MakeScale(Float(max(1, room.length / 1.8)), 5, 1)
         }
-        if !isolated {
-            let trim = UIColor(red: 0.94, green: 0.93, blue: 0.89, alpha: 1)
-            box(scene, width: 0.08, height: room.height, depth: room.width, at: SCNVector3(-room.length/2-0.04,room.height/2,0), color: wall)
-            box(scene, width: room.length, height: room.height, depth: 0.08, at: SCNVector3(0,room.height/2,-room.width/2-0.04), color: wall)
-            box(scene, width: 0.035, height: 0.10, depth: room.width, at: SCNVector3(-room.length/2,0.05,0), color: trim)
-            box(scene, width: room.length, height: 0.10, depth: 0.035, at: SCNVector3(0,0.05,-room.width/2), color: trim)
-        }
+        if !isolated { addDollhouseShell(to: scene, wall: wall) }
         for item in room.items { scene.rootNode.addChildNode(assetNode(item)) }
         let camera = SCNNode()
         camera.camera = SCNCamera()
@@ -639,28 +633,81 @@ private struct NookScene: UIViewRepresentable {
             camera.camera?.usesOrthographicProjection = true
             camera.camera?.orthographicScale = zoom ?? extent * 1.35
         } else {
-            camera.position = SCNVector3(extent * 0.95, extent * 0.95, extent * 1.3)
-            camera.look(at: SCNVector3(0, room.height/4, 0))
+            camera.camera?.usesOrthographicProjection = true
+            camera.camera?.orthographicScale = max(room.height, (room.length + room.width) * 0.70)
+            camera.position = SCNVector3(extent * 1.35, extent * 1.30, extent * 1.35)
+            camera.look(at: SCNVector3(0, room.height * 0.30, 0))
         }
         scene.rootNode.addChildNode(camera)
         let ambient = SCNNode()
         ambient.light = SCNLight()
         ambient.light?.type = .ambient
-        ambient.light?.intensity = 390
+        ambient.light?.intensity = 530
         ambient.light?.color = room.finish.light == "暖色" ? UIColor(red: 1, green: 0.81, blue: 0.62, alpha: 1) : UIColor.white
         scene.rootNode.addChildNode(ambient)
         let key = SCNNode()
         key.light = SCNLight()
         key.light?.type = .directional
-        key.light?.intensity = 780
+        key.light?.intensity = 930
         key.light?.castsShadow = true
         key.light?.shadowRadius = 4
         key.light?.shadowSampleCount = 8
-        key.light?.shadowColor = UIColor.black.withAlphaComponent(0.23)
+        key.light?.shadowColor = UIColor(red: 0.28, green: 0.20, blue: 0.14, alpha: 0.22)
         key.eulerAngles = SCNVector3(-0.9, -0.55, 0)
         scene.rootNode.addChildNode(key)
         view.scene = scene
         view.pointOfView = camera
+    }
+
+    private func addDollhouseShell(to scene: SCNScene, wall: UIColor) {
+        let trim = UIColor(red: 1, green: 0.95, blue: 0.84, alpha: 1)
+        let edge = UIColor(red: 0.67, green: 0.44, blue: 0.29, alpha: 1)
+        let left = -room.length / 2
+        let back = -room.width / 2
+        let border = min(0.13, min(room.length, room.width) * 0.07)
+        let depth = border * 1.55
+        let rail = min(0.09, room.height * 0.055)
+
+        // A cutaway shell leaves the working floor and all existing placements untouched.
+        box(scene, width: room.length + border * 2, height: depth, depth: room.width + border * 2,
+            at: SCNVector3(0, -0.10-depth/2, 0), color: edge)
+        box(scene, width: border, height: room.height, depth: room.width + border,
+            at: SCNVector3(left-border/2, room.height/2, -border/2), color: wall)
+        box(scene, width: room.length + border, height: room.height, depth: border,
+            at: SCNVector3(-border/2, room.height/2, back-border/2), color: wall)
+        for fraction in [0.025, 0.36, 0.975] {
+            let y = room.height * fraction
+            box(scene, width: border * 1.2, height: rail, depth: room.width + border,
+                at: SCNVector3(left-border/2, y, -border/2), color: trim)
+            box(scene, width: room.length + border, height: rail, depth: border * 1.2,
+                at: SCNVector3(-border/2, y, back-border/2), color: trim)
+        }
+        if !overhead {
+            addWallPanels(to: scene, back: back, border: border, trim: trim)
+        }
+    }
+
+    private func addWallPanels(to scene: SCNScene, back: Double, border: Double, trim: UIColor) {
+        let panelWidth = min(room.length * 0.24, 1.05)
+        let panelHeight = room.height * 0.31
+        let position = room.length * 0.18
+        let y = room.height * 0.69
+        let glass = UIColor(red: 0.67, green: 0.85, blue: 0.86, alpha: 1)
+        let seam = min(0.035, panelWidth * 0.08)
+        box(scene, width: panelWidth, height: panelHeight, depth: border * 0.30,
+            at: SCNVector3(position, y, back + border * 0.12), color: trim)
+        for x in [-1.0, 1.0] {
+            for level in [-1.0, 1.0] {
+                box(scene, width: panelWidth / 2 - seam * 2, height: panelHeight / 2 - seam * 2, depth: seam,
+                    at: SCNVector3(position + x * panelWidth / 4, y + level * panelHeight / 4, back + border * 0.29), color: glass)
+            }
+        }
+        let artX = -room.length * 0.20
+        box(scene, width: panelWidth * 0.65, height: panelHeight * 0.76, depth: border * 0.30,
+            at: SCNVector3(artX, y, back + border * 0.12), color: trim)
+        box(scene, width: panelWidth * 0.51, height: panelHeight * 0.60, depth: seam,
+            at: SCNVector3(artX, y, back + border * 0.29),
+            color: UIColor(red: 0.86, green: 0.63, blue: 0.67, alpha: 1))
     }
 
     private var sceneKey: Data? {
@@ -715,9 +762,9 @@ private struct NookScene: UIViewRepresentable {
         root.eulerAngles.y = Float(-item.rotation * .pi / 180)
         root.scale = SCNVector3(item.length * item.scale / 100, item.height * item.scale / 100, item.width * item.scale / 100)
         root.opacity = item.preview ? 0.58 : 1
-        let wood = UIColor(red: 0.52, green: 0.34, blue: 0.21, alpha: 1)
-        let fabric = UIColor(red: 0.30, green: 0.44, blue: 0.43, alpha: 1)
-        let pale = UIColor(red: 0.92, green: 0.87, blue: 0.78, alpha: 1)
+        let wood = UIColor(red: 0.74, green: 0.49, blue: 0.29, alpha: 1)
+        let fabric = UIColor(red: 0.42, green: 0.68, blue: 0.61, alpha: 1)
+        let pale = UIColor(red: 0.98, green: 0.91, blue: 0.79, alpha: 1)
         func part(_ w: CGFloat, _ h: CGFloat, _ d: CGFloat, _ y: Float, _ color: UIColor, x: Float = 0, z: Float = 0) {
             let shape = SCNBox(width: w, height: h, length: d, chamferRadius: min(0.055, min(w, min(h, d)) / 4))
             shape.firstMaterial?.diffuse.contents = color
@@ -730,7 +777,9 @@ private struct NookScene: UIViewRepresentable {
         switch item.appearance {
         case .sofa:
             part(1, 0.28, 0.92, 0.20, fabric)
-            part(0.78, 0.18, 0.70, 0.41, pale, z: 0.10)
+            for x: Float in [-0.25, 0, 0.25] { part(0.24, 0.15, 0.68, 0.42, pale, x: x, z: 0.10) }
+            part(0.19, 0.24, 0.14, 0.61, UIColor(red: 0.94, green: 0.68, blue: 0.46, alpha: 1), x: -0.27, z: -0.23)
+            part(0.19, 0.24, 0.14, 0.61, UIColor(red: 0.90, green: 0.66, blue: 0.73, alpha: 1), x: 0.27, z: -0.23)
             part(1, 0.64, 0.16, 0.68, fabric, z: -0.41)
             for x: Float in [-0.43, 0.43] { part(0.14, 0.44, 0.85, 0.47, fabric, x: x) }
         case .table:
@@ -745,7 +794,7 @@ private struct NookScene: UIViewRepresentable {
             part(0.78, 0.13, 0.20, 0.60, .white, z: -0.27)
             part(0.96, 0.09, 0.59, 0.57, fabric, z: 0.18)
         case .appliance:
-            part(0.97, 0.97, 0.87, 0.5, .lightGray)
+            part(0.97, 0.97, 0.87, 0.5, UIColor(red: 0.70, green: 0.83, blue: 0.87, alpha: 1))
             part(0.94, 0.70, 0.09, 0.63, .systemGray3, z: 0.44)
             part(0.04, 0.26, 0.04, 0.59, .darkGray, x: -0.30, z: 0.48)
         case .cabinet:
