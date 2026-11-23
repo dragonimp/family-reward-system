@@ -537,7 +537,7 @@ private struct DearActivityMapView: View {
                 }
                 .frame(height: 112)
             }
-            if !embedded && !membersOnly {
+            if !embedded && !visiblePoints.isEmpty {
             List(visiblePoints) { point in
                 Button {
                     selectedPointID = point.id
@@ -1328,9 +1328,13 @@ struct DearSocialView: View {
         .overlay(alignment: .bottom) { Divider() }
     }
 
+    private var activityCaptures: [DearCapturedMedia] {
+        capturedMedia.filter { $0.target.activityID == activityId && $0.target.spaceID == activityTenantId && $0.target.accountID == store.identity.accountIdentifier }
+    }
+
     private var activityPhotoSection: some View {
         Section {
-            ForEach(capturedMedia.filter { $0.target.activityID == activityId && $0.target.spaceID == activityTenantId && $0.target.accountID == store.identity.accountIdentifier }) { capture in
+            ForEach(activityCaptures) { capture in
                 Text(savingCaptures.contains(capture.id) ? "正在保存拍摄内容…" : "这项拍摄内容尚未加入同步队列，可以重试或另存。")
                     .font(.caption).foregroundStyle(.secondary)
                 HStack {
@@ -1403,19 +1407,6 @@ struct DearSocialView: View {
 
     private var activityTimelineSection: some View {
         Section {
-            if photoViewMode == "map" {
-                DearActivityMapView(locations: locations, store: store, title: selectedActivity?.text("title") ?? "",
-                                    spaceID: activityTenantId, activityID: activityId,
-                                    points: DearActivityMapPoint.points(checkIns: checkIns, photos: photos), photos: photos,
-                                    initialMembersOnly: false, embedded: true)
-                    .frame(height: 460)
-                    .listRowInsets(EdgeInsets())
-                    .id(activityId)
-                ForEach(activityDrafts.filter { $0.lastError != nil }) { draft in
-                    MomentPendingActivityRow(source: store.photoSource, draft: draft)
-                }
-            } else {
-
             if photoViewMode == "tiles" {
                 ForEach(Array(photoGridRows.enumerated()), id: \.offset) { _, row in
                     HStack(alignment: .top, spacing: 4) {
@@ -1446,49 +1437,52 @@ struct DearSocialView: View {
                 if busy { ProgressView("正在异步加载活动照片与动态…").font(.subheadline) }
                 else { Text("还没有动态，拍照、写日常或打卡，留下活动的第一刻。").foregroundStyle(.secondary).font(.subheadline) }
             }
-            }
         } header: {
-            HStack {
-                Text(String(localized: "活动动态", bundle: AgentIdentityLanguage.appBundle()))
-                let pendingCount = activityDrafts.filter { $0.lastError == nil }.count
-                if pendingCount > 0 {
-                    Label("\(pendingCount) 项待同步", systemImage: "arrow.triangle.2.circlepath")
-                        .font(.caption2).foregroundStyle(.secondary)
-                }
-                Spacer()
-                Button {
-                    if sharingSelectedOriginals {
-                        Task { await downloadSelectedPhotos(share: true) }
-                    } else {
-                        if photoViewMode == "map" { photoViewMode = "tiles" }
-                        selectingPhotoDownloads = true
-                        sharingSelectedOriginals = true
-                        selectedPhotoIDs.removeAll()
-                        batchOriginalURLs = []
-                        batchDownloadError = ""
-                    }
-                } label: {
-                    Image(systemName: "square.and.arrow.up")
-                }
-                .accessibilityLabel(sharingSelectedOriginals ? "分享选中的原文件" : "批量分享原文件")
-                .disabled(photos.isEmpty || batchDownloading || batchDeleting || (sharingSelectedOriginals && selectedPhotoIDs.isEmpty))
-                if sharingSelectedOriginals {
-                    Button("退出多选", systemImage: "xmark.circle") { exitPhotoShareSelection() }
-                        .labelStyle(.iconOnly)
-                        .disabled(batchDownloading || batchDeleting || savingBatchToPhotos)
-                }
-                Menu {
-                    Button(String(localized: "大图", bundle: AgentIdentityLanguage.appBundle()), systemImage: "rectangle") { photoViewMode = "grid" }
-                    Button(String(localized: "紧凑", bundle: AgentIdentityLanguage.appBundle()), systemImage: "list.bullet") { photoViewMode = "list" }
-                    Button(String(localized: "网格 · 每行5张", bundle: AgentIdentityLanguage.appBundle()), systemImage: "square.grid.3x3") { photoViewMode = "tiles" }
-                    Button(String(localized: "地图", bundle: AgentIdentityLanguage.appBundle()), systemImage: "map") {
-                        exitPhotoShareSelection()
-                        photoViewMode = "map"
-                    }
-                } label: { Image(systemName: "slider.horizontal.3") }
-                .accessibilityLabel(String(localized: "展示样式", bundle: AgentIdentityLanguage.appBundle()))
-            }.textCase(nil)
+            activityTimelineHeader
         }
+    }
+
+    private var activityTimelineHeader: some View {
+        HStack {
+        Text(String(localized: "活动动态", bundle: AgentIdentityLanguage.appBundle()))
+        let pendingCount = activityDrafts.filter { $0.lastError == nil }.count
+        if pendingCount > 0 {
+            Label("\(pendingCount) 项待同步", systemImage: "arrow.triangle.2.circlepath")
+                .font(.caption2).foregroundStyle(.secondary)
+        }
+        Spacer()
+        Button {
+            if sharingSelectedOriginals {
+                Task { await downloadSelectedPhotos(share: true) }
+            } else {
+                if photoViewMode == "map" { photoViewMode = "tiles" }
+                selectingPhotoDownloads = true
+                sharingSelectedOriginals = true
+                selectedPhotoIDs.removeAll()
+                batchOriginalURLs = []
+                batchDownloadError = ""
+            }
+        } label: {
+            Image(systemName: "square.and.arrow.up")
+        }
+        .accessibilityLabel(sharingSelectedOriginals ? "分享选中的原文件" : "批量分享原文件")
+        .disabled(photos.isEmpty || batchDownloading || batchDeleting || (sharingSelectedOriginals && selectedPhotoIDs.isEmpty))
+        if sharingSelectedOriginals {
+            Button("退出多选", systemImage: "xmark.circle") { exitPhotoShareSelection() }
+                .labelStyle(.iconOnly)
+                .disabled(batchDownloading || batchDeleting || savingBatchToPhotos)
+        }
+        Menu {
+            Button(String(localized: "大图", bundle: AgentIdentityLanguage.appBundle()), systemImage: "rectangle") { photoViewMode = "grid" }
+            Button(String(localized: "紧凑", bundle: AgentIdentityLanguage.appBundle()), systemImage: "list.bullet") { photoViewMode = "list" }
+            Button(String(localized: "网格 · 每行5张", bundle: AgentIdentityLanguage.appBundle()), systemImage: "square.grid.3x3") { photoViewMode = "tiles" }
+            Button(String(localized: "地图", bundle: AgentIdentityLanguage.appBundle()), systemImage: "map") {
+                exitPhotoShareSelection()
+                photoViewMode = "map"
+            }
+        } label: { Image(systemName: "slider.horizontal.3") }
+        .accessibilityLabel(String(localized: "展示样式", bundle: AgentIdentityLanguage.appBundle()))
+        }.textCase(nil)
     }
 
     private func activityRecordRow(_ entry: DearTimelineEntry) -> some View {
@@ -1541,15 +1535,66 @@ struct DearSocialView: View {
 
     }
 
-    private var activityDetail: some View {
-        List {
-            if !notice.isEmpty { Section { Text(notice).foregroundStyle(.teal) } }
-            if selectedActivity != nil {
-                activityPhotoSection
-                activityTimelineSection
+    @State private var showingMapSyncDetails = false
+
+    private var activityMapMode: some View {
+        let failed = activityDrafts.filter { $0.lastError != nil }
+        return VStack(spacing: 0) {
+            HStack(spacing: 12) {
+                activityTimelineHeader
+                if !failed.isEmpty || !activityCaptures.isEmpty {
+                    Button { showingMapSyncDetails = true } label: {
+                        Image(systemName: "exclamationmark.circle").foregroundStyle(.orange)
+                    }
+                    .accessibilityLabel("查看同步失败项目")
+                }
+            }
+            .font(.subheadline)
+            .padding(.horizontal, 16)
+            .padding(.vertical, 8)
+            if !notice.isEmpty {
+                Text(notice).font(.caption).foregroundStyle(.teal).padding(.horizontal, 16)
+            }
+            DearActivityMapView(locations: locations, store: store, title: selectedActivity?.text("title") ?? "",
+                                spaceID: activityTenantId, activityID: activityId,
+                                points: DearActivityMapPoint.points(checkIns: checkIns, photos: photos), photos: photos,
+                                initialMembersOnly: false, embedded: true)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .id(activityTenantId + "/" + activityId)
+        }
+        .sheet(isPresented: $showingMapSyncDetails) {
+            NavigationStack {
+                List {
+                    if !activityCaptures.isEmpty { activityPhotoSection }
+                    ForEach(failed) { draft in
+                        MomentPendingActivityRow(source: store.photoSource, draft: draft)
+                    }
+                }
+                .navigationTitle("同步状态")
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    Button("完成") { showingMapSyncDetails = false }
+                }
             }
         }
-        .listStyle(.insetGrouped)
+    }
+
+    private var activityDetail: some View {
+        Group {
+            if photoViewMode == "map", selectedActivity != nil {
+                activityMapMode
+            } else {
+                List {
+                    if !notice.isEmpty { Section { Text(notice).foregroundStyle(.teal) } }
+                    if selectedActivity != nil {
+                        activityPhotoSection
+                        activityTimelineSection
+                    }
+                }
+                .listStyle(.insetGrouped)
+                .readablePage()
+            }
+        }
         .safeAreaInset(edge: .top, spacing: 0) {
             if selectedActivity != nil { pinnedActivityOperations }
         }
@@ -1565,7 +1610,6 @@ struct DearSocialView: View {
             guard !Task.isCancelled else { return }
             exerciseArchive = snapshot
         }
-        .readablePage()
         .task(id: activityTenantId + activityId + photos.map(\.id).joined()) {
             let tenant = activityTenantId, activity = activityId, rows = photos.map(\.data)
             guard !tenant.isEmpty, !activity.isEmpty, !rows.isEmpty else { return }
