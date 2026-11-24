@@ -1,6 +1,7 @@
 import CoreTransferable
 import CryptoKit
 import UniformTypeIdentifiers
+import ImageIO
 import MapKit
 import Metal
 import PhotosUI
@@ -35,7 +36,7 @@ private extension NookRoom {
         if let door, abs(item.x - (door - 0.5) * length) < x + 0.45, width / 2 - item.z - z < 0.9 { return "物品占用门前空间。" }
         if let window, abs(item.x - (window - 0.5) * length) < x + 0.50,
            width / 2 + item.z - z < 0.35, item.height * item.scale / 100 > 90 / 100.0 { return "物品遮挡窗户。" }
-        if items.contains(where: { $0.id != item.id && $0.status != "已转出" && item.overlaps($0) }) { return "与另一件物品重叠。" }
+        if items.contains(where: { $0.id != item.id && $0.status != "已转出" && $0.awaitingPlacement != true && item.overlaps($0) }) { return "与另一件物品重叠。" }
         if wall < (aisle ?? 0.6) { return "物品与墙之间的距离小于过道阈值。" }
         return nil
     }
@@ -91,10 +92,22 @@ private struct NookItem: Codable, Identifiable {
     var condition: String?
     var note: String?
     var saleState: String?
+    var brand: String?
+    var awaitingPlacement: Bool?
+
+    static var newAsset: Self { Self(length: 0, width: 0, height: 0, awaitingPlacement: true) }
+
+    var validDimensions: Bool { [length, width, height].allSatisfy { (1...10000).contains($0) } }
+
+    mutating func setPhotos(_ photos: [Data]) {
+        let bounded = photos.prefix(9)
+        photo = bounded.first
+        extraPhotos = Array(bounded.dropFirst())
+    }
     var status: String { saleState ?? (idle ? "闲置" : "在用") }
     var photos: [Data] { (photo.map { [$0] } ?? []) + (extraPhotos ?? []) }
     var saleDescription: String {
-        "\(name)\n尺寸：\(Int(length)) × \(Int(width)) × \(Int(height)) cm\n参考售价：\(value.formatted(.currency(code: "CNY")))\n成色：\(condition ?? "未填写")\n\(note ?? "")"
+        "\(name)\n分类：\(category)\n品牌：\(brand ?? "未填写")\n尺寸：\(Int(length)) × \(Int(width)) × \(Int(height)) cm\n参考售价：\(value.formatted(.currency(code: "CNY")))\n成色：\(condition ?? "未填写")\n\(note ?? "")"
     }
 
     var appearance: NookMaterial {
@@ -328,11 +341,12 @@ private struct NookRoomView: View {
     @State private var warningDialog = false
     @State private var export: NookImage?
     @State private var exportError = false
-    @State private var cameraRevision = 0
     @AppStorage("moment.nook.grid") private var showGrid = false
     @AppStorage("moment.nook.snap") private var snap = false
     @State private var selected: UUID?
     @State private var itemDraft: NookItem?
+    @State private var savedAsset: UUID?
+    @State private var placementPrompt = false
     @State private var enlarged: NookItem?
     @State private var editRoom = false
     @State private var decorate = false
@@ -369,17 +383,15 @@ private struct NookRoomView: View {
             }, select: { id in
                 selected = id
             }, grid: showGrid, snap: snap)
-            .id(cameraRevision)
             .frame(height: height)
             .clipShape(RoundedRectangle(cornerRadius: 20))
-            HStack {
-                Button("俯视图", systemImage: "view.2d") { overhead = true; cameraRevision += 1 }
-                Spacer()
-                Button("等距视角", systemImage: "view.3d") { overhead = false; cameraRevision += 1 }
-            }.font(.caption)
+            Picker("视角", selection: $overhead) {
+                Text("2D俯视图").tag(true)
+                Text("3D等距视角").tag(false)
+            }.pickerStyle(.segmented)
             Toggle("俯视摆放", isOn: $overhead)
                 .accessibilityHint("开启后锁定正交俯视图，关闭后恢复 45° 等距视角")
-            Text("拖空白旋转 · 双指捏合缩放 · 双指平移 · 点选后拖动物品")
+            Text("拖动空白旋转视角 · 双指捏合缩放 · 双指平移画布 · 点选物品后拖动移位")
                 .font(.caption).foregroundStyle(.secondary)
             if let placementError {
                 Text(placementError).font(.caption).foregroundStyle(.orange)
@@ -411,10 +423,22 @@ private struct NookRoomView: View {
                     Button {
                         if batch {
                             if checked.contains(item.id) { checked.remove(item.id) } else { checked.insert(item.id) }
-                        } else { selected = item.id; overhead = true }
+                        } else { placeAsset(item.id) }
                     } label: {
-                        Label(item.name, systemImage: batch ? (checked.contains(item.id) ? "checkmark.circle.fill" : "circle") : (item.preview ? "cube.transparent" : "shippingbox.fill"))
-                            .foregroundStyle(item.preview ? Color.secondary : Color.primary)
+                        HStack {
+                            if !batch, let data = item.photo, let image = UIImage(data: data) {
+                                Image(uiImage: image).resizable().scaledToFill()
+                                    .frame(width: 42, height: 42).clipShape(.rect(cornerRadius: 8))
+                            } else {
+                                Image(systemName: batch ? (checked.contains(item.id) ? "checkmark.circle.fill" : "circle") :
+                                      (item.preview ? "cube.transparent" : "shippingbox.fill"))
+                            }
+                            VStack(alignment: .leading) {
+                                Text(item.name)
+                                Text(item.awaitingPlacement == true ? item.category + " · 待摆放" : item.category)
+                                    .font(.caption).foregroundStyle(.secondary)
+                            }
+                        }.foregroundStyle(item.preview ? Color.secondary : Color.primary)
                     }.buttonStyle(.borderless)
                     Spacer()
                     if !item.preview && item.status != "在用" { Text(item.status).font(.caption).foregroundStyle(.orange) }
@@ -444,7 +468,7 @@ private struct NookRoomView: View {
             if previewTab {
                 Button("添加意向商品预览", systemImage: "cube.transparent") { catalog = true }
             } else {
-                Button("录入自有物品", systemImage: "plus") { itemDraft = NookItem() }
+                Button("录入自有物品", systemImage: "plus") { itemDraft = .newAsset }
                 if room.items.contains(where: { $0.status == "已转出" }) {
                     NavigationLink("历史转出记录") {
                         List(room.items.filter { $0.status == "已转出" }) { item in
@@ -472,14 +496,28 @@ private struct NookRoomView: View {
                 }
             }
         }
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            Button {
+                itemDraft = .newAsset
+            } label: {
+                Label("拍照录入资产", systemImage: "camera.fill")
+                    .font(.subheadline.weight(.semibold))
+                    .frame(maxWidth: .infinity, minHeight: 44)
+            }
+            .buttonStyle(.borderedProminent)
+            .padding(.horizontal, 16).padding(.vertical, 6)
+            .background(.regularMaterial)
+        }
         .navigationTitle(Text(verbatim: room.name))
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 NookOrientationMenu { orientationError = true }.frame(width: 34, height: 34)
             }
             ToolbarItem(placement: .topBarTrailing) {
+                Button("房间设置", systemImage: "gearshape") { editRoom = true }
+            }
+            ToolbarItem(placement: .topBarTrailing) {
                 Menu("房间操作", systemImage: "ellipsis.circle") {
-                    Button("编辑房间", systemImage: "pencil") { editRoom = true }
                     Button("虚拟装修与摆放方案", systemImage: "paintpalette") { decorate = true }
                     Button("导出效果图", systemImage: "square.and.arrow.up") {
                         export = NookImage(room: room)
@@ -548,15 +586,29 @@ private struct NookRoomView: View {
         .sheet(isPresented: $decorate) {
             NookDecorationView(room: room, save: persist)
         }
-        .sheet(item: $itemDraft) { item in
-            NookItemForm(item: item) { item in
+        .sheet(item: $itemDraft, onDismiss: {
+            if savedAsset != nil { placementPrompt = true }
+        }) { item in
+            NookItemForm(item: item, room: room, photoFirst: item.awaitingPlacement == true && item.name.isEmpty) { item in
                 var next = room
                 if let index = next.items.firstIndex(where: { $0.id == item.id }) { next.items[index] = item }
                 else { next.items.append(item) }
                 guard persist(next) else { return false }
-                selected = item.id
+                if item.awaitingPlacement == true {
+                    previewTab = false
+                    filter = ""
+                    batch = false
+                    savedAsset = item.id
+                } else { selected = item.id }
                 return true
             }
+        }
+        .confirmationDialog("已录入自有资产", isPresented: $placementPrompt, titleVisibility: .visible) {
+            Button("直接放到房间") {
+                if let id = savedAsset { placeAsset(id) }
+                savedAsset = nil
+            }
+            Button("返回资产列表", role: .cancel) { savedAsset = nil }
         }
         .alert("当前窗口无法切换方向", isPresented: $orientationError) {
             Button("好", role: .cancel) {}
@@ -564,6 +616,18 @@ private struct NookRoomView: View {
             Text("请检查设备方向锁定。iPad 分屏时可调整窗口宽度。")
         }
         .alert("保存未完成", isPresented: $saveError) { Button("好", role: .cancel) {} }
+    }
+
+    private func placeAsset(_ id: UUID) {
+        guard let index = room.items.firstIndex(where: { $0.id == id }) else { return }
+        if room.items[index].awaitingPlacement == true {
+            var next = room
+            next.items[index].awaitingPlacement = false
+            guard persist(next) else { saveError = true; return }
+            placementError = next.placementWarning(next.items[index])
+        }
+        selected = id
+        overhead = true
     }
 
     private func persist(_ next: NookRoom) -> Bool {
@@ -583,10 +647,12 @@ private struct NookRoomView: View {
 private struct NookItemForm: View {
     @Environment(\.dismiss) private var dismiss
     @State var item: NookItem
+    let room: NookRoom
+    @State var photoFirst: Bool
     let save: (NookItem) -> Bool
+    @State private var roomPreview = false
     @State private var error = false
     @State private var camera = false
-    @State private var photo: PhotosPickerItem?
     @State private var recognitionStatus: String?
     @State private var recognizing = false
     @State private var unlockScale = false
@@ -598,112 +664,155 @@ private struct NookItemForm: View {
         recognizing = true
         defer { recognizing = false }
         do {
-            guard let data = try await load(), let image = UIImage(data: data) else {
-                recognitionStatus = "无法读取照片。"
+            guard let data = try await load(),
+                  let source = CGImageSourceCreateWithData(data as CFData, nil),
+                  let image = CGImageSourceCreateThumbnailAtIndex(source, 0, [
+                      kCGImageSourceCreateThumbnailFromImageAlways: true,
+                      kCGImageSourceCreateThumbnailWithTransform: true,
+                      kCGImageSourceThumbnailMaxPixelSize: 1280
+                  ] as CFDictionary),
+                  let jpeg = UIImage(cgImage: image).jpegData(compressionQuality: 0.73) else {
+                recognitionStatus = "无法读取照片，可继续手动填写。"
                 return
             }
-            let ratio = min(1, 720 / max(image.size.width, image.size.height))
-            let size = CGSize(width: max(1, image.size.width * ratio), height: max(1, image.size.height * ratio))
-            let format = UIGraphicsImageRendererFormat()
-            format.scale = 1
-            let thumb = UIGraphicsImageRenderer(size: size, format: format).image { _ in
-                image.draw(in: CGRect(origin: .zero, size: size))
+            guard item.photos.count < 9 else { return }
+            item.setPhotos(item.photos + [jpeg])
+            let needsName = item.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            let needsBrand = item.brand?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty != false
+            guard needsName || needsBrand else { return }
+            let suggestion = try await NookPhotoRecognition.suggest(jpeg, readBrand: needsBrand)
+            if needsBrand, item.brand?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty != false {
+                item.brand = suggestion.brand
             }
-            guard let jpeg = thumb.jpegData(compressionQuality: 0.72) else { throw CocoaError(.fileWriteUnknown) }
-            if item.photo == nil { item.photo = jpeg }
-            else if item.photos.count < 9 { item.extraPhotos = (item.extraPhotos ?? []) + [jpeg] }
-            if let candidate = try await NookPhotoRecognition.suggest(jpeg) {
-                if item.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { item.name = candidate.name; item.category = candidate.category }
-                recognitionStatus = "识别建议：\(candidate.name) · \(candidate.category)。请核对后保存。"
-            } else {
-                recognitionStatus = "未能可靠识别这件物品，可填写名称和分类。"
+            if needsName, item.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+               let candidate = suggestion.item {
+                item.name = candidate.name
+                item.category = candidate.category
+            }
+            if suggestion.item != nil || suggestion.brand != nil {
+                recognitionStatus = "AI识别仅供参考，请核对信息。"
+            } else if needsName {
+                recognitionStatus = "未能可靠识别这件物品，可手动填写。"
             }
         } catch {
             recognitionStatus = "照片读取或识别失败，可手动填写。"
         }
     }
 
+    private var photoSection: some View {
+        Section("实物照片（最多 9 张）") {
+            ForEach(Array(item.photos.enumerated()), id: \.offset) { index, data in
+                HStack {
+                    if let image = UIImage(data: data) {
+                        Image(uiImage: image).resizable().scaledToFill()
+                            .frame(width: 62, height: 62).clipShape(.rect(cornerRadius: 8))
+                    }
+                    Text(index == 0 ? "主图" : "照片 \(index + 1)")
+                    Spacer()
+                    if index > 0 {
+                        Button("设为主图") {
+                            var photos = item.photos
+                            let main = photos.remove(at: index)
+                            photos.insert(main, at: 0)
+                            item.setPhotos(photos)
+                        }.buttonStyle(.borderless)
+                    }
+                }.deleteDisabled(recognizing).moveDisabled(recognizing)
+            }
+            .onDelete { indexes in
+                var photos = item.photos
+                photos.remove(atOffsets: indexes)
+                item.setPhotos(photos)
+            }
+            .onMove { indexes, destination in
+                var photos = item.photos
+                photos.move(fromOffsets: indexes, toOffset: destination)
+                item.setPhotos(photos)
+            }
+            if item.photos.count < 9 {
+                if UIImagePickerController.isSourceTypeAvailable(.camera) {
+                    Button("拍照", systemImage: "camera") { camera = true }.disabled(recognizing)
+                }
+                PhotosPicker(selection: $gallery, maxSelectionCount: max(1, 9 - item.photos.count),
+                             selectionBehavior: .ordered, matching: .images) {
+                    Label("从相册选择", systemImage: "photo.on.rectangle")
+                }.disabled(recognizing)
+            }
+            if recognizing { ProgressView("正在设备上识别…") }
+            if let recognitionStatus { Text(recognitionStatus).font(.footnote).foregroundStyle(.secondary) }
+        }
+    }
+
     var body: some View {
         NavigationStack {
             Form {
-                if !item.preview {
-                    Section("照片识别") {
-                        ScrollView(.horizontal) {
-                            HStack {
-                                ForEach(Array(item.photos.enumerated()), id: \.offset) { index, data in
-                                    if let image = UIImage(data: data) {
-                                        Image(uiImage: image).resizable().scaledToFill().frame(width: 90, height: 90).clipped()
-                                            .contextMenu {
-                                                Button("移除照片", role: .destructive) {
-                                                    var current = item.photos
-                                                    current.remove(at: index)
-                                                    item.photo = current.first
-                                                    item.extraPhotos = Array(current.dropFirst())
-                                                }
-                                            }
-                                    }
+                if !item.preview { photoSection }
+                if photoFirst {
+                    Button(item.photos.isEmpty ? "跳过照片，手动填写" : "下一步：核对物品信息") { photoFirst = false }
+                        .disabled(recognizing)
+                } else {
+                    Section("物品信息") {
+                        TextField("物品名称", text: $item.name)
+                        if !item.preview {
+                            TextField("品牌（选填）", text: Binding(get: { item.brand ?? "" }, set: { item.brand = $0 }))
+                        }
+                        Picker("分类", selection: $item.category) {
+                            ForEach(Array(Set(["家具","家电","软装","厨卫","其他", item.category])).sorted(), id: \.self) { Text($0).tag($0) }
+                        }
+                        Picker("房间内的展示", selection: Binding(get: { item.appearance }, set: { item.material = $0.rawValue })) {
+                            ForEach(NookMaterial.allCases.filter { $0 != .photo || item.photo != nil }) { choice in
+                                Text(choice.rawValue).tag(choice)
+                            }
+                        }
+                        number("长（厘米）", $item.length)
+                        number("宽（厘米）", $item.width)
+                        number("高（厘米）", $item.height)
+                        Stepper("旋转 \(Int(item.rotation))°", value: $item.rotation, in: 0...360, step: 15)
+                        Toggle("允许修改模型比例", isOn: $unlockScale)
+                        Stepper("比例 \(item.scale.formatted(.percent))", value: $item.scale, in: 0.25...3, step: 0.25).disabled(!unlockScale)
+                        Text("比例默认 100%，修改后会影响真实尺寸参考。").font(.caption).foregroundStyle(.secondary)
+                        if !item.preview {
+                            number("参考价值（元）", $item.value)
+                            Toggle("记录购入日期", isOn: Binding(get: { item.purchaseDate != nil }, set: { item.purchaseDate = $0 ? Date() : nil }))
+                            if item.purchaseDate != nil {
+                                DatePicker("购入日期", selection: Binding(get: { item.purchaseDate ?? Date() }, set: { item.purchaseDate = $0 }), displayedComponents: .date)
+                            }
+                            number("购入价格（元）", Binding(get: { item.purchasePrice ?? 0 }, set: { item.purchasePrice = $0 }))
+                            TextField("成色", text: Binding(get: { item.condition ?? "" }, set: { item.condition = $0 }))
+                            TextField("备注", text: Binding(get: { item.note ?? "" }, set: { item.note = $0 }), axis: .vertical)
+                            if item.awaitingPlacement == true {
+                                Toggle("标记闲置", isOn: Binding(get: { item.status == "闲置" }, set: {
+                                    item.idle = $0
+                                    item.saleState = $0 ? "闲置" : "在用"
+                                }))
+                            } else {
+                                Picker("物品状态", selection: Binding(get: { item.status }, set: { item.saleState = $0; item.idle = $0 == "闲置" })) {
+                                    ForEach(["在用", "闲置", "待出售", "已转出"], id: \.self) { Text($0).tag($0) }
                                 }
                             }
                         }
-                        if item.photos.count < 9 {
-                        PhotosPicker(selection: $gallery, maxSelectionCount: max(1, 9 - item.photos.count), matching: .images) {
-                            Label("添加多张实物照片", systemImage: "photo.on.rectangle")
-                        }.disabled(recognizing)
-
-                        if UIImagePickerController.isSourceTypeAvailable(.camera) {
-                            Button("拍照识别", systemImage: "camera") { camera = true }.disabled(recognizing)
-                        }
-                        PhotosPicker(selection: $photo, matching: .images) {
-                            Label("选照片识别", systemImage: "photo")
-                        }.disabled(recognizing)
-                        }
-                        if recognizing { ProgressView("正在设备上识别…") }
-                        if let recognitionStatus { Text(recognitionStatus).font(.footnote).foregroundStyle(.secondary) }
                     }
+                    Button("预览摆进房间", systemImage: "view.3d") { roomPreview = true }
+                        .disabled(!item.validDimensions || item.appearance == .none)
+                    if error { Text("保存失败，请重试。").foregroundStyle(.red) }
                 }
-                TextField("物品名称", text: $item.name)
-                Picker("分类", selection: $item.category) {
-                    ForEach(Array(Set(["家具","家电","软装","厨卫","杂物","其他", item.category])).sorted(), id: \.self) { Text($0).tag($0) }
+            }
+            .sheet(isPresented: $roomPreview) {
+                NavigationStack {
+                    NookScene(room: previewRoom, selected: item.id, overhead: false, move: { _, _, _ in false }, select: { _ in })
+                        .navigationTitle("房间摆放预览")
+                        .toolbar { Button("完成") { roomPreview = false } }
                 }
-                Picker("房间内的展示", selection: Binding(get: { item.appearance }, set: { item.material = $0.rawValue })) {
-                    ForEach(NookMaterial.allCases.filter { $0 != .photo || item.photo != nil }) { choice in
-                        Text(choice.rawValue).tag(choice)
-                    }
-                }
-                number("长（厘米）", $item.length)
-                number("宽（厘米）", $item.width)
-                number("高（厘米）", $item.height)
-                Stepper("旋转 \(Int(item.rotation))°", value: $item.rotation, in: 0...360, step: 15)
-                Toggle("允许修改模型比例", isOn: $unlockScale)
-                Stepper("比例 \(item.scale.formatted(.percent))", value: $item.scale, in: 0.25...3, step: 0.25).disabled(!unlockScale)
-                Text("比例默认 100%，修改后会影响真实尺寸参考。").font(.caption).foregroundStyle(.secondary)
-                if !item.preview {
-                    number("参考价值（元）", $item.value)
-                    Toggle("记录购入日期", isOn: Binding(get: { item.purchaseDate != nil }, set: { item.purchaseDate = $0 ? Date() : nil }))
-                    if item.purchaseDate != nil {
-                        DatePicker("购入日期", selection: Binding(get: { item.purchaseDate ?? Date() }, set: { item.purchaseDate = $0 }), displayedComponents: .date)
-                    }
-                    number("购入价格（元）", Binding(get: { item.purchasePrice ?? 0 }, set: { item.purchasePrice = $0 }))
-                    TextField("成色", text: Binding(get: { item.condition ?? "" }, set: { item.condition = $0 }))
-                    TextField("备注", text: Binding(get: { item.note ?? "" }, set: { item.note = $0 }), axis: .vertical)
-                    Picker("物品状态", selection: Binding(get: { item.status }, set: { item.saleState = $0; item.idle = $0 == "闲置" })) {
-                        ForEach(["在用", "闲置", "待出售", "已转出"], id: \.self) { Text($0).tag($0) }
-                    }
-                }
-                if error { Text("保存失败，请重试。").foregroundStyle(.red) }
             }
             .task(id: gallery) {
                 for selection in gallery where item.photos.count < 9 {
                     await recognize { try await selection.loadTransferable(type: Data.self) }
                 }
+                if !Task.isCancelled && !gallery.isEmpty { gallery = [] }
             }
             .alert("请检查尺寸", isPresented: $invalidDimensions) {
                 Button("好", role: .cancel) {}
             } message: { Text("长宽高必须在 1 到 10000 厘米之间，金额不能为负。") }
-            .task(id: photo) {
-                guard let photo else { return }
-                await recognize { try await photo.loadTransferable(type: Data.self) }
-            }
             .fullScreenCover(isPresented: $camera) {
                 DearCamera(mode: .photo) { result in
                     camera = false
@@ -719,22 +828,36 @@ private struct NookItemForm: View {
                     }
                 }.ignoresSafeArea()
             }
-            .navigationTitle(item.preview ? "意向商品" : "自有物品")
+            .navigationTitle(photoFirst ? "拍摄或选图" : item.preview ? "意向商品" : "自有物品")
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) { Button("取消") { dismiss() } }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("保存") {
-                        item.name = item.name.trimmingCharacters(in: .whitespacesAndNewlines)
-                        guard [item.length,item.width,item.height].allSatisfy({ (1...10000).contains($0) }),
-                              (0...100000000).contains(item.value), (0...100000000).contains(item.purchasePrice ?? 0) else {
-                            invalidDimensions = true
-                            return
-                        }
-                        if save(item) { dismiss() } else { error = true }
-                    }.disabled(recognizing || item.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                if !item.preview && item.photos.count > 1 {
+                    ToolbarItem(placement: .secondaryAction) { EditButton().disabled(recognizing) }
+                }
+                if !photoFirst {
+                    ToolbarItem(placement: .confirmationAction) {
+                        Button("保存") {
+                            item.name = item.name.trimmingCharacters(in: .whitespacesAndNewlines)
+                            guard item.validDimensions,
+                                  (0...100000000).contains(item.value), (0...100000000).contains(item.purchasePrice ?? 0) else {
+                                invalidDimensions = true
+                                return
+                            }
+                            if save(item) { dismiss() } else { error = true }
+                        }.disabled(recognizing || item.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                    }
                 }
             }
         }
+    }
+
+    private var previewRoom: NookRoom {
+        var result = room
+        var candidate = item
+        candidate.awaitingPlacement = false
+        result.items.removeAll { $0.id == candidate.id }
+        result.items.append(candidate)
+        return result
     }
 }
 
@@ -744,29 +867,49 @@ private enum NookPhotoRecognition {
         let category: String
     }
 
-    nonisolated static func suggest(_ bytes: Data) async throws -> Candidate? {
-        try await Task.detached(priority: .userInitiated) { () throws -> Candidate? in
+    struct Suggestion: Sendable {
+        let item: Candidate?
+        let brand: String?
+    }
+
+    nonisolated static func suggest(_ bytes: Data, readBrand: Bool) async throws -> Suggestion {
+        try await Task.detached(priority: .userInitiated) { () throws -> Suggestion in
             let request = VNClassifyImageRequest()
-            try VNImageRequestHandler(data: bytes).perform([request])
+            let handler = VNImageRequestHandler(data: bytes)
+            try handler.perform([request])
+            var brand: String?
+            if readBrand {
+                let text = VNRecognizeTextRequest()
+                text.recognitionLanguages = ["zh-Hans", "en-US"]
+                if (try? handler.perform([text])) != nil {
+                    let known = ["海尔", "美的", "格力", "小米", "松下", "三星", "西门子", "宜家",
+                                 "Haier", "Midea", "Panasonic", "Samsung", "Siemens", "IKEA", "Sony", "Dyson", "Philips"]
+                    let lines = text.results?.compactMap { $0.topCandidates(1).first }.filter { $0.confidence >= 0.8 } ?? []
+                    let matches = known.filter { name in
+                        lines.contains { $0.string.trimmingCharacters(in: .whitespacesAndNewlines).caseInsensitiveCompare(name) == .orderedSame }
+                    }
+                    if matches.count == 1 { brand = matches.first }
+                }
+            }
             let matches: [(String, String, String)] = [
                 ("sofa", "沙发", "家具"), ("couch", "沙发", "家具"),
                 ("chair", "椅子", "家具"), ("table", "桌子", "家具"),
                 ("desk", "书桌", "家具"), ("bed", "床", "家具"),
                 ("refrigerator", "冰箱", "家电"), ("microwave", "微波炉", "家电"),
                 ("television", "电视", "家电"), ("vacuum", "吸尘器", "家电"),
-                ("shelf", "置物架", "收纳"), ("cabinet", "柜子", "收纳"),
-                ("luggage", "行李箱", "收纳"), ("kettle", "水壶", "厨具"),
-                ("pan", "锅具", "厨具"), ("cup", "杯子", "厨具"),
-                ("shoe", "鞋", "服饰"), ("jacket", "夹克", "服饰"),
+                ("shelf", "置物架", "家具"), ("cabinet", "柜子", "家具"),
+                ("luggage", "行李箱", "其他"), ("kettle", "水壶", "厨卫"),
+                ("pan", "锅具", "厨卫"), ("cup", "杯子", "厨卫"),
+                ("shoe", "鞋", "其他"), ("jacket", "夹克", "其他"),
                 ("book", "书籍", "其他"), ("plant", "植物", "其他")
             ]
             for observation in (request.results ?? []).prefix(8) where observation.confidence >= 0.35 {
                 let words = Set(observation.identifier.lowercased().split { !$0.isLetter }.map(String.init))
                 if let match = matches.first(where: { words.contains($0.0) }) {
-                    return Candidate(name: match.1, category: match.2)
+                    return Suggestion(item: Candidate(name: match.1, category: match.2), brand: brand)
                 }
             }
-            return nil
+            return Suggestion(item: nil, brand: brand)
         }.value
     }
 }
@@ -793,11 +936,13 @@ private struct NookAssetDetails: View {
     @Environment(\.dismiss) private var dismiss
     let item: NookItem
     let edit: () -> Void
+    @State private var draft = false
     var body: some View {
         NavigationStack {
             List {
                 LabeledContent("分类", value: item.category)
                 LabeledContent("状态", value: item.preview ? "意向预览" : item.status)
+                if let brand = item.brand, !brand.isEmpty { LabeledContent("品牌", value: brand) }
                 LabeledContent("尺寸", value: "\(item.length.formatted()) × \(item.width.formatted()) × \(item.height.formatted()) cm")
                 LabeledContent("参考价值", value: item.value.formatted(.currency(code: "CNY")))
                 if let date = item.purchaseDate { LabeledContent("购入日期", value: date.formatted(date: .abbreviated, time: .omitted)) }
@@ -808,14 +953,28 @@ private struct NookAssetDetails: View {
                     if let image = UIImage(data: bytes) { Image(uiImage: image).resizable().scaledToFit() }
                 }
                 if ["闲置", "待出售"].contains(item.status), !item.preview {
-                    ShareLink(item: item.saleDescription) { Label("分享出售草稿文字", systemImage: "square.and.arrow.up") }
+                    Button("生成闲鱼发布草稿", systemImage: "square.and.arrow.up") { draft = true }
                 }
                 Button("编辑物品", systemImage: "pencil", action: edit)
             }
             .navigationTitle(Text(verbatim: item.name))
             .toolbar { Button("关闭") { dismiss() } }
+            .sheet(isPresented: $draft) {
+                NookSaleShare(item: item)
+            }
         }
     }
+}
+
+private struct NookSaleShare: UIViewControllerRepresentable {
+    let item: NookItem
+
+    func makeUIViewController(context: Context) -> UIActivityViewController {
+        let photos = item.photos.compactMap { UIImage(data: $0) }
+        return UIActivityViewController(activityItems: [item.saleDescription] + (photos as [Any]), applicationActivities: nil)
+    }
+
+    func updateUIViewController(_ controller: UIActivityViewController, context: Context) {}
 }
 
 private struct NookItemPreview: View {
@@ -826,6 +985,7 @@ private struct NookItemPreview: View {
         var copy = item
         copy.x = 0
         copy.z = 0
+        copy.awaitingPlacement = false
         let extent = max(copy.length, copy.width, copy.height) * copy.scale / 100
         return NookRoom(name: item.name, length: extent * 1.5, width: extent * 1.5, height: extent, items: [copy])
     }
@@ -1071,7 +1231,7 @@ private struct NookScene: UIViewRepresentable {
                     at: SCNVector3((door - 0.5) * room.length, 0.009, room.width / 2 - 0.10), color: .systemMint)
             }
         }
-        for item in room.items where item.status != "已转出" && item.appearance != .none {
+        for item in room.items where item.status != "已转出" && item.awaitingPlacement != true && item.appearance != .none {
             scene.rootNode.addChildNode(assetNode(item))
         }
         if !isolated {
