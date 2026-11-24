@@ -80,6 +80,7 @@ public sealed class FamilyPage : ContentPage
             row.Add(new Label { Text = name, VerticalOptions = LayoutOptions.Center }); row.Add(toggle, 1); rows.Add(row);
         }
         rows.Add(status);
+        rows.Add(MomentStyle.Row("民俗工具", "✦", () => _ = Navigation.PushAsync(new FolkCulturePage())));
         void Apply() { applying = true; foreach (var p in toggles) p.Value.IsToggled = SectionEnabled(p.Key); applying = false; status.Text = store.ModulePreferenceError ?? "已同步至当前账号；“我的”始终保留。"; }
         rows.Add(MomentStyle.Action("重新同步", async () => { await store.RefreshModulePreferencesAsync(); Apply(); }));
         page.Appearing += async (_, _) => { store.ModulePreferencesChanged += Apply; await store.RefreshModulePreferencesAsync(); Apply(); };

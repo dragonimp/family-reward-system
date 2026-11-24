@@ -1492,6 +1492,9 @@ private struct MomentSectionSettings: View {
             }
             Text("长按拖动可调整顺序，点铅笔可改名。栏目开关在本机立即生效。「我的」始终保留。").font(.footnote).foregroundStyle(.secondary)
             if let error = store.modulePreferenceError { Text(error).foregroundStyle(.secondary) }
+            NavigationLink { FolkCultureView() } label: {
+                Label("民俗工具", systemImage: "sparkles")
+            }
             Button("重新同步") { Task { await store.refreshModulePreferences() } }
         }.navigationTitle(String(localized: "栏目设置", bundle: AgentIdentityLanguage.appBundle()))
             .task { await store.refreshModulePreferences() }
