@@ -1730,7 +1730,7 @@ struct DearSocialView: View {
         }
         .task(id: activityToastID) {
             guard !activityToast.isEmpty else { return }
-            do { try await Task.sleep(for: .seconds(4)) } catch { return }
+            do { try await Task.sleep(for: .seconds(3)) } catch { return }
             activityToast = ""
         }
         .onChange(of: checkInLocator.location?.timestamp) { _, value in

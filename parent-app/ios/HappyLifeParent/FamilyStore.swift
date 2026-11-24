@@ -298,7 +298,7 @@ private actor PhotoPreviewLoader {
         }
         let value: Any = (try? await decoding.value) ?? [String: Any]()
         guard current == revision, token == identity.accessToken else { throw CancellationError() }
-        if response.statusCode == 401 { logout(); throw APIError.message(String(localized: "登录已过期，请重新登录。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) }
+        if response.statusCode == 401 { throw APIError.message(String(localized: "登录已过期，请重新登录。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) }
         guard (200..<300).contains(response.statusCode) else {
             let detail = value as? [String: Any]
             throw APIError.http(response.statusCode, detail?["error"] as? String ?? detail?["message"] as? String ?? String(localized: "请求失败（\(response.statusCode)），请重试。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)))
@@ -472,7 +472,7 @@ private actor PhotoPreviewLoader {
         lastRefresh = Date()
     }
     func refreshIfStale() async {
-        guard !captureInProgress, ready, Date().timeIntervalSince(lastRefresh) > 5 else { return }
+        guard !captureInProgress, ready, Date().timeIntervalSince(lastRefresh) >= 4 * 60 * 60 else { return }
         do { try await refreshBalancesAndLedger() }
         catch is CancellationError {} catch { self.error = momentDisplayError(error) }
     }

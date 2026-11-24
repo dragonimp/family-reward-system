@@ -93,7 +93,7 @@ extension View {
             store.pendingActivityLink = link
         }
     }.onChange(of: scenePhase) { _, phase in
-        if phase == .active { store.resumePhotoSharing(); Task { await store.language.refresh(); await store.refreshModulePreferences(); await store.refreshIfStale() } }
+        if phase == .active { store.resumePhotoSharing(); Task { await store.language.refresh(); await store.refreshIfStale() } }
         else { store.suspendPhotoSharing() }
     } } }
 }
@@ -125,7 +125,7 @@ struct FamilyRoot: View {
         .task(id: identity.accountIdentifier) {
             while identity.isAuthenticated && !Task.isCancelled {
                 await store.refreshModulePreferences()
-                do { try await Task.sleep(for: .seconds(10)) } catch { break }
+                do { try await Task.sleep(for: .seconds(4 * 60 * 60)) } catch { break }
             }
         }
         .task(id: identity.isAuthenticated) {
@@ -138,10 +138,9 @@ struct FamilyRoot: View {
         }
         .overlay(alignment: .bottom) {
             if let message = store.error {
-                HStack(spacing: 12) {
-                    Text(message).font(.caption).lineLimit(2).frame(maxWidth: .infinity, alignment: .leading)
-                    Button { store.error = nil } label: { Label(String(localized: "关闭", bundle: AgentIdentityLanguage.appBundle()), systemImage: "xmark") }.labelStyle(.iconOnly)
-                }.padding(12).background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12)).padding()
+                Text(message).font(.subheadline).multilineTextAlignment(.center)
+                    .padding(12).background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12))
+                    .padding().allowsHitTesting(false)
             }
         }
     }
@@ -162,6 +161,11 @@ struct FamilyRoot: View {
                     if identity.isBusy {
                         HStack { ProgressView(); Text(identity.status).font(.subheadline); Spacer(); Button(String(localized: "取消", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) { identity.cancelLogin() }.buttonStyle(.bordered) }
                     }
+        .task(id: store.error) {
+            guard let message = store.error else { return }
+            do { try await Task.sleep(for: .seconds(3)) } catch { return }
+            if store.error == message { store.error = nil }
+        }
                     if let code = identity.displayCode { Text(String(localized: "本次登录验证码：\(code)", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))).font(.title3.monospacedDigit()).textSelection(.enabled) }
                     Button { signIn(false) } label: { HStack { Spacer(); if identity.isBusy { ProgressView() }; Text(String(localized: "用户中心登录", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))).bold(); Spacer() }.padding(.vertical, 8) }.buttonStyle(.borderedProminent).disabled(identity.isBusy)
                     Button(String(localized: "注册用户中心账号", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) { signIn(true) }.frame(maxWidth: .infinity).disabled(identity.isBusy)
