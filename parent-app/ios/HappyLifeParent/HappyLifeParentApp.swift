@@ -143,6 +143,11 @@ struct FamilyRoot: View {
                     .padding().allowsHitTesting(false)
             }
         }
+        .task(id: store.error) {
+            guard let message = store.error else { return }
+            do { try await Task.sleep(for: .seconds(3)) } catch { return }
+            if store.error == message { store.error = nil }
+        }
     }
     private var login: some View {
         NavigationStack {
@@ -161,11 +166,6 @@ struct FamilyRoot: View {
                     if identity.isBusy {
                         HStack { ProgressView(); Text(identity.status).font(.subheadline); Spacer(); Button(String(localized: "取消", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) { identity.cancelLogin() }.buttonStyle(.bordered) }
                     }
-        .task(id: store.error) {
-            guard let message = store.error else { return }
-            do { try await Task.sleep(for: .seconds(3)) } catch { return }
-            if store.error == message { store.error = nil }
-        }
                     if let code = identity.displayCode { Text(String(localized: "本次登录验证码：\(code)", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))).font(.title3.monospacedDigit()).textSelection(.enabled) }
                     Button { signIn(false) } label: { HStack { Spacer(); if identity.isBusy { ProgressView() }; Text(String(localized: "用户中心登录", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))).bold(); Spacer() }.padding(.vertical, 8) }.buttonStyle(.borderedProminent).disabled(identity.isBusy)
                     Button(String(localized: "注册用户中心账号", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) { signIn(true) }.frame(maxWidth: .infinity).disabled(identity.isBusy)
