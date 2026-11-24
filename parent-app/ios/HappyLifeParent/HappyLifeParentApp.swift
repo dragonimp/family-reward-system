@@ -106,10 +106,10 @@ struct FamilyRoot: View {
     @State private var selectedTab = 0
     private var nookEnabled: Bool { store.isModuleEnabled("nook") }
 
-    private var diningEnabled: Bool { get { store.moduleSections["dining"] ?? true } nonmutating set { Task { await store.setModule("dining", enabled: newValue) } } }
-    private var growthEnabled: Bool { get { store.moduleSections["growth"] ?? true } nonmutating set { Task { await store.setModule("growth", enabled: newValue) } } }
-    private var activitiesEnabled: Bool { get { store.moduleSections["activities"] ?? true } nonmutating set { Task { await store.setModule("activities", enabled: newValue) } } }
-    private var exerciseEnabled: Bool { get { store.moduleSections["exercise"] ?? true } nonmutating set { Task { await store.setModule("exercise", enabled: newValue) } } }
+    private var diningEnabled: Bool { get { store.isModuleEnabled("dining") } nonmutating set { Task { await store.setModule("dining", enabled: newValue) } } }
+    private var growthEnabled: Bool { get { store.isModuleEnabled("growth") } nonmutating set { Task { await store.setModule("growth", enabled: newValue) } } }
+    private var activitiesEnabled: Bool { get { store.isModuleEnabled("activities") } nonmutating set { Task { await store.setModule("activities", enabled: newValue) } } }
+    private var exerciseEnabled: Bool { get { store.isModuleEnabled("exercise") } nonmutating set { Task { await store.setModule("exercise", enabled: newValue) } } }
     var body: some View {
         Group {
             if !identity.isAuthenticated { login }
@@ -724,11 +724,11 @@ struct AccountView: View {
                     NavigationLink { MembersView(store: store) } label: { Label(String(localized: "家庭成员", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), systemImage: "person.3.fill") }
                     NavigationLink { FamilyInvitationHub(store: store) } label: { Label(String(localized: "邀请家人", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), systemImage: "envelope.open.fill") }
                     Link(destination: URL(string: UIApplication.openSettingsURLString)!) {
-                        Label(String(localized: "通知、照片与位置权限", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), systemImage: "gearshape.fill")
+                        Label(String(localized: "系统权限", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), systemImage: "gearshape.fill")
                     }
                 }
                 Section(String(localized: "帮助与隐私", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) {
-                    if let url = resources?.privacyPolicyUrl, url.scheme == "https" {
+                    if let url = resources?.privacyPolicyUrl ?? URL(string: "https://happylife.ai.impx.net/legal/linko-family-privacy.html"), url.scheme == "https" {
                         Link(destination: url) { Label(String(localized: "隐私政策", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), systemImage: "hand.raised.fill") }
                     } else {
                         Label(String(localized: "隐私政策未配置", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), systemImage: "hand.raised.fill").foregroundStyle(.secondary)
@@ -1408,14 +1408,17 @@ private struct MomentAboutView: View {
                 Text(String(localized: "Linko Moment 帮助家庭记录生活、分享照片与活动，并一起管理孩子的成长和日常事务。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)))
             }
             Section(String(localized: "版本信息", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) {
-                LabeledContent(String(localized: "当前版本", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), value: Self.version)
-                LabeledContent(String(localized: "构建号", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), value: build)
+                LabeledContent {
+                    Text(build.isEmpty ? Self.version : "\(Self.version) (\(build))")
+                } label: {
+                    Label(String(localized: "当前版本", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), systemImage: "info.circle")
+                }
                 NavigationLink { MomentVersionView() } label: {
                     Label(String(localized: "版本升级", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), systemImage: "arrow.up.circle")
                 }
             }
             Section(String(localized: "APP 备案号", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) {
-                Link(destination: URL(string: "https://beian.miit.gov.cn/")!) { Text(verbatim: "\u{95FD}ICP\u{5907}2024055146\u{53F7}-4A") }
+                Link(destination: URL(string: "https://beian.miit.gov.cn/")!) { Label { Text(verbatim: "\u{95FD}ICP\u{5907}2024055146\u{53F7}-4A") } icon: { Image(systemName: "checkmark.shield") } }
             }
             Section {
                 NavigationLink { MomentTeamMembersView() } label: {
@@ -1482,8 +1485,8 @@ private struct MomentSectionSettings: View {
                     }
                     .accessibilityAction(named: Text("上移")) { store.shiftModule(key, by: -1) }
                     .accessibilityAction(named: Text("下移")) { store.shiftModule(key, by: 1) }
-            }.disabled(store.modulePreferenceSaving)
-            Text("长按拖动可调整顺序，点铅笔可改名。名称、顺序和小小窝开关保存在本机，其他栏目开关随账号同步。「我的」始终保留。").font(.footnote).foregroundStyle(.secondary)
+            }
+            Text("长按拖动可调整顺序，点铅笔可改名。栏目开关在本机立即生效。「我的」始终保留。").font(.footnote).foregroundStyle(.secondary)
             if let error = store.modulePreferenceError { Text(error).foregroundStyle(.secondary) }
             Button("重新同步") { Task { await store.refreshModulePreferences() } }
         }.navigationTitle(String(localized: "栏目设置", bundle: AgentIdentityLanguage.appBundle()))

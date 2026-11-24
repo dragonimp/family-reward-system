@@ -1288,10 +1288,6 @@ struct DearSocialView: View {
 
     private var pinnedActivityOperations: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text(String(localized: "活动操作", bundle: AgentIdentityLanguage.appBundle()))
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(.secondary)
-                .accessibilityAddTraits(.isHeader)
             HStack(spacing: 8) {
                 Button { checkInNote = ""; checkInRequestID = UUID(); pendingCheckIn = true; checkInLocator.locate() } label: {
                     activityPhotoTile(String(localized: "打卡", bundle: AgentIdentityLanguage.appBundle()), icon: "location.circle")
@@ -3298,11 +3294,21 @@ private struct MomentPendingActivityRow: View {
     @ObservedObject var source: DearPhotoSource
     let draft: MomentLocalDraft
 
+    @State private var preview: PendingPreview?
+    private struct PendingPreview: Identifiable {
+        let url: URL
+        let video: Bool
+        var id: URL { url }
+    }
+
     var body: some View {
         HStack(spacing: 8) {
             if draft.kind == "media", let store = try? source.draftStore(), let local = store.file(draft) {
-                MomentDraftPreview(url: local, video: draft.contentType?.hasPrefix("video/") == true)
-                    .frame(width: 44, height: 44).clipShape(.rect(cornerRadius: 6))
+                let isVideo = draft.contentType?.hasPrefix("video/") == true
+                Button { preview = PendingPreview(url: local, video: isVideo) } label: {
+                    MomentDraftPreview(url: local, video: isVideo)
+                        .frame(width: 44, height: 44).clipShape(.rect(cornerRadius: 6))
+                }.buttonStyle(.borderless).accessibilityLabel(isVideo ? "预览本地视频" : "全屏预览本地照片")
             } else {
                 Image(systemName: draft.kind == "checkins" ? "location.circle" : "square.and.pencil")
             }
@@ -3328,6 +3334,35 @@ private struct MomentPendingActivityRow: View {
                 }.buttonStyle(.borderless)
             }
         }
+        .fullScreenCover(item: $preview) { item in
+            NavigationStack {
+                ZStack {
+                    Color.black.ignoresSafeArea()
+                    if item.video {
+                        MomentLocalDraftVideo(url: item.url)
+                    } else if let image = UIImage(contentsOfFile: item.url.path) {
+                        Image(uiImage: image).resizable().scaledToFit()
+                    } else {
+                        Text("无法打开本地照片").foregroundStyle(.white)
+                    }
+                }
+                .toolbar { ToolbarItem(placement: .confirmationAction) { Button("完成") { preview = nil } } }
+            }
+        }
+    }
+}
+
+private struct MomentLocalDraftVideo: View {
+    let url: URL
+    @State private var player: AVPlayer?
+    var body: some View {
+        VideoPlayer(player: player)
+            .task(id: url) {
+                let local = AVPlayer(url: url)
+                player = local
+                local.play()
+            }
+            .onDisappear { player?.pause(); player = nil }
     }
 }
 

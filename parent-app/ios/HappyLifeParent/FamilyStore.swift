@@ -117,6 +117,14 @@ private actor PhotoPreviewLoader {
         activityTitles[tenant, default: [:]][activity] = title
     }
 
+    func localExerciseActivities(scope: UUID?) -> [ExerciseActivity] {
+        guard let owner = identity.accountIdentifier, owner == activityTitleOwner else { return [] }
+        return activityTitles.flatMap { tenant, entries -> [ExerciseActivity] in
+            guard scope == nil || scope == tenant else { return [] }
+            return entries.map { ExerciseActivity(tenantID: tenant, id: $0.key, title: $0.value) }
+        }
+    }
+
     func refreshExerciseActivityTitles() async {
         guard let owner = identity.accountIdentifier else { return }
         let revision = UUID()
@@ -192,8 +200,11 @@ private actor PhotoPreviewLoader {
             guard let owner = identity.accountIdentifier else { return true }
             return savedNookVisibility[owner] ?? true
         }
-        return moduleSections[key] ?? true
+        let local = identity.accountIdentifier.flatMap { localModuleChoices[moduleOwnerKey($0)]?[key] }
+        return local ?? moduleSections[key] ?? true
     }
+    @Published private var localModuleChoices =
+        UserDefaults.standard.dictionary(forKey: "moment.localModuleChoices") as? [String: [String: Bool]] ?? [:]
     @Published private var savedModuleOrders: [String: [String]] =
         UserDefaults.standard.dictionary(forKey: "moment.moduleOrders") as? [String: [String]] ?? [:]
 
@@ -367,7 +378,13 @@ private actor PhotoPreviewLoader {
             UserDefaults.standard.set(savedNookVisibility, forKey: "moment.nook.visibility")
             return
         }
-        guard !modulePreferenceSaving, ["dining", "growth", "activities", "exercise"].contains(key) else { return }
+        guard let account = identity.accountIdentifier, ["dining", "growth", "activities", "exercise"].contains(key) else { return }
+        let ownerKey = moduleOwnerKey(account)
+        var choices = localModuleChoices
+        choices[ownerKey, default: [:]][key] = enabled
+        localModuleChoices = choices
+        UserDefaults.standard.set(choices, forKey: "moment.localModuleChoices")
+        guard !modulePreferenceSaving else { return }
         if modulePreferenceVersion == 0 { await refreshModulePreferences() }
         guard let owner = identity.accountIdentifier, modulePreferenceOwner == owner, modulePreferenceVersion > 0 else { return }
         modulePreferenceSaving = true; defer { modulePreferenceSaving = false }

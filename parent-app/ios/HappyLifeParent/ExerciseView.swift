@@ -594,6 +594,19 @@ struct ExerciseView: View {
                                     Text(active.steps.map { String(localized: "\($0) 步", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)) } ?? String(localized: "步数待获取", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)))
                                         .font(.title2).monospacedDigit()
                                 }
+                                if let speed = recentSpeed(active.routePoints, at: context.date), active.running {
+                                    Label(String(format: "速度 %.1f 公里/小时", speed), systemImage: "speedometer")
+                                        .font(.subheadline).monospacedDigit()
+                                }
+                                if let updated = family.watchMetricsUpdatedAt,
+                                   updated >= active.startedAt, abs(context.date.timeIntervalSince(updated)) < 45 {
+                                    if let heartRate = family.watchExerciseMetrics["heart"], heartRate > 0 {
+                                        Label(String(format: "心率 %.0f 次/分", heartRate), systemImage: "heart.fill").foregroundStyle(.red)
+                                    }
+                                    if let energy = family.watchExerciseMetrics["energy"] {
+                                        Label(String(format: "手表热量 %.0f 千卡", energy), systemImage: "flame")
+                                    }
+                                }
                                 if let altitude = active.routePoints.last?.altitudeMeters { Text(String(format: String(localized: "海拔 %.1f 米", bundle: AgentIdentityLanguage.appBundle()), altitude)).font(.subheadline) }
                                 Text(active.running ? String(localized: "运动中", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)) : String(localized: "已暂停", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))).foregroundStyle(active.running ? .teal : .secondary)
                             }.frame(maxWidth: .infinity).padding(.vertical, 4)
@@ -930,7 +943,22 @@ private struct ExerciseRouteMap: View {
             if points.isEmpty { Text(live ? String(localized: "等待 GPS 轨迹", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)) : String(localized: "开始运动后记录轨迹", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))).font(.caption).padding(8).background(.regularMaterial, in: Capsule()).padding(10) }
         }
         .onAppear { position = points.isEmpty && live ? .userLocation(fallback: .automatic) : .automatic }
+        .onChange(of: points.isEmpty) { wasEmpty, isEmpty in
+            guard live, wasEmpty, !isEmpty, let point = points.last else { return }
+            position = .region(MKCoordinateRegion(center: coordinate(point),
+                                                  latitudinalMeters: 500, longitudinalMeters: 500))
+        }
     }
+}
+
+private func recentSpeed(_ points: [ExerciseRoutePoint], at date: Date) -> Double? {
+    guard let last = points.last, points.count >= 2, abs(date.timeIntervalSince(last.recordedAt)) < 30 else { return nil }
+    let previous = points[points.count - 2]
+    let interval = last.recordedAt.timeIntervalSince(previous.recordedAt)
+    guard previous.segment == last.segment, interval > 0, interval < 30 else { return nil }
+    let first = CLLocation(latitude: previous.latitude, longitude: previous.longitude)
+    let end = CLLocation(latitude: last.latitude, longitude: last.longitude)
+    return end.distance(from: first) / interval * 3.6
 }
 
 private func exerciseDistanceTitle(_ session: ExerciseSession) -> String {
@@ -1485,17 +1513,30 @@ struct ExerciseActivityEditor: View {
             .task {
                 selection = selected
                 kind = workoutKind ?? ""
-                defer { loading = false }
+                var local = store.localExerciseActivities(scope: scope)
+                if let owner = store.profile?.text("unifiedUserId"), !owner.isEmpty {
+                    let exercise = ExerciseStore.shared(userID: owner)
+                    let linked = exercise.history.compactMap(\.activity) + [exercise.active?.activity].compactMap { $0 }
+                    local += linked.filter { scope == nil || $0.tenantID == scope }
+                }
+                var byID: [UUID: ExerciseActivity] = [:]
+                for activity in local { byID[activity.id] = activity }
+                targets = byID.values.sorted { $0.title.localizedStandardCompare($1.title) == .orderedAscending }
+                loading = false
                 do {
                     let rows = try await store.call("/api/dear/social/activities/joined") as? [[String: Any]] ?? []
-                    targets = rows.compactMap { row in
+                    let remote = rows.compactMap { row -> ExerciseActivity? in
                         guard let tenant = (row["sourceTenantId"] as? String).flatMap(UUID.init(uuidString:)),
                               scope == nil || scope == tenant,
                               let id = (row["id"] as? String).flatMap(UUID.init(uuidString:)),
                               let title = row["title"] as? String else { return nil }
                         return ExerciseActivity(tenantID: tenant, id: id, title: title)
-                    }.sorted { $0.title.localizedStandardCompare($1.title) == .orderedAscending }
-                } catch { self.error = error.localizedDescription }
+                    }
+                    for activity in remote { byID[activity.id] = activity }
+                    targets = byID.values.sorted { $0.title.localizedStandardCompare($1.title) == .orderedAscending }
+                } catch {
+                    if targets.isEmpty { self.error = error.localizedDescription }
+                }
             }
         }
     }
