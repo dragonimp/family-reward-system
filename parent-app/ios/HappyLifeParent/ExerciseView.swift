@@ -1061,7 +1061,7 @@ struct ActivityExerciseTimelineRow: View {
             }
             if !record.routePoints.isEmpty {
                 NavigationLink {
-                    ExerciseRouteMap(points: record.routePoints, live: record.endedAt == nil)
+                    ExerciseRouteReplay(points: record.routePoints)
                         .navigationTitle(exerciseKindTitle(record.kind))
                 } label: { Label(String(localized: "查看完整轨迹", bundle: AgentIdentityLanguage.appBundle()), systemImage: "map") }
             }
