@@ -1,5 +1,8 @@
+import CoreTransferable
 import CryptoKit
+import UniformTypeIdentifiers
 import MapKit
+import Metal
 import PhotosUI
 import Vision
 import SceneKit
@@ -44,8 +47,21 @@ private struct NookFinish: Codable, Identifiable {
     var floor = "木地板"
     var light = "日间"
     var brightness: Double?
+    var leftWall: String?
+    var ornaments: [NookOrnament]?
     var name: String?
     var layout: [NookItem]?
+}
+
+private struct NookOrnament: Identifiable, Codable {
+    enum Kind: String, CaseIterable, Identifiable, Codable {
+        case plant = "盆栽", lamp = "落地灯", rug = "地毯", vase = "小花瓶"
+        var id: String { rawValue }
+    }
+    var id = UUID()
+    var kind: Kind
+    var x = 0.0
+    var z = 0.0
 }
 
 private enum NookMaterial: String, CaseIterable, Identifiable {
@@ -133,7 +149,10 @@ struct NookView: View {
                 }
                 ForEach(rooms) { room in
                     NavigationLink(value: room.id) {
-                        LabeledContent(room.name, value: "\(room.items.filter { !$0.preview }.count) 件物品")
+                        HStack(spacing: 12) {
+                            NookCover(room: room)
+                            LabeledContent(room.name, value: "\(room.items.filter { !$0.preview }.count) 件物品")
+                        }
                     }
                 }
                 if let error { Text(error).foregroundStyle(.red) }
@@ -307,7 +326,11 @@ private struct NookRoomView: View {
     @State private var deletingRoom = false
     @State private var confirmEmptyDelete = false
     @State private var warningDialog = false
+    @State private var export: NookImage?
+    @State private var exportError = false
     @State private var cameraRevision = 0
+    @AppStorage("moment.nook.grid") private var showGrid = false
+    @AppStorage("moment.nook.snap") private var snap = false
     @State private var selected: UUID?
     @State private var itemDraft: NookItem?
     @State private var enlarged: NookItem?
@@ -329,28 +352,33 @@ private struct NookRoomView: View {
             if !room.address.isEmpty { Text(room.address).font(.caption).lineLimit(1) }
             Text([room.length, room.width, room.height].map { (centimeters ? $0 * 100 : $0).formatted(.number.precision(.fractionLength(0...2))) }.joined(separator: " × ") + (centimeters ? " cm" : " m"))
                 .font(.caption).foregroundStyle(.secondary)
-            NookScene(room: room, selected: selected, overhead: overhead) { id, x, z in
-                guard let index = room.items.firstIndex(where: { $0.id == id }) else { return false }
+            NookScene(room: room, selected: selected, overhead: overhead, move: { id, x, z in
                 var next = room
-                next.items[index].x = x
-                next.items[index].z = z
-                guard persist(next) else { saveError = true; return false }
-                placementError = next.placementWarning(next.items[index])
-                if placementError != nil && room.quietWarnings != true { warningDialog = true }
+                if let index = next.items.firstIndex(where: { $0.id == id }) {
+                    next.items[index].x = x
+                    next.items[index].z = z
+                    guard persist(next) else { saveError = true; return false }
+                    placementError = next.placementWarning(next.items[index])
+                    if placementError != nil && room.quietWarnings != true { warningDialog = true }
+                } else if let index = next.finish.ornaments?.firstIndex(where: { $0.id == id }) {
+                    next.finish.ornaments?[index].x = x
+                    next.finish.ornaments?[index].z = z
+                    guard persist(next) else { saveError = true; return false }
+                } else { return false }
                 return true
-            } select: { id in
+            }, select: { id in
                 selected = id
-            }
+            }, grid: showGrid, snap: snap)
             .id(cameraRevision)
             .frame(height: height)
             .clipShape(RoundedRectangle(cornerRadius: 20))
             HStack {
                 Button("俯视图", systemImage: "view.2d") { overhead = true; cameraRevision += 1 }
                 Spacer()
-                Button("人眼视角", systemImage: "view.3d") { overhead = false; cameraRevision += 1 }
+                Button("等距视角", systemImage: "view.3d") { overhead = false; cameraRevision += 1 }
             }.font(.caption)
             Toggle("俯视摆放", isOn: $overhead)
-                .accessibilityHint("开启后锁定正交俯视图，关闭后可透视漫游")
+                .accessibilityHint("开启后锁定正交俯视图，关闭后恢复 45° 等距视角")
             Text("拖空白旋转 · 双指捏合缩放 · 双指平移 · 点选后拖动物品")
                 .font(.caption).foregroundStyle(.secondary)
             if let placementError {
@@ -453,6 +481,12 @@ private struct NookRoomView: View {
                 Menu("房间操作", systemImage: "ellipsis.circle") {
                     Button("编辑房间", systemImage: "pencil") { editRoom = true }
                     Button("虚拟装修与摆放方案", systemImage: "paintpalette") { decorate = true }
+                    Button("导出效果图", systemImage: "square.and.arrow.up") {
+                        export = NookImage(room: room)
+                        exportError = export == nil
+                    }
+                    Toggle("显示摆放网格", isOn: $showGrid)
+                    Toggle("吸附网格与墙边", isOn: $snap)
                     Toggle("以厘米显示房间尺寸", isOn: $centimeters)
                     Button("删除房间", systemImage: "trash", role: .destructive) {
                         deletingRoom = true
@@ -498,6 +532,15 @@ private struct NookRoomView: View {
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) { itemDraft = item }
             }
         }
+        .sheet(item: $export) { image in
+            VStack(spacing: 18) {
+                Image(uiImage: image.preview).resizable().scaledToFit().clipShape(.rect(cornerRadius: 20))
+                ShareLink(item: image, preview: SharePreview(room.name, image: Image(uiImage: image.preview))) {
+                    Label("分享效果图", systemImage: "square.and.arrow.up").padding()
+                }.buttonStyle(.borderedProminent)
+            }.padding()
+        }
+        .alert("效果图未能生成", isPresented: $exportError) { Button("好", role: .cancel) {} }
         .fullScreenCover(item: $enlarged) { item in
             NookItemPreview(item: item)
         }
@@ -802,21 +845,82 @@ private struct NookItemPreview: View {
     }
 }
 
+private struct NookImage: Identifiable, Transferable {
+    let id = UUID()
+    let preview: UIImage
+    let png: Data
+
+    @MainActor init?(room: NookRoom) {
+        guard let image = NookScene.snapshot(room, size: CGSize(width: 1600, height: 1200)),
+              let data = image.pngData() else { return nil }
+        preview = image
+        png = data
+    }
+
+    static var transferRepresentation: some TransferRepresentation {
+        DataRepresentation(exportedContentType: .png) { $0.png }
+    }
+}
+
+private struct NookCover: View {
+    let room: NookRoom
+    @State private var picture: UIImage?
+
+    var body: some View {
+        Group {
+            if let picture { Image(uiImage: picture).resizable().scaledToFill() }
+            else { Image(systemName: "house").frame(maxWidth: .infinity, maxHeight: .infinity).background(.green.opacity(0.12)) }
+        }
+        .frame(width: 82, height: 56)
+        .clipShape(.rect(cornerRadius: 9))
+        .accessibilityHidden(true)
+        .task(id: NookScene.coverKey(room)) {
+            await Task.yield()
+            guard !Task.isCancelled else { return }
+            picture = NookScene.snapshot(room, size: CGSize(width: 246, height: 168))
+        }
+    }
+}
+
 private struct NookDecorationView: View {
     @Environment(\.dismiss) private var dismiss
     @State var room: NookRoom
     let save: (NookRoom) -> Bool
     @State private var error = false
     @State private var schemeName = ""
+    private let walls = ["暖白", "灰绿", "浅蓝", "条纹墙纸", "木饰面", "文化砖"]
     var body: some View {
         NavigationStack {
             Form {
                 NookScene(room: room, selected: nil, overhead: false, move: { _, _, _ in false }, select: { _ in }).frame(height: 240)
-                Picker("墙面", selection: $room.finish.wall) { ForEach(["暖白","灰绿","浅蓝"], id: \.self) { Text($0).tag($0) } }
-                Picker("地面", selection: $room.finish.floor) { ForEach(["木地板","瓷砖"], id: \.self) { Text($0).tag($0) } }
-                Picker("灯光", selection: $room.finish.light) { ForEach(["日间","暖色"], id: \.self) { Text($0).tag($0) } }
+                Picker("后墙", selection: $room.finish.wall) { ForEach(walls, id: \.self) { Text($0).tag($0) } }
+                Picker("左墙", selection: Binding(get: { room.finish.leftWall ?? "跟随后墙" },
+                                                  set: { room.finish.leftWall = $0 == "跟随后墙" ? nil : $0 })) {
+                    ForEach(["跟随后墙"] + walls, id: \.self) { Text($0).tag($0) }
+                }
+                Picker("地面", selection: $room.finish.floor) { ForEach(["木地板","浅橡木","瓷砖","复古花砖","地毯","草坪"], id: \.self) { Text($0).tag($0) } }
+                Picker("灯光", selection: $room.finish.light) { ForEach(["日间","暖黄昏","暖色"], id: \.self) { Text($0).tag($0) } }
                 Slider(value: Binding(get: { room.finish.brightness ?? 1 }, set: { room.finish.brightness = $0 }), in: 0.35...1.5)
                     .accessibilityLabel("灯光亮度")
+                Section("装饰") {
+                    Menu("添加装饰", systemImage: "leaf") {
+                        ForEach(NookOrnament.Kind.allCases) { kind in
+                            Button(kind.rawValue) {
+                                room.finish.ornaments = (room.finish.ornaments ?? []) + [NookOrnament(kind: kind)]
+                            }
+                        }
+                    }.disabled((room.finish.ornaments?.count ?? 0) >= 16)
+                    ForEach(room.finish.ornaments ?? []) { ornament in
+                        HStack {
+                            Text(ornament.kind.rawValue)
+                            Spacer()
+                            Button("移除", systemImage: "trash", role: .destructive) {
+                                room.finish.ornaments?.removeAll { $0.id == ornament.id }
+                            }.labelStyle(.iconOnly)
+                        }
+                    }
+                    Text("保存后可在房间中拖动装饰，装饰不计入资产。").font(.caption).foregroundStyle(.secondary)
+                }
                 ForEach(Array(room.schemes.enumerated()), id: \.element.id) { index, scheme in
                     Button(scheme.name ?? "方案 \(index + 1)") {
                         room.finish = scheme
@@ -892,12 +996,33 @@ private struct NookScene: UIViewRepresentable {
     let move: (UUID, Double, Double) -> Bool
     let select: (UUID?) -> Void
     var isolated = false
+    var grid = false
+    var snap = false
+
+    private var lowDetail: Bool {
+        ProcessInfo.processInfo.physicalMemory < 4_000_000_000
+            || ProcessInfo.processInfo.isLowPowerModeEnabled
+    }
+
+    static func coverKey(_ room: NookRoom) -> Data? {
+        NookScene(room: room, selected: nil, overhead: false, move: { _, _, _ in false }, select: { _ in }).sceneKey
+    }
+
+    static func snapshot(_ room: NookRoom, size: CGSize) -> UIImage? {
+        guard let device = MTLCreateSystemDefaultDevice() else { return nil }
+        let view = NookScene(room: room, selected: nil, overhead: false, move: { _, _, _ in false }, select: { _ in })
+        let (scene, camera) = view.makeScene(viewport: size)
+        let renderer = SCNRenderer(device: device, options: nil)
+        renderer.scene = scene
+        renderer.pointOfView = camera
+        return renderer.snapshot(atTime: 0, with: size, antialiasingMode: view.lowDetail ? .none : .multisampling4X)
+    }
 
     func makeCoordinator() -> Coordinator { Coordinator(self) }
     func makeUIView(context: Context) -> SCNView {
         let view = SCNView()
-        view.antialiasingMode = .multisampling4X
-        view.preferredFramesPerSecond = 60
+        view.antialiasingMode = lowDetail ? .none : .multisampling4X
+        view.preferredFramesPerSecond = lowDetail ? 30 : 60
         let tap = UITapGestureRecognizer(target: context.coordinator, action: #selector(Coordinator.tap(_:)))
         let drag = UIPanGestureRecognizer(target: context.coordinator, action: #selector(Coordinator.drag(_:)))
         drag.maximumNumberOfTouches = 1
@@ -921,25 +1046,26 @@ private struct NookScene: UIViewRepresentable {
         view.allowsCameraControl = isolated && !overhead
         if coordinator.sceneKey == sceneKey { return }
         let previousCamera = coordinator.lastOverhead == overhead ? view.pointOfView : nil
-        let zoom = previousCamera?.camera?.orthographicScale
-        let fieldOfView = previousCamera?.camera?.fieldOfView
         coordinator.lastOverhead = overhead
         coordinator.sceneKey = sceneKey
+        let (scene, camera) = makeScene(preserving: previousCamera, viewport: view.bounds.size)
+        view.scene = scene
+        view.pointOfView = camera
+    }
+
+    fileprivate func makeScene(preserving previousCamera: SCNNode? = nil, viewport: CGSize) -> (SCNScene, SCNNode) {
         let scene = SCNScene()
-        scene.background.contents = UIColor(red: 0.88, green: 0.92, blue: 0.82, alpha: 1)
-        let wall: UIColor = room.finish.wall == "灰绿" ? UIColor(red: 0.76, green: 0.85, blue: 0.66, alpha: 1) :
-            room.finish.wall == "浅蓝" ? UIColor(red: 0.72, green: 0.84, blue: 0.91, alpha: 1) : UIColor(red: 0.99, green: 0.89, blue: 0.73, alpha: 1)
-        let wood = room.finish.floor == "木地板"
+        let warm = ["暖色", "暖黄昏"].contains(room.finish.light)
+        scene.background.contents = warm ? UIColor(red: 0.94, green: 0.86, blue: 0.77, alpha: 1) :
+            UIColor(red: 0.88, green: 0.93, blue: 0.88, alpha: 1)
         let floor = box(scene, width: room.length, height: 0.10, depth: room.width, at: SCNVector3(0,-0.05,0),
-                        color: wood ? UIColor(red: 0.73, green: 0.56, blue: 0.40, alpha: 1) : .systemGray4)
+                        color: UIColor(red: 0.78, green: 0.65, blue: 0.51, alpha: 1))
         if let material = floor.geometry?.firstMaterial {
-            material.diffuse.contents = floorTexture(wood: wood)
-            material.diffuse.wrapS = .repeat
-            material.diffuse.wrapT = .repeat
-            material.diffuse.contentsTransform = SCNMatrix4MakeScale(Float(max(1, room.length / 1.8)), 5, 1)
+            applyTexture(room.finish.floor, to: material, repeatX: room.length / 1.55, repeatY: room.width / 1.55)
         }
         if !isolated {
-            addDollhouseShell(to: scene, wall: wall)
+            addDollhouseShell(to: scene)
+            if grid { addGrid(to: scene) }
             if let door = room.door {
                 box(scene, width: min(0.90, room.length), height: 0.015, depth: 0.20,
                     at: SCNVector3((door - 0.5) * room.length, 0.009, room.width / 2 - 0.10), color: .systemMint)
@@ -948,47 +1074,101 @@ private struct NookScene: UIViewRepresentable {
         for item in room.items where item.status != "已转出" && item.appearance != .none {
             scene.rootNode.addChildNode(assetNode(item))
         }
+        if !isolated {
+            let ornaments = room.finish.ornaments ?? []
+            for ornament in ornaments.prefix(lowDetail ? 8 : 16) {
+                addOrnament(ornament, to: scene)
+            }
+        }
         let camera = SCNNode()
         camera.camera = SCNCamera()
         let extent = max(room.length, room.width, room.height)
         camera.camera?.zFar = extent * 10
-        if overhead {
+        let aspect = Double(max(1, viewport.width) / max(1, viewport.height))
+        let diagonal = hypot(room.length, room.width)
+        camera.camera?.usesOrthographicProjection = true
+        camera.camera?.orthographicScale = previousCamera?.camera?.orthographicScale
+            ?? max(overhead ? room.width : diagonal * 0.60 + room.height * 0.87,
+                   (overhead ? room.length : diagonal) / max(0.5, aspect)) * 1.16
+        if let previousCamera {
+            camera.position = previousCamera.position
+            camera.orientation = previousCamera.orientation
+        } else if overhead {
             camera.position = SCNVector3(0, extent * 2, 0)
             camera.eulerAngles.x = -.pi/2
-            camera.camera?.usesOrthographicProjection = true
-            camera.camera?.orthographicScale = zoom ?? extent * 1.35
         } else {
-            camera.camera?.usesOrthographicProjection = false
-            camera.camera?.fieldOfView = fieldOfView ?? 44
-            camera.position = SCNVector3(extent * 1.20, extent * 1.30, extent * 1.20)
-            camera.look(at: SCNVector3(0, room.height * 0.28, 0))
-            if let previousCamera {
-                camera.position = previousCamera.position
-                camera.orientation = previousCamera.orientation
-            }
+            // Equal camera offsets give all three world axes the same foreshortening.
+            let center = room.height * 0.30
+            camera.position = SCNVector3(extent * 2, extent * 2 + center, extent * 2)
+            camera.look(at: SCNVector3(0, center, 0))
         }
         scene.rootNode.addChildNode(camera)
         let ambient = SCNNode()
         ambient.light = SCNLight()
         ambient.light?.type = .ambient
-        ambient.light?.intensity = CGFloat(530 * (room.finish.brightness ?? 1))
-        ambient.light?.color = room.finish.light == "暖色" ? UIColor(red: 1, green: 0.81, blue: 0.62, alpha: 1) : UIColor.white
+        ambient.light?.intensity = CGFloat((warm ? 560 : 710) * (room.finish.brightness ?? 1))
+        ambient.light?.color = warm ? UIColor(red: 1, green: 0.81, blue: 0.62, alpha: 1) : UIColor.white
         scene.rootNode.addChildNode(ambient)
         let key = SCNNode()
         key.light = SCNLight()
         key.light?.type = .directional
-        key.light?.intensity = CGFloat(930 * (room.finish.brightness ?? 1))
-        key.light?.castsShadow = true
-        key.light?.shadowRadius = 4
+        key.light?.intensity = CGFloat((warm ? 590 : 790) * (room.finish.brightness ?? 1))
+        key.light?.color = warm ? UIColor(red: 1, green: 0.76, blue: 0.53, alpha: 1) : UIColor.white
+        key.light?.castsShadow = !lowDetail
+        key.light?.shadowRadius = 6
         key.light?.shadowSampleCount = 8
         key.light?.shadowColor = UIColor(red: 0.28, green: 0.20, blue: 0.14, alpha: 0.22)
         key.eulerAngles = SCNVector3(-0.9, -0.55, 0)
         scene.rootNode.addChildNode(key)
-        view.scene = scene
-        view.pointOfView = camera
+        return (scene, camera)
     }
 
-    private func addDollhouseShell(to scene: SCNScene, wall: UIColor) {
+    private func addOrnament(_ ornament: NookOrnament, to scene: SCNScene) {
+        let root = SCNNode()
+        root.name = ornament.id.uuidString
+        root.position = SCNVector3(ornament.x, 0, ornament.z)
+        scene.rootNode.addChildNode(root)
+        func add(_ shape: SCNGeometry, color: UIColor, x: Float = 0, y: Float, z: Float = 0) {
+            shape.firstMaterial?.diffuse.contents = color
+            shape.firstMaterial?.lightingModel = .lambert
+            let node = SCNNode(geometry: shape)
+            node.position = SCNVector3(x, y, z)
+            root.addChildNode(node)
+        }
+        let terracotta = UIColor(red: 0.80, green: 0.53, blue: 0.42, alpha: 1)
+        switch ornament.kind {
+        case .plant:
+            add(SCNCone(topRadius: 0.16, bottomRadius: 0.12, height: 0.24), color: terracotta, y: 0.12)
+            for index in 0..<5 {
+                let angle = Double(index) * 2 * .pi / 5
+                add(SCNSphere(radius: 0.13), color: UIColor(red: 0.40, green: 0.60, blue: 0.35, alpha: 1),
+                    x: Float(cos(angle) * 0.10), y: 0.33 + Float(index % 2) * 0.09, z: Float(sin(angle) * 0.10))
+            }
+        case .lamp:
+            add(SCNCylinder(radius: 0.16, height: 0.055), color: .brown, y: 0.028)
+            add(SCNCylinder(radius: 0.018, height: 1.2), color: .brown, y: 0.62)
+            add(SCNCone(topRadius: 0.12, bottomRadius: 0.22, height: 0.28), color: .systemYellow.withAlphaComponent(0.85), y: 1.24)
+        case .rug:
+            add(SCNBox(width: 1.1, height: 0.008, length: 0.72, chamferRadius: 0.004), color: terracotta, y: 0.009)
+            add(SCNBox(width: 0.92, height: 0.008, length: 0.55, chamferRadius: 0.004), color: .systemPink.withAlphaComponent(0.7), y: 0.011)
+        case .vase:
+            add(SCNSphere(radius: 0.12), color: terracotta, y: 0.13)
+            add(SCNCylinder(radius: 0.055, height: 0.09), color: terracotta, y: 0.24)
+        }
+        if ornament.id == selected {
+            let halo = SCNPlane(width: 0.85, height: 0.85)
+            halo.firstMaterial?.diffuse.contents = Self.selectionHalo
+            halo.firstMaterial?.lightingModel = .constant
+            halo.firstMaterial?.writesToDepthBuffer = false
+            let ground = SCNNode(geometry: halo)
+            ground.eulerAngles.x = -.pi / 2
+            ground.position.y = 0.019
+            ground.castsShadow = false
+            root.addChildNode(ground)
+        }
+    }
+
+    private func addDollhouseShell(to scene: SCNScene) {
         let trim = UIColor(red: 1, green: 0.95, blue: 0.84, alpha: 1)
         let edge = UIColor(red: 0.67, green: 0.44, blue: 0.29, alpha: 1)
         let left = -room.length / 2
@@ -1000,10 +1180,16 @@ private struct NookScene: UIViewRepresentable {
         // A cutaway shell leaves the working floor and all existing placements untouched.
         box(scene, width: room.length + border * 2, height: depth, depth: room.width + border * 2,
             at: SCNVector3(0, -0.10-depth/2, 0), color: edge)
-        box(scene, width: border, height: room.height, depth: room.width + border,
-            at: SCNVector3(left-border/2, room.height/2, -border/2), color: wall)
-        box(scene, width: room.length + border, height: room.height, depth: border,
-            at: SCNVector3(-border/2, room.height/2, back-border/2), color: wall)
+        let leftWall = box(scene, width: border, height: room.height, depth: room.width + border,
+            at: SCNVector3(left-border/2, room.height/2, -border/2), color: .white)
+        let backWall = box(scene, width: room.length + border, height: room.height, depth: border,
+            at: SCNVector3(-border/2, room.height/2, back-border/2), color: .white)
+        if let material = leftWall.geometry?.firstMaterial {
+            applyTexture(room.finish.leftWall ?? room.finish.wall, to: material, repeatX: room.width / 1.7, repeatY: room.height / 1.7)
+        }
+        if let material = backWall.geometry?.firstMaterial {
+            applyTexture(room.finish.wall, to: material, repeatX: room.length / 1.7, repeatY: room.height / 1.7)
+        }
         for fraction in [0.025, 0.36, 0.975] {
             let y = room.height * fraction
             box(scene, width: border * 1.2, height: rail, depth: room.width + border,
@@ -1051,13 +1237,15 @@ private struct NookScene: UIViewRepresentable {
         let encoder = JSONEncoder()
         encoder.outputFormatting = .sortedKeys
         var geometry = room
+        geometry.schemes = []
+        geometry.finish.layout = nil
         for index in geometry.items.indices {
             if geometry.items[index].appearance != .photo { geometry.items[index].photo = nil }
             geometry.items[index].extraPhotos = nil
         }
-        return try? encoder.encode(SceneState(room: geometry, selected: selected, overhead: overhead))
+        return try? encoder.encode(SceneState(room: geometry, selected: selected, overhead: overhead, grid: grid))
     }
-    private struct SceneState: Encodable { let room: NookRoom; let selected: UUID?; let overhead: Bool }
+    private struct SceneState: Encodable { let room: NookRoom; let selected: UUID?; let overhead: Bool; let grid: Bool }
 
     @discardableResult private func box(_ scene: SCNScene, width: Double, height: Double, depth: Double,
                                       at position: SCNVector3, color: UIColor) -> SCNNode {
@@ -1071,26 +1259,86 @@ private struct NookScene: UIViewRepresentable {
         return node
     }
 
-    private func floorTexture(wood: Bool) -> UIImage {
-        let size = CGSize(width: 192, height: 192)
-        return UIGraphicsImageRenderer(size: size).image { context in
+    private func addGrid(to scene: SCNScene) {
+        let spacing = 0.25
+        let step = max(1, Int(ceil(max(room.length, room.width) / (60 * spacing))))
+        let tint = UIColor(white: 0.48, alpha: 0.38)
+        for x in stride(from: -Int(room.length / (2 * spacing)), through: Int(room.length / (2 * spacing)), by: step) {
+            box(scene, width: 0.008, height: 0.002, depth: room.width,
+                at: SCNVector3(Double(x) * spacing, 0.014, 0), color: tint)
+        }
+        for z in stride(from: -Int(room.width / (2 * spacing)), through: Int(room.width / (2 * spacing)), by: step) {
+            box(scene, width: room.length, height: 0.002, depth: 0.008,
+                at: SCNVector3(0, 0.014, Double(z) * spacing), color: tint)
+        }
+    }
+
+    private func applyTexture(_ name: String, to material: SCNMaterial, repeatX: Double, repeatY: Double) {
+        material.diffuse.contents = Self.textures.object(forKey: name as NSString) ?? {
+            let image = makeTexture(name)
+            Self.textures.setObject(image, forKey: name as NSString)
+            return image
+        }()
+        material.diffuse.wrapS = .repeat
+        material.diffuse.wrapT = .repeat
+        material.diffuse.contentsTransform = SCNMatrix4MakeScale(Float(max(1, repeatX)), Float(max(1, repeatY)), 1)
+    }
+
+    private static let textures: NSCache<NSString, UIImage> = {
+        let cache = NSCache<NSString, UIImage>()
+        cache.countLimit = 16
+        return cache
+    }()
+
+    private func makeTexture(_ name: String) -> UIImage {
+        let format = UIGraphicsImageRendererFormat()
+        format.scale = 1
+        return UIGraphicsImageRenderer(size: CGSize(width: 192, height: 192), format: format).image { context in
             let cg = context.cgContext
-            for row in 0..<6 {
-                let tone = CGFloat((row * 13) % 7) / 85
-                cg.setFillColor((wood ? UIColor(red: 0.74 + tone, green: 0.57 + tone, blue: 0.43 + tone, alpha: 1) :
-                                 UIColor(white: 0.83 + tone, alpha: 1)).cgColor)
-                cg.fill(CGRect(x: 0, y: row * 32, width: 192, height: 32))
-                cg.setFillColor(UIColor.black.withAlphaComponent(0.14).cgColor)
-                cg.fill(CGRect(x: 0, y: row * 32, width: 192, height: 1))
-                if wood {
-                    cg.fill(CGRect(x: (row * 55) % 192, y: row * 32, width: 1, height: 32))
-                    for strand in 0..<3 {
-                        cg.setFillColor(UIColor.black.withAlphaComponent(0.035).cgColor)
-                        cg.fill(CGRect(x: 0, y: row * 32 + 5 + strand * 8, width: 192, height: 1))
+            func fill(_ rect: CGRect, _ color: UIColor) {
+                cg.setFillColor(color.cgColor)
+                cg.fill(rect)
+            }
+            let cream = UIColor(red: 0.98, green: 0.90, blue: 0.79, alpha: 1)
+            let sage = UIColor(red: 0.76, green: 0.83, blue: 0.69, alpha: 1)
+            let rose = UIColor(red: 0.82, green: 0.60, blue: 0.55, alpha: 1)
+            let canvas = CGRect(x: 0, y: 0, width: 192, height: 192)
+            switch name {
+            case "木地板", "浅橡木", "木饰面":
+                fill(canvas, name == "木地板" ? UIColor(red: 0.73, green: 0.53, blue: 0.38, alpha: 1) : cream)
+                for row in 0..<8 {
+                    fill(CGRect(x: 0, y: row * 24, width: 192, height: 1), UIColor.brown.withAlphaComponent(0.35))
+                    fill(CGRect(x: (row * 53) % 192, y: row * 24, width: 1, height: 24), UIColor.brown.withAlphaComponent(0.23))
+                    for grain in 1...3 {
+                        fill(CGRect(x: 0, y: row * 24 + grain * 5, width: 192, height: 1), UIColor.brown.withAlphaComponent(0.08))
                     }
-                } else {
-                    cg.fill(CGRect(x: 96, y: row * 32, width: 1, height: 32))
                 }
+            case "瓷砖", "复古花砖", "文化砖":
+                fill(canvas, cream)
+                for row in 0..<6 {
+                    for column in 0..<6 {
+                        let tile = CGRect(x: column * 32, y: row * 32, width: 31, height: 31)
+                        fill(tile, (row + column).isMultiple(of: 2) ? sage : rose)
+                        if name == "复古花砖" {
+                            cg.setFillColor(cream.cgColor)
+                            cg.fillEllipse(in: tile.insetBy(dx: 8, dy: 8))
+                        }
+                    }
+                }
+            case "草坪", "地毯":
+                fill(canvas, name == "草坪" ? sage : rose)
+                for index in 0..<480 {
+                    fill(CGRect(x: (index * 37) % 192, y: (index * 73 + index / 12) % 192, width: 2, height: 3),
+                         UIColor.white.withAlphaComponent(0.12))
+                }
+            case "条纹墙纸":
+                fill(canvas, cream)
+                for x in stride(from: 0, to: 192, by: 24) {
+                    fill(CGRect(x: x, y: 0, width: 8, height: 192), sage)
+                }
+            case "灰绿": fill(canvas, sage)
+            case "浅蓝": fill(canvas, UIColor(red: 0.74, green: 0.85, blue: 0.89, alpha: 1))
+            default: fill(canvas, cream)
             }
         }
     }
@@ -1173,12 +1421,66 @@ private struct NookScene: UIViewRepresentable {
                 root.addChildNode(picture)
             }
         }
-        if room.placementWarning(item) != nil {
-            part(1, 0.018, 1, 0.009, .systemRed)
-        } else if selected == item.id {
-            part(1, 0.012, 1, 0.006, UIColor(red: 0.93, green: 0.62, blue: 0.25, alpha: 1))
+        if !isolated {
+            let shadow = SCNPlane(width: 1.20, height: 1.20)
+            let warning = room.placementWarning(item) != nil
+            shadow.firstMaterial?.diffuse.contents = warning ? Self.warningHalo : selected == item.id ? Self.selectionHalo : Self.contactShadow
+            shadow.firstMaterial?.lightingModel = .constant
+            shadow.firstMaterial?.writesToDepthBuffer = false
+            let ground = SCNNode(geometry: shadow)
+            ground.eulerAngles.x = -.pi / 2
+            ground.position.y = 0.02 / root.scale.y
+            ground.castsShadow = false
+            root.addChildNode(ground)
+            if item.status == "闲置" && !item.preview {
+                let badge = SCNPlane(width: 0.49, height: 0.22)
+                badge.firstMaterial?.diffuse.contents = Self.idleBadge
+                badge.firstMaterial?.lightingModel = .constant
+                badge.firstMaterial?.isDoubleSided = true
+                let label = SCNNode(geometry: badge)
+                label.position = SCNVector3(0.31, 1.10, 0)
+                label.constraints = [SCNBillboardConstraint()]
+                label.castsShadow = false
+                root.addChildNode(label)
+            }
         }
         return root
+    }
+
+    private static let warningHalo = halo(.systemRed, opacity: 0.56)
+    private static let selectionHalo = halo(.systemOrange, opacity: 0.56)
+    private static let contactShadow = halo(.black, opacity: 0.19)
+
+    private static func halo(_ tint: UIColor, opacity: CGFloat) -> UIImage {
+        let size = CGSize(width: 48, height: 48)
+        return UIGraphicsImageRenderer(size: size).image { context in
+            let center = CGPoint(x: 24, y: 24)
+            if let gradient = CGGradient(colorsSpace: CGColorSpaceCreateDeviceRGB(),
+                                         colors: [tint.withAlphaComponent(opacity).cgColor, tint.withAlphaComponent(0).cgColor] as CFArray,
+                                         locations: [0, 1]) {
+                context.cgContext.drawRadialGradient(gradient, startCenter: center, startRadius: 7,
+                                                     endCenter: center, endRadius: 24, options: [])
+            }
+        }
+    }
+
+    private static let idleBadge = UIGraphicsImageRenderer(size: CGSize(width: 65, height: 30)).image { _ in
+        UIColor(red: 0.92, green: 0.82, blue: 0.64, alpha: 1).setFill()
+        UIBezierPath(roundedRect: CGRect(x: 0, y: 0, width: 65, height: 30), cornerRadius: 9).fill()
+        ("闲置" as NSString).draw(at: CGPoint(x: 15, y: 5),
+                               withAttributes: [.font: UIFont.systemFont(ofSize: 16, weight: .semibold), .foregroundColor: UIColor.brown])
+    }
+
+    private func snappedPosition(_ point: SCNVector3, item id: UUID) -> SCNVector3 {
+        guard snap else { return point }
+        let (halfWidth, halfDepth) = room.items.first(where: { $0.id == id })?.footprint ?? (0, 0)
+        func align(_ position: Float, wall: Double) -> Float {
+            let value = Double(position)
+            if wall >= 0 && abs(abs(value) - wall) < 0.13 { return Float(value < 0 ? -wall : wall) }
+            return Float((value / 0.25).rounded() * 0.25)
+        }
+        return SCNVector3(align(point.x, wall: room.length / 2 - halfWidth), 0,
+                          align(point.z, wall: room.width / 2 - halfDepth))
     }
 
     final class Coordinator: NSObject, UIGestureRecognizerDelegate {
@@ -1264,7 +1566,8 @@ private struct NookScene: UIViewRepresentable {
                 let current = parent.selected.flatMap { ids.firstIndex(of: $0) } ?? -1
                 parent.select(ids[(current + 1) % ids.count])
             } else if parent.overhead, let id = parent.selected, let floor = floorPoint(point, in: view) {
-                _ = parent.move(id, Double(floor.x), Double(floor.z))
+                let point = parent.snappedPosition(floor, item: id)
+                _ = parent.move(id, Double(point.x), Double(point.z))
             }
         }
 
@@ -1285,7 +1588,7 @@ private struct NookScene: UIViewRepresentable {
                 let radius = hypot(Double(camera.position.x), Double(camera.position.z))
                 camera.position.x = Float(sin(next) * radius)
                 camera.position.z = Float(cos(next) * radius)
-                camera.look(at: SCNVector3(0, parent.room.height * 0.28, 0))
+                camera.look(at: SCNVector3(0, parent.room.height * 0.30, 0))
                 if gesture.state == .ended || gesture.state == .cancelled || gesture.state == .failed { orbitAngle = nil }
                 return
             }
@@ -1301,10 +1604,11 @@ private struct NookScene: UIViewRepresentable {
             }
             let x = drag.original.x + position.x - drag.anchor.x
             let z = drag.original.z + position.z - drag.anchor.z
-            drag.node.position = SCNVector3(x, 0, z)
+            let target = parent.snappedPosition(SCNVector3(x, 0, z), item: drag.id)
+            drag.node.position = target
             if gesture.state == .ended {
                 moving = nil
-                if !parent.move(drag.id, Double(x), Double(z)) { drag.node.position = drag.original }
+                if !parent.move(drag.id, Double(target.x), Double(target.z)) { drag.node.position = drag.original }
                 if parent.overhead { parent.select(drag.id) }
             }
         }
