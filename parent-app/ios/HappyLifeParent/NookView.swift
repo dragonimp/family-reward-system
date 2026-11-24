@@ -18,6 +18,24 @@ private struct NookRoom: Codable, Identifiable {
     var finish = NookFinish()
     var schemes: [NookFinish] = []
     var items: [NookItem] = []
+    var door: Double?
+    var window: Double?
+    var aisle: Double?
+    var quietWarnings: Bool?
+}
+
+private extension NookRoom {
+    func placementWarning(_ item: NookItem) -> String? {
+        let (x, z) = item.footprint
+        let wall = min(length / 2 - abs(item.x) - x, width / 2 - abs(item.z) - z)
+        if wall < -0.001 || item.height * item.scale / 100 > height { return "物品超出房间边界。" }
+        if let door, abs(item.x - (door - 0.5) * length) < x + 0.45, width / 2 - item.z - z < 0.9 { return "物品占用门前空间。" }
+        if let window, abs(item.x - (window - 0.5) * length) < x + 0.50,
+           width / 2 + item.z - z < 0.35, item.height * item.scale / 100 > 90 / 100.0 { return "物品遮挡窗户。" }
+        if items.contains(where: { $0.id != item.id && $0.status != "已转出" && item.overlaps($0) }) { return "与另一件物品重叠。" }
+        if wall < (aisle ?? 0.6) { return "物品与墙之间的距离小于过道阈值。" }
+        return nil
+    }
 }
 
 private struct NookFinish: Codable, Identifiable {
@@ -25,10 +43,13 @@ private struct NookFinish: Codable, Identifiable {
     var wall = "暖白"
     var floor = "木地板"
     var light = "日间"
+    var brightness: Double?
+    var name: String?
+    var layout: [NookItem]?
 }
 
 private enum NookMaterial: String, CaseIterable, Identifiable {
-    case cabinet = "木质收纳柜", sofa = "布艺沙发", table = "木桌", bed = "软包床", appliance = "家电", photo = "我的物品照片"
+    case cabinet = "木质收纳柜", sofa = "布艺沙发", table = "木桌", bed = "软包床", appliance = "家电", none = "无匹配模型", photo = "我的物品照片"
     var id: String { rawValue }
 }
 
@@ -48,6 +69,17 @@ private struct NookItem: Codable, Identifiable {
     var idle = false
     var photo: Data?
     var material: String?
+    var extraPhotos: [Data]?
+    var purchaseDate: Date?
+    var purchasePrice: Double?
+    var condition: String?
+    var note: String?
+    var saleState: String?
+    var status: String { saleState ?? (idle ? "闲置" : "在用") }
+    var photos: [Data] { (photo.map { [$0] } ?? []) + (extraPhotos ?? []) }
+    var saleDescription: String {
+        "\(name)\n尺寸：\(Int(length)) × \(Int(width)) × \(Int(height)) cm\n参考售价：\(value.formatted(.currency(code: "CNY")))\n成色：\(condition ?? "未填写")\n\(note ?? "")"
+    }
 
     var appearance: NookMaterial {
         if let material, let choice = NookMaterial(rawValue: material), choice != .photo || photo != nil { return choice }
@@ -113,7 +145,13 @@ struct NookView: View {
             }
             .navigationDestination(for: UUID.self) { id in
                 if let index = rooms.firstIndex(where: { $0.id == id }) {
-                    NookRoomView(room: rooms[index], save: { store($0) })
+                    NookRoomView(room: rooms[index], destinations: rooms.filter { $0.id != id }, save: { store($0) },
+                                 transfer: { items, destination in transfer(items, from: id, to: destination) },
+                                 delete: { destination in
+                    let success = transfer(Set((rooms.first { $0.id == id }?.items ?? []).filter { !$0.preview }.map(\.id)), from: id, to: destination, deleting: true)
+                    if success, path.last == id { path.removeLast() }
+                    return success
+                })
                 }
             }
             .sheet(item: $draft) { room in
@@ -137,6 +175,25 @@ struct NookView: View {
         var updated = rooms
         if let index = updated.firstIndex(where: { $0.id == room.id }) { updated[index] = room }
         else { updated.append(room) }
+        return saveArchive(updated)
+    }
+
+    private func transfer(_ ids: Set<UUID>, from source: UUID, to destination: UUID?, deleting: Bool = false) -> Bool {
+        guard !readFailed, let from = rooms.firstIndex(where: { $0.id == source }) else { return false }
+        var next = rooms
+        let items = next[from].items.filter { ids.contains($0.id) && !$0.preview }
+        if !items.isEmpty {
+            guard let destination, destination != source,
+                  let to = next.firstIndex(where: { $0.id == destination }),
+                  Set(next[to].items.map(\.id)).isDisjoint(with: items.map(\.id)) else { return false }
+            next[to].items += items
+            next[from].items.removeAll { ids.contains($0.id) && !$0.preview }
+        }
+        if deleting { next.remove(at: from) }
+        return saveArchive(next)
+    }
+
+    private func saveArchive(_ updated: [NookRoom]) -> Bool {
         do {
             try FileManager.default.createDirectory(at: archive.deletingLastPathComponent(), withIntermediateDirectories: true)
             try JSONEncoder().encode(updated).write(to: archive, options: [.atomic, .completeFileProtection])
@@ -167,6 +224,20 @@ private struct NookRoomForm: View {
                     number("宽（米）", $room.width)
                     number("高（米）", $room.height)
                     TextField("备注", text: $room.note, axis: .vertical)
+                }
+                Section("门窗与摆放规则") {
+                    Toggle("门（前墙）", isOn: Binding(get: { room.door != nil }, set: { room.door = $0 ? 0.5 : nil }))
+                    if room.door != nil {
+                        Slider(value: Binding(get: { room.door ?? 0.5 }, set: { room.door = $0 }), in: 0.1...0.9)
+                            .accessibilityLabel("门在前墙上的位置")
+                    }
+                    Toggle("窗（后墙）", isOn: Binding(get: { room.window != nil }, set: { room.window = $0 ? 0.5 : nil }))
+                    if room.window != nil {
+                        Slider(value: Binding(get: { room.window ?? 0.5 }, set: { room.window = $0 }), in: 0.1...0.9)
+                            .accessibilityLabel("窗在后墙上的位置")
+                    }
+                    number("过道阈值（米）", Binding(get: { room.aisle ?? 0.6 }, set: { room.aisle = min(3, max(0.2, $0)) }))
+                    Toggle("关闭落位弹窗", isOn: Binding(get: { room.quietWarnings ?? false }, set: { room.quietWarnings = $0 }))
                 }
                 Section("地址") {
                     TextField("搜索地址", text: $search)
@@ -222,7 +293,21 @@ private func number(_ label: String, _ value: Binding<Double>) -> some View {
 
 private struct NookRoomView: View {
     @State var room: NookRoom
+    let destinations: [NookRoom]
     let save: (NookRoom) -> Bool
+    let transfer: (Set<UUID>, UUID?) -> Bool
+    let delete: (UUID?) -> Bool
+    @AppStorage("moment.nook.centimeters") private var centimeters = false
+    @State private var previewTab = false
+    @State private var catalog = false
+    @State private var detail: NookItem?
+    @State private var batch = false
+    @State private var checked: Set<UUID> = []
+    @State private var targetDialog = false
+    @State private var deletingRoom = false
+    @State private var confirmEmptyDelete = false
+    @State private var warningDialog = false
+    @State private var cameraRevision = 0
     @State private var selected: UUID?
     @State private var itemDraft: NookItem?
     @State private var enlarged: NookItem?
@@ -234,33 +319,39 @@ private struct NookRoomView: View {
     @State private var placementError: String?
     @State private var orientationError = false
 
-    private var assets: [NookItem] { room.items.filter { !$0.preview } }
+    private var assets: [NookItem] { room.items.filter { !$0.preview && $0.status != "已转出" } }
     private var visibleItems: [NookItem] {
-        room.items.filter { filter.isEmpty || $0.name.localizedStandardContains(filter) || $0.category.localizedStandardContains(filter) }
+        room.items.filter { $0.preview == previewTab && $0.status != "已转出" && (filter.isEmpty || $0.name.localizedStandardContains(filter) || $0.category.localizedStandardContains(filter)) }
     }
 
     private func roomCanvas(height: CGFloat) -> some View {
         VStack(alignment: .leading, spacing: 8) {
+            if !room.address.isEmpty { Text(room.address).font(.caption).lineLimit(1) }
+            Text([room.length, room.width, room.height].map { (centimeters ? $0 * 100 : $0).formatted(.number.precision(.fractionLength(0...2))) }.joined(separator: " × ") + (centimeters ? " cm" : " m"))
+                .font(.caption).foregroundStyle(.secondary)
             NookScene(room: room, selected: selected, overhead: overhead) { id, x, z in
                 guard let index = room.items.firstIndex(where: { $0.id == id }) else { return false }
                 var next = room
                 next.items[index].x = x
                 next.items[index].z = z
-                if let reason = blocked(next.items[index], in: next) {
-                    placementError = reason
-                    return false
-                }
-                placementError = nil
                 guard persist(next) else { saveError = true; return false }
+                placementError = next.placementWarning(next.items[index])
+                if placementError != nil && room.quietWarnings != true { warningDialog = true }
                 return true
             } select: { id in
                 selected = id
-                if !overhead { enlarged = room.items.first { $0.id == id } }
             }
+            .id(cameraRevision)
             .frame(height: height)
             .clipShape(RoundedRectangle(cornerRadius: 20))
+            HStack {
+                Button("俯视图", systemImage: "view.2d") { overhead = true; cameraRevision += 1 }
+                Spacer()
+                Button("人眼视角", systemImage: "view.3d") { overhead = false; cameraRevision += 1 }
+            }.font(.caption)
             Toggle("俯视摆放", isOn: $overhead)
-            Text(overhead ? "直接拖动物品；也可先选物品，再点空位。" : "拖动物品可搬动。拖空白处旋转视角，双指缩放。")
+                .accessibilityHint("开启后锁定正交俯视图，关闭后可透视漫游")
+            Text("拖空白旋转 · 双指捏合缩放 · 双指平移 · 点选后拖动物品")
                 .font(.caption).foregroundStyle(.secondary)
             if let placementError {
                 Text(placementError).font(.caption).foregroundStyle(.orange)
@@ -276,31 +367,64 @@ private struct NookRoomView: View {
     }
 
     private var assetSection: some View {
-        Section("资产与预览") {
-            LabeledContent("自有资产", value: "\(assets.count) 件")
-            LabeledContent("参考总值", value: assets.reduce(0) { $0 + $1.value }.formatted(.currency(code: "CNY")))
+        Section {
+            Picker("物品范围", selection: $previewTab) {
+                Text("自有资产").tag(false)
+                Text("意向预览").tag(true)
+            }.pickerStyle(.segmented)
+            .onChange(of: previewTab) { _, _ in checked.removeAll() }
+            if !previewTab {
+                LabeledContent("数量 / 参考总值", value: "\(assets.count) 件 · \(assets.reduce(0) { $0 + $1.value }.formatted(.currency(code: "CNY")))")
+            }
             TextField("搜索名称或类别", text: $filter)
+            Button(batch ? "完成批量操作" : "批量操作") { batch.toggle(); checked.removeAll() }
             ForEach(visibleItems) { item in
-                Button {
-                    selected = item.id
-                    enlarged = item
-                } label: {
-                    HStack {
-                        Label(item.name, systemImage: selected == item.id ? "checkmark.circle.fill" : "cube")
-                        Spacer()
-                        Text(item.preview ? "意向预览" : item.category).foregroundStyle(.secondary)
-                    }
-                }
-                .contextMenu {
-                    Button("编辑") { itemDraft = item }
-                    Button("移除", role: .destructive) {
-                        update { $0.items.removeAll { $0.id == item.id } }
-                        if selected == item.id { selected = nil }
+                HStack {
+                    Button {
+                        if batch {
+                            if checked.contains(item.id) { checked.remove(item.id) } else { checked.insert(item.id) }
+                        } else { selected = item.id; overhead = true }
+                    } label: {
+                        Label(item.name, systemImage: batch ? (checked.contains(item.id) ? "checkmark.circle.fill" : "circle") : (item.preview ? "cube.transparent" : "shippingbox.fill"))
+                            .foregroundStyle(item.preview ? Color.secondary : Color.primary)
+                    }.buttonStyle(.borderless)
+                    Spacer()
+                    if !item.preview && item.status != "在用" { Text(item.status).font(.caption).foregroundStyle(.orange) }
+                    if !batch {
+                        Button("详情", systemImage: "info.circle") { detail = item }
+                            .labelStyle(.iconOnly).buttonStyle(.borderless)
                     }
                 }
             }
-            Button("录入自有物品", systemImage: "plus") { itemDraft = NookItem() }
-            Button("添加意向预览", systemImage: "cube.transparent") { itemDraft = NookItem(preview: true) }
+            if batch && !checked.isEmpty {
+                if previewTab {
+                    Button("移除选中意向物品", role: .destructive) {
+                        update { $0.items.removeAll { $0.preview && checked.contains($0.id) } }
+                        checked.removeAll()
+                    }
+                } else {
+                    Button("标记选中物品为闲置") {
+                        update { next in
+                            for index in next.items.indices where checked.contains(next.items[index].id) { next.items[index].saleState = "闲置" }
+                        }
+                        checked.removeAll()
+                    }
+                    Button("移动选中物品到其他房间") { deletingRoom = false; targetDialog = true }
+                        .disabled(destinations.isEmpty)
+                }
+            }
+            if previewTab {
+                Button("添加意向商品预览", systemImage: "cube.transparent") { catalog = true }
+            } else {
+                Button("录入自有物品", systemImage: "plus") { itemDraft = NookItem() }
+                if room.items.contains(where: { $0.status == "已转出" }) {
+                    NavigationLink("历史转出记录") {
+                        List(room.items.filter { $0.status == "已转出" }) { item in
+                            Button(item.name) { detail = item }
+                        }.navigationTitle("历史转出记录")
+                    }
+                }
+            }
         }
     }
 
@@ -328,8 +452,50 @@ private struct NookRoomView: View {
             ToolbarItem(placement: .topBarTrailing) {
                 Menu("房间操作", systemImage: "ellipsis.circle") {
                     Button("编辑房间", systemImage: "pencil") { editRoom = true }
-                    Button("虚拟装修", systemImage: "paintpalette") { decorate = true }
+                    Button("虚拟装修与摆放方案", systemImage: "paintpalette") { decorate = true }
+                    Toggle("以厘米显示房间尺寸", isOn: $centimeters)
+                    Button("删除房间", systemImage: "trash", role: .destructive) {
+                        deletingRoom = true
+                        if room.items.contains(where: { !$0.preview }) { targetDialog = true }
+                        else { confirmEmptyDelete = true }
+                    }
                 }
+            }
+        }
+        .confirmationDialog(deletingRoom ? "先转移自有资产，再删除房间" : "选择目标房间", isPresented: $targetDialog, titleVisibility: .visible) {
+            ForEach(destinations) { target in
+                Button(target.name) {
+                    if deletingRoom {
+                        if !delete(target.id) { saveError = true }
+                    } else if transfer(checked, target.id) {
+                        room.items.removeAll { checked.contains($0.id) && !$0.preview }
+                        checked.removeAll()
+                    } else { saveError = true }
+                }
+            }
+            Button("取消", role: .cancel) {}
+        } message: {
+            Text(destinations.isEmpty ? "请先创建一个接收资产的房间。" : "移动后请在目标房间重新核对摆放位置。")
+        }
+        .alert("删除这个房间及其预览方案？", isPresented: $confirmEmptyDelete) {
+            Button("删除", role: .destructive) { if !delete(nil) { saveError = true } }
+            Button("取消", role: .cancel) {}
+        }
+        .alert("摆放提醒", isPresented: $warningDialog) {
+            Button("知道了", role: .cancel) {}
+        } message: { Text(placementError ?? "") }
+        .sheet(item: $detail) { item in
+            NookAssetDetails(item: item) {
+                detail = nil
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) { itemDraft = item }
+            }
+        }
+        .sheet(isPresented: $catalog) {
+            NookCatalog { model in
+                var item = NookItem(name: model.rawValue, preview: true)
+                item.material = model.rawValue
+                catalog = false
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) { itemDraft = item }
             }
         }
         .fullScreenCover(item: $enlarged) { item in
@@ -368,25 +534,7 @@ private struct NookRoomView: View {
         if !persist(next) { saveError = true }
     }
 
-    private func blocked(_ item: NookItem, in room: NookRoom) -> String? {
-        let (x, z) = item.footprint
-        if abs(item.x) + x > room.length / 2 + 0.001 ||
-            abs(item.z) + z > room.width / 2 + 0.001 ||
-            item.height * item.scale / 100 > room.height {
-            return "放不下：超出房间边界。"
-        }
-        if room.items.contains(where: { $0.id != item.id && item.overlaps($0) }) {
-            return "这个位置已有物品，请拖到空位。"
-        }
-        return nil
-    }
-
-    private func warning(_ item: NookItem) -> String? {
-        if let reason = blocked(item, in: room) { return reason }
-        let (x, z) = item.footprint
-        let clearance = min(room.length / 2 - abs(item.x) - x, room.width / 2 - abs(item.z) - z)
-        return clearance < 0.6 ? "距最近墙面不足 60 厘米。" : nil
-    }
+    private func warning(_ item: NookItem) -> String? { room.placementWarning(item) }
 }
 
 private struct NookItemForm: View {
@@ -398,6 +546,9 @@ private struct NookItemForm: View {
     @State private var photo: PhotosPickerItem?
     @State private var recognitionStatus: String?
     @State private var recognizing = false
+    @State private var unlockScale = false
+    @State private var invalidDimensions = false
+    @State private var gallery: [PhotosPickerItem] = []
 
     @MainActor private func recognize(_ load: () async throws -> Data?) async {
         guard !recognizing else { return }
@@ -416,7 +567,8 @@ private struct NookItemForm: View {
                 image.draw(in: CGRect(origin: .zero, size: size))
             }
             guard let jpeg = thumb.jpegData(compressionQuality: 0.72) else { throw CocoaError(.fileWriteUnknown) }
-            item.photo = jpeg
+            if item.photo == nil { item.photo = jpeg }
+            else if item.photos.count < 9 { item.extraPhotos = (item.extraPhotos ?? []) + [jpeg] }
             if let candidate = try await NookPhotoRecognition.suggest(jpeg) {
                 if item.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { item.name = candidate.name; item.category = candidate.category }
                 recognitionStatus = "识别建议：\(candidate.name) · \(candidate.category)。请核对后保存。"
@@ -433,22 +585,42 @@ private struct NookItemForm: View {
             Form {
                 if !item.preview {
                     Section("照片识别") {
-                        if let data = item.photo, let image = UIImage(data: data) {
-                            Image(uiImage: image).resizable().scaledToFit().frame(maxHeight: 160)
+                        ScrollView(.horizontal) {
+                            HStack {
+                                ForEach(Array(item.photos.enumerated()), id: \.offset) { index, data in
+                                    if let image = UIImage(data: data) {
+                                        Image(uiImage: image).resizable().scaledToFill().frame(width: 90, height: 90).clipped()
+                                            .contextMenu {
+                                                Button("移除照片", role: .destructive) {
+                                                    var current = item.photos
+                                                    current.remove(at: index)
+                                                    item.photo = current.first
+                                                    item.extraPhotos = Array(current.dropFirst())
+                                                }
+                                            }
+                                    }
+                                }
+                            }
                         }
+                        if item.photos.count < 9 {
+                        PhotosPicker(selection: $gallery, maxSelectionCount: max(1, 9 - item.photos.count), matching: .images) {
+                            Label("添加多张实物照片", systemImage: "photo.on.rectangle")
+                        }.disabled(recognizing)
+
                         if UIImagePickerController.isSourceTypeAvailable(.camera) {
                             Button("拍照识别", systemImage: "camera") { camera = true }.disabled(recognizing)
                         }
                         PhotosPicker(selection: $photo, matching: .images) {
                             Label("选照片识别", systemImage: "photo")
                         }.disabled(recognizing)
+                        }
                         if recognizing { ProgressView("正在设备上识别…") }
                         if let recognitionStatus { Text(recognitionStatus).font(.footnote).foregroundStyle(.secondary) }
                     }
                 }
                 TextField("物品名称", text: $item.name)
                 Picker("分类", selection: $item.category) {
-                    ForEach(["家具","家电","收纳","厨具","服饰","其他"], id: \.self) { Text($0).tag($0) }
+                    ForEach(Array(Set(["家具","家电","软装","厨卫","杂物","其他", item.category])).sorted(), id: \.self) { Text($0).tag($0) }
                 }
                 Picker("房间内的展示", selection: Binding(get: { item.appearance }, set: { item.material = $0.rawValue })) {
                     ForEach(NookMaterial.allCases.filter { $0 != .photo || item.photo != nil }) { choice in
@@ -459,18 +631,32 @@ private struct NookItemForm: View {
                 number("宽（厘米）", $item.width)
                 number("高（厘米）", $item.height)
                 Stepper("旋转 \(Int(item.rotation))°", value: $item.rotation, in: 0...360, step: 15)
-                Stepper("比例 \(item.scale.formatted(.percent))", value: $item.scale, in: 0.25...3, step: 0.25)
+                Toggle("允许修改模型比例", isOn: $unlockScale)
+                Stepper("比例 \(item.scale.formatted(.percent))", value: $item.scale, in: 0.25...3, step: 0.25).disabled(!unlockScale)
+                Text("比例默认 100%，修改后会影响真实尺寸参考。").font(.caption).foregroundStyle(.secondary)
                 if !item.preview {
                     number("参考价值（元）", $item.value)
-                    Toggle("标记闲置", isOn: $item.idle)
-                    if item.idle {
-                        ShareLink(item: "\(item.name)\n分类：\(item.category)\n尺寸：\(item.length.formatted()) × \(item.width.formatted()) × \(item.height.formatted()) 厘米\n参考价：\(item.value.formatted(.currency(code: "CNY")))") {
-                            Label("分享闲置资料", systemImage: "square.and.arrow.up")
-                        }
+                    Toggle("记录购入日期", isOn: Binding(get: { item.purchaseDate != nil }, set: { item.purchaseDate = $0 ? Date() : nil }))
+                    if item.purchaseDate != nil {
+                        DatePicker("购入日期", selection: Binding(get: { item.purchaseDate ?? Date() }, set: { item.purchaseDate = $0 }), displayedComponents: .date)
+                    }
+                    number("购入价格（元）", Binding(get: { item.purchasePrice ?? 0 }, set: { item.purchasePrice = $0 }))
+                    TextField("成色", text: Binding(get: { item.condition ?? "" }, set: { item.condition = $0 }))
+                    TextField("备注", text: Binding(get: { item.note ?? "" }, set: { item.note = $0 }), axis: .vertical)
+                    Picker("物品状态", selection: Binding(get: { item.status }, set: { item.saleState = $0; item.idle = $0 == "闲置" })) {
+                        ForEach(["在用", "闲置", "待出售", "已转出"], id: \.self) { Text($0).tag($0) }
                     }
                 }
                 if error { Text("保存失败，请重试。").foregroundStyle(.red) }
             }
+            .task(id: gallery) {
+                for selection in gallery where item.photos.count < 9 {
+                    await recognize { try await selection.loadTransferable(type: Data.self) }
+                }
+            }
+            .alert("请检查尺寸", isPresented: $invalidDimensions) {
+                Button("好", role: .cancel) {}
+            } message: { Text("长宽高必须在 1 到 10000 厘米之间，金额不能为负。") }
             .task(id: photo) {
                 guard let photo else { return }
                 await recognize { try await photo.loadTransferable(type: Data.self) }
@@ -496,9 +682,13 @@ private struct NookItemForm: View {
                 ToolbarItem(placement: .confirmationAction) {
                     Button("保存") {
                         item.name = item.name.trimmingCharacters(in: .whitespacesAndNewlines)
+                        guard [item.length,item.width,item.height].allSatisfy({ (1...10000).contains($0) }),
+                              (0...100000000).contains(item.value), (0...100000000).contains(item.purchasePrice ?? 0) else {
+                            invalidDimensions = true
+                            return
+                        }
                         if save(item) { dismiss() } else { error = true }
-                    }.disabled(recognizing || item.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ||
-                                ![item.length,item.width,item.height].allSatisfy { (1...10000).contains($0) } || !(0...100000000).contains(item.value))
+                    }.disabled(recognizing || item.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                 }
             }
         }
@@ -538,6 +728,53 @@ private enum NookPhotoRecognition {
     }
 }
 
+private struct NookCatalog: View {
+    @Environment(\.dismiss) private var dismiss
+    @State private var query = ""
+    let add: (NookMaterial) -> Void
+    var body: some View {
+        NavigationStack {
+            List(NookMaterial.allCases.filter {
+                $0 != .none && $0 != .photo && (query.isEmpty || $0.rawValue.localizedStandardContains(query))
+            }) { model in
+                Button(model.rawValue, systemImage: "cube.transparent") { add(model) }
+            }
+            .searchable(text: $query, prompt: "搜索家具或家电")
+            .navigationTitle("内置模型库")
+            .toolbar { Button("关闭") { dismiss() } }
+        }
+    }
+}
+
+private struct NookAssetDetails: View {
+    @Environment(\.dismiss) private var dismiss
+    let item: NookItem
+    let edit: () -> Void
+    var body: some View {
+        NavigationStack {
+            List {
+                LabeledContent("分类", value: item.category)
+                LabeledContent("状态", value: item.preview ? "意向预览" : item.status)
+                LabeledContent("尺寸", value: "\(item.length.formatted()) × \(item.width.formatted()) × \(item.height.formatted()) cm")
+                LabeledContent("参考价值", value: item.value.formatted(.currency(code: "CNY")))
+                if let date = item.purchaseDate { LabeledContent("购入日期", value: date.formatted(date: .abbreviated, time: .omitted)) }
+                if let price = item.purchasePrice { LabeledContent("购入价格", value: price.formatted(.currency(code: "CNY"))) }
+                if let condition = item.condition, !condition.isEmpty { LabeledContent("成色", value: condition) }
+                if let note = item.note, !note.isEmpty { Text(note) }
+                ForEach(Array(item.photos.enumerated()), id: \.offset) { _, bytes in
+                    if let image = UIImage(data: bytes) { Image(uiImage: image).resizable().scaledToFit() }
+                }
+                if ["闲置", "待出售"].contains(item.status), !item.preview {
+                    ShareLink(item: item.saleDescription) { Label("分享出售草稿文字", systemImage: "square.and.arrow.up") }
+                }
+                Button("编辑物品", systemImage: "pencil", action: edit)
+            }
+            .navigationTitle(Text(verbatim: item.name))
+            .toolbar { Button("关闭") { dismiss() } }
+        }
+    }
+}
+
 private struct NookItemPreview: View {
     @Environment(\.dismiss) private var dismiss
     let item: NookItem
@@ -570,6 +807,7 @@ private struct NookDecorationView: View {
     @State var room: NookRoom
     let save: (NookRoom) -> Bool
     @State private var error = false
+    @State private var schemeName = ""
     var body: some View {
         NavigationStack {
             Form {
@@ -577,13 +815,35 @@ private struct NookDecorationView: View {
                 Picker("墙面", selection: $room.finish.wall) { ForEach(["暖白","灰绿","浅蓝"], id: \.self) { Text($0).tag($0) } }
                 Picker("地面", selection: $room.finish.floor) { ForEach(["木地板","瓷砖"], id: \.self) { Text($0).tag($0) } }
                 Picker("灯光", selection: $room.finish.light) { ForEach(["日间","暖色"], id: \.self) { Text($0).tag($0) } }
+                Slider(value: Binding(get: { room.finish.brightness ?? 1 }, set: { room.finish.brightness = $0 }), in: 0.35...1.5)
+                    .accessibilityLabel("灯光亮度")
                 ForEach(Array(room.schemes.enumerated()), id: \.element.id) { index, scheme in
-                    Button("方案 \(index + 1)：\(scheme.wall) · \(scheme.floor) · \(scheme.light)") { room.finish = scheme }
+                    Button(scheme.name ?? "方案 \(index + 1)") {
+                        room.finish = scheme
+                        room.finish.layout = nil
+                        if let layout = scheme.layout {
+                            for index in room.items.indices {
+                                guard let saved = layout.first(where: { $0.id == room.items[index].id }) else { continue }
+                                room.items[index].x = saved.x
+                                room.items[index].z = saved.z
+                                room.items[index].rotation = saved.rotation
+                            }
+                        }
+                    }
                 }
+                TextField("方案名称", text: $schemeName)
                 Button("另存方案") {
                     var scheme = room.finish
                     scheme.id = UUID()
+                    scheme.name = schemeName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "方案 \(room.schemes.count + 1)" : schemeName
+                    scheme.layout = room.items.map { item in
+                        var copy = item
+                        copy.photo = nil
+                        copy.extraPhotos = nil
+                        return copy
+                    }
                     room.schemes.append(scheme)
+                    schemeName = ""
                 }
                 if error { Text("保存失败，请重试。").foregroundStyle(.red) }
             }.navigationTitle("虚拟装修")
@@ -642,6 +902,11 @@ private struct NookScene: UIViewRepresentable {
         let drag = UIPanGestureRecognizer(target: context.coordinator, action: #selector(Coordinator.drag(_:)))
         drag.maximumNumberOfTouches = 1
         drag.delegate = context.coordinator
+        let pan = UIPanGestureRecognizer(target: context.coordinator, action: #selector(Coordinator.panCanvas(_:)))
+        pan.minimumNumberOfTouches = 2
+        pan.maximumNumberOfTouches = 2
+        pan.delegate = context.coordinator
+        view.addGestureRecognizer(pan)
         let pinch = UIPinchGestureRecognizer(target: context.coordinator, action: #selector(Coordinator.zoom(_:)))
         pinch.delegate = context.coordinator
         view.addGestureRecognizer(pinch)
@@ -657,6 +922,7 @@ private struct NookScene: UIViewRepresentable {
         if coordinator.sceneKey == sceneKey { return }
         let previousCamera = coordinator.lastOverhead == overhead ? view.pointOfView : nil
         let zoom = previousCamera?.camera?.orthographicScale
+        let fieldOfView = previousCamera?.camera?.fieldOfView
         coordinator.lastOverhead = overhead
         coordinator.sceneKey = sceneKey
         let scene = SCNScene()
@@ -672,8 +938,16 @@ private struct NookScene: UIViewRepresentable {
             material.diffuse.wrapT = .repeat
             material.diffuse.contentsTransform = SCNMatrix4MakeScale(Float(max(1, room.length / 1.8)), 5, 1)
         }
-        if !isolated { addDollhouseShell(to: scene, wall: wall) }
-        for item in room.items { scene.rootNode.addChildNode(assetNode(item)) }
+        if !isolated {
+            addDollhouseShell(to: scene, wall: wall)
+            if let door = room.door {
+                box(scene, width: min(0.90, room.length), height: 0.015, depth: 0.20,
+                    at: SCNVector3((door - 0.5) * room.length, 0.009, room.width / 2 - 0.10), color: .systemMint)
+            }
+        }
+        for item in room.items where item.status != "已转出" && item.appearance != .none {
+            scene.rootNode.addChildNode(assetNode(item))
+        }
         let camera = SCNNode()
         camera.camera = SCNCamera()
         let extent = max(room.length, room.width, room.height)
@@ -684,9 +958,9 @@ private struct NookScene: UIViewRepresentable {
             camera.camera?.usesOrthographicProjection = true
             camera.camera?.orthographicScale = zoom ?? extent * 1.35
         } else {
-            camera.camera?.usesOrthographicProjection = true
-            camera.camera?.orthographicScale = zoom ?? max(room.height * 1.4, (room.length + room.width) * 0.62)
-            camera.position = SCNVector3(extent * 1.32, extent * 1.92, extent * 1.32)
+            camera.camera?.usesOrthographicProjection = false
+            camera.camera?.fieldOfView = fieldOfView ?? 44
+            camera.position = SCNVector3(extent * 1.20, extent * 1.30, extent * 1.20)
             camera.look(at: SCNVector3(0, room.height * 0.28, 0))
             if let previousCamera {
                 camera.position = previousCamera.position
@@ -697,13 +971,13 @@ private struct NookScene: UIViewRepresentable {
         let ambient = SCNNode()
         ambient.light = SCNLight()
         ambient.light?.type = .ambient
-        ambient.light?.intensity = 530
+        ambient.light?.intensity = CGFloat(530 * (room.finish.brightness ?? 1))
         ambient.light?.color = room.finish.light == "暖色" ? UIColor(red: 1, green: 0.81, blue: 0.62, alpha: 1) : UIColor.white
         scene.rootNode.addChildNode(ambient)
         let key = SCNNode()
         key.light = SCNLight()
         key.light?.type = .directional
-        key.light?.intensity = 930
+        key.light?.intensity = CGFloat(930 * (room.finish.brightness ?? 1))
         key.light?.castsShadow = true
         key.light?.shadowRadius = 4
         key.light?.shadowSampleCount = 8
@@ -753,7 +1027,7 @@ private struct NookScene: UIViewRepresentable {
     private func addWallPanels(to scene: SCNScene, back: Double, border: Double, trim: UIColor) {
         let panelWidth = min(room.length * 0.24, 1.05)
         let panelHeight = room.height * 0.31
-        let position = room.length * 0.18
+        let position = room.window.map { ($0 - 0.5) * room.length } ?? room.length * 0.18
         let y = room.height * 0.69
         let glass = UIColor(red: 0.67, green: 0.85, blue: 0.86, alpha: 1)
         let seam = min(0.035, panelWidth * 0.08)
@@ -777,7 +1051,10 @@ private struct NookScene: UIViewRepresentable {
         let encoder = JSONEncoder()
         encoder.outputFormatting = .sortedKeys
         var geometry = room
-        for index in geometry.items.indices { if geometry.items[index].appearance != .photo { geometry.items[index].photo = nil } }
+        for index in geometry.items.indices {
+            if geometry.items[index].appearance != .photo { geometry.items[index].photo = nil }
+            geometry.items[index].extraPhotos = nil
+        }
         return try? encoder.encode(SceneState(room: geometry, selected: selected, overhead: overhead))
     }
     private struct SceneState: Encodable { let room: NookRoom; let selected: UUID?; let overhead: Bool }
@@ -866,6 +1143,8 @@ private struct NookScene: UIViewRepresentable {
                 part(0.91, 0.27, 0.07, y, pale, z: 0.45)
                 part(0.26, 0.035, 0.04, y + 0.035, wood, z: 0.49)
             }
+        case .none:
+            break
         case .photo:
             if overhead { part(0.96, 0.025, 0.96, 0.05, pale) }
             else { part(0.96, 0.96, 0.09, 0.5, pale) }
@@ -894,7 +1173,9 @@ private struct NookScene: UIViewRepresentable {
                 root.addChildNode(picture)
             }
         }
-        if selected == item.id {
+        if room.placementWarning(item) != nil {
+            part(1, 0.018, 1, 0.009, .systemRed)
+        } else if selected == item.id {
             part(1, 0.012, 1, 0.006, UIColor(red: 0.93, green: 0.62, blue: 0.25, alpha: 1))
         }
         return root
@@ -908,12 +1189,15 @@ private struct NookScene: UIViewRepresentable {
         init(_ parent: NookScene) { self.parent = parent }
 
         private func asset(at point: CGPoint, in view: SCNView) -> (SCNNode, UUID)? {
-            guard var node = view.hitTest(point, options: nil).first?.node else { return nil }
-            while true {
-                if let id = node.name.flatMap(UUID.init(uuidString:)) { return (node, id) }
-                guard let next = node.parent else { return nil }
-                node = next
+            guard let selected = parent.selected else { return nil }
+            for hit in view.hitTest(point, options: [.searchMode: SCNHitTestSearchMode.all.rawValue]) {
+                var cursor: SCNNode? = hit.node
+                while let node = cursor {
+                    if node.name.flatMap(UUID.init(uuidString:)) == selected { return (node, selected) }
+                    cursor = node.parent
+                }
             }
+            return nil
         }
 
         private func floorPoint(_ point: CGPoint, in view: SCNView) -> SCNVector3? {
@@ -934,22 +1218,51 @@ private struct NookScene: UIViewRepresentable {
             guard !parent.isolated, let view = gestureRecognizer.view as? SCNView else { return false }
             if gestureRecognizer is UIPinchGestureRecognizer { return moving == nil }
             guard let pan = gestureRecognizer as? UIPanGestureRecognizer else { return false }
+            if pan.minimumNumberOfTouches == 2 { return moving == nil }
             if !parent.overhead { return true }
             let point = pan.location(in: view), delta = pan.translation(in: view)
             return asset(at: CGPoint(x: point.x - delta.x, y: point.y - delta.y), in: view) != nil
         }
 
+        @objc func panCanvas(_ gesture: UIPanGestureRecognizer) {
+            guard let view = gesture.view as? SCNView, let camera = view.pointOfView else { return }
+            let now = gesture.location(in: view)
+            let delta = gesture.translation(in: view)
+            if let from = floorPoint(CGPoint(x: now.x - delta.x, y: now.y - delta.y), in: view),
+               let to = floorPoint(now, in: view) {
+                camera.position.x += from.x - to.x
+                camera.position.z += from.z - to.z
+            }
+            gesture.setTranslation(.zero, in: view)
+        }
+
         @objc func zoom(_ gesture: UIPinchGestureRecognizer) {
             guard let camera = (gesture.view as? SCNView)?.pointOfView?.camera else { return }
-            camera.orthographicScale = min(160, max(0.5, camera.orthographicScale / gesture.scale))
+            if camera.usesOrthographicProjection {
+                camera.orthographicScale = min(160, max(0.5, camera.orthographicScale / gesture.scale))
+            } else {
+                camera.fieldOfView = min(95, max(15, camera.fieldOfView / gesture.scale))
+            }
             gesture.scale = 1
         }
 
         @objc func tap(_ gesture: UITapGestureRecognizer) {
             guard let view = gesture.view as? SCNView, moving == nil else { return }
             let point = gesture.location(in: view)
-            if let (_, id) = asset(at: point, in: view) {
-                parent.select(id)
+            var ids: [UUID] = []
+            for hit in view.hitTest(point, options: [.searchMode: SCNHitTestSearchMode.all.rawValue]) {
+                var cursor: SCNNode? = hit.node
+                while let node = cursor {
+                    if let id = node.name.flatMap(UUID.init(uuidString:)) {
+                        if !ids.contains(id) { ids.append(id) }
+                        break
+                    }
+                    cursor = node.parent
+                }
+            }
+            if !ids.isEmpty {
+                let current = parent.selected.flatMap { ids.firstIndex(of: $0) } ?? -1
+                parent.select(ids[(current + 1) % ids.count])
             } else if parent.overhead, let id = parent.selected, let floor = floorPoint(point, in: view) {
                 _ = parent.move(id, Double(floor.x), Double(floor.z))
             }
