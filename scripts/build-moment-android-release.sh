@@ -37,7 +37,7 @@ for dependency in AgentIdentity Atlas MyVnc; do
   git -C "$repository" archive "$sdk_commit" | tar -x -C "$sdk_root/$dependency"
   printf '%s %s\n' "$dependency" "$sdk_commit" >> "$ATLAS_BUILD_OUTPUT/android-sdk-dependencies.txt"
 done
-native="$HOME/Projects/MyVnc/artifacts/native-rtc/android-arm64"
+native="${CONNECT_ANDROID_RTC_LIBRARY_DIR:-$HOME/Projects/MyVnc/artifacts/native-rtc/android-arm64}"
 python3 - "$HOME/Projects/MyVnc" "$native" "$ATLAS_BUILD_OUTPUT" <<'NATIVE'
 from pathlib import Path
 import subprocess,hashlib,json,sys
