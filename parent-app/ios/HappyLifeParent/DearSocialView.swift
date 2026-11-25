@@ -1,4 +1,5 @@
 import AgentIdentity
+import AppIntents
 import SwiftUI
 import AgentIdentity
 import CoreLocation
@@ -625,6 +626,7 @@ struct DearSocialView: View {
     @State private var selectedPhotos: [PhotosPickerItem] = []
     @State private var cameraMode: DearCamera.Mode?
     @State private var shortcutCameraRequest: UUID?
+    @State private var showingCameraShortcutSetup = false
     @State private var cameraTarget: DearCaptureTarget?
     @State private var capturedMedia: [DearCapturedMedia] = []
     @State private var savingCaptures: Set<URL> = []
@@ -1704,6 +1706,29 @@ struct DearSocialView: View {
             }
         }
         .sheet(isPresented: $showingMomentCreate) { momentCreateSheet }
+        .sheet(isPresented: $showingCameraShortcutSetup) {
+            NavigationStack {
+                Form {
+                    Section {
+                        ShortcutsLink()
+                        Text("打开 Linko Moment 的「活动拍照」快捷动作，在系统快捷指令中添加到主屏幕。")
+                            .font(.footnote).foregroundStyle(.secondary)
+                    }
+                    Section {
+                        ShareLink(item: URL(string: "https://happylife.ai.impx.net/activity-camera.html")!) {
+                            Label("分享 Safari 拍照入口", systemImage: "safari")
+                        }
+                    }
+                }
+                .navigationTitle("添加拍照到主屏幕")
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .confirmationAction) {
+                        Button("完成") { showingCameraShortcutSetup = false }
+                    }
+                }
+            }
+        }
         .fullScreenCover(item: $cameraMode, onDismiss: {
             store.captureInProgress = false
             if let capture = latestCapture {
@@ -1797,8 +1822,8 @@ struct DearSocialView: View {
                     if selectedActivity?.flag("canEdit") == true {
                         Button { showingAnonymousShares = true } label: { Label(String(localized: "匿名分享照片与视频", bundle: AgentIdentityLanguage.appBundle()), systemImage: "link") }
                     }
-                    ShareLink(item: URL(string: "https://happylife.ai.impx.net/activity-camera.html")!) {
-                        Label("桌面拍照入口", systemImage: "camera")
+                    Button { showingCameraShortcutSetup = true } label: {
+                        Label("添加拍照到主屏幕", systemImage: "camera")
                     }
                     if let url = activityShareURL() {
                         ShareLink(item: url) { Label("分享活动链接", systemImage: "square.and.arrow.up") }
