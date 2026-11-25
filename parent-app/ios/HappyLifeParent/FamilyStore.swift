@@ -169,7 +169,7 @@ private actor PhotoPreviewLoader {
     @Published private var savedNookVisibility = UserDefaults.standard.dictionary(forKey: "moment.nook.visibility") as? [String: Bool] ?? [:]
 
     func defaultModuleName(_ key: String) -> String {
-        let names = ["dining": "干饭", "growth": "带娃", "activities": "活动", "exercise": "运动", "nook": "小小窝🐌", "folkCulture": "民俗工具"]
+        let names = ["dining": "干饭", "growth": "带娃", "activities": "活动", "exercise": "运动", "nook": "小小窝🐌", "folkCulture": "测测"]
         let name = names[key] ?? key
         return AgentIdentityLanguage.appBundle().localizedString(forKey: name, value: name, table: nil)
     }

@@ -59,7 +59,7 @@ public sealed class FamilyPage : ContentPage
     private void WindowStopped(object? sender, EventArgs e) { exercise?.Suspend(); dining?.Suspend(); activities?.Deactivate(); }
 
     private static string ModuleKey(string name) => name switch { "干饭" => "dining", "带娃" => "growth", "活动" => "activities", "运动" => "exercise", _ => "" };
-    private const string FolkCulture = "民俗工具";
+    private const string FolkCulture = "测测";
     private string? FolkPreferenceKey(string field)
     {
         var owner = store.AccountProfile?.Subject ?? store.Profile?.Text("unifiedUserId");
@@ -87,7 +87,7 @@ public sealed class FamilyPage : ContentPage
         var rows = new VerticalStackLayout { Padding = 20, Spacing = 16 };
         var page = new ContentPage { Title = "栏目设置", Content = new ScrollView { Content = rows }, BackgroundColor = MomentStyle.Background };
         var toggles = new Dictionary<string, Switch>(); bool applying = false;
-        var status = MomentStyle.Caption("民俗工具的开关与名称保存在本机。“我的”始终保留。");
+        var status = MomentStyle.Caption("测测的开关与名称保存在本机。“我的”始终保留。");
         foreach (var name in new[] { "干饭", "带娃", "活动", "运动", FolkCulture }) {
             var toggle = new Switch { IsToggled = SectionEnabled(name) }; toggles[name] = toggle;
             toggle.Toggled += async (_, e) => {
@@ -111,7 +111,7 @@ public sealed class FamilyPage : ContentPage
             var title = new Label { Text = ColumnTitle(name), VerticalOptions = LayoutOptions.Center };
             row.Add(title); row.Add(toggle, 1); rows.Add(row);
             if (name == FolkCulture)
-                rows.Add(MomentStyle.Action("修改民俗工具栏目名称", async () =>
+                rows.Add(MomentStyle.Action("修改测测栏目名称", async () =>
                 {
                     if (FolkPreferenceKey("name") is not string key) return;
                     var entered = await page.DisplayPromptAsync("修改栏目名称", "留空恢复默认名称", "保存", "取消", maxLength: 16, initialValue: title.Text);
@@ -124,7 +124,7 @@ public sealed class FamilyPage : ContentPage
                 }));
         }
         rows.Add(status);
-        void Apply() { applying = true; foreach (var p in toggles) p.Value.IsToggled = SectionEnabled(p.Key); applying = false; status.Text = store.ModulePreferenceError ?? "民俗工具的开关与名称保存在本机。“我的”始终保留。"; }
+        void Apply() { applying = true; foreach (var p in toggles) p.Value.IsToggled = SectionEnabled(p.Key); applying = false; status.Text = store.ModulePreferenceError ?? "测测的开关与名称保存在本机。“我的”始终保留。"; }
         rows.Add(MomentStyle.Action("重新同步", async () => { await store.RefreshModulePreferencesAsync(); Apply(); }));
         page.Appearing += async (_, _) => { store.ModulePreferencesChanged += Apply; await store.RefreshModulePreferencesAsync(); Apply(); };
         page.Disappearing += (_, _) => store.ModulePreferencesChanged -= Apply;
