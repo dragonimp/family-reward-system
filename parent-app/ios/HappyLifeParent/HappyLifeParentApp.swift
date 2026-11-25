@@ -110,9 +110,13 @@ extension View {
         photoPushDelegate.connect(store: store)
     }.onReceive(ActivityCameraShortcutRequest.shared.$pending) { request in
         guard let request else { return }
-        ActivityCameraShortcutRequest.shared.pending = nil
-        store.notifications.showingInbox = false
-        store.pendingActivityCamera = request
+        Task { @MainActor in
+            let shortcut = ActivityCameraShortcutRequest.shared
+            guard shortcut.pending == request else { return }
+            shortcut.pending = nil
+            store.notifications.showingInbox = false
+            store.pendingActivityCamera = request
+        }
     }.onOpenURL { url in
         if let code = WorkoutInvitation.code(in: url) {
             store.notifications.showingInbox = false
