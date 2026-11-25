@@ -140,6 +140,7 @@ struct GenealogyDetailView: View {
     @State private var birthdayCalendarExpanded = false
     @State private var relatedPersonID = 0
     @State private var relationPersonQuery = ""
+    @State private var showingRelationshipPath = false
     @State private var relationKind = "parent"
     @State private var invitationURL: URL?
     @State private var matches: [Int: Int] = [:]
@@ -156,6 +157,10 @@ struct GenealogyDetailView: View {
                     Text(tree.text("name")).font(.title2.bold())
                     Text(String(localized: "\(tree.int("peopleCount")) 位人物 · \(tree.int("memberCount")) 位已加入成员", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))).foregroundStyle(.secondary)
                     if !tree.text("description").isEmpty { Text(tree.text("description")) }
+                    Button("亲缘路径", systemImage: "point.topleft.down.to.point.bottomright.curvepath") {
+                        showingRelationshipPath = true
+                    }
+                    .disabled(people.isEmpty && relationships.isEmpty)
                     if owner {
                         Button(String(localized: "添加家族成员", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), systemImage: "person.badge.plus") { openAddPerson() }
                             .buttonStyle(.borderedProminent)
@@ -209,6 +214,9 @@ struct GenealogyDetailView: View {
         .navigationTitle(tree?.text("name") ?? String(localized: "族谱", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)))
         .refreshable { await load() }
         .task { await load() }
+        .sheet(isPresented: $showingRelationshipPath) {
+            GenealogyPathView(people: people, relationships: relationships)
+        }
         .sheet(item: $selected) { person in
             NavigationStack {
                 Form {
@@ -550,5 +558,142 @@ struct GenealogyDetailView: View {
     private func selectPerson(_ id: Int) async {
         do { openPerson(Record(fields: try object(await store.call(base + "/people/\(id)")))) }
         catch { self.error = momentDisplayError(error) }
+    }
+}
+
+private struct GenealogyPathGraph {
+    struct Step: Identifiable {
+        let id: Int
+        let relation: String
+    }
+
+    let names: [Int: String]
+    let neighbors: [Int: [Step]]
+
+    init(people: [Record], relationships: [Record]) {
+        var names: [Int: String] = [:]
+        var neighbors: [Int: [Step]] = [:]
+        for person in people { names[person.id] = person.text("displayName") }
+        for row in relationships {
+            let from = row.int("fromPersonId"), to = row.int("toPersonId")
+            guard from > 0, to > 0, from != to else { continue }
+            let forward: String
+            let reverse: String
+            switch row.text("kind") {
+            case "parent": forward = "子女"; reverse = "父母"
+            case "spouse": forward = "配偶"; reverse = "配偶"
+            default: continue
+            }
+            if names[from] == nil { names[from] = row.text("fromName") }
+            if names[to] == nil { names[to] = row.text("toName") }
+            neighbors[from, default: []].append(Step(id: to, relation: forward))
+            neighbors[to, default: []].append(Step(id: from, relation: reverse))
+        }
+        self.names = names
+        self.neighbors = neighbors
+    }
+
+    func path(from start: Int, to end: Int) -> [Step]? {
+        guard names[start] != nil, names[end] != nil, start != end else { return nil }
+        var queue = [start]
+        var index = 0
+        var visited: Set<Int> = [start]
+        var previous: [Int: (person: Int, step: Step)] = [:]
+        while index < queue.count {
+            let person = queue[index]
+            index += 1
+            for step in neighbors[person] ?? [] where visited.insert(step.id).inserted {
+                previous[step.id] = (person, step)
+                if step.id == end {
+                    var steps: [Step] = []
+                    var cursor = end
+                    while let edge = previous[cursor] {
+                        steps.append(edge.step)
+                        cursor = edge.person
+                    }
+                    return Array(steps.reversed())
+                }
+                queue.append(step.id)
+            }
+        }
+        return nil
+    }
+}
+
+private struct GenealogyPathView: View {
+    @Environment(\.dismiss) private var dismiss
+    @State private var first: Int?
+    @State private var second: Int?
+    @State private var choosingFirst: Bool
+    @State private var search = ""
+    let graph: GenealogyPathGraph
+
+    init(people: [Record], relationships: [Record]) {
+        graph = GenealogyPathGraph(people: people, relationships: relationships)
+        let me = people.first { $0.flag("isSelf") }?.id
+        _first = State(initialValue: me)
+        _choosingFirst = State(initialValue: me == nil)
+    }
+
+    private var candidates: [Int] {
+        let query = search.trimmingCharacters(in: .whitespacesAndNewlines)
+        return graph.names.keys.filter { id in
+            query.isEmpty || graph.names[id, default: ""].localizedCaseInsensitiveContains(query)
+                || String(id).contains(query)
+        }.sorted { lhs, rhs in
+            let order = graph.names[lhs, default: ""].localizedStandardCompare(graph.names[rhs, default: ""])
+            return order == .orderedSame ? lhs < rhs : order == .orderedAscending
+        }
+    }
+
+    var body: some View {
+        NavigationStack {
+            List {
+                Section {
+                    Button { choosingFirst = true; search = "" } label: {
+                        LabeledContent("起点", value: first.flatMap { graph.names[$0] } ?? "选择人物")
+                    }
+                    Button { choosingFirst = false; search = "" } label: {
+                        LabeledContent("终点", value: second.flatMap { graph.names[$0] } ?? "选择人物")
+                    }
+                }.buttonStyle(.borderless)
+
+                if let first, let second {
+                    Section("已记录的关系路径") {
+                        if let steps = graph.path(from: first, to: second) {
+                            Label(graph.names[first, default: ""], systemImage: "person.crop.circle.fill")
+                            ForEach(steps) { step in
+                                LabeledContent(step.relation, value: graph.names[step.id, default: ""])
+                            }
+                        } else {
+                            Text("现有记录中未找到连接这两位人物的关系路径。")
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                }
+
+                Section(choosingFirst ? "选择起点" : "选择终点") {
+                    let matches = candidates
+                    if matches.isEmpty { Text("没有匹配的人物").foregroundStyle(.secondary) }
+                    ForEach(Array(matches.prefix(50)), id: \.self) { id in
+                        Button {
+                            if choosingFirst { first = id; choosingFirst = false }
+                            else { second = id }
+                            search = ""
+                        } label: {
+                            LabeledContent(graph.names[id, default: ""], value: "#\(id)")
+                        }
+                        .disabled(id == (choosingFirst ? second : first))
+                    }
+                    if matches.count > 50 { Text("输入姓名或编号缩小范围。").font(.footnote).foregroundStyle(.secondary) }
+                }
+            }
+            .searchable(text: $search, prompt: "按姓名或编号查找")
+            .navigationTitle("亲缘路径")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) { Button("完成") { dismiss() } }
+            }
+        }
     }
 }
