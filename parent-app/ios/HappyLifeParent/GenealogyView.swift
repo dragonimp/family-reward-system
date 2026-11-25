@@ -139,6 +139,7 @@ struct GenealogyDetailView: View {
     @State private var showAddPerson = false
     @State private var birthdayCalendarExpanded = false
     @State private var relatedPersonID = 0
+    @State private var relationPersonQuery = ""
     @State private var relationKind = "parent"
     @State private var invitationURL: URL?
     @State private var matches: [Int: Int] = [:]
@@ -270,10 +271,20 @@ struct GenealogyDetailView: View {
                                 Text(String(localized: "子女", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))).tag("child")
                                 Text(String(localized: "配偶", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))).tag("spouse")
                             }
+                            TextField("搜索姓名、支系或辈分", text: $relationPersonQuery)
+                            let search = relationPersonQuery.trimmingCharacters(in: .whitespacesAndNewlines)
+                            let candidates = people.filter { other in
+                                other.id != person.id && (search.isEmpty || other.id == relatedPersonID ||
+                                    ["displayName", "branchName", "generationLabel"].contains { other.text($0).localizedCaseInsensitiveContains(search) })
+                            }
+                            if candidates.isEmpty && !search.isEmpty {
+                                Text("没有匹配的家族成员").foregroundStyle(.secondary)
+                            }
                             Picker(String(localized: "另一位成员", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), selection: $relatedPersonID) {
                                 Text(String(localized: "请选择", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))).tag(0)
-                                ForEach(people.filter { $0.id != person.id }) { other in
-                                    Text(other.text("displayName") + " #\(other.id)").tag(other.id)
+                                ForEach(candidates) { other in
+                                    let detail = [other.text("branchName"), other.text("generationLabel")].filter { !$0.isEmpty }
+                                    Text(([other.text("displayName")] + detail).joined(separator: " · ") + " #\(other.id)").tag(other.id)
                                 }
                             }
                             Button(String(localized: "添加关系", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) { Task { await addRelation(person.id) } }
@@ -449,6 +460,7 @@ struct GenealogyDetailView: View {
         editBirthPrecision = person.int("birthDay") > 0 ? "date" : person.int("birthMonth") > 0 ? "month" : person.int("birthYear") > 0 ? "year" : "none"
         editError = nil
         relatedPersonID = 0
+        relationPersonQuery = ""
         invitationURL = nil
         selected = person
         Task { await loadInferred(person.id) }

@@ -365,12 +365,21 @@ struct FamilyRoot: View {
 
 struct FamilyHome: View {
     @ObservedObject var store: FamilyStore
+    @State private var quickRewardChild: Record?
     var body: some View {
         NavigationStack {
             List {
                 Section(String(localized: "我的孩子", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) {
                     ForEach(store.homeChildren) { child in
-                        NavigationLink { ChildDetail(store: store, child: child) } label: { ChildRow(child: child) }
+                        HStack(spacing: 8) {
+                            NavigationLink { ChildDetail(store: store, child: child) } label: { ChildRow(child: child) }
+                            Button { quickRewardChild = child } label: {
+                                Image(systemName: "plus.circle.fill").font(.title2)
+                                    .frame(width: 44, height: 44)
+                            }
+                            .buttonStyle(.borderless)
+                            .accessibilityLabel("给\(child.text("name"))记分")
+                        }
                     }
                     if store.homeChildren.isEmpty && !store.loading {
                         Text(String(localized: "还没有孩子", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))).foregroundStyle(.secondary)
@@ -417,6 +426,9 @@ struct FamilyHome: View {
             }
             .refreshable { await store.load() }
             .task { await store.refreshIfStale() }
+            .sheet(item: $quickRewardChild) { child in
+                RewardEditor(store: store, child: child, quick: true)
+            }
         }
     }
 }
@@ -1126,6 +1138,7 @@ struct NativeEditor: View {
 struct RewardEditor: View {
     @ObservedObject var store: FamilyStore
     let child: Record
+    var quick = false
     @Environment(\.dismiss) private var dismiss
     @State private var amount = ""
     @State private var description = ""
@@ -1135,6 +1148,9 @@ struct RewardEditor: View {
     @State private var item = ""
     @State private var date = Date()
     @State private var saving = false
+    @State private var receipt: Record?
+    @State private var refreshed = false
+    @State private var showFullForm = false
     @State private var error: String?
     @State private var attempted = false
     @State private var requestBody: [String: Any]?
@@ -1142,24 +1158,67 @@ struct RewardEditor: View {
     var body: some View {
         NavigationStack {
             Form {
+                if let receipt {
+                    Section("已记分") {
+                        LedgerRow(row: receipt)
+                        if refreshed, let current = store.homeChildren.first(where: { $0.id == child.id }) {
+                            LabeledContent("当前积分", value: current.amount("score"))
+                        }
+                        NavigationLink("查看积分流水") { LedgerView(store: store) }
+                    }
+                    if let error {
+                        Text(error).foregroundStyle(.secondary)
+                        Button("刷新余额和流水") { Task { await refreshReceipt() } }.disabled(saving)
+                    }
+                } else {
                 Section(child.text("name")) {
+                    if quick && !showFullForm {
+                        let rules = store.rules.filter { $0.number("points") != 0 }
+                        if rules.isEmpty { Text("暂无可用积分规则").foregroundStyle(.secondary) }
+                        ForEach(rules) { rule in
+                            Button { applyRule(rule) } label: {
+                                LabeledContent(rule.text("name"), value: (rule.number("points") > 0 ? "+" : "") + rule.amount("points"))
+                            }.buttonStyle(.borderless)
+                        }
+                        if valid {
+                            LabeledContent(description, value: (direction == "-" ? "−" : "+") + amount)
+                        }
+                        Button("手动填写") { showFullForm = true }
+                    } else {
                     Picker(String(localized: "类型", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), selection: $kind) { Text(String(localized: "积分", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))).tag("points"); Text(String(localized: "零用钱", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))).tag("cash"); Text(String(localized: "物品", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))).tag("items") }
                     Picker(String(localized: "方向", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), selection: $direction) { Text(String(localized: "奖励", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))).tag("+"); Text(String(localized: "扣除", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))).tag("-") }.pickerStyle(.segmented)
                     if kind == "items" { TextField(String(localized: "物品名称", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), text: $item) } else { TextField(String(localized: "数量（大于 0）", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), text: $amount).keyboardType(.decimalPad) }
                     TextField(String(localized: "记录内容", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), text: $description); TextField(String(localized: "类别", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), text: $category)
                     DatePicker(String(localized: "日期（当地日历）", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), selection: $date, displayedComponents: .date).environment(\.timeZone, TimeZone.current)
                     if kind == "points" {
-                        Menu(String(localized: "使用现有规则", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) { ForEach(store.rules) { rule in Button(rule.text("name")) { amount = String(abs(rule.number("points"))); direction = rule.number("points") < 0 ? "-" : "+"; description = rule.text("name"); category = rule.text("category") } } }
+                        Menu(String(localized: "使用现有规则", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) { ForEach(store.rules) { rule in Button(rule.text("name")) { applyRule(rule) } } }
+                    }
                     }
                 }.disabled(attempted || saving)
                 if let error { Text(error).foregroundStyle(.red) }
                 Button(saving ? String(localized: "正在保存…", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)) : attempted ? String(localized: "核对并重试同一笔记录", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)) : String(localized: "保存记录", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) { Task { await save() } }.disabled(saving || !valid)
                 Text(String(localized: "重试会使用同一个记录编号，避免重复记分。提交后请以服务端记录为准。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))).font(.footnote).foregroundStyle(.secondary)
+                }
             }.readablePage(maxWidth: 720).navigationTitle(String(localized: "记录奖励", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))).toolbar { ToolbarItem(placement: .cancellationAction) { Button(String(localized: "关闭", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) { dismiss() }.disabled(saving) } }.interactiveDismissDisabled(saving)
         }
     }
     private var valid: Bool { !description.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && !category.isEmpty && (kind == "items" ? !item.isEmpty : (Double(amount)?.isFinite == true && (Double(amount) ?? 0) > 0)) }
+    private func applyRule(_ rule: Record) {
+        amount = String(abs(rule.number("points")))
+        direction = rule.number("points") < 0 ? "-" : "+"
+        description = rule.text("name")
+        category = rule.text("category")
+    }
+
+    private func refreshReceipt() async {
+        saving = true
+        defer { saving = false }
+        do { try await store.refreshBalancesAndLedger(); refreshed = true; error = nil }
+        catch { self.error = "记录已保存，余额与流水暂未刷新。" }
+    }
+
     private func save() async {
+        guard !saving, receipt == nil, valid else { return }
         saving = true; error = nil
         defer { saving = false }
         if requestBody == nil {
@@ -1167,7 +1226,16 @@ struct RewardEditor: View {
             requestBody = ["child_id": child.id, "type": kind, "direction": direction, "points": kind == "points" ? Double(amount) ?? 0 : 0, "cash_cny": kind == "cash" ? Double(amount) ?? 0 : 0, "items": item, "description": description, "category": category, "date": formatter.string(from: date), "idempotency_key": idempotency]
         }
         attempted = true
-        do { _ = try await store.call("/api/transactions", method: "POST", body: requestBody); try await store.refreshBalancesAndLedger(); dismiss() }
+        do {
+            let response = try await store.call("/api/transactions", method: "POST", body: requestBody) as? [String: Any]
+            if quick, let transaction = response?["transaction"] as? [String: Any] {
+                receipt = Record(fields: transaction.merging(["childName": child.text("name")]) { _, name in name })
+                await refreshReceipt()
+            } else {
+                try await store.refreshBalancesAndLedger()
+                dismiss()
+            }
+        }
         catch { self.error = momentDisplayError(error) + String(localized: " 可重试同一笔记录，或关闭后在记录页核对。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)) }
     }
 }

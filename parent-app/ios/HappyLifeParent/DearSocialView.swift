@@ -596,6 +596,29 @@ private struct DearActivityMapView: View {
     }
 }
 
+private enum ActivityTimelineFilter: String, CaseIterable, Identifiable {
+    case all = "全部", media = "照片与视频", checkIn = "打卡", exercise = "运动", dining = "饭局"
+    var id: Self { self }
+    var showsMedia: Bool { self == .all || self == .media }
+    var showsCheckIns: Bool { self == .all || self == .checkIn }
+
+    func includes(_ entry: DearTimelineEntry) -> Bool {
+        switch self {
+        case .all: return true
+        case .media: return entry.kind == .photo || entry.draft?.kind == "media"
+        case .checkIn: return entry.checkIn || entry.draft?.kind == "checkins"
+        case .dining:
+            guard entry.kind == .moment || entry.draft?.kind == "moments" else { return false }
+            return (entry.draft?.displayName ?? entry.record.text("text")).hasPrefix("干饭 · ")
+        case .exercise:
+            if entry.kind == .exercise { return true }
+            guard entry.kind == .moment else { return false }
+            let firstLine = String(entry.record.text("text").prefix { !$0.isNewline })
+            return firstLine.range(of: #"^(爬山|散步|飞行|滑雪|徒步|慢跑|自由运动) · [0-9:]+$"#, options: .regularExpression) != nil
+        }
+    }
+}
+
 private struct DearTimelineEntry: Identifiable {
     let id: String
     enum Kind { case photo, moment, checkIn, exercise, pending }
@@ -1407,9 +1430,16 @@ struct DearSocialView: View {
         }
     }
 
+    @State private var timelineFilter: ActivityTimelineFilter = .all
+
+    private var showsActivityMap: Bool {
+        photoViewMode == "map" && (timelineFilter.showsMedia || timelineFilter.showsCheckIns)
+    }
+
     private var activityTimelineSection: some View {
-        Section {
-            if photoViewMode == "tiles" {
+        let entries = activityTimeline.filter(timelineFilter.includes)
+        return Section {
+            if photoViewMode == "tiles" && timelineFilter.showsMedia {
                 ForEach(Array(photoGridRows.enumerated()), id: \.offset) { _, row in
                     HStack(alignment: .top, spacing: 4) {
                         ForEach(row) { photo in photoGridTile(photo).frame(maxWidth: .infinity) }
@@ -1417,7 +1447,7 @@ struct DearSocialView: View {
                     }.listRowInsets(EdgeInsets(top: 4, leading: 8, bottom: 4, trailing: 8))
                 }
             }
-            ForEach(activityTimeline.filter { photoViewMode != "tiles" || $0.kind != .photo }, id: \.id) { entry in
+            ForEach(entries.filter { photoViewMode != "tiles" || $0.kind != .photo }, id: \.id) { entry in
                 if let exercise = entry.exercise {
                     ActivityExerciseTimelineRow(record: exercise) {
                         store.pendingExerciseContinuation = exercise.id
@@ -1435,8 +1465,9 @@ struct DearSocialView: View {
                     activityRecordRow(entry)
                 }
             }
-            if activityTimeline.isEmpty {
+            if entries.isEmpty {
                 if busy { ProgressView("正在异步加载活动照片与动态…").font(.subheadline) }
+                else if timelineFilter != .all { Text("此类别暂无动态").foregroundStyle(.secondary) }
                 else { Text("还没有动态，拍照、写日常或打卡，留下活动的第一刻。").foregroundStyle(.secondary).font(.subheadline) }
             }
         } header: {
@@ -1458,6 +1489,7 @@ struct DearSocialView: View {
                 Task { await downloadSelectedPhotos(share: true) }
             } else {
                 if photoViewMode == "map" { photoViewMode = "tiles" }
+                if !timelineFilter.showsMedia { timelineFilter = .media }
                 selectingPhotoDownloads = true
                 sharingSelectedOriginals = true
                 selectedPhotoIDs.removeAll()
@@ -1474,6 +1506,18 @@ struct DearSocialView: View {
                 .labelStyle(.iconOnly)
                 .disabled(batchDownloading || batchDeleting || savingBatchToPhotos)
         }
+        Menu {
+            Picker("筛选动态", selection: $timelineFilter) {
+                ForEach(ActivityTimelineFilter.allCases) { filter in
+                    Text(filter.rawValue).tag(filter)
+                }
+            }
+        } label: {
+            Image(systemName: timelineFilter == .all ? "line.3.horizontal.decrease.circle" : "line.3.horizontal.decrease.circle.fill")
+        }
+        .accessibilityLabel("筛选动态")
+        .accessibilityValue(timelineFilter.rawValue)
+        .disabled(selectingPhotoDownloads)
         Menu {
             Button(String(localized: "大图", bundle: AgentIdentityLanguage.appBundle()), systemImage: "rectangle") { photoViewMode = "grid" }
             Button(String(localized: "紧凑", bundle: AgentIdentityLanguage.appBundle()), systemImage: "list.bullet") { photoViewMode = "list" }
@@ -1541,6 +1585,8 @@ struct DearSocialView: View {
 
     private var activityMapMode: some View {
         let failed = activityDrafts.filter { $0.lastError != nil }
+        let mapPhotos = timelineFilter.showsMedia ? photos : []
+        let mapCheckIns = timelineFilter.showsCheckIns ? checkIns : []
         return VStack(spacing: 0) {
             HStack(spacing: 12) {
                 activityTimelineHeader
@@ -1559,10 +1605,10 @@ struct DearSocialView: View {
             }
             DearActivityMapView(locations: locations, store: store, title: selectedActivity?.text("title") ?? "",
                                 spaceID: activityTenantId, activityID: activityId,
-                                points: DearActivityMapPoint.points(checkIns: checkIns, photos: photos), photos: photos,
+                                points: DearActivityMapPoint.points(checkIns: mapCheckIns, photos: mapPhotos), photos: mapPhotos,
                                 initialMembersOnly: false, embedded: true)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .id(activityTenantId + "/" + activityId)
+                .id(activityTenantId + "/" + activityId + "/" + timelineFilter.rawValue)
         }
         .sheet(isPresented: $showingMapSyncDetails) {
             NavigationStack {
@@ -1583,7 +1629,7 @@ struct DearSocialView: View {
 
     private var activityDetail: some View {
         Group {
-            if photoViewMode == "map", selectedActivity != nil {
+            if showsActivityMap, selectedActivity != nil {
                 activityMapMode
             } else {
                 List {
