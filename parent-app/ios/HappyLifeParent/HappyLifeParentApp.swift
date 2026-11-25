@@ -1,33 +1,9 @@
 import AtlasReleases
-import AppIntents
 import SwiftUI
 import CoreImage.CIFilterBuiltins
 import AgentIdentity
 import Charts
 import UserNotifications
-
-@MainActor final class ActivityCameraShortcutRequest: ObservableObject {
-    static let shared = ActivityCameraShortcutRequest()
-    @Published var pending: UUID?
-}
-
-struct OpenActivityCameraIntent: AppIntent {
-    static let title: LocalizedStringResource = "活动拍照"
-    static let openAppWhenRun = true
-
-    @MainActor func perform() async throws -> some IntentResult {
-        ActivityCameraShortcutRequest.shared.pending = UUID()
-        return .result()
-    }
-}
-
-struct MomentAppShortcuts: AppShortcutsProvider {
-    static var appShortcuts: [AppShortcut] {
-        AppShortcut(intent: OpenActivityCameraIntent(),
-                    phrases: ["用\(.applicationName)活动拍照", "打开\(.applicationName)活动相机"],
-                    shortTitle: "活动拍照", systemImageName: "camera.fill")
-    }
-}
 
 @MainActor final class PhotoPushDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDelegate {
     weak var photoSource: DearPhotoSource?
@@ -108,15 +84,6 @@ extension View {
     @Environment(\.scenePhase) private var scenePhase
     var body: some Scene { WindowGroup { FamilyRoot(store: store, identity: store.identity, notifications: store.notifications).agentIdentityInAppLinks(session: store.identity, trustedOrigins: [URL(string: "https://auth.ai.xmkurt.com")!]).environmentObject(store.language).tint(.teal).onAppear {
         photoPushDelegate.connect(store: store)
-    }.onReceive(ActivityCameraShortcutRequest.shared.$pending) { request in
-        guard let request else { return }
-        Task { @MainActor in
-            let shortcut = ActivityCameraShortcutRequest.shared
-            guard shortcut.pending == request else { return }
-            shortcut.pending = nil
-            store.notifications.showingInbox = false
-            store.pendingActivityCamera = request
-        }
     }.onOpenURL { url in
         if let code = WorkoutInvitation.code(in: url) {
             store.notifications.showingInbox = false
@@ -343,9 +310,6 @@ struct FamilyRoot: View {
         .onChange(of: store.pendingExerciseActivity) { _, value in if value != nil { exerciseEnabled = true; selectedTab = 3 } }
         .onChange(of: store.pendingWorkoutInvitation, initial: true) { _, value in
             if value != nil { exerciseEnabled = true; selectedTab = 3 }
-        }
-        .onChange(of: store.pendingActivityCamera, initial: true) { _, request in
-            if request != nil { activitiesEnabled = true; selectedTab = 2 }
         }
         .onAppear { if store.pendingActivityLink != nil { activitiesEnabled = true; selectedTab = 2 } }
         .onChange(of: store.pendingActivityLink?.id) { _, id in if id != nil { activitiesEnabled = true; selectedTab = 2 } }

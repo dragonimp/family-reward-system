@@ -624,7 +624,6 @@ struct DearSocialView: View {
     @State private var selectedPhoto: DearRecord?
     @State private var selectedPhotos: [PhotosPickerItem] = []
     @State private var cameraMode: DearCamera.Mode?
-    @State private var shortcutCameraRequest: UUID?
     @State private var cameraTarget: DearCaptureTarget?
     @State private var capturedMedia: [DearCapturedMedia] = []
     @State private var savingCaptures: Set<URL> = []
@@ -910,9 +909,6 @@ struct DearSocialView: View {
                 guard isActive, store.identity.accountIdentifier != nil else { return }
                 await refresh()
                 await openPendingActivityLink()
-            }
-            .task(id: isActive && scenePhase == .active && store.identity.accountIdentifier != nil ? store.pendingActivityCamera : nil) {
-                if isActive && scenePhase == .active { await resolveActivityCameraShortcut() }
             }
             .onChange(of: store.pendingActivityLink?.id) { _, link in
                 if isActive, link != nil { Task { await refresh(); await openPendingActivityLink() } }
@@ -1598,12 +1594,6 @@ struct DearSocialView: View {
         .safeAreaInset(edge: .top, spacing: 0) {
             if selectedActivity != nil { pinnedActivityOperations }
         }
-        .onChange(of: activityTenantId + "/" + activityId, initial: true) { _, _ in rememberCameraActivity() }
-        .task(id: shortcutCameraRequest) {
-            guard shortcutCameraRequest != nil else { return }
-            await openCamera(.photo)
-            if !Task.isCancelled { shortcutCameraRequest = nil }
-        }
         .onAppear { locations.activate(store: store, tenant: activityTenantId, activity: activityId) }
         .onReceive(NotificationCenter.default.publisher(for: .exerciseRecordsChanged)) { _ in exerciseRevision = UUID() }
         .task(id: activityTenantId + activityId + (store.profile?.text("unifiedUserId") ?? "") + exerciseRevision.uuidString) {
@@ -1830,47 +1820,6 @@ struct DearSocialView: View {
     private func showActivityToast(_ message: String) {
         activityToast = message
         activityToastID = UUID()
-    }
-
-    private func cameraActivityKey(_ account: String) -> String {
-        let digest = SHA256.hash(data: Data(account.utf8)).map { String(format: "%02x", $0) }.joined()
-        return "moment.lastCameraActivity." + digest
-    }
-
-    private func rememberCameraActivity() {
-        guard showingActivity, let account = store.identity.accountIdentifier,
-              let activity = UUID(uuidString: activityId), let tenant = UUID(uuidString: activityTenantId) else { return }
-        let target = ExerciseActivity(tenantID: tenant, id: activity, title: "")
-        if let data = try? JSONEncoder().encode(target) {
-            UserDefaults.standard.set(data, forKey: cameraActivityKey(account))
-        }
-    }
-
-    @MainActor private func resolveActivityCameraShortcut() async {
-        guard let request = store.pendingActivityCamera, let account = store.identity.accountIdentifier else { return }
-        defer {
-            if !Task.isCancelled, store.pendingActivityCamera == request { store.pendingActivityCamera = nil }
-        }
-        if showingActivity, selectedActivity != nil {
-            shortcutCameraRequest = request
-            return
-        }
-        guard let stored = UserDefaults.standard.data(forKey: cameraActivityKey(account)),
-              let target = try? JSONDecoder().decode(ExerciseActivity.self, from: stored) else {
-            store.error = "请先打开要拍照的活动。"
-            return
-        }
-        do {
-            let joined = try DearRecord.list(await store.call(base + "activities/joined"))
-            try Task.checkCancellation()
-            guard store.identity.accountIdentifier == account, store.pendingActivityCamera == request else { return }
-            joinedActivities = joined
-            try openLinkedActivity(tenant: target.tenantID, activity: target.id)
-            shortcutCameraRequest = request
-        } catch {
-            if !Task.isCancelled, store.identity.accountIdentifier == account,
-               store.pendingActivityCamera == request { store.error = momentDisplayError(error) }
-        }
     }
 
     @MainActor private func openCamera(_ mode: DearCamera.Mode) async {
