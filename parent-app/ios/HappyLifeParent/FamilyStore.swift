@@ -146,6 +146,7 @@ private actor PhotoPreviewLoader {
     @Published var pendingWorkoutInvitation: UUID?
     @Published var pendingExerciseActivity: ExerciseActivity?
     @Published var pendingActivityLink: MomentActivityLink?
+    @Published var pendingActivityCamera: UUID?
     @Published var profile: Record?
     @Published var groups: [Record] = []
     @Published var children: [Record] = []
@@ -497,6 +498,7 @@ private actor PhotoPreviewLoader {
         exerciseStore?.accountDidChange(); exerciseStore = nil
         activityTitleOwner = nil; activityTitles = [:]; activityTitleRevision = UUID()
         pendingExerciseActivity = nil
+        pendingActivityCamera = nil
         pendingExerciseContinuation = nil; watchExerciseActivity = nil; watchExerciseMetrics = [:]; watchMetricsUpdatedAt = nil
         Task { await photoPreviews.clear() }
         DearShareInbox.clearCatalog()
