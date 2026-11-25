@@ -872,7 +872,7 @@ private struct ExerciseRouteReplay: View {
     var body: some View {
         let lastIndex = max(0, points.count - 1)
         VStack(spacing: 12) {
-            ExerciseRouteMap(points: points, live: false, replayIndex: lastIndex > 0 ? Int(progress) : nil)
+            ExerciseRouteMap(points: points, live: false, replayIndex: points.isEmpty ? nil : Int(progress))
             if lastIndex > 0 {
                 HStack {
                     Button {
@@ -928,7 +928,30 @@ private struct ExerciseRouteMap: View {
             if let first = points.first { Marker(String(localized: "起点", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), systemImage: "flag.fill", coordinate: coordinate(first)).tint(.green) }
             if let last = points.last { Marker(live ? String(localized: "当前位置", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)) : String(localized: "终点", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)), systemImage: "figure.walk", coordinate: coordinate(last)).tint(.teal) }
             if let replayIndex, points.indices.contains(replayIndex) {
-                Marker(String(localized: "回放位置", bundle: AgentIdentityLanguage.appBundle()), systemImage: "location.fill", coordinate: coordinate(points[replayIndex])).tint(.orange)
+                let point = points[replayIndex]
+                let clock = Date.FormatStyle(date: .omitted, time: .standard, timeZone: .autoupdatingCurrent)
+                let fullTime = Date.FormatStyle(date: .abbreviated, time: .standard, timeZone: .autoupdatingCurrent)
+                let spansDays = points.first.flatMap { first in
+                    points.last.map { !Calendar.autoupdatingCurrent.isDate(first.recordedAt, inSameDayAs: $0.recordedAt) }
+                } ?? false
+                Annotation("", coordinate: coordinate(point), anchor: .bottom) {
+                    VStack(spacing: 4) {
+                        Text(point.recordedAt, format: spansDays ? fullTime : clock)
+                            .font(.caption.weight(.semibold))
+                            .monospacedDigit()
+                            .fixedSize()
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 5)
+                            .background(.regularMaterial, in: Capsule())
+                        Image(systemName: "location.circle.fill")
+                            .font(.title2)
+                            .foregroundStyle(.white, .orange)
+                            .background(.white, in: Circle())
+                            .accessibilityHidden(true)
+                    }
+                    .accessibilityLabel(Text(String(localized: "回放位置", bundle: AgentIdentityLanguage.appBundle())))
+                    .accessibilityValue(Text(point.recordedAt, format: fullTime))
+                }
             }
             if live { UserAnnotation() }
         }
