@@ -1,6 +1,7 @@
 import SwiftUI
 
 struct FolkCultureView: View {
+    let title: String
     @State private var date = Date()
     @State private var first = 0
     @State private var second = 0
@@ -85,7 +86,7 @@ struct FolkCultureView: View {
                 Text("仅供民俗游戏，不能作为婚恋依据。").font(.caption).foregroundStyle(.secondary)
             }
         }
-        .navigationTitle("民俗工具")
+        .navigationTitle(title)
         .navigationBarTitleDisplayMode(.inline)
     }
 }

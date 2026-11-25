@@ -257,6 +257,7 @@ struct FamilyRoot: View {
                 Image(systemName: icon).font(.system(size: 21))
                     .overlay(alignment: .topTrailing) {
                         if badge > 0 {
+                case "folkCulture" where store.isModuleEnabled(key): bottomTab(6, store.displayModuleName(key), "sparkles")
                             Text(badge > 99 ? "99+" : String(badge))
                                 .font(.system(size: 9, weight: .bold)).padding(3)
                                 .foregroundStyle(.white).background(.red, in: Capsule())
@@ -294,7 +295,7 @@ struct FamilyRoot: View {
 
     private var businessPager: some View {
         TabView(selection: $selectedTab) {
-            ForEach(enabledBusinessTabs.filter { $0 != "nook" }, id: \.self) { key in
+            ForEach(enabledBusinessTabs.filter { $0 != "nook" && $0 != "folkCulture" }, id: \.self) { key in
                 switch key {
             case "dining":
             Group {
@@ -302,6 +303,7 @@ struct FamilyRoot: View {
                     DiningModesView(userID: account, family: store).id(account)
                 } else {
                     ProgressView()
+        case "folkCulture": 6
                 }
             }.tag(0)
             case "growth":
@@ -350,6 +352,9 @@ struct FamilyRoot: View {
         .onChange(of: store.pendingActivityCamera, initial: true) { _, request in
             if request != nil { activitiesEnabled = true; selectedTab = 2 }
         }
+            } else if activeTab == 6 {
+                NavigationStack { FolkCultureView(title: store.displayModuleName("folkCulture")) }
+                    .id(identity.accountIdentifier)
         .onAppear { if store.pendingActivityLink != nil { activitiesEnabled = true; selectedTab = 2 } }
         .onChange(of: store.pendingActivityLink?.id) { _, id in if id != nil { activitiesEnabled = true; selectedTab = 2 } }
         .onChange(of: enabledBusinessTabs) { _, _ in
@@ -1531,9 +1536,6 @@ private struct MomentSectionSettings: View {
             }
             Text("长按拖动可调整顺序，点铅笔可改名。栏目开关在本机立即生效。「我的」始终保留。").font(.footnote).foregroundStyle(.secondary)
             if let error = store.modulePreferenceError { Text(error).foregroundStyle(.secondary) }
-            NavigationLink { FolkCultureView() } label: {
-                Label("民俗工具", systemImage: "sparkles")
-            }
             Button("重新同步") { Task { await store.refreshModulePreferences() } }
         }.navigationTitle(String(localized: "栏目设置", bundle: AgentIdentityLanguage.appBundle()))
             .task { await store.refreshModulePreferences() }

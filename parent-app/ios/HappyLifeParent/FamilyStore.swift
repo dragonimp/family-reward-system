@@ -164,12 +164,12 @@ private actor PhotoPreviewLoader {
     @Published var ledgerPage = 1
     @Published var ledgerTotal = 0
     @Published var moduleSections: [String: Bool] = ["dining": true, "growth": true, "activities": true, "exercise": true]
-    private static let defaultModuleOrder = ["dining", "growth", "activities", "exercise", "nook"]
+    private static let defaultModuleOrder = ["dining", "growth", "activities", "exercise", "nook", "folkCulture"]
     @Published private var savedModuleNames = UserDefaults.standard.dictionary(forKey: "moment.moduleNames") as? [String: [String: String]] ?? [:]
     @Published private var savedNookVisibility = UserDefaults.standard.dictionary(forKey: "moment.nook.visibility") as? [String: Bool] ?? [:]
 
     func defaultModuleName(_ key: String) -> String {
-        let names = ["dining": "干饭", "growth": "带娃", "activities": "活动", "exercise": "运动", "nook": "小小窝🐌"]
+        let names = ["dining": "干饭", "growth": "带娃", "activities": "活动", "exercise": "运动", "nook": "小小窝🐌", "folkCulture": "民俗工具"]
         let name = names[key] ?? key
         return AgentIdentityLanguage.appBundle().localizedString(forKey: name, value: name, table: nil)
     }
@@ -379,13 +379,13 @@ private actor PhotoPreviewLoader {
             UserDefaults.standard.set(savedNookVisibility, forKey: "moment.nook.visibility")
             return
         }
-        guard let account = identity.accountIdentifier, ["dining", "growth", "activities", "exercise"].contains(key) else { return }
+        guard let account = identity.accountIdentifier, ["dining", "growth", "activities", "exercise", "folkCulture"].contains(key) else { return }
         let ownerKey = moduleOwnerKey(account)
         var choices = localModuleChoices
         choices[ownerKey, default: [:]][key] = enabled
         localModuleChoices = choices
         UserDefaults.standard.set(choices, forKey: "moment.localModuleChoices")
-        guard !modulePreferenceSaving else { return }
+        guard key != "folkCulture", !modulePreferenceSaving else { return }
         if modulePreferenceVersion == 0 { await refreshModulePreferences() }
         guard let owner = identity.accountIdentifier, modulePreferenceOwner == owner, modulePreferenceVersion > 0 else { return }
         modulePreferenceSaving = true; defer { modulePreferenceSaving = false }

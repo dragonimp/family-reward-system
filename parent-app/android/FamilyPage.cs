@@ -59,29 +59,72 @@ public sealed class FamilyPage : ContentPage
     private void WindowStopped(object? sender, EventArgs e) { exercise?.Suspend(); dining?.Suspend(); activities?.Deactivate(); }
 
     private static string ModuleKey(string name) => name switch { "干饭" => "dining", "带娃" => "growth", "活动" => "activities", "运动" => "exercise", _ => "" };
-    private bool SectionEnabled(string name) => name == "我的" || store.ModuleEnabled(ModuleKey(name));
+    private const string FolkCulture = "民俗工具";
+    private string? FolkPreferenceKey(string field)
+    {
+        var owner = store.AccountProfile?.Subject ?? store.Profile?.Text("unifiedUserId");
+        if (string.IsNullOrWhiteSpace(owner)) return null;
+        var account = Guid.TryParse(owner, out var id) ? id.ToString("D") : owner;
+        return $"moment.folkCulture.{field}.{account}";
+    }
+
+    private string ColumnTitle(string name)
+    {
+        var key = FolkPreferenceKey("name");
+        return name == FolkCulture && key != null ? Preferences.Default.Get(key, name) : name;
+    }
+
+    private bool SectionEnabled(string name)
+    {
+        if (name == "我的") return true;
+        if (name != FolkCulture) return store.ModuleEnabled(ModuleKey(name));
+        var key = FolkPreferenceKey("enabled");
+        return key == null || Preferences.Default.Get(key, true);
+    }
 
     private void SectionSettings()
     {
         var rows = new VerticalStackLayout { Padding = 20, Spacing = 16 };
-        var page = new ContentPage { Title = "栏目启用", Content = rows, BackgroundColor = MomentStyle.Background };
+        var page = new ContentPage { Title = "栏目设置", Content = new ScrollView { Content = rows }, BackgroundColor = MomentStyle.Background };
         var toggles = new Dictionary<string, Switch>(); bool applying = false;
-        var status = MomentStyle.Caption("同一账号的所有设备同步栏目设置；“我的”始终保留。");
-        foreach (var name in new[] { "干饭", "带娃", "活动", "运动" }) {
+        var status = MomentStyle.Caption("民俗工具的开关与名称保存在本机。“我的”始终保留。");
+        foreach (var name in new[] { "干饭", "带娃", "活动", "运动", FolkCulture }) {
             var toggle = new Switch { IsToggled = SectionEnabled(name) }; toggles[name] = toggle;
             toggle.Toggled += async (_, e) => {
                 if (applying) return;
                 foreach (var item in toggles.Values) item.IsEnabled = false;
-                try { await store.SetModuleAsync(ModuleKey(name), e.Value); }
+                try
+                {
+                    if (name == FolkCulture)
+                    {
+                        if (FolkPreferenceKey("enabled") is not string key) throw new InvalidOperationException("账号资料尚未载入。");
+                        Preferences.Default.Set(key, e.Value);
+                        if (tab == FolkCulture && !e.Value) SelectTab("我的");
+                        else RenderNavigation();
+                    }
+                    else await store.SetModuleAsync(ModuleKey(name), e.Value);
+                }
                 catch (Exception error) { await page.DisplayAlertAsync("未保存", error.Message, "知道了"); }
                 finally { Apply(); foreach (var item in toggles.Values) item.IsEnabled = true; }
             };
             var row = new Grid { ColumnDefinitions = new ColumnDefinitionCollection { new(GridLength.Star), new(GridLength.Auto) } };
-            row.Add(new Label { Text = name, VerticalOptions = LayoutOptions.Center }); row.Add(toggle, 1); rows.Add(row);
+            var title = new Label { Text = ColumnTitle(name), VerticalOptions = LayoutOptions.Center };
+            row.Add(title); row.Add(toggle, 1); rows.Add(row);
+            if (name == FolkCulture)
+                rows.Add(MomentStyle.Action("修改民俗工具栏目名称", async () =>
+                {
+                    if (FolkPreferenceKey("name") is not string key) return;
+                    var entered = await page.DisplayPromptAsync("修改栏目名称", "留空恢复默认名称", "保存", "取消", maxLength: 16, initialValue: title.Text);
+                    if (entered == null || FolkPreferenceKey("name") != key) return;
+                    var trimmed = entered.Trim();
+                    if (trimmed.Length == 0) Preferences.Default.Remove(key);
+                    else Preferences.Default.Set(key, trimmed);
+                    title.Text = ColumnTitle(name);
+                    RenderNavigation();
+                }));
         }
         rows.Add(status);
-        rows.Add(MomentStyle.Row("民俗工具", "✦", () => _ = Navigation.PushAsync(new FolkCulturePage())));
-        void Apply() { applying = true; foreach (var p in toggles) p.Value.IsToggled = SectionEnabled(p.Key); applying = false; status.Text = store.ModulePreferenceError ?? "已同步至当前账号；“我的”始终保留。"; }
+        void Apply() { applying = true; foreach (var p in toggles) p.Value.IsToggled = SectionEnabled(p.Key); applying = false; status.Text = store.ModulePreferenceError ?? "民俗工具的开关与名称保存在本机。“我的”始终保留。"; }
         rows.Add(MomentStyle.Action("重新同步", async () => { await store.RefreshModulePreferencesAsync(); Apply(); }));
         page.Appearing += async (_, _) => { store.ModulePreferencesChanged += Apply; await store.RefreshModulePreferencesAsync(); Apply(); };
         page.Disappearing += (_, _) => store.ModulePreferencesChanged -= Apply;
@@ -90,6 +133,7 @@ public sealed class FamilyPage : ContentPage
 
     private void SelectTab(string name)
     {
+        if (name == FolkCulture && !SectionEnabled(name)) return;
         if ((name is "干饭" or "带娃" or "活动" or "运动") && !SectionEnabled(name)) _ = EnableSectionAsync(name);
         if (name != "干饭" && tab == "干饭") { dining?.ResetPosition(); dining?.Suspend(); }
         if (name != "运动") exercise?.Suspend();
@@ -102,7 +146,7 @@ public sealed class FamilyPage : ContentPage
     {
         bottom.Children.Clear();
         var selected = tab is "审批" or "记录" or "规则" or "管理" ? "带娃" : tab;
-        var names = new[] { "干饭", "带娃", "活动", "运动", "我的" }.Where(SectionEnabled).ToArray();
+        var names = new[] { "干饭", "带娃", "活动", "运动", FolkCulture, "我的" }.Where(SectionEnabled).ToArray();
         bottom.ColumnDefinitions.Clear();
         foreach (var _ in names) bottom.ColumnDefinitions.Add(new ColumnDefinition(GridLength.Star));
         var column = 0;
@@ -111,9 +155,9 @@ public sealed class FamilyPage : ContentPage
             var active = selected == name;
             var view = new VerticalStackLayout { Spacing = 3, Padding = new Thickness(4, 3), MinimumHeightRequest = 52 };
             view.Add(MomentStyle.Icon(name, active));
-            view.Add(new Label { Text = name, FontSize = 12, TextColor = active ? MomentStyle.Accent : Colors.Gray, HorizontalTextAlignment = TextAlignment.Center });
+            view.Add(new Label { Text = ColumnTitle(name), FontSize = 12, LineBreakMode = LineBreakMode.TailTruncation, MaxLines = 1, TextColor = active ? MomentStyle.Accent : Colors.Gray, HorizontalTextAlignment = TextAlignment.Center });
             var tap = new TapGestureRecognizer(); tap.Tapped += (_, _) => SelectTab(name); view.GestureRecognizers.Add(tap);
-            SemanticProperties.SetDescription(view, name + (active ? "，已选中" : ""));
+            SemanticProperties.SetDescription(view, ColumnTitle(name) + (active ? "，已选中" : ""));
             var item = MomentStyle.Card(view, new Thickness(2)); item.BackgroundColor = active ? Color.FromArgb("#E5E5EA") : Colors.Transparent;
             bottom.Add(item, column++, 0);
         }
@@ -149,10 +193,13 @@ public sealed class FamilyPage : ContentPage
         bottom.IsVisible = store.Authenticated;
         if (bottom.IsVisible) RenderNavigation();
         if (!store.Authenticated) { dining?.Suspend(); dining = null; diningUser = null; activities?.Reset(); activities = null; exercise?.Suspend(); exercise = null; exerciseUser = null; LoginContent(); return; }
-        if (!store.ParentReady && tab is not ("干饭" or "活动" or "我的")) { ParentProfileUnavailableContent(); return; }
+        if (!store.ParentReady && tab is not ("干饭" or "活动" or "我的" or FolkCulture)) { ParentProfileUnavailableContent(); return; }
         if (childId is int id) { ChildContent(id); return; }
         switch (tab)
         {
+            case FolkCulture:
+                viewport.Content = new FolkCulturePanel(ColumnTitle(FolkCulture));
+                break;
             case "干饭":
                 var diningId = store.AccountProfile?.Subject ?? store.Profile?.Text("unifiedUserId") ?? "";
                 if (string.IsNullOrEmpty(diningId)) {
@@ -396,7 +443,7 @@ public sealed class FamilyPage : ContentPage
         if (store.AccountProfileError is { } profileError) content.Add(new Label { Text = profileError, FontSize = 12 });
         Section("应用与设置",
             MomentStyle.MenuRow("连接手表", "连接手表", WatchConnections),
-            MomentStyle.MenuRow("栏目启用", "栏目启用", SectionSettings),
+            MomentStyle.MenuRow("栏目设置", "栏目启用", SectionSettings),
             MomentStyle.MenuRow("AI 对话", "AI 对话", () => _ = OpenAccountWeb("/assistant")),
             MomentStyle.MenuRow("家族族谱", "带娃", () => _ = OpenAccountWeb("/genealogy")),
             MomentStyle.MenuRow("家庭成员", "带娃", () => _ = OpenAccountWeb("/my/family-members")),

@@ -2,14 +2,13 @@ using System.Globalization;
 
 namespace LinkoFamily;
 
-internal sealed class FolkCulturePage : ContentPage
+internal sealed class FolkCulturePanel : ContentView
 {
     private static readonly string[] Animals = ["鼠", "牛", "虎", "兔", "龙", "蛇", "马", "羊", "猴", "鸡", "狗", "猪"];
     private static readonly string[] Themes = ["播种与生长", "灯火与节庆", "土地与收成", "金石与手作", "河流与雨水"];
 
-    public FolkCulturePage()
+    public FolkCulturePanel(string title)
     {
-        Title = "民俗工具";
         BackgroundColor = MomentStyle.Background;
         var date = new DatePicker { Date = DateTime.Today, MinimumDate = new(1902, 1, 1), MaximumDate = new(2099, 12, 31) };
         var lunarSummary = new Label();
@@ -71,6 +70,7 @@ internal sealed class FolkCulturePage : ContentPage
                 Padding = 20, Spacing = 12,
                 Children =
                 {
+                    new Label { Text = title, FontSize = 22, FontAttributes = FontAttributes.Bold },
                     new Label { Text = "农历与流年趣味", FontAttributes = FontAttributes.Bold },
                     date, lunarSummary, MomentStyle.Caption("仅供民俗娱乐"),
                     new Label { Text = "姓名五格", FontAttributes = FontAttributes.Bold },
