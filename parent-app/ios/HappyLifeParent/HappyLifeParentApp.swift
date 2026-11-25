@@ -239,6 +239,7 @@ struct FamilyRoot: View {
                 case "activities" where activitiesEnabled: bottomTab(2, store.displayModuleName("activities"), "photo.on.rectangle.angled")
                 case "exercise" where exerciseEnabled: bottomTab(3, store.displayModuleName("exercise"), "figure.walk")
                 case "nook" where nookEnabled: bottomTab(5, store.displayModuleName("nook"), "house")
+                case "folkCulture" where store.isModuleEnabled(key): bottomTab(6, store.displayModuleName(key), "sparkles")
                 default: EmptyView()
                 }
             }
@@ -257,7 +258,6 @@ struct FamilyRoot: View {
                 Image(systemName: icon).font(.system(size: 21))
                     .overlay(alignment: .topTrailing) {
                         if badge > 0 {
-                case "folkCulture" where store.isModuleEnabled(key): bottomTab(6, store.displayModuleName(key), "sparkles")
                             Text(badge > 99 ? "99+" : String(badge))
                                 .font(.system(size: 9, weight: .bold)).padding(3)
                                 .foregroundStyle(.white).background(.red, in: Capsule())
@@ -285,6 +285,7 @@ struct FamilyRoot: View {
         case "activities": 2
         case "exercise": 3
         case "nook": 5
+        case "folkCulture": 6
         default: nil
         }
     }
@@ -303,7 +304,6 @@ struct FamilyRoot: View {
                     DiningModesView(userID: account, family: store).id(account)
                 } else {
                     ProgressView()
-        case "folkCulture": 6
                 }
             }.tag(0)
             case "growth":
@@ -334,6 +334,9 @@ struct FamilyRoot: View {
                 } else {
                     ProgressView()
                 }
+            } else if activeTab == 6 {
+                NavigationStack { FolkCultureView(title: store.displayModuleName("folkCulture")) }
+                    .id(identity.accountIdentifier)
             } else {
                 businessPager
             }
@@ -352,9 +355,6 @@ struct FamilyRoot: View {
         .onChange(of: store.pendingActivityCamera, initial: true) { _, request in
             if request != nil { activitiesEnabled = true; selectedTab = 2 }
         }
-            } else if activeTab == 6 {
-                NavigationStack { FolkCultureView(title: store.displayModuleName("folkCulture")) }
-                    .id(identity.accountIdentifier)
         .onAppear { if store.pendingActivityLink != nil { activitiesEnabled = true; selectedTab = 2 } }
         .onChange(of: store.pendingActivityLink?.id) { _, id in if id != nil { activitiesEnabled = true; selectedTab = 2 } }
         .onChange(of: enabledBusinessTabs) { _, _ in
