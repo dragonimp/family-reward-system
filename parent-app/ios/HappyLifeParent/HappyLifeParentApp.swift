@@ -240,6 +240,7 @@ struct FamilyRoot: View {
                 case "exercise" where exerciseEnabled: bottomTab(3, store.displayModuleName("exercise"), "figure.walk")
                 case "nook" where nookEnabled: bottomTab(5, store.displayModuleName("nook"), "house")
                 case "folkCulture" where store.isModuleEnabled(key): bottomTab(6, store.displayModuleName(key), "sparkles")
+                case "dailyHexagram" where store.isModuleEnabled(key): bottomTab(7, store.displayModuleName(key), "circle.hexagongrid")
                 default: EmptyView()
                 }
             }
@@ -286,6 +287,7 @@ struct FamilyRoot: View {
         case "exercise": 3
         case "nook": 5
         case "folkCulture": 6
+        case "dailyHexagram": 7
         default: nil
         }
     }
@@ -296,7 +298,7 @@ struct FamilyRoot: View {
 
     private var businessPager: some View {
         TabView(selection: $selectedTab) {
-            ForEach(enabledBusinessTabs.filter { $0 != "nook" && $0 != "folkCulture" }, id: \.self) { key in
+            ForEach(enabledBusinessTabs.filter { $0 != "nook" && $0 != "folkCulture" && $0 != "dailyHexagram" }, id: \.self) { key in
                 switch key {
             case "dining":
             Group {
@@ -337,6 +339,8 @@ struct FamilyRoot: View {
             } else if activeTab == 6 {
                 NavigationStack { FolkCultureView(title: store.displayModuleName("folkCulture")) }
                     .id(identity.accountIdentifier)
+            } else if activeTab == 7 {
+                DailyHexagramView()
             } else {
                 businessPager
             }

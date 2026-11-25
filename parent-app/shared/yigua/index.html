@@ -1,0 +1,334 @@
+<!doctype html>
+<html lang="zh-Hans">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'">
+<title>每日一卦</title>
+<style>
+:root{color-scheme:light;--ink:#352522;--paper:#f7efdd;--red:#902f26;--gold:#ac8651;--muted:#685246}
+*{box-sizing:border-box}
+body{margin:0;background:var(--paper);color:var(--ink);font-family:"Hiragino Sans GB","PingFang SC","Microsoft YaHei",sans-serif;line-height:1.6}
+main{max-width:36rem;margin:auto;padding:0 1rem 1rem}
+header{display:flex;align-items:center;justify-content:space-between;gap:.5rem}
+h1,h2,h3{font-family:"Songti SC","Noto Serif CJK SC",serif;margin:.55em 0;color:var(--red)}
+h1{font-size:1.6rem}h2{font-size:1.25rem}h3{font-size:1rem}
+small,footer,.note{color:var(--muted);font-size:.875rem}
+.badge{border:1px solid var(--red);color:var(--red);border-radius:4px;padding:.15rem .45rem;white-space:nowrap}
+nav{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:.25rem;margin:0 0 .8rem}
+button,input{font:inherit}
+button{cursor:pointer;min-height:42px;color:var(--red);background:#fffaf0;border:1px solid var(--gold);border-radius:8px;padding:.4rem .6rem}
+button:disabled{cursor:default;opacity:.65}
+button[aria-pressed="true"],.primary{background:var(--red);color:white;border-color:var(--red)}
+nav button{font-size:.8rem;padding:.35rem .15rem;line-height:1.2}
+input{display:block;min-width:0;width:100%;padding:.6rem;border:1px solid var(--gold);border-radius:8px;background:#fffaf0;color:var(--ink);margin:.25rem 0 .7rem}
+.card{background:#fffaf0;border:1px solid #cfb58c;border-radius:12px;padding:1rem;margin:.7rem 0;box-shadow:0 2px 8px #52312412;overflow-wrap:anywhere}
+.row{display:flex;flex-wrap:wrap;gap:.5rem;align-items:center}
+.stars{color:#8b4d18}.result{font-weight:700;color:var(--red);margin:.5rem 0}
+.lines{width:7rem;display:flex;flex-direction:column-reverse;gap:.38rem;margin:.8rem auto}
+.lines i{display:flex;gap:.35rem;height:.36rem}
+.lines i::before,.lines i.broken::after{content:"";background:var(--red);border-radius:2px;flex:1}
+.lines.animate i{animation:appear .2s both;animation-delay:calc(330ms + var(--line) * 75ms)}
+.coins{display:flex;justify-content:center;gap:.5rem}
+.coin{width:1.65rem;height:1.65rem;border:2px solid #86602e;border-radius:50%;background:#e5bf77;display:grid;place-items:center;animation:shake .33s ease}
+.coin::after{content:"";width:.4rem;height:.4rem;border:1px solid #86602e;background:var(--paper)}
+@keyframes shake{50%{transform:translateY(-9px) rotate(75deg)}}
+@keyframes appear{from{opacity:0;transform:translateY(5px)}}
+@media(prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important}}
+.legend{display:grid;grid-template-columns:repeat(8,minmax(0,1fr));gap:.22rem}
+.legend button{padding:.18rem .08rem;font-size:.7rem;line-height:1.15;overflow-wrap:anywhere}
+.week{display:grid;grid-template-columns:repeat(auto-fit,minmax(5.6rem,1fr));gap:.35rem}
+.week button{font-size:.78rem}
+progress{width:100%;accent-color:var(--red)}
+p{margin:.48em 0}footer{padding:.8rem 0}
+[hidden]{display:none!important}
+</style>
+</head>
+<body>
+<main>
+<header><h1>每日一卦</h1><span class="badge">仅供娱乐</span></header>
+<nav aria-label="功能">
+<button data-tab="daily" aria-pressed="true">每日一卦</button><button data-tab="question" aria-pressed="false">事项占问</button><button data-tab="choice" aria-pressed="false">二选一</button><button data-tab="collection" aria-pressed="false">卦象图鉴</button><button data-tab="history" aria-pressed="false">灵验簿</button>
+</nav>
+<section id="daily">
+<div class="row"><button id="shake" class="primary">再摇一次</button><button id="collect">收藏今日</button></div>
+<p class="note">再摇只重播动画，当日卦象会保持一致。</p>
+<div id="daily-card"></div>
+<h2>未来七日</h2><div id="week" class="week"></div><div id="preview"></div>
+</section>
+<section id="question" hidden>
+<form class="card" id="question-form"><label>你想问什么？<input name="question" required maxlength="120" placeholder="今天适合表白吗？"></label><button class="primary">起卦</button><p class="note" role="status"></p></form>
+<div id="question-card"></div>
+</section>
+<section id="choice" hidden>
+<form class="card" id="choice-form"><label>选项 A<input name="a" required maxlength="60"></label><label>选项 B<input name="b" required maxlength="60"></label><button class="primary">起卦</button><p class="note" role="status"></p></form>
+<div id="choice-card"></div>
+</section>
+<section id="collection" hidden><h2 id="progress-label"></h2><progress max="64" aria-labelledby="progress-label"></progress><div id="grid" class="legend"></div><div id="detail"></div></section>
+<section id="history" hidden><h2>灵验簿</h2><p id="stats"></p><div id="entries"></div></section>
+<footer>卦象、评分与结论均为程序生成。仅供娱乐，请勿用于重大现实决策。</footer>
+<p class="note" id="storage-error" role="status" hidden>当前环境无法保存数据，本次记录会在退出后丢失。</p>
+</main>
+<script>
+'use strict';
+// Rows are upper trigrams and columns are lower trigrams, both in the same order.
+const trigrams = [
+    ['乾', '111'], ['兑', '110'], ['离', '101'], ['震', '100'],
+    ['巽', '011'], ['坎', '010'], ['艮', '001'], ['坤', '000'],
+];
+// Traditional King Wen numbers, arranged by upper and lower trigram.
+const matrix = [
+    [1,10,13,25,44,6,33,12], [43,58,49,17,28,47,31,45],
+    [14,38,30,21,50,64,56,35], [34,54,55,51,32,40,62,16],
+    [9,61,37,42,57,59,53,20], [5,60,63,3,48,29,39,8],
+    [26,41,22,27,18,4,52,23], [11,19,36,24,46,7,15,2],
+];
+const traditionalNames = '乾为天 坤为地 水雷屯 山水蒙 水天需 天水讼 地水师 水地比 风天小畜 天泽履 地天泰 天地否 天火同人 火天大有 地山谦 雷地豫 泽雷随 山风蛊 地泽临 风地观 火雷噬嗑 山火贲 山地剥 地雷复 天雷无妄 山天大畜 山雷颐 泽风大过 坎为水 离为火 泽山咸 雷风恒 天山遁 雷天大壮 火地晋 地火明夷 风火家人 火泽睽 水山蹇 雷水解 山泽损 风雷益 泽天夬 天风姤 泽地萃 地风升 泽水困 水风井 泽火革 火风鼎 震为雷 艮为山 风山渐 雷泽归妹 雷火丰 火山旅 巽为风 兑为泽 风水涣 水泽节 风泽中孚 雷山小过 水火既济 火水未济'.split(' ');
+const sayings = [
+    ['宜休整，把节奏放慢。', '宜收尾，给自己一点余地。', '宜留白，把决定放到休息之后。'],
+    ['宜复核，先把信息补齐。', '宜整理，先完成眼前的一件小事。', '宜放缓，给计划留余裕。'],
+    ['宜按计划推进，做完一步再看下一步。', '宜稳住节奏，完成熟悉的任务。', '宜尝试一个容易回退的小步骤。'],
+    ['宜行动，先完成最重要的一步。', '宜主动沟通，把想法说清楚。', '宜开始准备已计划的事。'],
+    ['宜开启新计划，先设一个可达到的目标。', '宜推进，把好点子变成具体动作。', '宜把握节奏，给计划一个清楚的起点。'],
+];
+const actions = ['休息片刻', '核对信息', '完成手头任务', '推进一个小目标', '着手准备新计划'];
+const avoid = ['赶进度', '仓促答应', '分心多线并进', '同时接太多任务', '把日程排得过满'];
+const colors = ['朱砂红','黛青','米白','桂花黄','竹绿','墨蓝','藕紫','赭石'];
+const directions = ['北','东北','东','东南','南','西南','西','西北'];
+
+function mix(seed) {
+    let value = (seed + 0x6d2b79f5) | 0;
+    value = Math.imul(value ^ value >>> 15, value | 1);
+    value ^= value + Math.imul(value ^ value >>> 7, value | 61);
+    return (value ^ value >>> 14) >>> 0;
+}
+function hash(text) {
+    let seed = 2166136261;
+    for (const char of text) seed = Math.imul(seed ^ char.codePointAt(0), 16777619);
+    return seed;
+}
+function dateKey(date) {
+    return date.getFullYear() * 10000 + (date.getMonth() + 1) * 100 + date.getDate();
+}
+function draw(position) {
+    const upper = Math.floor(position / 8), lower = position % 8;
+    const id = matrix[upper][lower];
+    const score = 1 + mix(id) % 5;
+    const index = score - 1;
+    return {
+        id, name: traditionalNames[id - 1], upperTrigram: trigrams[upper][0], lowerTrigram: trigrams[lower][0],
+        lines: [...trigrams[lower][1], ...trigrams[upper][1]].map(Number),
+        score, level: ['凶','小凶','平','吉','大吉'][index], verdict: sayings[index][id % 3],
+        suitable: actions[index], avoid: avoid[index], luckyColor: colors[id % 8],
+        luckyNumber: (id - 1) % 9 + 1, luckyDirection: directions[(id * 3) % 8],
+        advice: '为「' + actions[index] + '」留出十分钟。',
+        remedy: score <= 2 ? '先喝杯水、走两步，把事情拆成一个轻松的小动作。' : '',
+    };
+}
+const daily = date => draw(mix(dateKey(date)) % 64);
+const all = Array.from({length:64}, (_, index) => draw(index));
+const byId = new Map(all.map(result => [result.id, result]));
+const get = id => document.getElementById(id);
+
+function load(key) {
+    try {
+        const value = JSON.parse((window.yiguaStore ?? localStorage).getItem(key));
+        return Array.isArray(value) ? value : [];
+    } catch {
+        return [];
+    }
+}
+function save(key, value) {
+    try {
+        (window.yiguaStore ?? localStorage).setItem(key, JSON.stringify(value));
+    } catch {
+        get('storage-error').hidden = false;
+    }
+}
+let history = load('yigua:history').filter(entry => entry && byId.has(entry.hexagramId)).slice(0, 200);
+const unlocked = new Set([...load('yigua:unlocked'), ...history.map(entry => entry.hexagramId)].filter(id => byId.has(id)));
+const collected = new Set(load('yigua:collected'));
+let currentDate;
+let currentDaily;
+
+function unlock(result) {
+    if (unlocked.has(result.id)) return;
+    unlocked.add(result.id);
+    save('yigua:unlocked', [...unlocked]);
+}
+function remember(type, question, result, verdict, timestamp, day) {
+    if (day && history.some(entry => entry.day === day && entry.type === type)) return;
+    history = [{type, question, hexagramId:result.id, verdict, timestamp, day, verified:null}, ...history].slice(0, 200);
+    save('yigua:history', history);
+}
+function node(tag, text, className) {
+    const element = document.createElement(tag);
+    if (text !== undefined) element.textContent = text;
+    if (className) element.className = className;
+    return element;
+}
+function button(text, action) {
+    const item = node('button', text);
+    item.type = 'button';
+    item.addEventListener('click', action);
+    return item;
+}
+function card(target, result, verdict = result.verdict, animate = false, compact = false) {
+    const wrapper = node('article', undefined, 'card');
+    wrapper.append(node('h2', result.name));
+    if (animate) {
+        const coins = node('div', undefined, 'coins');
+        coins.setAttribute('aria-hidden','true');
+        for (let i = 0; i < 3; i++) coins.append(node('span', '', 'coin'));
+        wrapper.append(coins);
+    }
+    if (!compact) {
+        wrapper.append(node('p', '上卦 ' + result.upperTrigram + ' · 下卦 ' + result.lowerTrigram));
+        const lines = node('div', undefined, animate ? 'lines animate' : 'lines');
+        lines.setAttribute('role','img');
+        lines.setAttribute('aria-label', '自下而上：' + result.lines.map(line => line ? '阳' : '阴').join('、'));
+        result.lines.forEach((line, index) => {
+            const row = node('i', undefined, line ? '' : 'broken');
+            row.style.setProperty('--line', index);
+            lines.append(row);
+        });
+        wrapper.append(lines);
+    }
+    const rating = node('p', '★'.repeat(result.score) + '☆'.repeat(5 - result.score) + ' · ' + result.level, 'stars');
+    rating.setAttribute('aria-label', result.score + ' 星，' + result.level);
+    const outcome = node('p', verdict, 'result');
+    wrapper.append(rating, outcome);
+    if (!compact) {
+        wrapper.append(node('p', '宜 ' + result.suitable + '　忌 ' + result.avoid));
+        wrapper.append(node('p', '幸运色 ' + result.luckyColor + '　数字 ' + result.luckyNumber + '　方位 ' + result.luckyDirection));
+        wrapper.append(node('p', '行动建议 · ' + result.advice));
+    }
+    if (result.remedy) wrapper.append(node('p', '化解小贴士 · ' + result.remedy));
+    target.replaceChildren(wrapper);
+    if (animate && !matchMedia('(prefers-reduced-motion: reduce)').matches) {
+        const status = node('p', '起卦中…', 'note');
+        status.setAttribute('role','status');
+        wrapper.prepend(status);
+        outcome.hidden = true;
+        setTimeout(() => { status.textContent = '卦象已成'; outcome.hidden = false; }, 900);
+    }
+}
+function updateCollect() {
+    const saved = collected.has(currentDaily.id);
+    get('collect').textContent = saved ? '已收藏' : '收藏今日';
+    get('collect').disabled = saved;
+}
+function refreshDaily() {
+    const now = new Date(), today = dateKey(now);
+    if (today === currentDate) return;
+    currentDate = today;
+    currentDaily = daily(now);
+    unlock(currentDaily);
+    remember('每日', '每日一卦', currentDaily, currentDaily.verdict, now.getTime(), today);
+    card(get('daily-card'), currentDaily);
+    updateCollect();
+    get('preview').replaceChildren();
+    const week = get('week');
+    week.replaceChildren();
+    for (let offset = 1; offset <= 7; offset++) {
+        const date = new Date(now.getFullYear(), now.getMonth(), now.getDate() + offset, 12);
+        const result = daily(date);
+        week.append(button((date.getMonth() + 1) + '/' + date.getDate() + ' ' + result.name + ' · ' + result.score + '星', () => {
+            unlock(result);
+            card(get('preview'), result, result.verdict, false, true);
+        }));
+    }
+}
+get('shake').addEventListener('click', () => { refreshDaily(); card(get('daily-card'), currentDaily, currentDaily.verdict, true); });
+get('collect').addEventListener('click', () => {
+    refreshDaily();
+    collected.add(currentDaily.id);
+    save('yigua:collected', [...collected]);
+    updateCollect();
+});
+function renderCollection() {
+    get('progress-label').textContent = '已解锁 ' + unlocked.size + ' / 64';
+    document.querySelector('progress').value = unlocked.size;
+    const grid = get('grid');
+    grid.replaceChildren();
+    get('detail').replaceChildren();
+    for (const result of byId.values()) {
+        const known = unlocked.has(result.id);
+        const item = button(known ? result.name : '？', () => card(get('detail'), result));
+        item.disabled = !known;
+        if (!known) item.setAttribute('aria-label', '未解锁卦象');
+        grid.append(item);
+    }
+}
+function renderHistory() {
+    const verified = history.filter(entry => typeof entry.verified === 'boolean');
+    const hits = verified.filter(entry => entry.verified).length;
+    get('stats').textContent = verified.length
+        ? '已复盘 ' + verified.length + ' 条 · 命中 ' + hits + ' 条 · 趣味准确率 ' + Math.round(100 * hits / verified.length) + '%'
+        : '还没有复盘结果。';
+    const container = get('entries');
+    container.replaceChildren();
+    for (const entry of history) {
+        const item = node('article', undefined, 'card');
+        item.append(node('h3', entry.type + ' · ' + entry.question), node('p', byId.get(entry.hexagramId).name + ' · ' + entry.verdict));
+        item.append(node('small', new Date(entry.timestamp).toLocaleString()));
+        const decisions = node('div', undefined, 'row');
+        for (const [label, value] of [['准了', true], ['没准', false]]) {
+            const choice = button(label, () => {
+                entry.verified = value;
+                save('yigua:history', history);
+                renderHistory();
+            });
+            choice.setAttribute('aria-pressed', entry.verified === value);
+            decisions.append(choice);
+        }
+        item.append(decisions);
+        container.append(item);
+    }
+}
+function ask(form, isChoice) {
+    const data = new FormData(form);
+    const a = String(data.get(isChoice ? 'a' : 'question')).trim();
+    const b = isChoice ? String(data.get('b')).trim() : '';
+    const status = form.querySelector('[role=status]');
+    if (!a || (isChoice && (!b || a === b))) {
+        status.textContent = isChoice ? '请填写两个不同的选项。' : '请先写下你想问的事项。';
+        return;
+    }
+    status.textContent = '';
+    const question = isChoice ? 'A ' + a + ' / B ' + b : a;
+    const now = Date.now();
+    const seed = hash(question.normalize('NFC')) + now;
+    const result = draw(mix(seed) % 64);
+    const verdict = isChoice
+        ? (result.id % 2 ? '选 A · ' + a : '选 B · ' + b)
+        : (result.score >= 3 ? '宜 · 先从一个小步骤开始。' : '不宜 · 先缓一缓，再核对计划。');
+    unlock(result);
+    remember(isChoice ? '决策' : '事项', question, result, verdict, now);
+    card(get(isChoice ? 'choice-card' : 'question-card'), result, verdict, true);
+    const submit = form.querySelector('button');
+    submit.disabled = true;
+    setTimeout(() => { submit.disabled = false; }, 900);
+}
+for (const item of document.querySelectorAll('nav button')) {
+    item.addEventListener('click', () => {
+        for (const tab of document.querySelectorAll('nav button')) {
+            const active = tab === item;
+            tab.setAttribute('aria-pressed', active);
+            get(tab.dataset.tab).hidden = !active;
+        }
+        const active = item.dataset.tab;
+        if (active === 'collection') renderCollection();
+        if (active === 'history') renderHistory();
+        if (active === 'daily') refreshDaily();
+    });
+}
+get('question-form').addEventListener('submit', event => { event.preventDefault(); ask(event.currentTarget, false); });
+get('choice-form').addEventListener('submit', event => { event.preventDefault(); ask(event.currentTarget, true); });
+document.addEventListener('visibilitychange', () => { if (!document.hidden) refreshDaily(); });
+window.addEventListener('focus', refreshDaily);
+setInterval(refreshDaily, 60_000);
+refreshDaily();
+</script>
+</body>
+</html>

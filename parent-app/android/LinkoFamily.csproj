@@ -9,8 +9,8 @@
     <Nullable>enable</Nullable>
     <ApplicationTitle>Linko Moment</ApplicationTitle>
     <ApplicationId>net.impx.happylife</ApplicationId>
-    <ApplicationDisplayVersion>1.0.38</ApplicationDisplayVersion>
-    <ApplicationVersion>47</ApplicationVersion>
+    <ApplicationDisplayVersion>1.0.39</ApplicationDisplayVersion>
+    <ApplicationVersion>48</ApplicationVersion>
     <SupportedOSPlatformVersion>26</SupportedOSPlatformVersion>
     <AgentIdentityNativeClientProject Condition="'$(AgentIdentityNativeClientProject)' == ''">$(MSBuildThisFileDirectory)../../../AgentIdentity/src/AgentIdentity.NativeClient/AgentIdentity.NativeClient.csproj</AgentIdentityNativeClientProject>
   </PropertyGroup>
@@ -18,6 +18,7 @@
     <MauiIcon Include="Resources/AppIcon/familyicon.png" BaseSize="512,512" />
     <MauiSplashScreen Include="Resources/AppIcon/familyicon.png" Color="#0F766E" BaseSize="128,128" />
     <MauiFont Include="Resources/Fonts/*" />
+    <MauiAsset Include="../shared/yigua/index.html" LogicalName="yigua/index.html" />
     <MauiAsset Include="../shared/CeceCalendar.json" LogicalName="CeceCalendar.json" />
     <MauiAsset Include="../../frontend/public/legal/linko-family-privacy.html" LogicalName="linko-family-privacy.html" />
     <ProjectReference Include="$(AgentIdentityNativeClientProject)" />

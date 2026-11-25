@@ -60,6 +60,8 @@ public sealed class FamilyPage : ContentPage
 
     private static string ModuleKey(string name) => name switch { "干饭" => "dining", "带娃" => "growth", "活动" => "activities", "运动" => "exercise", _ => "" };
     private const string FolkCulture = "测测";
+    private const string DailyHexagram = "每日一卦";
+    private const string HexagramPage = "file:///android_asset/yigua/index.html";
     private string? FolkPreferenceKey(string field)
     {
         var owner = store.AccountProfile?.Subject ?? store.Profile?.Text("unifiedUserId");
@@ -77,6 +79,7 @@ public sealed class FamilyPage : ContentPage
     private bool SectionEnabled(string name)
     {
         if (name == "我的") return true;
+        if (name == DailyHexagram) return Preferences.Default.Get("moment.dailyHexagram.enabled", true);
         if (name != FolkCulture) return store.ModuleEnabled(ModuleKey(name));
         var key = FolkPreferenceKey("enabled");
         return key == null || Preferences.Default.Get(key, true);
@@ -88,7 +91,7 @@ public sealed class FamilyPage : ContentPage
         var page = new ContentPage { Title = "栏目设置", Content = new ScrollView { Content = rows }, BackgroundColor = MomentStyle.Background };
         var toggles = new Dictionary<string, Switch>(); bool applying = false;
         var status = MomentStyle.Caption("测测的开关与名称保存在本机。“我的”始终保留。");
-        foreach (var name in new[] { "干饭", "带娃", "活动", "运动", FolkCulture }) {
+        foreach (var name in new[] { "干饭", "带娃", "活动", "运动", FolkCulture, DailyHexagram }) {
             var toggle = new Switch { IsToggled = SectionEnabled(name) }; toggles[name] = toggle;
             toggle.Toggled += async (_, e) => {
                 if (applying) return;
@@ -100,6 +103,12 @@ public sealed class FamilyPage : ContentPage
                         if (FolkPreferenceKey("enabled") is not string key) throw new InvalidOperationException("账号资料尚未载入。");
                         Preferences.Default.Set(key, e.Value);
                         if (tab == FolkCulture && !e.Value) SelectTab("我的");
+                        else RenderNavigation();
+                    }
+                    else if (name == DailyHexagram)
+                    {
+                        Preferences.Default.Set("moment.dailyHexagram.enabled", e.Value);
+                        if (tab == DailyHexagram && !e.Value) SelectTab("我的");
                         else RenderNavigation();
                     }
                     else await store.SetModuleAsync(ModuleKey(name), e.Value);
@@ -133,7 +142,7 @@ public sealed class FamilyPage : ContentPage
 
     private void SelectTab(string name)
     {
-        if (name == FolkCulture && !SectionEnabled(name)) return;
+        if ((name is FolkCulture or DailyHexagram) && !SectionEnabled(name)) return;
         if ((name is "干饭" or "带娃" or "活动" or "运动") && !SectionEnabled(name)) _ = EnableSectionAsync(name);
         if (name != "干饭" && tab == "干饭") { dining?.ResetPosition(); dining?.Suspend(); }
         if (name != "运动") exercise?.Suspend();
@@ -146,7 +155,7 @@ public sealed class FamilyPage : ContentPage
     {
         bottom.Children.Clear();
         var selected = tab is "审批" or "记录" or "规则" or "管理" ? "带娃" : tab;
-        var names = new[] { "干饭", "带娃", "活动", "运动", FolkCulture, "我的" }.Where(SectionEnabled).ToArray();
+        var names = new[] { "干饭", "带娃", "活动", "运动", FolkCulture, DailyHexagram, "我的" }.Where(SectionEnabled).ToArray();
         bottom.ColumnDefinitions.Clear();
         foreach (var _ in names) bottom.ColumnDefinitions.Add(new ColumnDefinition(GridLength.Star));
         var column = 0;
@@ -193,10 +202,20 @@ public sealed class FamilyPage : ContentPage
         bottom.IsVisible = store.Authenticated;
         if (bottom.IsVisible) RenderNavigation();
         if (!store.Authenticated) { dining?.Suspend(); dining = null; diningUser = null; activities?.Reset(); activities = null; exercise?.Suspend(); exercise = null; exerciseUser = null; LoginContent(); return; }
-        if (!store.ParentReady && tab is not ("干饭" or "活动" or "我的" or FolkCulture)) { ParentProfileUnavailableContent(); return; }
+        if (!store.ParentReady && tab is not ("干饭" or "活动" or "我的" or FolkCulture or DailyHexagram)) { ParentProfileUnavailableContent(); return; }
         if (childId is int id) { ChildContent(id); return; }
         switch (tab)
         {
+            case DailyHexagram:
+                var hexagram = new WebView();
+                hexagram.HandlerChanged += (_, _) => {
+                    if (hexagram.Handler?.PlatformView is Android.Webkit.WebView native)
+                        native.Settings.DomStorageEnabled = true;
+                };
+                hexagram.Navigating += (_, args) => args.Cancel = args.Url != HexagramPage;
+                hexagram.Source = new UrlWebViewSource { Url = HexagramPage };
+                viewport.Content = hexagram;
+                break;
             case FolkCulture:
                 viewport.Content = new FolkCulturePanel(ColumnTitle(FolkCulture));
                 break;

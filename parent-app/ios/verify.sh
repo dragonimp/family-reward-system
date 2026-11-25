@@ -10,8 +10,8 @@ bash "$root/parent-app/ios/check-local-time.sh"
 python3 "$root/scripts/check-ios-localization.py"
 xcrun swiftc HappyLifeParent/NativeModels.swift Tests/NativeModelTests.swift -o "$ATLAS_BUILD_WORK/native-model-tests"
 "$ATLAS_BUILD_WORK/native-model-tests"
-if rg -n 'WKWebView|import WebKit' HappyLifeParent --glob '*.swift'; then
-  echo 'Business app must contain only native views' >&2
+if rg -n 'WKWebView|import WebKit' HappyLifeParent --glob '*.swift' --glob '!DailyHexagramView.swift'; then
+  echo 'Business views must be native apart from the bundled Daily Hexagram' >&2
   exit 1
 fi
 plutil -lint HappyLifeParent/Info.plist HappyLifeParent.xcodeproj/project.pbxproj
