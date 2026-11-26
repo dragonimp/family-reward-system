@@ -193,6 +193,7 @@ string? DiningOwner(HttpRequest request)
     return string.IsNullOrWhiteSpace(owner) ? null : Guid.TryParse(owner, out var id) ? id.ToString("D") : owner;
 }
 app.MapDiningAccounts(connectionString, DiningOwner);
+app.MapBeverages(connectionString, DiningOwner);
 app.MapDiningGatherings(connectionString, DiningOwner);
 app.MapDiningCircle(connectionString, DiningOwner);
 app.MapDiningFoodMaps(connectionString, DiningOwner);
