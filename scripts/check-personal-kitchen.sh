@@ -6,7 +6,7 @@ createdb "$db"
 trap 'dropdb --if-exists "$db"' EXIT
 pg_dump -Fc "$db" > "$ATLAS_BUILD_WORK/before.dump"
 mkdir -p "$ATLAS_BUILD_WORK/migrations"
-cp scripts/migrations/20261107-kitchen-recipes-v1.sql scripts/migrations/20261108-personal-kitchen-v1.sql "$ATLAS_BUILD_WORK/migrations/"
+cp scripts/migrations/{20261107-kitchen-recipes-v1,20261108-personal-kitchen-v1,20261121-personal-beverages-v1,20261127-beverage-recognition-v1}.sql "$ATLAS_BUILD_WORK/migrations/"
 export FAMILY_REWARD_DB_DSN="dbname=$db" FAMILY_REWARD_DB_BACKUP="$ATLAS_BUILD_WORK/before.dump"
 bash scripts/run-db-migrations.sh "$ATLAS_BUILD_WORK/migrations"
 bash scripts/run-db-migrations.sh "$ATLAS_BUILD_WORK/migrations"

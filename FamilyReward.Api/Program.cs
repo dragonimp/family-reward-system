@@ -193,7 +193,8 @@ string? DiningOwner(HttpRequest request)
     return string.IsNullOrWhiteSpace(owner) ? null : Guid.TryParse(owner, out var id) ? id.ToString("D") : owner;
 }
 app.MapDiningAccounts(connectionString, DiningOwner);
-app.MapBeverages(connectionString, DiningOwner);
+app.MapBeverages(connectionString, DiningOwner, request => NormalizeBusinessUserName(
+    FirstClaim(request, "preferred_username", ClaimTypes.Name, "name") ?? DiningOwner(request)!));
 app.MapDiningGatherings(connectionString, DiningOwner);
 app.MapDiningCircle(connectionString, DiningOwner);
 app.MapDiningFoodMaps(connectionString, DiningOwner);

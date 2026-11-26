@@ -319,6 +319,7 @@ private struct BeverageHome: View {
     @State private var items: [[String: Any]] = []
     @State private var photos: [String] = []
     @State private var recordID = UUID()
+    @State private var recognitionID: UUID?
     @State private var name = ""
     @State private var category = "unknown"
     @State private var details: [String: String] = [:]
@@ -369,11 +370,12 @@ private struct BeverageHome: View {
                     TextField("饮用地点", text: $place)
                     DatePicker("饮用日期", selection: $day, displayedComponents: .date)
                     if items.contains(where: { matches($0) }) { Text("已有同款档案，将关联本次记录。") }
-                    Button("确认归档") { Task { await save() } }.disabled(busy || name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || category == "unknown")
+                    Button("确认归档") { Task { await save() } }.disabled(busy)
                 } else {
                     TextField("搜索名称、品牌、品类", text: $query)
                     ForEach(visible, id: \.id) { profile in
                         DisclosureGroup(profile.data["name"] as? String ?? "饮品") {
+                            if profile.data["category"] as? String == "unknown" { Text("分类待确认").font(.caption) }
                             let favorite = profile.data["favorite"] as? Bool == true
                             Button(favorite ? "取消收藏" : "收藏") { Task { await run {
                                 _ = try await family.call("/api/beverages/\(profile.id)/favorite", method: "PUT", body: ["favorite": !favorite])
@@ -409,7 +411,8 @@ private struct BeverageHome: View {
     private var visible: [Row] {
         let type = section == "我的酒柜" ? "alcoholic" : "nonalcoholic"
         return rows(items.filter { item in
-            item["category"] as? String == type && (query.isEmpty ||
+            let category = item["category"] as? String
+            return (category == type || (type == "nonalcoholic" && category == "unknown")) && (query.isEmpty ||
                 ["name", "brand", "kind"].contains { (item[$0] as? String ?? "").localizedCaseInsensitiveContains(query) })
         })
     }
@@ -420,6 +423,7 @@ private struct BeverageHome: View {
     }
     private func edit(_ profile: [String: Any], record: Row) {
         guard let id = UUID(uuidString: record.id) else { return }
+        recognitionID = nil
         recordID = id; profileID = profile["id"] as? String
         apply(profile)
         photos = record.data["photoIds"] as? [String] ?? []
@@ -454,24 +458,41 @@ private struct BeverageHome: View {
     private func add(_ bytes: Data) async {
         await run {
             guard photos.count < 6 else { return }
-            let media = UUID().uuidString, task = UUID().uuidString
+            let media = UUID().uuidString, task = UUID()
             _ = try await family.call("/api/kitchen/media", method: "POST", body: ["id":media,"purpose":"recipe","base64":bytes.base64EncodedString()])
             photos.append(media)
-            _ = try await family.call("/api/beverages/recognitions/\(task)", method: "POST", body: ["mediaId":media])
+            recognitionID = task
+            message = "正在识别，可先手动填写并归档。"
+            Task { await recognize(task, media: media) }
+        }
+    }
+    private func recognize(_ task: UUID, media: String) async {
+        let route = "/api/beverages/recognitions/\(task.uuidString)"
+        do {
+            _ = try await family.call(route, method: "POST", body: ["mediaId":media])
             for _ in 0..<95 {
-                let row = try await family.call("/api/beverages/recognitions/\(task)") as? [String: Any]
+                guard recognitionID == task else { return }
+                let row = try await family.call(route) as? [String: Any]
+                guard recognitionID == task else { return }
                 if row?["state"] as? String == "completed", let draft = row?["result"] as? [String: Any] {
-                    apply(draft, onlyEmpty: true); message = "请确认识别结果，可手动修改。"; return
+                    apply(draft, onlyEmpty: true)
+                    message = (draft["name"] as? String ?? "").isEmpty
+                        ? "未识别出饮品名称，请输入名称后归档。" : "请确认识别结果，可手动修改。"
+                    return
                 }
-                if row?["state"] as? String == "failed" { message = "识别未完成，照片已保留，可手动填写。"; return }
+                if row?["state"] as? String == "failed" { break }
                 try await Task.sleep(for: .seconds(2))
             }
-            message = "识别等待超时，可手动填写。"
+        } catch {
+            // The uploaded photo is still available for manual archiving.
         }
+        if recognitionID == task { message = "识别未完成，照片已保留，请输入饮品名称后归档。" }
     }
     private func save() async {
         await run {
-            var draft: [String: Any] = ["name":name, "category":category]
+            let title = name.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !title.isEmpty else { message = "请填写饮品名称。"; return }
+            var draft: [String: Any] = ["name":title, "category":category]
             for (key, value) in details where !value.isEmpty {
                 if key == "alcoholPercent" {
                     guard let number = Double(value), number.isFinite, (0...100).contains(number) else { message = "请输入有效酒精度。"; return }
@@ -484,6 +505,7 @@ private struct BeverageHome: View {
             var body: [String: Any] = ["beverage":draft,"consumedOn":formatter.string(from: day),"note":note,"place":place,"photoIds":photos]
             if let profileID { body["beverageId"] = profileID }
             if rating > 0 { body["rating"] = rating }
+            recognitionID = nil
             _ = try await family.call("/api/beverages/records/\(recordID.uuidString)", method: "PUT", body: body)
             section = category == "alcoholic" ? "我的酒柜" : "我的饮品屋"
             name = ""; category = "unknown"; details = [:]; photos = []; rating = 0

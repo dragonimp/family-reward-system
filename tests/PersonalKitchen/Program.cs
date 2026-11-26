@@ -17,11 +17,17 @@ void Check(bool ok,string label){if(!ok)throw new Exception(label);Console.Write
 var targets=JsonNode.Parse("[{\"id\":1,\"status\":\"Active\",\"agentType\":\"Goldfish\",\"ownerUsername\":\"bob\"},{\"id\":2,\"status\":\"Active\",\"agentType\":\"Goldfish\",\"ownerUsername\":\"alice\"},{\"id\":3,\"status\":\"Inactive\",\"agentType\":\"Goldfish\",\"ownerUsername\":\"alice\"}]")!.AsArray();
 Check(KitchenOrbitResolver.Select(targets,"alice",null)==2,"automatic OCR target belongs to current user");
 Check(KitchenOrbitResolver.Select(targets,"alice",99)==null&&KitchenOrbitResolver.Select(targets,"alice",3)==null,"configured OCR target must be currently authorized and active");
+var beverage = BeverageEndpoints.ReadRecognition(JsonNode.Parse("""
+    {"draft":{"name":" 茉莉花茶 ","category":"nonalcoholic","brand":null,"alcoholPercent":110}}
+    """)!.AsObject());
+Check(beverage["name"]?.ToString()=="茉莉花茶" && beverage["category"]?.ToString()=="nonalcoholic"
+    && !beverage.ContainsKey("brand") && !beverage.ContainsKey("alcoholPercent"), "beverage recognition accepts wrapped evidence and omits invalid fields");
+Check(BeverageEndpoints.Valid(new("手动记录",null,"unknown",null,null,null,null,null,null)), "manual archiving permits pending classification");
 var builder=WebApplication.CreateBuilder();builder.WebHost.UseUrls("http://127.0.0.1:0");builder.Logging.ClearProviders();
 builder.Services.AddAuthentication("test").AddScheme<AuthenticationSchemeOptions,Identity>("test",_=>{});builder.Services.AddAuthorization();builder.Services.AddRateLimiter(o=>o.AddFixedWindowLimiter("kitchen-upload",v=>{v.PermitLimit=100;v.Window=TimeSpan.FromMinutes(1);}));
-await using var app=builder.Build();app.UseAuthentication();app.UseAuthorization();app.UseRateLimiter();app.MapPersonalKitchen(cs,r=>r.HttpContext.User.Identity?.IsAuthenticated==true?new KitchenActor(r.HttpContext.User.FindFirst(ClaimTypes.NameIdentifier)!.Value,"test"):null);await app.StartAsync();
+await using var app=builder.Build();app.UseAuthentication();app.UseAuthorization();app.UseRateLimiter();app.MapPersonalKitchen(cs,r=>r.HttpContext.User.Identity?.IsAuthenticated==true?new KitchenActor(r.HttpContext.User.FindFirst(ClaimTypes.NameIdentifier)!.Value,"test"):null);app.MapBeverages(cs,r=>r.HttpContext.User.FindFirst(ClaimTypes.NameIdentifier)?.Value, _=>"test");await app.StartAsync();
 using var client=new HttpClient{BaseAddress=new Uri(app.Services.GetRequiredService<IServer>().Features.Get<IServerAddressesFeature>()!.Addresses.Single())};
-async Task<HttpResponseMessage> Send(string method,string path,object? body=null,string? owner="alice"){using var req=new HttpRequestMessage(new HttpMethod(method),"/api/kitchen/"+path);if(owner!=null)req.Headers.Add("X-Test-User",owner);if(body!=null)req.Content=JsonContent.Create(body);return await client.SendAsync(req);}
+async Task<HttpResponseMessage> Send(string method,string path,object? body=null,string? owner="alice"){using var req=new HttpRequestMessage(new HttpMethod(method),path.StartsWith("/api/")?path:"/api/kitchen/"+path);if(owner!=null)req.Headers.Add("X-Test-User",owner);if(body!=null)req.Content=JsonContent.Create(body);return await client.SendAsync(req);}
 async Task<JsonObject> Data(HttpResponseMessage r){var text=await r.Content.ReadAsStringAsync();if(!r.IsSuccessStatusCode)throw new Exception($"{r.StatusCode}: {text}");return JsonNode.Parse(string.IsNullOrWhiteSpace(text)?"{}":text)!.AsObject();}
 async Task<int> Count(Guid id){var data=await Data(await Send("GET",$"recipes/{id}?kind=private"));return data["madeCount"]!.GetValue<int>();}
 var id=Guid.NewGuid();var draft=new {name="测试蛋炒饭",ingredients=new[]{new{name="米饭",quantity="1",unit="碗"}},steps=new[]{new{number=1,action="炒熟",ingredients=new[]{"米饭"},duration="5分钟",heat="中火",instruction="翻炒至充分热透。",notes="注意食品安全"}}};
@@ -49,6 +55,17 @@ using(var transport=new VisionFixture())using(var http=new HttpClient(transport)
     Check((await Data(await Send("GET","recipes")))["items"]!.AsArray().Count==1,"recognition never automatically saves a recipe");
     Check(!await worker.RunOne(CancellationToken.None),"completed task is not generated again");
     var failedTask=Guid.NewGuid();await Data(await Send("POST","recognitions",new{id=failedTask,mediaId=media}));transport.Fail=true;await worker.RunOne(CancellationToken.None);Check((await Data(await Send("GET",$"recognitions/{failedTask}")))["state"]!.ToString()=="failed","provider error persists recoverable failure without saving recipe");
+    transport.Fail=false;
+    transport.BeverageResponse="""{"name":null,"category":"unknown"}""";
+    var emptyRoute=$"/api/beverages/recognitions/{Guid.NewGuid():D}";
+    await Data(await Send("POST",emptyRoute,new{mediaId=media}));
+    await worker.RunOne(CancellationToken.None);
+    Check((await Data(await Send("GET",emptyRoute)))["state"]?.ToString()=="failed","empty drink recognition is a recoverable failure");
+    var record=$"/api/beverages/records/{Guid.NewGuid():D}";
+    await Data(await Send("PUT",record,new{beverage=new{name="手动记录",category="unknown"},consumedOn="2026-11-27",photoIds=new[]{media}}));
+    var archives=await Data(await Send("GET","/api/beverages"));
+    Check(archives["items"]?[0]?["records"]?[0]?["photoIds"]?[0]?.ToString()==media.ToString("D"),"manual archiving keeps the uploaded photo after failed recognition");
+
 }
 if(Environment.GetEnvironmentVariable("KITCHEN_LIVE_ORBIT_USERNAME") is {Length:>0} liveUser){
     var fixture=File.ReadAllBytes(Environment.GetEnvironmentVariable("KITCHEN_LIVE_ORBIT_IMAGE")!);var liveMedia=Guid.NewGuid();await Data(await Send("POST","media",new{id=liveMedia,purpose="recipe",base64=Convert.ToBase64String(fixture)}));var liveTask=Guid.NewGuid();await Data(await Send("POST","recognitions",new{id=liveTask,mediaId=liveMedia}));
@@ -77,13 +94,14 @@ sealed class Identity(IOptionsMonitor<AuthenticationSchemeOptions> o,ILoggerFact
 
 sealed class VisionFixture:HttpMessageHandler {
  public bool SawPrivateDataUrl,Stopped,Archived,Fail;
+ public string? BeverageResponse;
  protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage req,CancellationToken ct){
   var path=req.RequestUri!.AbsolutePath;
   if(path.EndsWith("/stream")){
    var body=JsonNode.Parse(await req.Content!.ReadAsStringAsync(ct))!;SawPrivateDataUrl=body["attachments"]?[0]?["dataUrl"]?.ToString().StartsWith("data:image/jpeg;base64,")==true;
    if(Fail)return new HttpResponseMessage(HttpStatusCode.ServiceUnavailable);
    var draft=new{draft=new{name="转录测试",ingredients=new[]{new{name="米饭",quantity=1,unit="碗"}},steps=new[]{new{number=5,instruction="充分热透"}},duration=(int?)null,servings=(int?)null},uncertainFields=new[]{"火候"}};
-   var frame=System.Text.Json.JsonSerializer.Serialize(new{type="stream.delta",payload=new{channel="content",delta=System.Text.Json.JsonSerializer.Serialize(draft)}});
+   var frame=System.Text.Json.JsonSerializer.Serialize(new{type="stream.delta",payload=new{channel="content",delta=BeverageResponse??System.Text.Json.JsonSerializer.Serialize(draft)}});
    return new HttpResponseMessage(HttpStatusCode.OK){Content=new StringContent("data: "+frame+"\n\ndata: [DONE]\n\n",Encoding.UTF8,"text/event-stream")};
   }
   if(path.EndsWith("/stop"))Stopped=true;

@@ -10,8 +10,8 @@ internal sealed class BeveragePage : ContentPage
     private readonly Picker section = new() { ItemsSource = new[] { "喝点啥", "拍照记一杯", "我的酒柜", "我的饮品屋" }, SelectedIndex = 1 };
     private readonly Label status = MomentStyle.Caption("");
     private readonly Entry name = new() { Placeholder = "饮品名称" };
-    private readonly Picker category = new() { Title = "分类", ItemsSource = new[] { "酒类", "非酒精" } };
-    private readonly string[] categories = ["alcoholic", "nonalcoholic"];
+    private readonly Picker category = new() { Title = "分类", ItemsSource = new[] { "酒类", "非酒精", "待确认" } };
+    private readonly string[] categories = ["alcoholic", "nonalcoholic", "unknown"];
     private readonly Picker rating = new() { Title = "评分", ItemsSource = new[] { "不评分", "★", "★★", "★★★", "★★★★", "★★★★★" }, SelectedIndex = 0 };
     private readonly Entry note = new() { Placeholder = "一句话评价", MaxLength = 500 };
     private readonly Entry place = new() { Placeholder = "饮用地点", MaxLength = 160 };
@@ -30,6 +30,7 @@ internal sealed class BeveragePage : ContentPage
     private string? profileId;
     private int recommendation;
     private bool busy;
+    private string? recognitionRoute;
 
     public BeveragePage(FamilyStore store)
     {
@@ -96,12 +97,13 @@ internal sealed class BeveragePage : ContentPage
             rows.Add(search);
             rows.Add(MomentStyle.Action("搜索", Render));
             var type = categories[section.SelectedIndex == 2 ? 0 : 1];
-            foreach (var item in items.Where(item => Value(item, "category") == type &&
+            foreach (var item in items.Where(item => (Value(item, "category") == type || (type == "nonalcoholic" && Value(item, "category") == "unknown")) &&
                 (string.IsNullOrWhiteSpace(search.Text) || new[] { "name", "brand", "kind" }.Any(key => Value(item, key).Contains(search.Text, StringComparison.CurrentCultureIgnoreCase)))))
             {
                 var card = new VerticalStackLayout { Spacing = 8 };
                 var favorite = item?["favorite"]?.GetValue<bool>() == true;
                 card.Add(MomentStyle.Title(Value(item, "name"), 18));
+                if (Value(item, "category") == "unknown") card.Add(MomentStyle.Caption("分类待确认"));
                 card.Add(MomentStyle.Action(favorite ? "取消收藏" : "收藏", () => _ = Run(async () =>
                 {
                     await store.CallAsync($"/api/beverages/{Value(item, "id")}/favorite", HttpMethod.Put, new { favorite = !favorite });
@@ -133,6 +135,7 @@ internal sealed class BeveragePage : ContentPage
     private void Edit(JsonNode? profile, JsonNode? record)
     {
         if (!Guid.TryParse(Value(record, "id"), out recordId)) return;
+        recognitionRoute = null;
         profileId = Value(profile, "id");
         Apply(profile, false);
         rating.SelectedIndex = int.TryParse(Value(record, "rating"), out var stars) ? stars : 0;
@@ -148,7 +151,7 @@ internal sealed class BeveragePage : ContentPage
     private void Apply(JsonNode? profile, bool onlyEmpty)
     {
         if (!onlyEmpty || string.IsNullOrWhiteSpace(name.Text)) name.Text = Value(profile, "name");
-        if (!onlyEmpty || category.SelectedIndex < 0) category.SelectedIndex = Array.IndexOf(categories, Value(profile, "category"));
+        if (!onlyEmpty || category.SelectedIndex is < 0 or 2) category.SelectedIndex = Array.IndexOf(categories, Value(profile, "category"));
         foreach (var (key, entry) in details)
             if (!onlyEmpty || string.IsNullOrWhiteSpace(entry.Text)) entry.Text = Value(profile, key);
     }
@@ -160,30 +163,49 @@ internal sealed class BeveragePage : ContentPage
         var route = "/recognitions/" + Guid.NewGuid().ToString("D");
         await KitchenPersonal.Upload(store, media, "recipe", data);
         photos.Add(media);
-        await Call(route, HttpMethod.Post, new { mediaId = media });
-        for (var i = 0; i < 95; i++)
+        recognitionRoute = route;
+        status.Text = "正在识别，可先手动填写并归档。";
+        _ = Recognize(route, media);
+    }
+
+    private async Task Recognize(string route, string media)
+    {
+        try
         {
-            var task = await Call(route);
-            if (Value(task, "state") == "completed")
+            await Call(route, HttpMethod.Post, new { mediaId = media });
+            for (var i = 0; i < 95 && recognitionRoute == route; i++)
             {
-                Apply(task?["result"], true);
-                status.Text = "请确认识别结果，可手动修改。";
-                return;
+                var task = await Call(route);
+                if (recognitionRoute != route) return;
+                if (Value(task, "state") == "completed")
+                {
+                    var draft = task?["result"];
+                    Apply(draft, true);
+                    status.Text = string.IsNullOrWhiteSpace(Value(draft, "name"))
+                        ? "未识别出饮品名称，请输入名称后归档。" : "请确认识别结果，可手动修改。";
+                    return;
+                }
+                if (Value(task, "state") == "failed") break;
+                await Task.Delay(2000);
             }
-            if (Value(task, "state") == "failed") break;
-            await Task.Delay(2000);
         }
-        status.Text = "识别未完成，照片已保留，可手动填写。";
+        catch (Exception)
+        {
+            // Recognition is optional once the photo has been uploaded.
+        }
+        if (recognitionRoute == route) status.Text = "识别未完成，照片已保留，请输入饮品名称后归档。";
     }
 
     private async Task Save()
     {
-        if (string.IsNullOrWhiteSpace(name.Text) || category.SelectedIndex < 0)
+        var title = name.Text?.Trim();
+        if (string.IsNullOrEmpty(title))
         {
-            status.Text = "请确认饮品名称和分类。";
+            status.Text = "请填写饮品名称。";
             return;
         }
-        var draft = new Dictionary<string, object?> { ["name"] = name.Text, ["category"] = categories[category.SelectedIndex] };
+        var selectedCategory = category.SelectedIndex >= 0 ? categories[category.SelectedIndex] : "unknown";
+        var draft = new Dictionary<string, object?> { ["name"] = title, ["category"] = selectedCategory };
         foreach (var (key, entry) in details)
         {
             if (string.IsNullOrWhiteSpace(entry.Text)) continue;
@@ -201,6 +223,7 @@ internal sealed class BeveragePage : ContentPage
             }
             else draft[key] = entry.Text;
         }
+        recognitionRoute = null;
         await Call($"/records/{recordId:D}", HttpMethod.Put, new
         {
             beverageId = profileId, beverage = draft, consumedOn = (day.Date ?? DateTime.Today).ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),

@@ -34,6 +34,8 @@ internal sealed class KitchenRecognitionWorker(string cs, Func<string,Cancellati
             var content=text.ToString();var start=content.IndexOf('{');var end=content.LastIndexOf('}');if(start<0||end<start)throw new InvalidDataException();var result=JsonNode.Parse(content[start..(end+1)]) as JsonObject??throw new InvalidDataException();if (kind == "beverage")
             {
                 result = BeverageEndpoints.ReadRecognition(result);
+                if (result.Count == 1 && result["category"]?.ToString() == "unknown")
+                    throw new InvalidDataException("No drink information in the recognition result.");
             }
             else
             {
