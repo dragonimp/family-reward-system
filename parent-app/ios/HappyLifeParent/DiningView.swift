@@ -670,7 +670,7 @@ struct DiningView: View {
                 }.padding(20).frame(maxWidth: 760).frame(maxWidth: .infinity)
             }.background(Color(uiColor: .systemGroupedBackground)).navigationTitle(String(localized: "干饭", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))).navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .topBarLeading) { DiningModeMenu(cooking: $cooking) }
+                ToolbarItem(placement: .topBarLeading) { DiningModeMenu(cooking: $cooking, family: family) }
                 ToolbarItem(placement: .topBarTrailing) {
                     Menu {
                         Button(diningText("到店打卡"), systemImage: "mappin.circle") { showingCheckIn = true }

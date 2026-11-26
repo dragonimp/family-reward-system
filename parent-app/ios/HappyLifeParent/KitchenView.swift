@@ -28,6 +28,8 @@ struct DiningModesView: View {
 
 struct DiningModeMenu: View {
     @Binding var cooking: Bool
+    let family: FamilyStore
+    @State private var beverages = false
 
     var body: some View {
         Menu {
@@ -35,10 +37,11 @@ struct DiningModeMenu: View {
                 Label(kitchenText("出去吃"), systemImage: "fork.knife").tag(false)
                 Label(kitchenText("下厨房"), systemImage: "frying.pan").tag(true)
             }
+            Button("整两口", systemImage: "wineglass") { beverages = true }
         } label: {
             Image(systemName: "line.3.horizontal")
                 .accessibilityLabel(kitchenText("用餐方式"))
-        }
+        }.sheet(isPresented: $beverages) { BeverageHome(family: family) }
     }
 }
 
@@ -184,7 +187,7 @@ private struct KitchenView: View {
             }.background(Color(uiColor: .systemGroupedBackground))
                 .navigationTitle(kitchenText("下厨房")).navigationBarTitleDisplayMode(.inline)
                 .toolbar {
-                    ToolbarItem(placement: .topBarLeading) { DiningModeMenu(cooking: $cooking) }
+                    ToolbarItem(placement: .topBarLeading) { DiningModeMenu(cooking: $cooking, family: family) }
                     ToolbarItem(placement: .topBarTrailing) {
                         Menu {
                             NavigationLink("我的厨房") { MyKitchenView(family: family) }
@@ -306,5 +309,186 @@ private struct HealthyEatingView: View {
             Text(String(localized: "少油少盐，以水替代含糖饮料。生熟分开，处理食材前后洗手。食谱为原创搭配，尚待营养师及烹饪复核。", bundle: AgentIdentityLanguage.appBundle()))
             Text(String(localized: "参考：WHO Healthy diet · https://www.who.int/news-room/fact-sheets/detail/healthy-diet", bundle: AgentIdentityLanguage.appBundle())).font(.footnote)
         }.padding(20) }
+    }
+}
+
+private struct BeverageHome: View {
+    let family: FamilyStore
+    @Environment(\.dismiss) private var dismiss
+    @State private var section = "拍照记一杯"
+    @State private var items: [[String: Any]] = []
+    @State private var photos: [String] = []
+    @State private var recordID = UUID()
+    @State private var name = ""
+    @State private var category = "unknown"
+    @State private var details: [String: String] = [:]
+    @State private var rating = 0
+    @State private var note = ""
+    @State private var place = ""
+    @State private var day = Date()
+    @State private var busy = false
+    @State private var message = ""
+    @State private var query = ""
+    @State private var recommendation = 0
+    private let fields = [("brand","品牌"),("kind","品类"),("origin","产地"),("producer","生产商"),("size","规格"),("alcoholPercent","酒精度"),("vintage","年份")]
+    private var suggestions: [String] {
+        let ranked = items.sorted { score($0) > score($1) }.compactMap { $0["name"] as? String }
+        return ranked.isEmpty ? ["茉莉花茶", "冰拿铁", "气泡水", "乌龙奶茶"] : ranked
+    }
+    private func score(_ item: [String: Any]) -> Int {
+        let scores = (item["records"] as? [[String: Any]] ?? []).compactMap { $0["rating"] as? Int }
+        return (scores.isEmpty ? 0 : scores.reduce(0, +) * 10 / scores.count) + ((item["favorite"] as? Bool == true) ? 10 : 0)
+    }
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Picker("整两口", selection: $section) {
+                    ForEach(["喝点啥", "拍照记一杯", "我的酒柜", "我的饮品屋"], id: \.self) { Text($0) }
+                }
+                if section == "喝点啥" {
+                    Text(suggestions[recommendation % suggestions.count]).font(.title2)
+                    Button("换一杯") { recommendation += 1 }
+                } else if section == "拍照记一杯" {
+                    KitchenPhotoPicker { data in Task { await add(data) } }.disabled(busy || photos.count >= 6)
+                    Text("已添加 \(photos.count) 张照片")
+                    TextField("饮品名称", text: $name)
+                    Picker("分类", selection: $category) {
+                        Text("待确认").tag("unknown")
+                        Text("酒类").tag("alcoholic")
+                        Text("非酒精").tag("nonalcoholic")
+                    }
+                    ForEach(fields, id: \.0) { field in
+                        TextField(field.1, text: Binding(get: { details[field.0, default: ""] }, set: { details[field.0] = $0 }))
+                    }
+                    Picker("评分", selection: $rating) {
+                        Text("不评分").tag(0)
+                        ForEach(1...5, id: \.self) { Text(String(repeating: "★", count: $0)).tag($0) }
+                    }
+                    TextField("一句话评价", text: $note)
+                    TextField("饮用地点", text: $place)
+                    DatePicker("饮用日期", selection: $day, displayedComponents: .date)
+                    if items.contains(where: { matches($0) }) { Text("已有同款档案，将关联本次记录。") }
+                    Button("确认归档") { Task { await save() } }.disabled(busy || name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || category == "unknown")
+                } else {
+                    TextField("搜索名称、品牌、品类", text: $query)
+                    ForEach(visible, id: \.id) { profile in
+                        DisclosureGroup(profile.data["name"] as? String ?? "饮品") {
+                            let favorite = profile.data["favorite"] as? Bool == true
+                            Button(favorite ? "取消收藏" : "收藏") { Task { await run {
+                                _ = try await family.call("/api/beverages/\(profile.id)/favorite", method: "PUT", body: ["favorite": !favorite])
+                                try await load()
+                            } } }
+                            ForEach(records(profile.data), id: \.id) { record in
+                                Text([record.data["consumedOn"] as? String, record.data["note"] as? String, record.data["place"] as? String].compactMap { $0 }.joined(separator: " · "))
+                                if let score = record.data["rating"] as? Int, (1...5).contains(score) { Text(String(repeating: "★", count: score)) }
+                                Button("编辑记录") { edit(profile.data, record: record) }
+                                Button("删除记录", role: .destructive) { pendingDeletion = record.id }
+                            }
+                        }
+                    }
+                }
+                if busy { ProgressView() }
+                if !message.isEmpty { Text(message).foregroundStyle(.secondary) }
+            }.navigationTitle("整两口").toolbar { Button("关闭") { dismiss() } }
+            .task { await run { try await load() } }
+            .confirmationDialog("删除这条饮用记录？", isPresented: Binding(get: { pendingDeletion != nil }, set: { if !$0 { pendingDeletion = nil } })) {
+                if let id = pendingDeletion {
+                    Button("删除", role: .destructive) { Task { await run {
+                        _ = try await family.call("/api/beverages/records/\(id)", method: "DELETE")
+                        try await load()
+                    } } }
+                }
+            }
+        }
+    }
+    @State private var pendingDeletion: String?
+    @State private var profileID: String?
+    private struct Row: Identifiable { let id: String; let data: [String: Any] }
+    private func rows(_ data: [[String: Any]]) -> [Row] { data.compactMap { row in (row["id"] as? String).map { Row(id: $0, data: row) } } }
+    private var visible: [Row] {
+        let type = section == "我的酒柜" ? "alcoholic" : "nonalcoholic"
+        return rows(items.filter { item in
+            item["category"] as? String == type && (query.isEmpty ||
+                ["name", "brand", "kind"].contains { (item[$0] as? String ?? "").localizedCaseInsensitiveContains(query) })
+        })
+    }
+    private func records(_ item: [String: Any]) -> [Row] { rows(item["records"] as? [[String: Any]] ?? []) }
+    private var formatter: DateFormatter {
+        let value = DateFormatter(); value.calendar = Calendar(identifier: .gregorian)
+        value.locale = Locale(identifier: "en_US_POSIX"); value.dateFormat = "yyyy-MM-dd"; return value
+    }
+    private func edit(_ profile: [String: Any], record: Row) {
+        guard let id = UUID(uuidString: record.id) else { return }
+        recordID = id; profileID = profile["id"] as? String
+        apply(profile)
+        photos = record.data["photoIds"] as? [String] ?? []
+        rating = record.data["rating"] as? Int ?? 0
+        note = record.data["note"] as? String ?? ""; place = record.data["place"] as? String ?? ""
+        day = formatter.date(from: record.data["consumedOn"] as? String ?? "") ?? Date()
+        section = "拍照记一杯"
+    }
+    private func apply(_ draft: [String: Any], onlyEmpty: Bool = false) {
+        if !onlyEmpty || name.isEmpty { name = draft["name"] as? String ?? "" }
+        if !onlyEmpty || category == "unknown" { category = draft["category"] as? String ?? "unknown" }
+        for (key, _) in fields where !onlyEmpty || details[key, default: ""].isEmpty {
+            details[key] = draft[key] as? String ?? (draft[key] as? NSNumber)?.stringValue ?? ""
+        }
+    }
+    private func matches(_ item: [String: Any]) -> Bool {
+        ["name", "brand", "producer", "vintage"].allSatisfy { key in
+            let left = key == "name" ? name : details[key, default: ""]
+            let right = item[key] as? String ?? (item[key] as? NSNumber)?.stringValue ?? ""
+            return left.trimmingCharacters(in: .whitespacesAndNewlines).compare(right, options: [.caseInsensitive, .widthInsensitive]) == .orderedSame
+        }
+    }
+    private func load() async throws {
+        let result = try await family.call("/api/beverages") as? [String: Any]
+        items = result?["items"] as? [[String: Any]] ?? []
+    }
+    private func run(_ work: () async throws -> Void) async {
+        guard !busy else { return }
+        busy = true; message = ""; defer { busy = false }
+        do { try await work() } catch { message = error.localizedDescription }
+    }
+    private func add(_ bytes: Data) async {
+        await run {
+            guard photos.count < 6 else { return }
+            let media = UUID().uuidString, task = UUID().uuidString
+            _ = try await family.call("/api/kitchen/media", method: "POST", body: ["id":media,"purpose":"recipe","base64":bytes.base64EncodedString()])
+            photos.append(media)
+            _ = try await family.call("/api/beverages/recognitions/\(task)", method: "POST", body: ["mediaId":media])
+            for _ in 0..<95 {
+                let row = try await family.call("/api/beverages/recognitions/\(task)") as? [String: Any]
+                if row?["state"] as? String == "completed", let draft = row?["result"] as? [String: Any] {
+                    apply(draft, onlyEmpty: true); message = "请确认识别结果，可手动修改。"; return
+                }
+                if row?["state"] as? String == "failed" { message = "识别未完成，照片已保留，可手动填写。"; return }
+                try await Task.sleep(for: .seconds(2))
+            }
+            message = "识别等待超时，可手动填写。"
+        }
+    }
+    private func save() async {
+        await run {
+            var draft: [String: Any] = ["name":name, "category":category]
+            for (key, value) in details where !value.isEmpty {
+                if key == "alcoholPercent" {
+                    guard let number = Double(value), number.isFinite, (0...100).contains(number) else { message = "请输入有效酒精度。"; return }
+                    draft[key] = number
+                } else if key == "vintage" {
+                    guard let year = Int(value), (1000...9999).contains(year) else { message = "请输入有效年份。"; return }
+                    draft[key] = year
+                } else { draft[key] = value }
+            }
+            var body: [String: Any] = ["beverage":draft,"consumedOn":formatter.string(from: day),"note":note,"place":place,"photoIds":photos]
+            if let profileID { body["beverageId"] = profileID }
+            if rating > 0 { body["rating"] = rating }
+            _ = try await family.call("/api/beverages/records/\(recordID.uuidString)", method: "PUT", body: body)
+            section = category == "alcoholic" ? "我的酒柜" : "我的饮品屋"
+            name = ""; category = "unknown"; details = [:]; photos = []; rating = 0
+            note = ""; place = ""; day = Date(); profileID = nil; recordID = UUID()
+            try await load()
+        }
     }
 }

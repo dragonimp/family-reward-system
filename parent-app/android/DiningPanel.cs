@@ -10,7 +10,6 @@ public sealed class DiningPanel : ContentView
     private readonly ContentPage owner;
     private readonly VerticalStackLayout body = new() { Spacing = 20, Padding = new Thickness(20, 18, 20, 30) };
     private readonly string file;
-    private readonly ContentView modeHost = new();
     private DiningArchive archive = new();
     private DiningSyncState syncState = new();
     private readonly string syncFile, accountID;
@@ -105,19 +104,40 @@ public sealed class DiningPanel : ContentView
         catch { readable = false; message = "干饭记录暂时无法读取，原记录已保留，请重试。"; }
         var outside = new ScrollView { Content = body };
         var cooking = new KitchenPanel(store, owner);
-        var viewport = new ContentView { Content = outside };
-        Border Modes(int index) => MomentStyle.Segmented(new[] { "出去吃", "下厨房" }, index, next => {
-            if (next == 1 && index == 0) { ResetPosition(); Suspend(); }
-            viewport.Content = next == 1 ? cooking : outside; modeHost.Content = Modes(next);
-            if (next == 1) _ = cooking.Load();
+        var preference = "dining.mode." + accountID;
+        var isCooking = accountID.Length != 0 && Preferences.Default.Get(preference, false);
+        var viewport = new ContentView { Content = isCooking ? cooking : outside };
+        var switching = false;
+        var modeMenu = MomentStyle.IconButton("菜单", "用餐方式", async () => {
+            if (switching) return;
+            switching = true;
+            try {
+                var selected = await owner.DisplayActionSheetAsync("用餐方式", "取消", null, "出去吃", "下厨房", "整两口");
+                if (selected == "整两口") { await owner.Navigation.PushAsync(new BeveragePage(store)); return; }
+                if (selected is not ("出去吃" or "下厨房")) return;
+                var nextCooking = selected == "下厨房";
+                if (nextCooking == isCooking) return;
+                if (nextCooking) { ResetPosition(); Suspend(); }
+                isCooking = nextCooking;
+                if (accountID.Length != 0) Preferences.Default.Set(preference, isCooking);
+                viewport.Content = isCooking ? cooking : outside;
+                if (isCooking) await cooking.Load();
+                else {
+                    syncTimer?.Start();
+                    await SyncAsync();
+                }
+            } finally { switching = false; }
         });
+        modeMenu.Margin = new Thickness(16, 0, 0, 0);
+        modeMenu.HorizontalOptions = LayoutOptions.Start;
         var root = new Grid { RowDefinitions = new RowDefinitionCollection { new(GridLength.Auto), new(GridLength.Star) } };
-        modeHost.Margin = new Thickness(16, 8); modeHost.Content = Modes(0); root.Add(modeHost); root.Add(viewport, 0, 1);
+        root.Add(modeMenu); root.Add(viewport, 0, 1);
         Content = root;
         Loaded += (_, _) => {
             syncTimer ??= Dispatcher.CreateTimer(); syncTimer.Interval = TimeSpan.FromSeconds(30);
-            if (!syncTimer.IsRunning) { syncTimer.Tick -= SyncTick; syncTimer.Tick += SyncTick; syncTimer.Start(); }
-            _ = SyncAsync();
+            syncTimer.Tick -= SyncTick; syncTimer.Tick += SyncTick;
+            if (isCooking) _ = cooking.Load();
+            else { syncTimer.Start(); _ = SyncAsync(); }
         };
         Unloaded += (_, _) => { syncTimer?.Stop(); };
         Render();
