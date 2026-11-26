@@ -1,6 +1,7 @@
 // Regenerate parent-app/shared/CeceCalendar.json with lunar-typescript 1.8.7.
 // Run from the repository root: node frontend/generate-cece-calendar.mjs
 import { writeFileSync } from 'node:fs';
+import { URL } from 'node:url';
 import { LunarYear, Solar } from 'lunar-typescript';
 
 const boundaries = ['小寒', '立春', '惊蛰', '清明', '立夏', '芒种', '小暑', '立秋', '白露', '寒露', '立冬', '大雪'];
