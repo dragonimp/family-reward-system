@@ -934,9 +934,16 @@ private struct ExerciseRouteMap: View {
                 let spansDays = points.first.flatMap { first in
                     points.last.map { !Calendar.autoupdatingCurrent.isDate(first.recordedAt, inSameDayAs: $0.recordedAt) }
                 } ?? false
+                let speed = replaySpeed(points, at: replayIndex)
+                let speedLabel = speed.map {
+                    $0.formatted(.number.precision(.fractionLength(1))) + " km/h"
+                }
                 Annotation("", coordinate: coordinate(point), anchor: .bottom) {
                     VStack(spacing: 4) {
-                        Text(point.recordedAt, format: spansDays ? fullTime : clock)
+                        VStack(spacing: 2) {
+                            Text(point.recordedAt, format: spansDays ? fullTime : clock)
+                            if let speedLabel { Text(speedLabel).foregroundStyle(.secondary) }
+                        }
                             .font(.caption.weight(.semibold))
                             .monospacedDigit()
                             .fixedSize()
@@ -950,7 +957,7 @@ private struct ExerciseRouteMap: View {
                             .accessibilityHidden(true)
                     }
                     .accessibilityLabel(Text(String(localized: "回放位置", bundle: AgentIdentityLanguage.appBundle())))
-                    .accessibilityValue(Text(point.recordedAt, format: fullTime))
+                    .accessibilityValue(Text([point.recordedAt.formatted(fullTime), speedLabel].compactMap { $0 }.joined(separator: ", ")))
                 }
             }
             if live { UserAnnotation() }
@@ -976,7 +983,18 @@ private struct ExerciseRouteMap: View {
 
 private func recentSpeed(_ points: [ExerciseRoutePoint], at date: Date) -> Double? {
     guard let last = points.last, points.count >= 2, abs(date.timeIntervalSince(last.recordedAt)) < 30 else { return nil }
-    let previous = points[points.count - 2]
+    return routeSpeed(from: points[points.count - 2], to: last)
+}
+
+private func replaySpeed(_ points: [ExerciseRoutePoint], at index: Int) -> Double? {
+    if index > 0, let speed = routeSpeed(from: points[index - 1], to: points[index]) {
+        return speed
+    }
+    guard index + 1 < points.count else { return nil }
+    return routeSpeed(from: points[index], to: points[index + 1])
+}
+
+private func routeSpeed(from previous: ExerciseRoutePoint, to last: ExerciseRoutePoint) -> Double? {
     let interval = last.recordedAt.timeIntervalSince(previous.recordedAt)
     guard previous.segment == last.segment, interval > 0, interval < 30 else { return nil }
     let first = CLLocation(latitude: previous.latitude, longitude: previous.longitude)
