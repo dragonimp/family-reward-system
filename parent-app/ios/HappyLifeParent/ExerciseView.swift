@@ -868,6 +868,12 @@ private struct ExerciseRouteReplay: View {
     let points: [ExerciseRoutePoint]
     @State private var progress = 0.0
     @State private var playing = false
+    @State private var rate: Double = 1
+    private let rates: [Double] = [0.5, 1, 2, 4]
+
+    private func rateLabel(_ value: Double) -> String {
+        value.formatted(.number.precision(.fractionLength(0...1))) + "×"
+    }
 
     var body: some View {
         let lastIndex = max(0, points.count - 1)
@@ -887,6 +893,20 @@ private struct ExerciseRouteReplay: View {
                     }).accessibilityLabel(Text(String(localized: "轨迹进度", bundle: AgentIdentityLanguage.appBundle())))
                     Text(ExerciseSession.clock(points[Int(progress)].recordedAt.timeIntervalSince(points[0].recordedAt)))
                         .monospacedDigit()
+                    Menu {
+                        Picker("回放倍速", selection: $rate) {
+                            ForEach(rates, id: \.self) { value in
+                                Text(rateLabel(value)).tag(value)
+                            }
+                        }
+                    } label: {
+                        Text(rateLabel(rate))
+                            .font(.subheadline.weight(.semibold))
+                            .monospacedDigit()
+                            .frame(minWidth: 44, minHeight: 44)
+                    }
+                    .accessibilityLabel("回放倍速")
+                    .accessibilityValue(rateLabel(rate))
                 }.padding(.horizontal)
             }
         }
@@ -895,7 +915,7 @@ private struct ExerciseRouteReplay: View {
             let step = max(1, Double(lastIndex) / 300)
             while !Task.isCancelled && progress < Double(lastIndex) {
                 do { try await Task.sleep(for: .milliseconds(100)) } catch { return }
-                progress = min(Double(lastIndex), progress + step)
+                progress = min(Double(lastIndex), progress + step * rate)
             }
             playing = false
         }
