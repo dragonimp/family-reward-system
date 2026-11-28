@@ -35,6 +35,7 @@ struct ExerciseArchive: Codable {
     var importedWatchIDs: [UUID]?
     var uploaded: [UUID]?
     var pendingDeletions: [UUID]?
+    var localTransferOwner: String?
 
     func activityRecords(tenantID: UUID, activityID: UUID) -> [ExerciseSession] {
         ([active].compactMap { $0 } + history).filter {

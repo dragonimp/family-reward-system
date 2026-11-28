@@ -140,6 +140,12 @@ struct FamilyRoot: View {
     @ObservedObject var identity: AgentIdentitySession
     @ObservedObject var notifications: MomentNotifications
     @State private var selectedTab = 0
+    @State private var showingLogin = false
+    @State private var localWorkoutRunning = false
+
+    private var exerciseOwner: String {
+        localWorkoutRunning ? FamilyStore.localAccount : store.workoutOwner
+    }
     private var nookEnabled: Bool { store.isModuleEnabled("nook") }
 
     private var diningEnabled: Bool { get { store.isModuleEnabled("dining") } nonmutating set { Task { await store.setModule("dining", enabled: newValue) } } }
@@ -147,9 +153,23 @@ struct FamilyRoot: View {
     private var activitiesEnabled: Bool { get { store.isModuleEnabled("activities") } nonmutating set { Task { await store.setModule("activities", enabled: newValue) } } }
     private var exerciseEnabled: Bool { get { store.isModuleEnabled("exercise") } nonmutating set { Task { await store.setModule("exercise", enabled: newValue) } } }
     var body: some View {
-        Group {
-            if !identity.isAuthenticated { login }
-            else { main }
+        main
+        .sheet(isPresented: $showingLogin) { login }
+        .onChange(of: identity.isAuthenticated) { _, authenticated in
+            if authenticated { showingLogin = false }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .exerciseRecordsChanged)) { _ in
+            localWorkoutRunning = ExerciseStore.shared(userID: FamilyStore.localAccount).active != nil
+        }
+        .onAppear {
+            localWorkoutRunning = ExerciseStore.shared(userID: FamilyStore.localAccount).active != nil
+        }
+        .onReceive(store.photoSource.$networkAvailable.removeDuplicates().filter { $0 }) { _ in
+            guard identity.isAuthenticated else { return }
+            Task {
+                if store.profile == nil { await store.load() }
+                await store.syncWorkouts()
+            }
         }
         .environment(\.locale, language.locale)
         .environmentObject(store)
@@ -164,10 +184,14 @@ struct FamilyRoot: View {
                 do { try await Task.sleep(for: .seconds(4 * 60 * 60)) } catch { break }
             }
         }
-        .task(id: identity.isAuthenticated) {
+        .task(id: identity.accountIdentifier) {
             store.language.accountDidChange(identity.isAuthenticated ? identity.accountIdentifier : nil)
             await store.language.refresh()
-            if identity.isAuthenticated { await store.load(); store.resumePhotoSharing() }
+            if identity.isAuthenticated {
+                store.resumePhotoSharing()
+                await store.load()
+                await store.syncWorkouts()
+            }
         }
         .sheet(isPresented: Binding(get: { identity.isAuthenticated && notifications.showingInbox }, set: { notifications.showingInbox = $0 })) {
             MomentNotificationInbox(store: store, notifications: notifications)
@@ -301,20 +325,15 @@ struct FamilyRoot: View {
             ForEach(enabledBusinessTabs.filter { $0 != "nook" && $0 != "folkCulture" && $0 != "dailyHexagram" }, id: \.self) { key in
                 switch key {
             case "dining":
-            Group {
-                if let account = identity.accountIdentifier, !account.isEmpty {
-                    DiningModesView(userID: account, family: store).id(account)
-                } else {
-                    ProgressView()
-                }
-            }.tag(0)
+            DiningModesView(userID: store.localContentAccount, family: store)
+                .id(store.localContentAccount).tag(0)
             case "growth":
             Group { if store.ready { FamilyHome(store: store) } else { growthUnavailable } }
                 .tag(1)
             case "activities":
             DearSocialView(isActive: selectedTab == 2, store: store).tag(2)
             case "exercise":
-            Group { if store.ready { ExerciseView(userID: store.profile?.text("unifiedUserId") ?? "").id(store.profile?.text("unifiedUserId") ?? "") } else { growthUnavailable } }.tag(3)
+            ExerciseView(userID: exerciseOwner).id(exerciseOwner).tag(3)
                 default: EmptyView()
                 }
             }
@@ -326,16 +345,13 @@ struct FamilyRoot: View {
         Group {
             if activeTab == 4 {
                 VStack(spacing: 0) {
-                    AccountView(store: store, notifications: notifications)
+                    AccountView(store: store, notifications: notifications, openLogin: { showingLogin = true })
                         .frame(maxHeight: .infinity)
                     bottomTabs.fixedSize(horizontal: false, vertical: true)
                 }
             } else if activeTab == 5 {
-                if let account = identity.accountIdentifier, !account.isEmpty {
-                    NookView(account: account, title: store.displayModuleName("nook")).id(account)
-                } else {
-                    ProgressView()
-                }
+                NookView(account: store.localContentAccount, title: store.displayModuleName("nook"))
+                    .id(store.localContentAccount)
             } else if activeTab == 6 {
                 NavigationStack { FolkCultureView(title: store.displayModuleName("folkCulture")) }
                     .id(identity.accountIdentifier)
@@ -737,6 +753,7 @@ struct AccountView: View {
     @EnvironmentObject private var language: AgentIdentityLanguageStore
     @ObservedObject var store: FamilyStore
     @ObservedObject var notifications: MomentNotifications
+    let openLogin: () -> Void
     @Environment(\.openURL) private var openURL
     @State private var logout = false
     @State private var deleteAccount = false
@@ -755,6 +772,7 @@ struct AccountView: View {
         NavigationStack {
             List {
                 Section(String(localized: "用户与权益", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) {
+                    if store.identity.isAuthenticated {
                     AgentIdentityAccountRow(iconEmoji: userInfo?.iconEmoji, avatarImage: userInfo?.avatarImage,
                                             username: userInfo?.username ?? store.profile?.text("username") ?? String(localized: "账号", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)),
                                             displayName: userInfo?.displayName,
@@ -773,6 +791,9 @@ struct AccountView: View {
                     Button { notifications.open() } label: {
                         Label(String(localized: "消息中心", bundle: AgentIdentityLanguage.appBundle()), systemImage: "bell")
                     }.badge(notifications.unreadCount)
+                    } else {
+                        Button(action: openLogin) { Label("登录并同步", systemImage: "person.crop.circle.badge.plus") }
+                    }
                     NavigationLink { AgentIdentityLanguageSettingsView(store: store.language) } label: {
                         Label(store.language.text("language.settings"), systemImage: "character.bubble")
                     }

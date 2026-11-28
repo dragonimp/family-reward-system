@@ -295,7 +295,37 @@ import UniformTypeIdentifiers
     }
     func stopObserving() { generation = UUID(); pedometer.stopUpdates() }
 
-    func connect(_ store: FamilyStore) { api = store; store.exerciseStore = self }
+    func connect(_ store: FamilyStore) {
+        api = store
+        if userID != FamilyStore.localAccount { store.exerciseStore = self }
+    }
+
+    private func adoptLocalHistory() throws {
+        guard userID != FamilyStore.localAccount else { return }
+        let local = Self.shared(userID: FamilyStore.localAccount)
+        guard local.readable, local.archive.active == nil, !local.archive.history.isEmpty else { return }
+        guard local.archive.localTransferOwner == nil || local.archive.localTransferOwner == userID else { return }
+
+        // Bind the transfer before writing the destination, so an interrupted
+        // retry cannot assign the same guest records to a different account.
+        var source = local.archive
+        source.localTransferOwner = userID
+        try local.persistence.sync { try source.write(to: local.file) }
+        local.archive = source
+
+        let known = Set(archive.history.map(\.id) + (archive.pendingDeletions ?? []))
+        var destination = archive
+        destination.history.append(contentsOf: source.history.filter { !known.contains($0.id) })
+        destination.history.sort { $0.startedAt > $1.startedAt }
+        try persistence.sync { try destination.write(to: file) }
+        archive = destination
+
+        source.history.removeAll()
+        source.pendingDeletions = nil
+        source.localTransferOwner = nil
+        try local.persistence.sync { try source.write(to: local.file) }
+        local.archive = source
+    }
     func accountDidChange() { shareUpload?.cancel(); api = nil; stopLocationTracking(); stopObserving(); Self.stores.removeValue(forKey: userID) }
     func enableRoute() {
         guard active != nil, readable else { return }
@@ -360,6 +390,11 @@ import UniformTypeIdentifiers
     func sync() async {
         guard readable, let api, !userID.isEmpty, DiningAccount.identity(api.profile?.text("unifiedUserId") ?? "") == DiningAccount.identity(userID) else { return }
         if syncing { syncAgain = true; return }
+        do { try adoptLocalHistory() }
+        catch {
+            syncMessage = "本机运动记录已保留，稍后重试同步。"
+            return
+        }
         syncing = true; syncMessage = nil
         defer {
             syncing = false
@@ -724,13 +759,15 @@ struct ExerciseView: View {
                     exercise.enableRoute()
                     receiveActivity()
                     if let id = family.pendingExerciseContinuation, let record = exercise.history.first(where: { $0.id == id }) { exercise.continueRecord(record); family.pendingExerciseContinuation = nil }
-                    await family.refreshExerciseActivityTitles(); await exercise.refresh(); await refreshHealth()
+                    await exercise.refresh(); await exercise.sync(); await family.refreshExerciseActivityTitles(); await refreshHealth()
                 }
                 .onChange(of: family.pendingExerciseContinuation) { _, value in
                     if let id = value, let record = exercise.history.first(where: { $0.id == id }) { exercise.continueRecord(record); family.pendingExerciseContinuation = nil }
                 }
                 .onChange(of: family.pendingExerciseActivity) { _, _ in receiveActivity() }
-                .onChange(of: family.profile?.text("unifiedUserId")) { _, _ in activity = nil; exercise.accountDidChange() }
+                .onChange(of: family.profile?.text("unifiedUserId")) { _, _ in
+                    Task { await exercise.sync() }
+                }
                 .onChange(of: phase) { _, value in
                     if value == .active { Task { await family.refreshExerciseActivityTitles(); await exercise.refresh(); await refreshHealth() } }
                     else { exercise.stopObserving() }

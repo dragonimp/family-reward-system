@@ -85,7 +85,23 @@ private actor PhotoPreviewLoader {
         set { photoTransfers.updateProgress(newValue) }
     }
     var captureInProgress = false
+    static let localAccount = "moment-on-device"
+    var localContentAccount: String { identity.accountIdentifier ?? Self.localAccount }
+    var workoutOwner: String {
+        guard let account = identity.accountIdentifier else { return Self.localAccount }
+        let key = moduleOwnerKey(account) + ".workoutOwner"
+        return UserDefaults.standard.string(forKey: key) ?? Self.localAccount
+    }
+
     var exerciseStore: ExerciseStore?
+
+    func syncWorkouts() async {
+        guard identity.isAuthenticated, let owner = profile?.text("unifiedUserId"),
+              !owner.isEmpty, workoutOwner == owner else { return }
+        let target = ExerciseStore.shared(userID: owner)
+        target.connect(self)
+        await target.sync()
+    }
     @Published var pendingExerciseContinuation: UUID?
     @Published var watchMetricsUpdatedAt: Date?
     @Published var watchExerciseMetrics: [String: Double] = [:]
@@ -198,10 +214,9 @@ private actor PhotoPreviewLoader {
 
     func isModuleEnabled(_ key: String) -> Bool {
         if key == "nook" {
-            guard let owner = identity.accountIdentifier else { return true }
-            return savedNookVisibility[owner] ?? true
+            return savedNookVisibility[localContentAccount] ?? true
         }
-        let local = identity.accountIdentifier.flatMap { localModuleChoices[moduleOwnerKey($0)]?[key] }
+        let local = localModuleChoices[moduleOwnerKey(localContentAccount)]?[key]
         return local ?? moduleSections[key] ?? true
     }
     @Published private var localModuleChoices =
@@ -374,18 +389,18 @@ private actor PhotoPreviewLoader {
     }
     func setModule(_ key: String, enabled: Bool) async {
         if key == "nook" {
-            guard let owner = identity.accountIdentifier else { return }
+            let owner = localContentAccount
             savedNookVisibility[owner] = enabled
             UserDefaults.standard.set(savedNookVisibility, forKey: "moment.nook.visibility")
             return
         }
-        guard let account = identity.accountIdentifier, ["dining", "growth", "activities", "exercise", "folkCulture", "dailyHexagram"].contains(key) else { return }
-        let ownerKey = moduleOwnerKey(account)
+        guard ["dining", "growth", "activities", "exercise", "folkCulture", "dailyHexagram"].contains(key) else { return }
+        let ownerKey = moduleOwnerKey(localContentAccount)
         var choices = localModuleChoices
         choices[ownerKey, default: [:]][key] = enabled
         localModuleChoices = choices
         UserDefaults.standard.set(choices, forKey: "moment.localModuleChoices")
-        guard key != "folkCulture", key != "dailyHexagram", !modulePreferenceSaving else { return }
+        guard identity.isAuthenticated, key != "folkCulture", key != "dailyHexagram", !modulePreferenceSaving else { return }
         if modulePreferenceVersion == 0 { await refreshModulePreferences() }
         guard let owner = identity.accountIdentifier, modulePreferenceOwner == owner, modulePreferenceVersion > 0 else { return }
         modulePreferenceSaving = true; defer { modulePreferenceSaving = false }
@@ -400,7 +415,7 @@ private actor PhotoPreviewLoader {
     }
 
     func load() async {
-        guard identity.isAuthenticated else { return }
+        guard identity.isAuthenticated, let account = identity.accountIdentifier else { return }
         revision = UUID()
         let current = revision
         loading = true; error = nil
@@ -408,7 +423,11 @@ private actor PhotoPreviewLoader {
         do {
             let info = try await call("/api/user/profile?channel=pc")
             guard let fields = info as? [String: Any] else { throw APIError.message(String(localized: "无法读取家长身份。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) }
-            profile = Record(fields: fields)
+            guard current == revision, identity.accountIdentifier == account else { return }
+            let loadedProfile = Record(fields: fields)
+            let owner = loadedProfile.text("unifiedUserId")
+            if !owner.isEmpty { UserDefaults.standard.set(owner, forKey: moduleOwnerKey(account) + ".workoutOwner") }
+            profile = loadedProfile
             guard ready else { return }
             groups = try Record.list(await call("/api/family-groups"))
             if !groups.contains(where: { $0.id == groupID }) { groupID = groups.first?.id ?? 0 }
