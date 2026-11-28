@@ -408,11 +408,9 @@ export interface AppUserProfile {
   unifiedUserId?: string;
   username?: string;
   channel?: 'pc' | 'watch' | string;
-  role?: 'parent' | 'child' | string;
   appUserId?: string;
   childProfileKey?: string | null;
   childId?: number | null;
-  needsRole?: boolean;
 }
 
 export interface AuthContextType {

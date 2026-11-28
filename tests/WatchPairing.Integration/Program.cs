@@ -32,8 +32,13 @@ static async Task<JsonNode> Json(HttpResponseMessage response) {
     if (!response.IsSuccessStatusCode) throw new Exception($"Unexpected {response.StatusCode}: {body}");
     return JsonNode.Parse(body)!;
 }
-foreach (var client in new[] { parent, other }) await Json(await client.PostAsJsonAsync("/api/user/profile", new { channel = "pc", role = "parent" }));
+foreach (var client in new[] { parent, other }) await Json(await client.PostAsJsonAsync("/api/user/profile", new { channel = "pc" }));
 var profile = await Json(await parent.GetAsync("/api/user/profile"));
+var watchProfile = await Json(await parent.PostAsJsonAsync("/api/user/profile", new { channel = "watch", role = "child" }));
+Check(watchProfile["channel"]!.GetValue<string>() == "watch", "watch channel missing");
+Check(watchProfile["appUserId"]!.GetValue<string>() == profile["appUserId"]!.GetValue<string>(), "watch account differs from mobile account");
+Check(watchProfile["childId"] is null, "legacy role request provisioned a child account");
+
 var groups = await Json(await parent.GetAsync("/api/family-groups"));
 var child = await Json(await parent.PostAsJsonAsync("/api/children", new { name = "Pairing integration " + Guid.NewGuid().ToString("N")[..8], familyGroupId = groups[0]!["id"]!.GetValue<int>() }));
 var id = child["id"]!.GetValue<int>();
@@ -51,6 +56,8 @@ anonymous.DefaultRequestHeaders.Add("X-App-User-Id", profile["appUserId"]!.GetVa
 anonymous.DefaultRequestHeaders.Add("X-App-User-Role", "parent");
 anonymous.DefaultRequestHeaders.Add("X-User-Id", "pairing-owner");
 Check((await anonymous.PostAsJsonAsync(path, new { code })).StatusCode == HttpStatusCode.Unauthorized, "spoofed identity headers");
+Check((await anonymous.GetAsync("/api/user/profile")).StatusCode == HttpStatusCode.Unauthorized, "profile accepted legacy identity headers");
+Check((await anonymous.GetAsync("/api/family-groups")).StatusCode == HttpStatusCode.Unauthorized, "family groups accepted legacy identity headers");
 Check((await other.PostAsJsonAsync(path, new { code })).StatusCode == HttpStatusCode.Forbidden, "foreign child");
 other.DefaultRequestHeaders.Add("X-App-User-Id", profile["appUserId"]!.GetValue<string>());
 other.DefaultRequestHeaders.Add("X-App-User-Role", "parent");

@@ -23,9 +23,6 @@ http.interceptors.request.use((config) => {
   if (appProfile?.appUserId) {
     config.headers['X-App-User-Id'] = appProfile.appUserId;
   }
-  if (appProfile?.role) {
-    config.headers['X-App-User-Role'] = appProfile.role;
-  }
   return config;
 });
 

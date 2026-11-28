@@ -93,7 +93,7 @@ public sealed class FamilyStore
         catch { ModulePreferenceSaving = false; await RefreshModulePreferencesAsync(); throw new FamilyApiException("未确认保存：请检查网络并核对同步状态后再试。"); }
         finally { ModulePreferenceSaving = false; }
     }
-    public bool ParentReady => Profile is { } profile && profile.Text("role") == "parent" && !profile.Bool("needsRole");
+    public bool ProfileReady => Profile is not null;
     public string? DisplayCode { get; private set; }
     public FamilyRecord? Profile { get; private set; }
     public UserCenterProfile? AccountProfile { get; private set; }
@@ -267,7 +267,6 @@ public sealed class FamilyStore
             if (current != generation) return;
             AccountProfile = null; AccountProfileError = "用户中心资料暂不可用";
         }
-        if (!ParentReady) return;
         await RefreshModulePreferencesAsync();
         var groups = FamilyRecord.Array(await CallAsync("/api/family-groups"));
         if (current != generation) return;

@@ -267,7 +267,7 @@ private actor PhotoPreviewLoader {
         }
     }
     var scope: String { groupID == 0 ? "" : "familyGroupId=\(groupID)" }
-    var ready: Bool { profile?.text("role") == "parent" && profile?.flag("needsRole") == false }
+    var ready: Bool { profile != nil }
     var selectedFamily: String { groups.first(where: { $0.id == groupID })?.text("name") ?? String(localized: "我的群组", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)) }
 
     func call(_ path: String, method: String = "GET", body: [String: Any]? = nil, timeout: TimeInterval = 30) async throws -> Any {
@@ -422,7 +422,7 @@ private actor PhotoPreviewLoader {
         defer { if current == revision { loading = false } }
         do {
             let info = try await call("/api/user/profile?channel=pc")
-            guard let fields = info as? [String: Any] else { throw APIError.message(String(localized: "无法读取家长身份。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) }
+            guard let fields = info as? [String: Any] else { throw APIError.message(String(localized: "无法读取账号资料。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) }
             guard current == revision, identity.accountIdentifier == account else { return }
             let loadedProfile = Record(fields: fields)
             let owner = loadedProfile.text("unifiedUserId")

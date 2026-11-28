@@ -1682,9 +1682,9 @@
       "iosKey": "家长调整"
     },
     "moment.t185ee3e7dd87": {
-      "zh-Hans": "家长资料暂时无法读取。",
-      "en": "The parent profile is temporarily unavailable.",
-      "iosKey": "家长资料暂时无法读取。"
+      "zh-Hans": "账号资料暂时无法读取。",
+      "en": "The account profile is temporarily unavailable.",
+      "iosKey": "账号资料暂时无法读取。"
     },
     "moment.t96f502a602b1": {
       "zh-Hans": "对准手表上的配对二维码，识别后返回确认绑定。",
@@ -2527,9 +2527,9 @@
       "iosKey": "无法识别照片格式。"
     },
     "moment.t1a64930b12af": {
-      "zh-Hans": "无法读取家长身份。",
-      "en": "Could not identify the parent account.",
-      "iosKey": "无法读取家长身份。"
+      "zh-Hans": "无法读取账号资料。",
+      "en": "Could not load the account profile.",
+      "iosKey": "无法读取账号资料。"
     },
     "moment.tb3ec4fc85064": {
       "zh-Hans": "无法读取或保存分享文件，请重试。",
@@ -3002,9 +3002,9 @@
       "iosKey": "正在计算…"
     },
     "moment.t1af9b4217e3f": {
-      "zh-Hans": "正在读取家长资料…",
-      "en": "Loading parent profile…",
-      "iosKey": "正在读取家长资料…"
+      "zh-Hans": "正在读取账号资料…",
+      "en": "Loading account profile…",
+      "iosKey": "正在读取账号资料…"
     },
     "moment.t72ab4aa38984": {
       "zh-Hans": "正在读取已有活动…",

@@ -48,7 +48,6 @@ function authHeaders() {
     ...(user?.username ? { 'X-User-Name': user.username } : {}),
     ...(user?.role ? { 'X-User-Role': user.role } : {}),
     ...(appProfile?.appUserId ? { 'X-App-User-Id': appProfile.appUserId } : {}),
-    ...(appProfile?.role ? { 'X-App-User-Role': appProfile.role } : {}),
   }
 }
 

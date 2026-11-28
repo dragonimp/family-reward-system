@@ -216,7 +216,7 @@ app.MapCreditScoreEndpoints(connectionString,
             return (null, Results.Json(new { error = "请先通过用户中心登录", code = "login_required" }, statusCode: StatusCodes.Status401Unauthorized));
         if (string.IsNullOrWhiteSpace(FirstClaim(request, ClaimTypes.NameIdentifier, "sub", "user_id", "uid")))
             return (null, Results.Json(new { error = "登录凭证缺少用户 ID", code = "identity_required" }, statusCode: StatusCodes.Status403Forbidden));
-        var access = await RequireParentProfile(connectionString, request, allowHeaderOverride: false);
+        var access = await RequireAccountProfile(connectionString, request);
         return (access.Profile?.AppUserId, access.Error);
     },
     async request =>
@@ -230,7 +230,7 @@ app.MapFamilyConnectionEndpoints(connectionString,
     {
         if (request.HttpContext.User.Identity?.IsAuthenticated != true)
             return (null, Results.Json(new { error = "请先通过用户中心登录" }, statusCode: 401));
-        var access = await RequireParentProfile(connectionString, request, allowHeaderOverride: false);
+        var access = await RequireAccountProfile(connectionString, request);
         return (access.Profile?.AppUserId, access.Error);
     },
     async request =>
@@ -245,7 +245,7 @@ app.MapGenealogyEndpoints(connectionString, async request =>
         return (null, null, Results.Json(new { error = "请先通过用户中心登录" }, statusCode: 401));
     if (string.IsNullOrWhiteSpace(FirstClaim(request, ClaimTypes.NameIdentifier, "sub", "user_id", "uid")))
         return (null, null, Results.Json(new { error = "登录凭证缺少用户 ID" }, statusCode: 403));
-    var access = await RequireParentProfile(connectionString, request, allowHeaderOverride: false);
+    var access = await RequireAccountProfile(connectionString, request);
     return (access.Profile?.AppUserId, access.Profile?.Username, access.Error);
 });
 
@@ -279,7 +279,7 @@ app.MapPost("/api/payment/fulfillment", async (HttpRequest request, JsonObject b
 
 app.MapGet("/api/subscription", async (HttpRequest request) =>
 {
-    var access = await RequireParentProfile(connectionString, request);
+    var access = await RequireAccountProfile(connectionString, request);
     if (access.Error is not null) return access.Error;
     var vipWatchFaces = await HasPlanFeature(connectionString, access.Profile!.AppUserId, VipWatchFacesFeatureCode);
     var subscription = await GetCurrentSubscription(connectionString, access.Profile.UnifiedUserId);
@@ -295,7 +295,7 @@ app.MapGet("/api/subscription", async (HttpRequest request) =>
 
 app.MapPost("/api/subscription/checkout", async (JsonObject body, IHttpClientFactory httpClientFactory, HttpRequest request) =>
 {
-    var access = await RequireParentProfile(connectionString, request);
+    var access = await RequireAccountProfile(connectionString, request);
     if (access.Error is not null) return access.Error;
     try
     {
@@ -310,7 +310,7 @@ app.MapPost("/api/subscription/checkout", async (JsonObject body, IHttpClientFac
 
 app.MapPost("/api/subscription/checkout/{checkoutId}/order", async (string checkoutId, JsonObject body, IHttpClientFactory httpClientFactory, HttpRequest request) =>
 {
-    var access = await RequireParentProfile(connectionString, request);
+    var access = await RequireAccountProfile(connectionString, request);
     if (access.Error is not null) return access.Error;
     var channel = body.String("channel").Trim().ToLowerInvariant();
     if (channel is not ("wechatpay" or "alipay")) return Results.BadRequest(new { error = "请选择微信支付或支付宝" });
@@ -421,45 +421,31 @@ app.MapGet("/watch/icon.svg", () => Results.Content("""
     </svg>
     """, "image/svg+xml; charset=utf-8"));
 
-app.MapGet("/api/user/profile", async (HttpRequest request) =>
-{
-    if (!HasUnifiedIdentity(request))
-    {
-        return Results.Json(new { error = "请先登录", code = "login_required" }, statusCode: StatusCodes.Status401Unauthorized);
-    }
-    var channel = NormalizeIdentityChannel(request.Query.String("channel"), IsWatchRequest(request) ? "watch" : "pc");
-    var role = channel == "watch" ? null : "parent";
-    try { return Results.Json(await GetOrCreateAppUserProfile(connectionString, request, channel, role, autoCreate: true)); }
-    catch (InvalidOperationException ex) { return Results.Conflict(new { error = ex.Message }); }
-});
+app.MapGet("/api/user/profile", (HttpRequest request) =>
+    ReadAccountProfile(request, request.Query.String("channel")));
 
-app.MapPost("/api/user/profile", async (JsonObject body, HttpRequest request) =>
-{
-    if (!HasUnifiedIdentity(request))
-    {
-        return Results.Json(new { error = "请先登录", code = "login_required" }, statusCode: StatusCodes.Status401Unauthorized);
-    }
-    var channel = NormalizeIdentityChannel(body.String("channel"), IsWatchRequest(request) ? "watch" : "pc");
-    var role = NormalizeAppRole(body.String("role"));
-    if (string.IsNullOrWhiteSpace(role) || channel == "pc" && role != "parent")
-    {
-        return Results.BadRequest(new { error = "手机和网页仅支持家长身份" });
-    }
+app.MapPost("/api/user/profile", (JsonObject body, HttpRequest request) =>
+    ReadAccountProfile(request, body.String("channel")));
 
-    try { return Results.Json(await GetOrCreateAppUserProfile(connectionString, request, channel, role, autoCreate: true, body)); }
-    catch (InvalidOperationException ex) { return Results.Conflict(new { error = ex.Message }); }
-});
+async Task<IResult> ReadAccountProfile(HttpRequest request, string? channel)
+{
+    if (!HasAccountIdentity(request))
+        return Results.Json(new { error = "请先登录", code = "login_required" }, statusCode: StatusCodes.Status401Unauthorized);
+
+    var profile = await GetOrCreateAccountProfile(connectionString, request);
+    return Results.Json(profile with { Channel = NormalizeIdentityChannel(channel) });
+}
 
 app.MapGet("/api/family-groups", async (HttpRequest request) =>
 {
-    var access = await RequireParentProfile(connectionString, request);
+    var access = await RequireAccountProfile(connectionString, request);
     if (access.Error is not null) return access.Error;
     return Results.Json(await GetFamilyGroups(connectionString, access.Profile!.AppUserId));
 });
 
 app.MapPost("/api/family-groups", async (JsonObject body, HttpRequest request) =>
 {
-    var access = await RequireParentProfile(connectionString, request);
+    var access = await RequireAccountProfile(connectionString, request);
     if (access.Error is not null) return access.Error;
 
     var created = await CreateFamilyGroup(connectionString, body.String("name"), access.Profile!.AppUserId, body.String("description"));
@@ -473,7 +459,7 @@ app.MapPost("/api/family-groups", async (JsonObject body, HttpRequest request) =
 
 app.MapPut("/api/family-groups/{id:int}", async (int id, JsonObject body, HttpRequest request) =>
 {
-    var access = await RequireParentProfile(connectionString, request);
+    var access = await RequireAccountProfile(connectionString, request);
     if (access.Error is not null) return access.Error;
 
     var updated = await UpdateFamilyGroup(connectionString, id, body.String("name"), access.Profile!.AppUserId, body.String("description"));
@@ -493,7 +479,7 @@ app.MapPut("/api/family-groups/{id:int}", async (int id, JsonObject body, HttpRe
 
 app.MapDelete("/api/family-groups/{id:int}", async (int id, HttpRequest request) =>
 {
-    var access = await RequireParentProfile(connectionString, request);
+    var access = await RequireAccountProfile(connectionString, request);
     if (access.Error is not null) return access.Error;
 
     var result = await DeleteFamilyGroup(connectionString, id, access.Profile!.AppUserId);
@@ -514,7 +500,7 @@ app.MapDelete("/api/family-groups/{id:int}", async (int id, HttpRequest request)
 
 app.MapGet("/api/family-groups/{id:int}/invite", async (int id, HttpRequest request) =>
 {
-    var access = await RequireParentProfile(connectionString, request);
+    var access = await RequireAccountProfile(connectionString, request);
     if (access.Error is not null) return access.Error;
     var invite = await GetOrCreateFamilyGroupInvite(connectionString, id, access.Profile!.AppUserId);
     if (!invite.Success)
@@ -538,7 +524,7 @@ app.MapGet("/api/family-groups/{id:int}/invite", async (int id, HttpRequest requ
 
 app.MapPost("/api/family-groups/join", async (JsonObject body, HttpRequest request) =>
 {
-    var access = await RequireParentProfile(connectionString, request);
+    var access = await RequireAccountProfile(connectionString, request);
     if (access.Error is not null) return access.Error;
     var inviteCode = body.String("invite_code");
     if (string.IsNullOrWhiteSpace(inviteCode))
@@ -565,7 +551,7 @@ app.MapPost("/api/family-groups/join", async (JsonObject body, HttpRequest reque
 
 app.MapPut("/api/family-groups/{id:int}/users", async (int id, JsonObject body, HttpRequest request) =>
 {
-    var access = await RequireParentProfile(connectionString, request);
+    var access = await RequireAccountProfile(connectionString, request);
     if (access.Error is not null) return access.Error;
     var userId = body.String("user_id");
     if (string.IsNullOrWhiteSpace(userId))
@@ -588,7 +574,7 @@ app.MapPut("/api/family-groups/{id:int}/users", async (int id, JsonObject body, 
 
 app.MapGet("/api/family-groups/{id:int}/children", async (int id, HttpRequest request) =>
 {
-    var access = await RequireParentProfile(connectionString, request);
+    var access = await RequireAccountProfile(connectionString, request);
     if (access.Error is not null) return access.Error;
     var result = await GetFamilyGroupChildren(connectionString, id, access.Profile!.AppUserId);
     if (result.Forbidden)
@@ -600,7 +586,7 @@ app.MapGet("/api/family-groups/{id:int}/children", async (int id, HttpRequest re
 
 app.MapDelete("/api/family-groups/{id:int}/children/{childId:int}", async (int id, int childId, HttpRequest request) =>
 {
-    var access = await RequireParentProfile(connectionString, request);
+    var access = await RequireAccountProfile(connectionString, request);
     if (access.Error is not null) return access.Error;
     var result = await RemoveChildFromFamilyGroup(connectionString, id, childId, access.Profile!.AppUserId);
     if (result.Forbidden)
@@ -612,7 +598,7 @@ app.MapDelete("/api/family-groups/{id:int}/children/{childId:int}", async (int i
 
 app.MapGet("/api/family-members", async (HttpRequest request) =>
 {
-    var access = await RequireParentProfile(connectionString, request);
+    var access = await RequireAccountProfile(connectionString, request);
     if (access.Error is not null) return access.Error;
 
     await using var conn = await OpenConnection(connectionString);
@@ -632,7 +618,7 @@ app.MapGet("/api/family-members", async (HttpRequest request) =>
 
 app.MapGet("/api/family-members/genealogy-links", async (HttpRequest request) =>
 {
-    var access = await RequireParentProfile(connectionString, request);
+    var access = await RequireAccountProfile(connectionString, request);
     if (access.Error is not null) return access.Error;
     await using var conn = await OpenConnection(connectionString);
     await using var cmd = new NpgsqlCommand("""
@@ -656,7 +642,7 @@ app.MapGet("/api/family-members/genealogy-links", async (HttpRequest request) =>
 
 app.MapPut("/api/family-members/{id:int}/genealogy-links/{treeId:long}", async (int id, long treeId, JsonObject body, HttpRequest request) =>
 {
-    var access = await RequireParentProfile(connectionString, request);
+    var access = await RequireAccountProfile(connectionString, request);
     if (access.Error is not null) return access.Error;
     if (!long.TryParse(body["personId"]?.ToString(), out var personId) || personId <= 0)
         return Results.BadRequest(new { error = "请选择族谱中的人物" });
@@ -692,7 +678,7 @@ app.MapPut("/api/family-members/{id:int}/genealogy-links/{treeId:long}", async (
 
 app.MapDelete("/api/family-members/{id:int}/genealogy-links/{treeId:long}", async (int id, long treeId, HttpRequest request) =>
 {
-    var access = await RequireParentProfile(connectionString, request);
+    var access = await RequireAccountProfile(connectionString, request);
     if (access.Error is not null) return access.Error;
     await using var conn = await OpenConnection(connectionString);
     await using var cmd = new NpgsqlCommand("""
@@ -708,7 +694,7 @@ app.MapDelete("/api/family-members/{id:int}/genealogy-links/{treeId:long}", asyn
 
 app.MapPost("/api/family-members", async (JsonObject body, HttpRequest request) =>
 {
-    var access = await RequireParentProfile(connectionString, request);
+    var access = await RequireAccountProfile(connectionString, request);
     if (access.Error is not null) return access.Error;
     var displayName = body.String("displayName").Trim();
     var role = NormalizeHouseholdRole(body.String("role"));
@@ -734,7 +720,7 @@ app.MapPost("/api/family-members", async (JsonObject body, HttpRequest request) 
 
 app.MapPut("/api/family-members/{id:int}", async (int id, JsonObject body, HttpRequest request) =>
 {
-    var access = await RequireParentProfile(connectionString, request);
+    var access = await RequireAccountProfile(connectionString, request);
     if (access.Error is not null) return access.Error;
     var displayName = body.String("displayName").Trim();
     var role = NormalizeHouseholdRole(body.String("role"));
@@ -766,7 +752,7 @@ app.MapPut("/api/family-members/{id:int}", async (int id, JsonObject body, HttpR
 
 app.MapDelete("/api/family-members/{id:int}", async (int id, HttpRequest request) =>
 {
-    var access = await RequireParentProfile(connectionString, request);
+    var access = await RequireAccountProfile(connectionString, request);
     if (access.Error is not null) return access.Error;
 
     await using var conn = await OpenConnection(connectionString);
@@ -797,7 +783,7 @@ app.MapDelete("/api/family-members/{id:int}", async (int id, HttpRequest request
 
 app.MapGet("/api/children", async (HttpRequest request) =>
 {
-    var access = await RequireParentProfile(connectionString, request);
+    var access = await RequireAccountProfile(connectionString, request);
     if (access.Error is not null) return access.Error;
     var ownedOnly = request.Query.Bool("ownedOnly") ?? request.Query.Bool("owned_only") ?? false;
     int? familyGroupId = ownedOnly && !HasFamilyGroupSelector(request)
@@ -808,7 +794,7 @@ app.MapGet("/api/children", async (HttpRequest request) =>
 
 app.MapGet("/api/children/{id:int}", async (int id, HttpRequest request) =>
 {
-    var access = await RequireParentProfile(connectionString, request);
+    var access = await RequireAccountProfile(connectionString, request);
     if (access.Error is not null) return access.Error;
     var ownedOnly = request.Query.Bool("ownedOnly") ?? request.Query.Bool("owned_only") ?? true;
     int? familyGroupId = HasFamilyGroupSelector(request)
@@ -820,7 +806,7 @@ app.MapGet("/api/children/{id:int}", async (int id, HttpRequest request) =>
 
 app.MapGet("/api/watch/preview/{childId:int}", async (int childId, HttpRequest request) =>
 {
-    var access = await RequireParentProfile(connectionString, request);
+    var access = await RequireAccountProfile(connectionString, request);
     if (access.Error is not null) return access.Error;
 
     var ownedChildren = await GetChildren(connectionString, ownerAppUserId: access.Profile!.AppUserId);
@@ -1050,10 +1036,10 @@ app.MapPost("/api/children/{id:int}/pair-device", async (int id, JsonObject body
 {
     if (!AgentIdentityAuthorizationExtensions.IsUserIdentity(request.HttpContext.User)
         || FirstClaim(request, ClaimTypes.NameIdentifier, "sub") is null)
-        return Results.Json(new { error = "请先登录家长账号" }, statusCode: 401);
-    var profile = await GetOrCreateAppUserProfile(connectionString, request, "pc", "parent", autoCreate: true);
-    if (profile.Role != "parent" || !await IsAppUserBusinessActive(connectionString, profile.UnifiedUserId))
-        return Results.Json(new { error = "请使用有效的家长账号" }, statusCode: 403);
+        return Results.Json(new { error = "请先登录" }, statusCode: 401);
+    var profile = await GetOrCreateAccountProfile(connectionString, request);
+    if (!await IsAppUserBusinessActive(connectionString, profile.UnifiedUserId))
+        return Results.Json(new { error = "请使用有效的账号" }, statusCode: 403);
     var owner = profile.AppUserId;
     var group = await ResolveChildFamilyGroupId(connectionString, request, body, id, owner);
     if (await GetParentOwnedChild(connectionString, id, group, owner) is null)
@@ -1118,7 +1104,7 @@ app.MapPost("/api/watch/device-unbind", async (JsonObject body, HttpRequest requ
 
 app.MapPost("/api/watch/requests/{id:int}/approve", async (int id, JsonObject body, HttpRequest request) =>
 {
-    var access = await RequireParentProfile(connectionString, request);
+    var access = await RequireAccountProfile(connectionString, request);
     if (access.Error is not null) return access.Error;
     var familyGroupId = HasFamilyGroupSelector(request, body)
         ? await ResolveFamilyGroupId(connectionString, request, body)
@@ -1129,7 +1115,7 @@ app.MapPost("/api/watch/requests/{id:int}/approve", async (int id, JsonObject bo
 
 app.MapGet("/api/reward-requests", async (HttpRequest request) =>
 {
-    var access = await RequireParentProfile(connectionString, request);
+    var access = await RequireAccountProfile(connectionString, request);
     if (access.Error is not null) return access.Error;
     var familyGroupId = HasFamilyGroupSelector(request)
         ? await ResolveFamilyGroupId(connectionString, request)
@@ -1142,7 +1128,7 @@ app.MapGet("/api/reward-requests", async (HttpRequest request) =>
 
 app.MapGet("/api/warm-moments", async (HttpRequest request) =>
 {
-    var access = await RequireParentProfile(connectionString, request);
+    var access = await RequireAccountProfile(connectionString, request);
     if (access.Error is not null) return access.Error;
     var limit = Math.Clamp(request.Query.Int("limit") ?? 30, 1, 100);
     var childId = request.Query.Int("childId");
@@ -1151,7 +1137,7 @@ app.MapGet("/api/warm-moments", async (HttpRequest request) =>
 
 app.MapGet("/api/growth-reports", async (HttpRequest request, IHttpClientFactory httpClientFactory) =>
 {
-    var access = await RequireParentProfile(connectionString, request);
+    var access = await RequireAccountProfile(connectionString, request);
     if (access.Error is not null) return access.Error;
     var period = NormalizeGrowthPeriod(request.Query.String("period"));
     var audience = request.Query.String("audience").Equals("parent", StringComparison.OrdinalIgnoreCase) ? "parent" : "child";
@@ -1165,7 +1151,7 @@ app.MapGet("/api/growth-reports", async (HttpRequest request, IHttpClientFactory
 
 app.MapGet("/api/stats/growth", async (HttpRequest request) =>
 {
-    var access = await RequireParentProfile(connectionString, request);
+    var access = await RequireAccountProfile(connectionString, request);
     if (access.Error is not null) return access.Error;
     var familyGroupId = HasFamilyGroupSelector(request) ? await ResolveFamilyGroupId(connectionString, request) : (int?)null;
     return Results.Json(new { children = await GetSelfGrowthStats(connectionString, access.Profile!.AppUserId, familyGroupId) });
@@ -1173,7 +1159,7 @@ app.MapGet("/api/stats/growth", async (HttpRequest request) =>
 
 app.MapGet("/api/children/{id:int}/growth-settings", async (int id, HttpRequest request) =>
 {
-    var access = await RequireParentProfile(connectionString, request);
+    var access = await RequireAccountProfile(connectionString, request);
     if (access.Error is not null) return access.Error;
     var familyGroupId = await ResolveFamilyGroupId(connectionString, request);
     var child = await GetParentOwnedChild(connectionString, id, familyGroupId, access.Profile!.AppUserId);
@@ -1183,7 +1169,7 @@ app.MapGet("/api/children/{id:int}/growth-settings", async (int id, HttpRequest 
 
 app.MapPut("/api/children/{id:int}/growth-settings", async (int id, JsonObject body, HttpRequest request) =>
 {
-    var access = await RequireParentProfile(connectionString, request);
+    var access = await RequireAccountProfile(connectionString, request);
     if (access.Error is not null) return access.Error;
     var familyGroupId = await ResolveFamilyGroupId(connectionString, request, body);
     var child = await GetParentOwnedChild(connectionString, id, familyGroupId, access.Profile!.AppUserId);
@@ -1194,7 +1180,7 @@ app.MapPut("/api/children/{id:int}/growth-settings", async (int id, JsonObject b
 
 app.MapPost("/api/reward-requests/{id:int}/approve", async (int id, JsonObject body, HttpRequest request) =>
 {
-    var access = await RequireParentProfile(connectionString, request);
+    var access = await RequireAccountProfile(connectionString, request);
     if (access.Error is not null) return access.Error;
     var familyGroupId = HasFamilyGroupSelector(request, body)
         ? await ResolveFamilyGroupId(connectionString, request, body)
@@ -1207,7 +1193,7 @@ app.MapPost("/api/feedback", async (JsonObject body, IHttpClientFactory httpClie
 {
     if (LegacyFeedbackEndpointsRetired()) return Results.StatusCode(StatusCodes.Status410Gone);
 
-    var access = await RequireParentProfile(connectionString, request);
+    var access = await RequireAccountProfile(connectionString, request);
     if (access.Error is not null) return access.Error;
 
     var feedbackType = body.String("feedbackType", body.String("feedback_type", "suggestion")).Trim().ToLowerInvariant();
@@ -1277,7 +1263,7 @@ app.MapGet("/api/feedback/mine", async (IHttpClientFactory httpClientFactory, Ht
 {
     if (LegacyFeedbackEndpointsRetired()) return Results.StatusCode(StatusCodes.Status410Gone);
 
-    var access = await RequireParentProfile(connectionString, request);
+    var access = await RequireAccountProfile(connectionString, request);
     if (access.Error is not null) return access.Error;
     var take = Math.Clamp(request.Query.Int("take") ?? 50, 1, 100);
     var result = await FetchAtlasFeedback(httpClientFactory, access.Profile!, $"/api/feedback/mine?take={take}");
@@ -2029,7 +2015,7 @@ app.MapGet("/watch", () =>
 
 app.MapPost("/api/children", async (JsonObject body, HttpRequest request) =>
 {
-    var access = await RequireParentProfile(connectionString, request);
+    var access = await RequireAccountProfile(connectionString, request);
     if (access.Error is not null) return access.Error;
     body["user_id"] = access.Profile!.AppUserId;
     body["parent_app_user_id"] = access.Profile!.AppUserId;
@@ -2044,7 +2030,7 @@ app.MapPost("/api/children", async (JsonObject body, HttpRequest request) =>
 
 app.MapPut("/api/children/{id:int}", async (int id, JsonObject body, HttpRequest request) =>
 {
-    var access = await RequireParentProfile(connectionString, request);
+    var access = await RequireAccountProfile(connectionString, request);
     if (access.Error is not null) return access.Error;
     await using var conn = await OpenConnection(connectionString);
     await using var tx = await conn.BeginTransactionAsync();
@@ -2117,7 +2103,7 @@ app.MapPut("/api/children/{id:int}", async (int id, JsonObject body, HttpRequest
 
 app.MapDelete("/api/children/{id:int}", async (int id, HttpRequest request) =>
 {
-    var access = await RequireParentProfile(connectionString, request);
+    var access = await RequireAccountProfile(connectionString, request);
     if (access.Error is not null) return access.Error;
     var result = await DeleteChildMembership(connectionString, id, access.Profile!.AppUserId);
     return result.ContainsKey("error") ? Results.NotFound(result) : Results.Json(result);
@@ -2125,7 +2111,7 @@ app.MapDelete("/api/children/{id:int}", async (int id, HttpRequest request) =>
 
 app.MapPost("/api/children/{id:int}/auth-code", async (int id, JsonObject body, HttpRequest request) =>
 {
-    var access = await RequireParentProfile(connectionString, request);
+    var access = await RequireAccountProfile(connectionString, request);
     if (access.Error is not null) return access.Error;
     var familyGroupId = await ResolveChildFamilyGroupId(connectionString, request, body, id, access.Profile!.AppUserId);
     var minutes = Math.Clamp(body.Int("expiresInMinutes") ?? 24 * 60, 10, 24 * 60);
@@ -2135,7 +2121,7 @@ app.MapPost("/api/children/{id:int}/auth-code", async (int id, JsonObject body, 
 
 app.MapGet("/api/children/{id:int}/devices", async (int id, HttpRequest request) =>
 {
-    var access = await RequireParentProfile(connectionString, request);
+    var access = await RequireAccountProfile(connectionString, request);
     if (access.Error is not null) return access.Error;
     var familyGroupId = await ResolveChildFamilyGroupId(connectionString, request, null, id, access.Profile!.AppUserId);
     var result = await GetChildWatchDevices(connectionString, id, familyGroupId, access.Profile!.AppUserId);
@@ -2144,7 +2130,7 @@ app.MapGet("/api/children/{id:int}/devices", async (int id, HttpRequest request)
 
 app.MapGet("/api/children/{id:int}/friends", async (int id, HttpRequest request) =>
 {
-    var access = await RequireParentProfile(connectionString, request);
+    var access = await RequireAccountProfile(connectionString, request);
     if (access.Error is not null) return access.Error;
     var familyGroupId = await ResolveChildFamilyGroupId(connectionString, request, null, id, access.Profile!.AppUserId);
     var child = await GetParentOwnedChild(connectionString, id, familyGroupId, access.Profile!.AppUserId);
@@ -2160,7 +2146,7 @@ app.MapGet("/api/children/{id:int}/friends", async (int id, HttpRequest request)
 
 app.MapGet("/api/children/friend-notifications", async (HttpRequest request) =>
 {
-    var access = await RequireParentProfile(connectionString, request);
+    var access = await RequireAccountProfile(connectionString, request);
     if (access.Error is not null) return access.Error;
     var unreadOnly = request.Query.Bool("unreadOnly") ?? request.Query.Bool("unread_only") ?? false;
     return Results.Json(new { notifications = await GetChildFriendNotifications(connectionString, access.Profile!.AppUserId, unreadOnly) });
@@ -2168,7 +2154,7 @@ app.MapGet("/api/children/friend-notifications", async (HttpRequest request) =>
 
 app.MapPost("/api/children/friend-notifications/{id:int}/read", async (int id, HttpRequest request) =>
 {
-    var access = await RequireParentProfile(connectionString, request);
+    var access = await RequireAccountProfile(connectionString, request);
     if (access.Error is not null) return access.Error;
     var result = await MarkChildFriendNotificationRead(connectionString, id, access.Profile!.AppUserId);
     return result.ContainsKey("error") ? Results.NotFound(result) : Results.Json(result);
@@ -2176,7 +2162,7 @@ app.MapPost("/api/children/friend-notifications/{id:int}/read", async (int id, H
 
 app.MapDelete("/api/children/{id:int}/devices/{deviceId:int}", async (int id, int deviceId, HttpRequest request) =>
 {
-    var access = await RequireParentProfile(connectionString, request);
+    var access = await RequireAccountProfile(connectionString, request);
     if (access.Error is not null) return access.Error;
     var familyGroupId = await ResolveChildFamilyGroupId(connectionString, request, null, id, access.Profile!.AppUserId);
     var result = await RevokeChildWatchDevice(connectionString, id, deviceId, familyGroupId, access.Profile!.AppUserId);
@@ -2185,7 +2171,7 @@ app.MapDelete("/api/children/{id:int}/devices/{deviceId:int}", async (int id, in
 
 app.MapPost("/api/children/{id:int}/devices/{deviceId:int}/unbind-code", async (int id, int deviceId, JsonObject body, HttpRequest request) =>
 {
-    var access = await RequireParentProfile(connectionString, request);
+    var access = await RequireAccountProfile(connectionString, request);
     if (access.Error is not null) return access.Error;
     var familyGroupId = await ResolveChildFamilyGroupId(connectionString, request, body, id, access.Profile!.AppUserId);
     var minutes = Math.Clamp(body.Int("expiresInMinutes") ?? 10, 5, 30);
@@ -2195,7 +2181,7 @@ app.MapPost("/api/children/{id:int}/devices/{deviceId:int}/unbind-code", async (
 
 app.MapGet("/api/transactions", async (HttpRequest request) =>
 {
-    var access = await RequireParentProfile(connectionString, request);
+    var access = await RequireAccountProfile(connectionString, request);
     if (access.Error is not null) return access.Error;
     var query = request.Query;
     var childId = query.Int("childId") ?? query.Int("child_id");
@@ -2269,7 +2255,7 @@ app.MapGet("/api/transactions", async (HttpRequest request) =>
 
 app.MapPost("/api/transactions", async (JsonObject body, HttpRequest request) =>
 {
-    var access = await RequireParentProfile(connectionString, request);
+    var access = await RequireAccountProfile(connectionString, request);
     if (access.Error is not null) return access.Error;
     var familyGroupId = await ResolveFamilyGroupId(connectionString, request, body);
     var result = await CreateTransaction(connectionString, body, familyGroupId, access.Profile!.AppUserId);
@@ -2278,7 +2264,7 @@ app.MapPost("/api/transactions", async (JsonObject body, HttpRequest request) =>
 
 app.MapPost("/api/transactions/batch", async (JsonArray body, HttpRequest request) =>
 {
-    var access = await RequireParentProfile(connectionString, request);
+    var access = await RequireAccountProfile(connectionString, request);
     if (access.Error is not null) return access.Error;
     var results = new List<object>();
     foreach (var node in body.OfType<JsonObject>())
@@ -2298,7 +2284,7 @@ app.MapPost("/api/transactions/batch", async (JsonArray body, HttpRequest reques
 
 app.MapDelete("/api/transactions/{id:int}", async (int id, HttpRequest request) =>
 {
-    var access = await RequireParentProfile(connectionString, request);
+    var access = await RequireAccountProfile(connectionString, request);
     if (access.Error is not null) return access.Error;
     var result = await DeleteTransaction(connectionString, id, parentAppUserId: access.Profile!.AppUserId);
     return result.ContainsKey("error") ? Results.NotFound(result) : Results.Json(result);
@@ -2306,14 +2292,14 @@ app.MapDelete("/api/transactions/{id:int}", async (int id, HttpRequest request) 
 
 app.MapGet("/api/rules", async (HttpRequest request) =>
 {
-    var access = await RequireParentProfile(connectionString, request);
+    var access = await RequireAccountProfile(connectionString, request);
     if (access.Error is not null) return access.Error;
     return Results.Json(await GetRules(connectionString, access.Profile!.AppUserId));
 });
 
 app.MapPost("/api/rules", async (JsonObject body, HttpRequest request) =>
 {
-    var access = await RequireParentProfile(connectionString, request);
+    var access = await RequireAccountProfile(connectionString, request);
     if (access.Error is not null) return access.Error;
     var created = await CreatePersonalRule(connectionString, access.Profile!.AppUserId, body);
     return created.ContainsKey("error")
@@ -2323,7 +2309,7 @@ app.MapPost("/api/rules", async (JsonObject body, HttpRequest request) =>
 
 app.MapPut("/api/rule-template", async (JsonObject body, HttpRequest request) =>
 {
-    var access = await RequireParentProfile(connectionString, request);
+    var access = await RequireAccountProfile(connectionString, request);
     if (access.Error is not null) return access.Error;
     var ruleIds = body["ruleIds"] is JsonArray array
         ? array.Select(node => node?.GetValue<int?>()).Where(id => id.HasValue).Select(id => id!.Value).Distinct().ToList()
@@ -2334,7 +2320,7 @@ app.MapPut("/api/rule-template", async (JsonObject body, HttpRequest request) =>
 
 app.MapPut("/api/rules/{id:int}", async (int id, JsonObject body, HttpRequest request) =>
 {
-    var access = await RequireParentProfile(connectionString, request);
+    var access = await RequireAccountProfile(connectionString, request);
     if (access.Error is not null) return access.Error;
     await using var conn = await OpenConnection(connectionString);
     await using var cmd = new NpgsqlCommand("""
@@ -2361,7 +2347,7 @@ app.MapPut("/api/rules/{id:int}", async (int id, JsonObject body, HttpRequest re
 
 app.MapDelete("/api/rules/{id:int}", async (int id, HttpRequest request) =>
 {
-    var access = await RequireParentProfile(connectionString, request);
+    var access = await RequireAccountProfile(connectionString, request);
     if (access.Error is not null) return access.Error;
     await using var conn = await OpenConnection(connectionString);
     await using var cmd = new NpgsqlCommand("DELETE FROM rules WHERE id = @id AND owner_app_user_id = @owner_app_user_id", conn);
@@ -2376,7 +2362,7 @@ app.MapDelete("/api/rules/{id:int}", async (int id, HttpRequest request) =>
 
 app.MapGet("/api/stats/dashboard", async (HttpRequest request) =>
 {
-    var access = await RequireParentProfile(connectionString, request);
+    var access = await RequireAccountProfile(connectionString, request);
     if (access.Error is not null) return access.Error;
     var familyGroupId = await ResolveFamilyGroupId(connectionString, request);
     var children = await GetChildren(connectionString, familyGroupId);
@@ -2386,7 +2372,7 @@ app.MapGet("/api/stats/dashboard", async (HttpRequest request) =>
 
 app.MapGet("/api/stats/leaderboard", async (HttpRequest request) =>
 {
-    var access = await RequireParentProfile(connectionString, request);
+    var access = await RequireAccountProfile(connectionString, request);
     if (access.Error is not null) return access.Error;
     var familyGroupId = await ResolveFamilyGroupId(connectionString, request);
     var children = await GetChildren(connectionString, familyGroupId);
@@ -2397,7 +2383,7 @@ app.MapGet("/api/stats/leaderboard", async (HttpRequest request) =>
 
 app.MapGet("/api/stats/categories", async (HttpRequest request) =>
 {
-    var access = await RequireParentProfile(connectionString, request);
+    var access = await RequireAccountProfile(connectionString, request);
     if (access.Error is not null) return access.Error;
     var familyGroupId = await ResolveFamilyGroupId(connectionString, request);
     await using var conn = await OpenConnection(connectionString);
@@ -2426,14 +2412,14 @@ app.MapGet("/api/stats/categories", async (HttpRequest request) =>
 
 app.MapGet("/api/system/config", async (HttpRequest request) =>
 {
-    var access = await RequireParentProfile(connectionString, request);
+    var access = await RequireAccountProfile(connectionString, request);
     if (access.Error is not null) return access.Error;
     return Results.Json(await configStore.LoadAsync());
 });
 
 app.MapPut("/api/system/config", async (JsonObject body, HttpRequest request) =>
 {
-    var access = await RequireParentProfile(connectionString, request);
+    var access = await RequireAccountProfile(connectionString, request);
     if (access.Error is not null) return access.Error;
     var saved = await configStore.SaveAsync(body);
     return Results.Json(saved);
@@ -2492,7 +2478,7 @@ app.MapPost("/api/xiaotiancai/device-test-application/send", async (
 
 app.MapPost("/api/agent/parse-reward", async (JsonObject body, IHttpClientFactory httpClientFactory, HttpRequest request) =>
 {
-    var access = await RequireParentProfile(connectionString, request);
+    var access = await RequireAccountProfile(connectionString, request);
     if (access.Error is not null) return access.Error;
     var transcript = body.String("text").Trim();
     if (string.IsNullOrWhiteSpace(transcript))
@@ -2594,7 +2580,7 @@ app.MapPost("/api/agent/parse-reward", async (JsonObject body, IHttpClientFactor
 
 app.MapPost("/api/agent/invoke", async (JsonObject body, IHttpClientFactory httpClientFactory, HttpRequest request) =>
 {
-    var access = await RequireParentProfile(connectionString, request);
+    var access = await RequireAccountProfile(connectionString, request);
     if (access.Error is not null) return access.Error;
     var config = await configStore.LoadAsync();
     var agent = config["agent"]!.AsObject();
@@ -2684,7 +2670,7 @@ app.MapPost("/api/agent/invoke", async (JsonObject body, IHttpClientFactory http
 
 app.MapGet("/api/agentfree/agents", async (IHttpClientFactory httpClientFactory, HttpRequest request) =>
 {
-    var access = await RequireParentProfile(connectionString, request);
+    var access = await RequireAccountProfile(connectionString, request);
     if (access.Error is not null) return access.Error;
     try
     {
@@ -2700,7 +2686,7 @@ app.MapGet("/api/agentfree/agents", async (IHttpClientFactory httpClientFactory,
 
 app.MapGet("/api/agentfree/sessions", async (IHttpClientFactory httpClientFactory, HttpRequest request) =>
 {
-    var access = await RequireParentProfile(connectionString, request);
+    var access = await RequireAccountProfile(connectionString, request);
     if (access.Error is not null) return access.Error;
     try
     {
@@ -2724,7 +2710,7 @@ app.MapGet("/api/agentfree/sessions", async (IHttpClientFactory httpClientFactor
 
 app.MapGet("/api/agentfree/sessions/{id}", async (string id, IHttpClientFactory httpClientFactory, HttpRequest request) =>
 {
-    var access = await RequireParentProfile(connectionString, request);
+    var access = await RequireAccountProfile(connectionString, request);
     if (access.Error is not null) return access.Error;
     try
     {
@@ -2747,7 +2733,7 @@ app.MapGet("/api/agentfree/sessions/{id}", async (string id, IHttpClientFactory 
 
 app.MapGet("/api/agentfree/sessions/{id}/messages", async (string id, IHttpClientFactory httpClientFactory, HttpRequest request) =>
 {
-    var access = await RequireParentProfile(connectionString, request);
+    var access = await RequireAccountProfile(connectionString, request);
     if (access.Error is not null) return access.Error;
     try
     {
@@ -2779,7 +2765,7 @@ app.MapGet("/api/agentfree/sessions/{id}/messages", async (string id, IHttpClien
 
 app.MapGet("/api/agentfree/sessions/{id}/timeline", async (string id, IHttpClientFactory httpClientFactory, HttpRequest request) =>
 {
-    var access = await RequireParentProfile(connectionString, request);
+    var access = await RequireAccountProfile(connectionString, request);
     if (access.Error is not null) return access.Error;
     try
     {
@@ -2803,7 +2789,7 @@ app.MapGet("/api/agentfree/sessions/{id}/timeline", async (string id, IHttpClien
 
 app.MapGet("/api/agentfree/sessions/{id}/queue", async (string id, IHttpClientFactory httpClientFactory, HttpRequest request) =>
 {
-    var access = await RequireParentProfile(connectionString, request);
+    var access = await RequireAccountProfile(connectionString, request);
     if (access.Error is not null) return access.Error;
     try
     {
@@ -2828,7 +2814,7 @@ app.MapGet("/api/agentfree/sessions/{id}/queue", async (string id, IHttpClientFa
 
 app.MapPost("/api/agentfree/sessions", async (JsonObject body, IHttpClientFactory httpClientFactory, HttpRequest request) =>
 {
-    var access = await RequireParentProfile(connectionString, request);
+    var access = await RequireAccountProfile(connectionString, request);
     if (access.Error is not null) return access.Error;
     try
     {
@@ -2871,7 +2857,7 @@ app.MapPost("/api/agentfree/sessions", async (JsonObject body, IHttpClientFactor
 
 app.MapPut("/api/agentfree/sessions/{id}", async (string id, JsonObject body, IHttpClientFactory httpClientFactory, HttpRequest request) =>
 {
-    var access = await RequireParentProfile(connectionString, request);
+    var access = await RequireAccountProfile(connectionString, request);
     if (access.Error is not null) return access.Error;
     try
     {
@@ -2901,7 +2887,7 @@ app.MapPut("/api/agentfree/sessions/{id}", async (string id, JsonObject body, IH
 
 app.MapPost("/api/agentfree/chat/sessions/{id}/reset", async (string id, IHttpClientFactory httpClientFactory, HttpRequest request) =>
 {
-    var access = await RequireParentProfile(connectionString, request);
+    var access = await RequireAccountProfile(connectionString, request);
     if (access.Error is not null) return access.Error;
     try
     {
@@ -2924,7 +2910,7 @@ app.MapPost("/api/agentfree/chat/sessions/{id}/reset", async (string id, IHttpCl
 
 app.MapPost("/api/agentfree/interactions/{interactionId}/respond", async (string interactionId, JsonObject body, IHttpClientFactory httpClientFactory, HttpRequest request) =>
 {
-    var access = await RequireParentProfile(connectionString, request);
+    var access = await RequireAccountProfile(connectionString, request);
     if (access.Error is not null) return access.Error;
     try
     {
@@ -2940,7 +2926,7 @@ app.MapPost("/api/agentfree/interactions/{interactionId}/respond", async (string
 
 app.MapPost("/api/agentfree/chat/stream", async (JsonObject body, IHttpClientFactory httpClientFactory, HttpContext context) =>
 {
-    var access = await RequireParentProfile(connectionString, context.Request);
+    var access = await RequireAccountProfile(connectionString, context.Request);
     if (access.Error is not null)
     {
         await access.Error.ExecuteAsync(context);
@@ -7506,27 +7492,16 @@ static (string? Username, IResult? Error) RequireXiaotiancaiEmailOperator(HttpRe
     return (username, null);
 }
 
-static async Task<(AppUserProfile? Profile, IResult? Error)> RequireParentProfile(string connectionString, HttpRequest request, bool allowHeaderOverride = true)
-{
-    var headerRole = request.Headers.TryGetValue("X-App-User-Role", out var roleHeader) ? NormalizeAppRole(roleHeader.ToString()) : "";
-    if (allowHeaderOverride && headerRole == "child")
-    {
-        return (null, Results.Json(new { error = "孩子账号只能使用手表端积分查询和积分申请功能", code = "child_forbidden" }, statusCode: StatusCodes.Status403Forbidden));
-    }
-    if (allowHeaderOverride && headerRole == "parent" && request.Headers.TryGetValue("X-App-User-Id", out var appUserId) && !string.IsNullOrWhiteSpace(appUserId.ToString()))
-    {
-        return (new AppUserProfile(GetUnifiedUserId(request), GetUnifiedUsername(request), "pc", "parent", appUserId.ToString().Trim(), null, null, false), null);
-    }
+static bool HasAccountIdentity(HttpRequest request) =>
+    AgentIdentityAuthorizationExtensions.IsUserIdentity(request.HttpContext.User)
+    && FirstClaim(request, ClaimTypes.NameIdentifier, "sub", "user_id", "uid") is not null;
 
-    var profile = await GetOrCreateAppUserProfile(connectionString, request, "pc", "parent", autoCreate: true);
-    if (profile.NeedsRole)
-    {
-        return (null, Results.Json(new { error = "无法读取家长资料", code = "profile_unavailable" }, statusCode: StatusCodes.Status503ServiceUnavailable));
-    }
-    if (!string.Equals(profile.Role, "parent", StringComparison.Ordinal))
-    {
-        return (null, Results.Json(new { error = "孩子账号只能使用手表端积分查询和积分申请功能", code = "child_forbidden" }, statusCode: StatusCodes.Status403Forbidden));
-    }
+static async Task<(AppUserProfile? Profile, IResult? Error)> RequireAccountProfile(string connectionString, HttpRequest request)
+{
+    if (!HasAccountIdentity(request))
+        return (null, Results.Json(new { error = "请先登录", code = "login_required" }, statusCode: StatusCodes.Status401Unauthorized));
+
+    var profile = await GetOrCreateAccountProfile(connectionString, request);
     if (!await IsAppUserBusinessActive(connectionString, profile.UnifiedUserId))
     {
         return (null, Results.Json(new { error = "该家加分账号已被停用", code = "user_disabled" }, statusCode: StatusCodes.Status403Forbidden));
@@ -7835,71 +7810,31 @@ static async Task SetPlanFeature(string connectionString, string planCode, strin
     await cmd.ExecuteNonQueryAsync();
 }
 
-static async Task<AppUserProfile> GetOrCreateAppUserProfile(
-    string connectionString,
-    HttpRequest request,
-    string channel,
-    string? role,
-    bool autoCreate,
-    JsonObject? body = null)
+static async Task<AppUserProfile> GetOrCreateAccountProfile(string connectionString, HttpRequest request)
 {
-    channel = NormalizeIdentityChannel(channel, "pc");
-    role = NormalizeAppRole(role);
-    if (channel == "pc" && role == "child")
-        throw new InvalidOperationException("身份与设备通道不匹配");
     var unifiedUserId = GetUnifiedUserId(request);
-    var username = GetUnifiedUsername(request);
+    var username = FirstClaim(request, "preferred_username", ClaimTypes.Name, "name") ?? unifiedUserId;
     await using var conn = await OpenConnection(connectionString);
 
+    // The existing pc profile owns the same data on mobile, web and watch.
+    const string channel = "pc";
+    await using (var existingCmd = new NpgsqlCommand("""
+        SELECT * FROM app_user_profiles
+        WHERE unified_user_id = @unified_user_id AND channel = @channel
+        """, conn))
     {
-        await using var existingCmd = new NpgsqlCommand("""
-            SELECT *
-            FROM app_user_profiles
-            WHERE unified_user_id = @unified_user_id AND channel = @channel
-            LIMIT 1
-            """, conn);
         existingCmd.Parameters.AddWithValue("unified_user_id", unifiedUserId);
         existingCmd.Parameters.AddWithValue("channel", channel);
         await using var existingReader = await existingCmd.ExecuteReaderAsync();
-        if (await existingReader.ReadAsync())
-        {
-            var existing = ReadAppUserProfile(existingReader, needsRole: false);
-            await existingReader.CloseAsync();
-            if (channel == "watch" && body is not null)
-                return role == "child"
-                    ? await EnsureChildAppUserProfile(conn, unifiedUserId, username, channel, body)
-                    : await EnsureParentAppUserProfile(conn, unifiedUserId, username, channel);
-            if (string.IsNullOrWhiteSpace(role) || existing.Role == role) return existing;
-            throw new InvalidOperationException("账号设备身份与当前通道不匹配，请联系支持人员");
-        }
-        await existingReader.CloseAsync();
-
-        if (!autoCreate)
-        {
-            return new AppUserProfile(unifiedUserId, username, channel, "", "", null, null, true);
-        }
-        role = channel == "watch" ? "child" : "parent";
+        if (await existingReader.ReadAsync()) return ReadAppUserProfile(existingReader);
     }
 
-    var profile = string.Equals(role, "child", StringComparison.Ordinal)
-        ? await EnsureChildAppUserProfile(conn, unifiedUserId, username, channel, body)
-        : await EnsureParentAppUserProfile(conn, unifiedUserId, username, channel);
-    return profile;
-}
-
-static async Task<AppUserProfile> EnsureParentAppUserProfile(NpgsqlConnection conn, string unifiedUserId, string username, string channel)
-{
     var appUserId = MakeParentAppUserId(username);
     await using var cmd = new NpgsqlCommand("""
         INSERT INTO app_user_profiles (unified_user_id, username, channel, role, app_user_id)
         VALUES (@unified_user_id, @username, @channel, 'parent', @app_user_id)
         ON CONFLICT (unified_user_id, channel) DO UPDATE SET
-            username = @username,
-            role = 'parent',
-            app_user_id = @app_user_id,
-            child_profile_key = NULL,
-            child_id = NULL,
-            updated_at = CURRENT_TIMESTAMP
+            unified_user_id = EXCLUDED.unified_user_id
         RETURNING *
         """, conn);
     cmd.Parameters.AddWithValue("unified_user_id", unifiedUserId);
@@ -7908,108 +7843,7 @@ static async Task<AppUserProfile> EnsureParentAppUserProfile(NpgsqlConnection co
     cmd.Parameters.AddWithValue("app_user_id", appUserId);
     await using var reader = await cmd.ExecuteReaderAsync();
     await reader.ReadAsync();
-    return ReadAppUserProfile(reader, needsRole: false);
-}
-
-static async Task<AppUserProfile> EnsureChildAppUserProfile(NpgsqlConnection conn, string unifiedUserId, string username, string channel, JsonObject? body)
-{
-    var requestedChildId = body?.Int("child_id") ?? body?.Int("childId");
-    string? childProfileKey = null;
-    string childName = body?.String("child_name") ?? body?.String("childName") ?? "";
-    int? existingChildId = null;
-
-    if (requestedChildId is not null)
-    {
-        await using var childCmd = new NpgsqlCommand("SELECT id, name, profile_key FROM children WHERE id = @id", conn);
-        childCmd.Parameters.AddWithValue("id", requestedChildId.Value);
-        await using var childReader = await childCmd.ExecuteReaderAsync();
-        if (await childReader.ReadAsync())
-        {
-            existingChildId = childReader.Int("id");
-            childName = childReader.String("name");
-            childProfileKey = childReader.String("profile_key");
-        }
-    }
-
-    if (string.IsNullOrWhiteSpace(childProfileKey))
-    {
-        await using var profileCmd = new NpgsqlCommand("""
-            SELECT child_profile_key, child_id
-            FROM app_user_profiles
-            WHERE unified_user_id = @unified_user_id AND role = 'child' AND child_profile_key IS NOT NULL
-            ORDER BY id
-            LIMIT 1
-            """, conn);
-        profileCmd.Parameters.AddWithValue("unified_user_id", unifiedUserId);
-        await using var profileReader = await profileCmd.ExecuteReaderAsync();
-        if (await profileReader.ReadAsync())
-        {
-            childProfileKey = profileReader.String("child_profile_key");
-            existingChildId = NullableInt(profileReader, "child_id");
-        }
-    }
-
-    if (string.IsNullOrWhiteSpace(childProfileKey))
-    {
-        var nextNumber = await NextBabyNumber(conn, username);
-        childProfileKey = $"{unifiedUserId}:baby{nextNumber}";
-        if (string.IsNullOrWhiteSpace(childName))
-        {
-            childName = $"宝宝{nextNumber}";
-        }
-    }
-
-    var babyNumber = ExtractBabyNumber(childProfileKey) ?? await NextBabyNumber(conn, username);
-    var appUserId = MakeChildAppUserId(username, babyNumber);
-    var parentAppUserId = MakeParentAppUserId(username);
-    var familyGroupId = await EnsureFamilyGroup(conn, $"{username}的圈子", parentAppUserId);
-    var childId = existingChildId ?? await EnsureChildInFamilyGroup(conn, familyGroupId, childProfileKey, childName, "");
-
-    await UpsertChildBinding(conn, parentAppUserId, childProfileKey, childId);
-
-    await using var cmd = new NpgsqlCommand("""
-        INSERT INTO app_user_profiles (unified_user_id, username, channel, role, app_user_id, child_profile_key, child_id)
-        VALUES (@unified_user_id, @username, @channel, 'child', @app_user_id, @child_profile_key, @child_id)
-        ON CONFLICT (unified_user_id, channel) DO UPDATE SET
-            username = @username,
-            role = 'child',
-            app_user_id = @app_user_id,
-            child_profile_key = @child_profile_key,
-            child_id = @child_id,
-            updated_at = CURRENT_TIMESTAMP
-        RETURNING *
-        """, conn);
-    cmd.Parameters.AddWithValue("unified_user_id", unifiedUserId);
-    cmd.Parameters.AddWithValue("username", username);
-    cmd.Parameters.AddWithValue("channel", channel);
-    cmd.Parameters.AddWithValue("app_user_id", appUserId);
-    cmd.Parameters.AddWithValue("child_profile_key", childProfileKey);
-    cmd.Parameters.AddWithValue("child_id", childId);
-    await using var reader = await cmd.ExecuteReaderAsync();
-    await reader.ReadAsync();
-    return ReadAppUserProfile(reader, needsRole: false);
-}
-
-static async Task<int> NextBabyNumber(NpgsqlConnection conn, string username)
-{
-    await using var cmd = new NpgsqlCommand("SELECT COUNT(*) FROM app_user_profiles WHERE app_user_id LIKE @prefix", conn);
-    cmd.Parameters.AddWithValue("prefix", $"{username}baby%");
-    return Convert.ToInt32(await cmd.ExecuteScalarAsync(), CultureInfo.InvariantCulture) + 1;
-}
-
-static async Task UpsertChildBinding(NpgsqlConnection conn, string parentAppUserId, string childProfileKey, int childId)
-{
-    await using var cmd = new NpgsqlCommand("""
-        INSERT INTO child_user_bindings (parent_app_user_id, child_profile_key, child_id)
-        VALUES (@parent_app_user_id, @child_profile_key, @child_id)
-        ON CONFLICT (parent_app_user_id, child_profile_key) DO UPDATE SET
-            child_id = @child_id,
-            updated_at = CURRENT_TIMESTAMP
-        """, conn);
-    cmd.Parameters.AddWithValue("parent_app_user_id", parentAppUserId);
-    cmd.Parameters.AddWithValue("child_profile_key", childProfileKey);
-    cmd.Parameters.AddWithValue("child_id", childId);
-    await cmd.ExecuteNonQueryAsync();
+    return ReadAppUserProfile(reader);
 }
 
 static async Task<int> EnsureChildInFamilyGroup(NpgsqlConnection conn, int familyGroupId, string profileKey, string name, string note, NpgsqlTransaction? tx = null)
@@ -8271,21 +8105,8 @@ static string? FirstClaim(HttpRequest request, params string[] types)
     return null;
 }
 
-static bool IsWatchRequest(HttpRequest request) =>
-    request.Path.StartsWithSegments("/watch", StringComparison.OrdinalIgnoreCase)
-    || request.Path.StartsWithSegments("/api/watch", StringComparison.OrdinalIgnoreCase);
-
-static string NormalizeIdentityChannel(string? value, string fallback)
-{
-    var channel = (value ?? fallback).Trim().ToLowerInvariant();
-    return channel == "watch" ? "watch" : "pc";
-}
-
-static string NormalizeAppRole(string? value)
-{
-    var role = (value ?? "").Trim().ToLowerInvariant();
-    return role is "parent" or "child" ? role : "";
-}
+static string NormalizeIdentityChannel(string? value) =>
+    string.Equals(value?.Trim(), "watch", StringComparison.OrdinalIgnoreCase) ? "watch" : "pc";
 
 static string NormalizeBusinessUserName(string value)
 {
@@ -8295,43 +8116,15 @@ static string NormalizeBusinessUserName(string value)
 
 static string MakeParentAppUserId(string username) => $"{NormalizeBusinessUserName(username)}parent";
 
-static string MakeChildAppUserId(string username, int number) => $"{NormalizeBusinessUserName(username)}baby{Math.Max(1, number)}";
-
-static int? ExtractBabyNumber(string profileKey)
-{
-    var marker = "baby";
-    var index = profileKey.LastIndexOf(marker, StringComparison.OrdinalIgnoreCase);
-    if (index < 0) return null;
-    return int.TryParse(profileKey[(index + marker.Length)..], NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsed)
-        ? parsed
-        : null;
-}
-
-static Dictionary<string, object?> ReadAppUserProfilePayload(IDataRecord reader, bool needsRole) => new()
-{
-    ["needsRole"] = needsRole,
-    ["unifiedUserId"] = reader.String("unified_user_id"),
-    ["username"] = reader.String("username"),
-    ["channel"] = reader.String("channel"),
-    ["role"] = reader.String("role"),
-    ["appUserId"] = reader.String("app_user_id"),
-    ["childProfileKey"] = reader.HasColumn("child_profile_key") ? NullableString(reader, "child_profile_key") : null,
-    ["childId"] = reader.HasColumn("child_id") ? NullableInt(reader, "child_id") : null
-};
-
-static AppUserProfile ReadAppUserProfile(IDataRecord reader, bool needsRole = false)
-{
-    var payload = ReadAppUserProfilePayload(reader, needsRole);
-    return new AppUserProfile(
-        Convert.ToString(payload["unifiedUserId"], CultureInfo.InvariantCulture) ?? "",
-        Convert.ToString(payload["username"], CultureInfo.InvariantCulture) ?? "",
-        Convert.ToString(payload["channel"], CultureInfo.InvariantCulture) ?? "",
-        Convert.ToString(payload["role"], CultureInfo.InvariantCulture) ?? "",
-        Convert.ToString(payload["appUserId"], CultureInfo.InvariantCulture) ?? "",
-        Convert.ToString(payload["childProfileKey"], CultureInfo.InvariantCulture),
-        payload["childId"] is int childId ? childId : null,
-        needsRole);
-}
+static AppUserProfile ReadAppUserProfile(IDataRecord reader) => new(
+    reader.String("unified_user_id"),
+    reader.String("username"),
+    reader.String("channel"),
+    "parent",
+    reader.String("app_user_id"),
+    null,
+    null,
+    false);
 
 static Dictionary<string, object?> ReadFamilyGroup(IDataRecord reader) => new()
 {
@@ -10577,17 +10370,6 @@ static int? NullableInt(IDataRecord reader, string name)
 
     var value = reader[name];
     return value is DBNull ? null : Convert.ToInt32(value, CultureInfo.InvariantCulture);
-}
-
-static string? NullableString(IDataRecord reader, string name)
-{
-    if (!reader.HasColumn(name))
-    {
-        return null;
-    }
-
-    var value = reader[name];
-    return value is DBNull ? null : Convert.ToString(value, CultureInfo.InvariantCulture);
 }
 
 static string? NullableDateTimeString(IDataRecord reader, string name)

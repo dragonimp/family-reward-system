@@ -245,9 +245,9 @@ struct FamilyRoot: View {
                     VStack(spacing: 24) {
                         Image(systemName: "person.2.circle.fill").font(.system(size: 64)).foregroundStyle(.teal)
                         Text(String(localized: "欢迎使用 Linko Moment", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))).font(.title2.bold())
-                        if store.loading { ProgressView(String(localized: "正在读取家长资料…", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) }
+                        if store.loading { ProgressView(String(localized: "正在读取账号资料…", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) }
                         else {
-                            Text(String(localized: "家长资料暂时无法读取。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)))
+                            Text(String(localized: "账号资料暂时无法读取。", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current)))
                             Button(String(localized: "重新加载", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) { Task { await store.load() } }.buttonStyle(.borderedProminent)
                         }
                         Button(String(localized: "退出登录", bundle: AgentIdentityLanguage.appBundle(), locale: Locale(identifier: AgentIdentityLanguage.current))) { store.logout() }

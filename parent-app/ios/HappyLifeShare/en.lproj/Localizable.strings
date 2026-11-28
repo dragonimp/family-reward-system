@@ -286,7 +286,7 @@
 "解绑后手表将退出当前孩子，需重新扫码才能使用。" = "The watch will sign out of the child’s account and must be paired again.";
 "暂停回放" = "Pause replay";
 "群组简介" = "Group description";
-"家长资料暂时无法读取。" = "The parent profile is temporarily unavailable.";
+"账号资料暂时无法读取。" = "The account profile is temporarily unavailable.";
 "修改会话名称" = "Rename chat";
 "原文件发送进度" = "Original file transfer progress";
 "登录已过期，请重新登录。" = "Your session has expired. Sign in again.";
@@ -296,10 +296,10 @@
 "邀请" = "Invite";
 "请在系统设置中允许此 App 使用位置后重试。" = "Allow location access for this app in Settings, then try again.";
 "第 %lld 项：%@" = "Item %lld: %@";
-"无法读取家长身份。" = "Could not identify the parent account.";
+"无法读取账号资料。" = "Could not load the account profile.";
 "用餐方式" = "Dining mode";
 "请先在族谱中选择对应的人物，再生成专属邀请链接。对方登录并确认后会绑定该人物。" = "Select the matching person in the family tree before creating a personal invitation link. The person is linked after they sign in and confirm.";
-"正在读取家长资料…" = "Loading parent profile…";
+"正在读取账号资料…" = "Loading account profile…";
 "AI 助手" = "AI assistant";
 "空间成员" = "Space members";
 "移出活动" = "Remove from activity";

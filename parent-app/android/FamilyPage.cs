@@ -202,7 +202,7 @@ public sealed class FamilyPage : ContentPage
         bottom.IsVisible = store.Authenticated;
         if (bottom.IsVisible) RenderNavigation();
         if (!store.Authenticated) { dining?.Suspend(); dining = null; diningUser = null; activities?.Reset(); activities = null; exercise?.Suspend(); exercise = null; exerciseUser = null; LoginContent(); return; }
-        if (!store.ParentReady && tab is not ("干饭" or "活动" or "我的" or FolkCulture or DailyHexagram)) { ParentProfileUnavailableContent(); return; }
+        if (!store.ProfileReady && tab is not ("干饭" or "活动" or "我的" or FolkCulture or DailyHexagram)) { ProfileUnavailableContent(); return; }
         if (childId is int id) { ChildContent(id); return; }
         switch (tab)
         {
@@ -287,9 +287,9 @@ public sealed class FamilyPage : ContentPage
         finally { loginCancellation?.Dispose(); loginCancellation = null; Render(); }
     }
 
-    private void ParentProfileUnavailableContent()
+    private void ProfileUnavailableContent()
     {
-        content.Add(Heading("家长资料暂时无法读取", 21));
+        content.Add(Heading("账号资料暂时无法读取", 21));
         content.Add(Button("重新读取", () => _ = Run(store.LoadAsync), true));
         content.Add(Button("退出登录", () => { store.Logout(); Render(); }));
     }

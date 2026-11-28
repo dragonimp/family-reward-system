@@ -34,7 +34,7 @@ test('mobile assistant reuses the complete AgentFree WebApp chat surface', async
   assert.match(api, /timeout: AGENTFREE_REQUEST_TIMEOUT_MS/);
   assert.match(api, /respondInteraction[\s\S]*agentFreeRequestConfig\(\)/);
   assert.match(api, /'X-App-User-Id': appProfile\.appUserId/);
-  assert.match(api, /'X-App-User-Role': appProfile\.role/);
+  assert.doesNotMatch(api, /X-App-User-Role/);
   assert.match(api, /headers:\s*\{\s*'Content-Type': 'application\/json',\s*\.\.\.authHeaders\(\)/s);
   assert.match(backend, /webAppBotId/);
   assert.match(backend, /request\.Query\.Int\("agentId"\)/);
