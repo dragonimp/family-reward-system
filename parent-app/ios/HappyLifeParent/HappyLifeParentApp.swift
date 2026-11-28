@@ -156,14 +156,15 @@ struct FamilyRoot: View {
         main
         .sheet(isPresented: $showingLogin) { login }
         .onChange(of: identity.isAuthenticated) { _, authenticated in
-            if authenticated { showingLogin = false }
+            if authenticated {
+                refreshLocalWorkoutState()
+                showingLogin = false
+            }
         }
         .onReceive(NotificationCenter.default.publisher(for: .exerciseRecordsChanged)) { _ in
-            localWorkoutRunning = ExerciseStore.shared(userID: FamilyStore.localAccount).active != nil
+            Task { @MainActor in refreshLocalWorkoutState() }
         }
-        .onAppear {
-            localWorkoutRunning = ExerciseStore.shared(userID: FamilyStore.localAccount).active != nil
-        }
+        .task { refreshLocalWorkoutState() }
         .onReceive(store.photoSource.$networkAvailable.removeDuplicates().filter { $0 }) { _ in
             guard identity.isAuthenticated else { return }
             Task {
@@ -320,21 +321,33 @@ struct FamilyRoot: View {
         enabledBusinessTabs.contains { tabTag(for: $0) == selectedTab } ? selectedTab : 4
     }
 
+    private func refreshLocalWorkoutState() {
+        guard identity.isAuthenticated else { return }
+        let active = ExerciseStore.shared(userID: FamilyStore.localAccount).active != nil
+        if localWorkoutRunning != active { localWorkoutRunning = active }
+    }
+
+    @ViewBuilder private func businessPage(_ key: String) -> some View {
+        switch key {
+        case "dining":
+            DiningModesView(userID: store.localContentAccount, family: store)
+                .id(store.localContentAccount)
+        case "growth":
+            if store.ready { FamilyHome(store: store) } else { growthUnavailable }
+        case "activities":
+            DearSocialView(isActive: activeTab == 2, store: store)
+        case "exercise":
+            ExerciseView(userID: exerciseOwner).id(exerciseOwner)
+        default:
+            EmptyView()
+        }
+    }
+
     private var businessPager: some View {
         TabView(selection: $selectedTab) {
-            ForEach(enabledBusinessTabs.filter { $0 != "nook" && $0 != "folkCulture" && $0 != "dailyHexagram" }, id: \.self) { key in
-                switch key {
-            case "dining":
-            DiningModesView(userID: store.localContentAccount, family: store)
-                .id(store.localContentAccount).tag(0)
-            case "growth":
-            Group { if store.ready { FamilyHome(store: store) } else { growthUnavailable } }
-                .tag(1)
-            case "activities":
-            DearSocialView(isActive: selectedTab == 2, store: store).tag(2)
-            case "exercise":
-            ExerciseView(userID: exerciseOwner).id(exerciseOwner).tag(3)
-                default: EmptyView()
+            ForEach(enabledBusinessTabs.filter { ["dining", "growth", "activities", "exercise"].contains($0) }, id: \.self) { key in
+                if let tag = tabTag(for: key) {
+                    businessPage(key).tag(tag)
                 }
             }
         }
@@ -357,8 +370,11 @@ struct FamilyRoot: View {
                     .id(identity.accountIdentifier)
             } else if activeTab == 7 {
                 DailyHexagramView()
-            } else {
+            } else if identity.isAuthenticated {
                 businessPager
+            } else if let current = enabledBusinessTabs.first(where: { tabTag(for: $0) == activeTab }) {
+                businessPage(current)
+                    .id(current)
             }
         }
         .safeAreaInset(edge: .bottom, spacing: 0) {
